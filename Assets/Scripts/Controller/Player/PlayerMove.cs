@@ -7,14 +7,25 @@ using UnityEngine;
 /// </summary>
 public class PlayerMove : MonoBehaviour
 {
-    public float speed = 5;
+    
     public Rigidbody2D rb;
     public Animator animator;
+
+    protected CharacterCore core;
 
     // 记住最后一次的方向
     private float lastInputX;
     private float lastInputY;
- 
+
+    private float moveSpeed; // 速度
+    
+    private void Awake()
+    {
+        core = GetComponent<CharacterCore>();
+
+        moveSpeed = core.stats.moveSpeed;
+    }
+
     void Update()
     {
         float inputX = Input.GetAxisRaw("Horizontal"); 
@@ -42,7 +53,7 @@ public class PlayerMove : MonoBehaviour
         animator.SetBool("IsMoving", isMoving);
 
         // 移动
-        rb.velocity = new Vector2(inputX, inputY) * speed;
+        rb.velocity = new Vector2(inputX, inputY) * moveSpeed;
 
        
     }

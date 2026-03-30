@@ -35,7 +35,7 @@ public class PlayerInteraction : MonoBehaviour
     // 进入交互范围就显示提示
     private void OnTriggerEnter2D(Collider2D col) 
     {
-        if (col.TryGetComponent(out IInteractable interactable)) // 获取碰撞对象中实现接口的组件 // 若有组件实现该接口，则进入
+        if (col.TryGetComponent(out IInteractable interactable)) // 获取碰撞对象中的接口组件 
         {
             currentInteractable = interactable;
 

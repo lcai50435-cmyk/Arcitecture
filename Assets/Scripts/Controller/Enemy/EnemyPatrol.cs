@@ -19,11 +19,15 @@ public class EnemyPatrol : MonoBehaviour
     private bool isMovingX = false;
     private bool isMovingY = false;
 
+    private EnemyObstacleAvoidance obstacleAvoidance;
+
     void Start()
     {
         originPos = transform.position;
         waitCounter = waitTime;
         SetNewRandomTarget();
+
+        obstacleAvoidance = GetComponent<EnemyObstacleAvoidance>();
     }
 
     void Update()
@@ -104,6 +108,8 @@ public class EnemyPatrol : MonoBehaviour
 
         // ·ñÔò¼ÌÐø×ß Y
         Vector2 dir = new Vector2(0, Mathf.Sign(dy));
-        enemyMove.SetMoveDirection(dir);
+
+        Vector2 finalDir = obstacleAvoidance.GetAvoidedDirection(dir);
+        enemyMove.SetMoveDirection(finalDir);
     }
 }
