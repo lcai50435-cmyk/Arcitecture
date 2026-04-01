@@ -557,6 +557,68 @@ SpriteRenderer:
   m_WasSpriteAssigned: 0
   m_MaskInteraction: 0
   m_SpriteSortPoint: 0
+--- !u!1 &349152587
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 349152589}
+  - component: {fileID: 349152588}
+  m_Layer: 0
+  m_Name: MapManager
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &349152588
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 349152587}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 80c91a370580b2942b1af8cf19c491b4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  terrainTilemap: {fileID: 0}
+  buildingTilemap: {fileID: 0}
+  grassTile: {fileID: 0}
+  dirtTile: {fileID: 0}
+  buildingTile: {fileID: 0}
+  width: 80
+  height: 80
+  scale: 15
+  octaves: 3
+  persistence: 0.5
+  lacunarity: 2
+  offset: {x: 0, y: 0}
+  dirtThreshold: 0.4
+  buildingOnDirt: 1
+  fixedPosition: {x: 0, y: 0}
+  randomPosition: 1
+  showDebugInfo: 1
+  clearBeforeGenerate: 1
+--- !u!4 &349152589
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 349152587}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 12.495429, y: 9.760756, z: -0.0062389257}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &396509744
 GameObject:
   m_ObjectHideFlags: 0
@@ -3994,3 +4056,4 @@ SceneRoots:
   - {fileID: 1857206558}
   - {fileID: 396509746}
   - {fileID: 1926786811}
+  - {fileID: 349152589}
