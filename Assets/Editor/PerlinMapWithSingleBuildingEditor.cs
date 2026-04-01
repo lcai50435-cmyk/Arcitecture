@@ -2,10 +2,13 @@ using System.Collections.Generic;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.Tilemaps;
 
 [CustomEditor(typeof(PerlinMapWithSingleBuilding))]
 public class PerlinMapWithSingleBuildingEditor : Editor
 {
+    private const string MapResourcesPath = "Assets/File/MapResources";
+    private const string BlockResourcesPath = "Assets/File/MapResources/Block";
     private const string GrassPath = "Assets/File/MapResources/Block/GrassBlock.png";
     private const string SoilPath = "Assets/File/MapResources/Block/SoilBlock.png";
     private const string WaterPath = "Assets/File/MapResources/Block/WaterBlock.png";
@@ -32,40 +35,93 @@ public class PerlinMapWithSingleBuildingEditor : Editor
 
         using (new EditorGUILayout.VerticalScope("box"))
         {
+            if (GUILayout.Button("一键修复迁移后的引用"))
+            {
+                RepairMigratedReferences(map);
+            }
+
+            if (GUILayout.Button("重导入 Block 资源"))
+            {
+                ReimportFolder(BlockResourcesPath);
+            }
+
+            if (GUILayout.Button("重导入全部 MapResources"))
+            {
+                ReimportFolder(MapResourcesPath);
+            }
+
             if (GUILayout.Button("填充基础地形示例资源"))
             {
+                RecordUndo(map, "Apply Base Terrain Example");
                 ApplyBaseTerrainExample(map);
             }
 
             if (GUILayout.Button("初始化推荐过渡骨架"))
             {
+                RecordUndo(map, "Initialize Recommended Transition Skeleton");
                 InitializeRecommendedSkeleton(map);
             }
 
             if (GUILayout.Button("初始化完整过渡骨架"))
             {
+                RecordUndo(map, "Initialize Full Transition Skeleton");
                 InitializeFullSkeleton(map);
             }
 
             if (GUILayout.Button("填充 Phase 1 稳定草土示例"))
             {
+                RecordUndo(map, "Apply Phase One Soil Grass Example");
                 ApplyPhaseOneSoilGrassExample(map);
             }
 
             if (GUILayout.Button("清空全部过渡表"))
             {
+                RecordUndo(map, "Clear Transition Lookups");
                 ClearTransitionLookups(map);
             }
         }
 
         EditorGUILayout.HelpBox(
-            "参考文档: Docs/PerlinMapTransitionAssetNotes.md, Docs/PerlinMapInspectorExample.md, Docs/PerlinMapSetupTODO.md",
+            "参考文档: Docs/PerlinMapTransitionAssetNotes.md, Docs/PerlinMapInspectorExample.md, Docs/PerlinMapSetupTODO.md, Docs/PerlinMapMigrationRecovery.md",
             MessageType.None);
+    }
+
+    private static void RepairMigratedReferences(PerlinMapWithSingleBuilding map)
+    {
+        Undo.RecordObject(map, "Repair Migrated Perlin References");
+
+        ReimportFolder(BlockResourcesPath);
+        EnsureCatalog(map);
+        TryAssignTerrainTilemap(map);
+        TryAssignBuildingTilemap(map);
+        ApplyBaseTerrainExample(map);
+
+        if (map.terrainTiles.soilGrassTransitions.entries == null || map.terrainTiles.soilGrassTransitions.entries.Count == 0)
+        {
+            InitializeRecommendedSkeleton(map);
+            ApplyPhaseOneSoilGrassExample(map);
+        }
+
+        map.useRandomSeed = false;
+        map.seed = 12345;
+
+        MarkDirty(map);
+
+        if (map.terrainTilemap == null)
+        {
+            Debug.LogWarning("⚠️ 未自动找到 terrainTilemap，请手动绑定到地形层 Tilemap。");
+        }
+
+        if (map.buildingTilemap == null)
+        {
+            Debug.LogWarning("⚠️ 当前场景未自动找到 buildingTilemap。若本轮只验证地形生成，可以暂时留空。");
+        }
+
+        Debug.Log("✅ 已完成迁移引用修复。请保存场景，然后进入 Play Mode 验证。");
     }
 
     private static void ApplyBaseTerrainExample(PerlinMapWithSingleBuilding map)
     {
-        Undo.RecordObject(map, "Apply Base Terrain Example");
         EnsureCatalog(map);
 
         AssignSpriteIfEmpty(map.terrainTiles.grass, GrassPath);
@@ -78,7 +134,6 @@ public class PerlinMapWithSingleBuildingEditor : Editor
 
     private static void InitializeRecommendedSkeleton(PerlinMapWithSingleBuilding map)
     {
-        Undo.RecordObject(map, "Initialize Recommended Transition Skeleton");
         EnsureCatalog(map);
 
         map.terrainTiles.soilGrassTransitions.entries = new List<MaskedTileVariants>
@@ -112,7 +167,6 @@ public class PerlinMapWithSingleBuildingEditor : Editor
 
     private static void InitializeFullSkeleton(PerlinMapWithSingleBuilding map)
     {
-        Undo.RecordObject(map, "Initialize Full Transition Skeleton");
         EnsureCatalog(map);
 
         map.terrainTiles.soilGrassTransitions.entries = CreateFullEntryList("草土");
@@ -125,7 +179,6 @@ public class PerlinMapWithSingleBuildingEditor : Editor
 
     private static void ApplyPhaseOneSoilGrassExample(PerlinMapWithSingleBuilding map)
     {
-        Undo.RecordObject(map, "Apply Phase One Soil Grass Example");
         EnsureCatalog(map);
 
         AssignSpriteIfEmpty(map.terrainTiles.grass, GrassPath);
@@ -149,7 +202,6 @@ public class PerlinMapWithSingleBuildingEditor : Editor
 
     private static void ClearTransitionLookups(PerlinMapWithSingleBuilding map)
     {
-        Undo.RecordObject(map, "Clear Transition Lookups");
         EnsureCatalog(map);
 
         map.terrainTiles.soilGrassTransitions.entries = new List<MaskedTileVariants>();
@@ -230,6 +282,89 @@ public class PerlinMapWithSingleBuildingEditor : Editor
         if (sprite != null)
         {
             reference.sprite = sprite;
+            return;
+        }
+
+        Debug.LogWarning($"⚠️ 示例资源加载失败: {path}");
+    }
+
+    private static void ReimportFolder(string folderPath)
+    {
+        if (!AssetDatabase.IsValidFolder(folderPath))
+        {
+            Debug.LogWarning($"⚠️ 无法重导入，目录不存在: {folderPath}");
+            return;
+        }
+
+        AssetDatabase.ImportAsset(folderPath, ImportAssetOptions.ImportRecursive | ImportAssetOptions.ForceUpdate);
+        AssetDatabase.Refresh();
+        Debug.Log($"🔄 已重导入目录: {folderPath}");
+    }
+
+    private static void TryAssignTerrainTilemap(PerlinMapWithSingleBuilding map)
+    {
+        if (map.terrainTilemap != null)
+        {
+            return;
+        }
+
+        Tilemap[] childTilemaps = map.GetComponentsInChildren<Tilemap>(true);
+        for (int i = 0; i < childTilemaps.Length; i++)
+        {
+            if (childTilemaps[i] == null)
+            {
+                continue;
+            }
+
+            if (childTilemaps[i].name.IndexOf("Building", System.StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                continue;
+            }
+
+            map.terrainTilemap = childTilemaps[i];
+            return;
+        }
+
+        Tilemap[] sceneTilemaps = Object.FindObjectsOfType<Tilemap>(true);
+        for (int i = 0; i < sceneTilemaps.Length; i++)
+        {
+            if (sceneTilemaps[i] == null)
+            {
+                continue;
+            }
+
+            if (sceneTilemaps[i].name.IndexOf("Building", System.StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                continue;
+            }
+
+            map.terrainTilemap = sceneTilemaps[i];
+            return;
+        }
+    }
+
+    private static void TryAssignBuildingTilemap(PerlinMapWithSingleBuilding map)
+    {
+        if (map.buildingTilemap != null)
+        {
+            return;
+        }
+
+        Tilemap[] sceneTilemaps = Object.FindObjectsOfType<Tilemap>(true);
+        for (int i = 0; i < sceneTilemaps.Length; i++)
+        {
+            if (sceneTilemaps[i] == null)
+            {
+                continue;
+            }
+
+            if (sceneTilemaps[i].name.IndexOf("Building", System.StringComparison.OrdinalIgnoreCase) < 0)
+            {
+                continue;
+            }
+
+            map.buildingTilemap = sceneTilemaps[i];
+            return;
         }
     }
 
@@ -303,6 +438,14 @@ public class PerlinMapWithSingleBuildingEditor : Editor
         if (map != null && map.gameObject.scene.IsValid())
         {
             EditorSceneManager.MarkSceneDirty(map.gameObject.scene);
+        }
+    }
+
+    private static void RecordUndo(PerlinMapWithSingleBuilding map, string actionName)
+    {
+        if (map != null)
+        {
+            Undo.RecordObject(map, actionName);
         }
     }
 }

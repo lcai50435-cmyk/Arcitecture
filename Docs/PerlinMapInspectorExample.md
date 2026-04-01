@@ -10,15 +10,21 @@
 
 推荐顺序：
 
-1. 点击 `填充基础地形示例资源`
-2. 点击 `初始化推荐过渡骨架`
-3. 点击 `填充 Phase 1 稳定草土示例`
+1. 如果这是迁移后的旧场景，先点击 `一键修复迁移后的引用`
+2. 如果基础资源仍为空，点击 `重导入 Block 资源`
+3. 再次点击 `一键修复迁移后的引用`
+4. 点击 `初始化推荐过渡骨架`
+5. 点击 `填充 Phase 1 稳定草土示例`
 
 这样会自动完成：
 
+- `terrainTilemap` 的自动回填
 - `terrainTiles.grass / soil / water` 的基础资源填充
 - `soilGrassTransitions` 的稳定骨架创建
 - `Trilateral / Quadrilateral` 的稳定草土过渡示例填充
+- `useRandomSeed = false` 与 `seed = 12345` 的稳定化设置
+
+如果 `重导入 Block 资源` 后仍然无法填入基础资源，再继续点击 `重导入全部 MapResources`，然后重复第 1 步。
 
 ## Phase 1 示例结果
 
@@ -84,11 +90,12 @@
 
 ## 还需要你手动填的字段
 
-- `terrainTilemap`
 - `buildingTilemap`
 - `buildingTileAsset`
 - 建筑相关阈值参数
 - 水边与混合过渡图
+
+如果当前场景还没有单独的建筑层，`buildingTilemap` 可以在本轮先留空。只要 `buildingTileAsset` 也为空，系统会跳过建筑生成，不会阻塞地形验证。
 
 ## 推荐的第一轮参数
 
@@ -124,5 +131,6 @@
 
 ## 配套文档
 
+- `Docs/PerlinMapMigrationRecovery.md`
 - `Docs/PerlinMapTransitionAssetNotes.md`
 - `Docs/PerlinMapSetupTODO.md`

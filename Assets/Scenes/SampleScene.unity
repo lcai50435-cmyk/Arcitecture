@@ -1591,24 +1591,55 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 80c91a370580b2942b1af8cf19c491b4, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  terrainTilemap: {fileID: 0}
+  terrainTilemap: {fileID: 38991050}
   buildingTilemap: {fileID: 0}
-  grassTile: {fileID: 0}
-  dirtTile: {fileID: 0}
-  buildingTile: {fileID: 0}
+  terrainTiles:
+    grass:
+      tile: {fileID: 0}
+      sprite: {fileID: 21300000, guid: 24680006afde8cf41989339a275c59d9, type: 3}
+    soil:
+      tile: {fileID: 0}
+      sprite: {fileID: 21300000, guid: e4bebb781f73c9b4780db66d25b93be3, type: 3}
+    water:
+      tile: {fileID: 0}
+      sprite: {fileID: 21300000, guid: 7091dc956a2e20c4284d6012f08aaa05, type: 3}
+    soilGrassTransitions:
+      entries: []
+    waterEdgeTransitions:
+      entries: []
+    mixedTransitions:
+      entries: []
+  buildingTileAsset:
+    tile: {fileID: 0}
+    sprite: {fileID: 0}
   width: 80
   height: 80
-  scale: 15
+  useRandomSeed: 0
+  seed: 12345
+  manualOffset: {x: 0, y: 0}
+  heightScale: 18
+  moistureScale: 12
   octaves: 3
   persistence: 0.5
   lacunarity: 2
-  offset: {x: 0, y: 0}
-  dirtThreshold: 0.4
-  buildingOnDirt: 1
+  waterThreshold: 0.32
+  soilThreshold: 0.52
+  edgeFalloffWidth: 6
+  smoothingPasses: 1
+  minWaterClusterSize: 12
+  minSoilClusterSize: 10
+  buildingOnSoil: 1
+  useFixedPosition: 0
   fixedPosition: {x: 0, y: 0}
-  randomPosition: 1
+  allowGeneratedBuildingPosition: 1
+  buildingMinClusterSize: 18
+  buildingPadding: 1
+  minDistanceFromBorder: 3
   showDebugInfo: 1
   clearBeforeGenerate: 1
+  legacyGrassTile: {fileID: 0}
+  legacySoilTile: {fileID: 0}
+  legacyBuildingTile: {fileID: 0}
 --- !u!4 &349152589
 Transform:
   m_ObjectHideFlags: 0
