@@ -8,26 +8,18 @@ using static UnityEditor.Progress;
 /// </summary>
 public class PlayerGetArchitectural : MonoBehaviour
 {
-    private Dictionary<ArchitecturalType, int> cachedExpDict = new Dictionary<ArchitecturalType, int>();   // 存储建筑结构构建度
+    private BackpackMananger _backpack;
+    private BackpackUI _backpackUI;
 
-    [Header("背包设置")]
-    private int maxBackpackSize = 6; // 背包容量
-    public List<ArchitecturalCrystal> backpackItems = new List<ArchitecturalCrystal>();  // 背包物品
-
-    public event System.Action OnBackpackChanged; // 背包事件通知
-
-    /// <summary>
-    /// 缓存经验
-    /// </summary>
-    /// <param name="type"></param>
-    /// <param name="value"></param>
-    public void CacheExp(ArchitecturalType type, int value)
+    private void Start()
     {
-        // 针对相关建筑物品类型增加对应构建度
-        if (cachedExpDict.ContainsKey(type))
-            cachedExpDict[type] += value;
-        else
-            cachedExpDict[type] = value;
+        if (BackpackMananger.Instance == null)
+        {
+            Debug.LogError("背包管理器不存在！请放到场景里");
+            return;
+        }
+        _backpack = BackpackMananger.Instance;
+        _backpackUI = FindObjectOfType<BackpackUI>();
     }
 
     /// <summary>
@@ -36,26 +28,11 @@ public class PlayerGetArchitectural : MonoBehaviour
     /// <param name="crystal"></param>
     public void PickCrystal(ArchitecturalCrystal crystal)
     {
-        if (backpackItems.Count >= maxBackpackSize)
+        // 调用背包的拾取方法，成功则刷新UI
+        if (_backpack.PickItem(crystal))
         {
-            Debug.Log("背包满啦！");
-            return;
+            _backpackUI.RefreshUI();
         }
-
-        // 创建数据类
-        ArchitecturalCrystal newCrystal = new ArchitecturalCrystal(
-            crystal.type,
-            crystal.expValue,
-            crystal.icon,
-            crystal.backIcon,           
-            crystal.textDescription
-        );
-
-        backpackItems.Add(newCrystal);  // 加入物品至列表
-        CacheExp(crystal.type, crystal.expValue);  // 暂时记录经验
-
-        // 通知UI刷新
-        OnBackpackChanged?.Invoke();
     }
 
     /// <summary>
@@ -63,19 +40,19 @@ public class PlayerGetArchitectural : MonoBehaviour
     /// </summary>
     public void SubmitAllCachedExp()
     {
-        if (cachedExpDict.Count == 0) return;
-
-        foreach (var pair in cachedExpDict)
+        if (_backpack.backpackItems.Count == 0)
         {
-            ExperienceManager.Instance.AddExperience(pair.Key, pair.Value);
+            Debug.Log("背包为空，无需上交！");
+            return;
         }
-
-        cachedExpDict.Clear(); // 提交完清空
-        backpackItems.Clear(); // 提交完以后清空背包数据 // 目前提交是一次性提交，所以才是一次性清空数据
-
-        OnBackpackChanged?.Invoke(); // 通知UI图片没有了
+        // 遍历背包物品，添加经验
+        foreach (var item in _backpack.backpackItems)
+        {
+            ExperienceManager.Instance.AddExperience(item.type, item.expValue);
+        }
+        // 清空背包并刷新UI
+        _backpack.ClearAllItems();
+        _backpackUI.RefreshUI();
     }
-   
-    /// <summary> 获得背包物品数据 </summary>
-    public List<ArchitecturalCrystal> GetBackpackItems() => backpackItems;
 }
+   

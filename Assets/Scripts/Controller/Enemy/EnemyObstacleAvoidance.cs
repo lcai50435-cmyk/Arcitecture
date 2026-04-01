@@ -68,7 +68,7 @@ public class EnemyObstacleAvoidance : MonoBehaviour
             transform.position,
             dir,
             checkDistance,
-            ~ignoreLayers        // 忽略指定层 → 其余都算障碍物
+            ~ignoreLayers        // 忽略指定层，其余都算障碍物
         );
 
         Debug.DrawRay(transform.position, dir * checkDistance, hit ? Color.red : Color.green);

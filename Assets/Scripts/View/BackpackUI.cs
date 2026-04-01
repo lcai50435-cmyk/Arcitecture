@@ -1,41 +1,48 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 
+/// <summary>
+/// 仅负责背包格子的图片显示/隐藏
+/// 数据全部从PlayerBackpack获取，无存储逻辑
+/// </summary>
 public class BackpackUI : MonoBehaviour
 {
-    [Header("背包格子")]
-    public GameObject[] backPackGrid;  // 设置背包格子位置
+    [Header("背包格子（拖入6个空GameObject）")]
+    public GameObject[] backPackGrid; // 你的6个格子物体
+    private BackpackMananger _backpack;
 
-    private PlayerGetArchitectural playerGetArc;  
-
-    void Awake()
+    private void Start()
     {
-        playerGetArc = FindObjectOfType<PlayerGetArchitectural>();
-
-        // UI订阅事件
-        playerGetArc.OnBackpackChanged += RefreshUI;
+        _backpack = BackpackMananger.Instance;
+        // 初始化UI（防止场景启动时格子有残留图片）
+        RefreshUI();
     }
 
-    /// <summary> 纯UI渲染 </summary>
-    void RefreshUI()
+    /// <summary>
+    /// 纯UI渲染：根据背包数据更新格子图片
+    /// </summary>
+    public void RefreshUI()
     {
-        var items = playerGetArc.GetBackpackItems();
-
         for (int i = 0; i < backPackGrid.Length; i++)
         {
-            // 直接从 背包格子 拿到 Sprite 组件
-            SpriteRenderer spriteRenderer = backPackGrid[i].GetComponent<SpriteRenderer>();
-
-            if (i < items.Count)
+            SpriteRenderer sr = backPackGrid[i].GetComponent<SpriteRenderer>();
+            if (sr == null)
             {
-                spriteRenderer.sprite = items[i].backIcon;  // 换图片
-                spriteRenderer.enabled = true;          // 显示
+                Debug.LogError($"第{i}个背包格子缺少SpriteRenderer组件！");
+                continue;
+            }
+
+            ArchitecturalCrystal item = _backpack.GetItem(i);
+            if (item != null)
+            {
+                // 有物品：显示背图标
+                sr.sprite = item.backIcon;
+                sr.enabled = true;
             }
             else
             {
-                spriteRenderer.sprite = null;           // 清空图片
-                spriteRenderer.enabled = false;         // 隐藏
+                // 无物品：清空图片并隐藏
+                sr.sprite = null;
+                sr.enabled = false;
             }
         }
     }

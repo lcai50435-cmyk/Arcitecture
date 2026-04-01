@@ -2,7 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public class CrystalInteractHandler1 : MonoBehaviour, IInteractable
+public class CatagloueInteractHandler : MonoBehaviour, IInteractable
 {
     public void OnInteract()
     {

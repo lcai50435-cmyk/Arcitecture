@@ -35,6 +35,9 @@ public abstract class CharacterAttack : MonoBehaviour
         if (isAttacking) return; // 攻击中禁止重复触发
         isAttacking = true;
 
+        // 强制重置移动状态，避免动画卡住
+        if (anim != null) anim.SetBool("IsMoving", false);
+
         // 禁用移动脚本
         if (moveScript != null) moveScript.enabled = false;
         // 触发攻击动画
@@ -49,12 +52,15 @@ public abstract class CharacterAttack : MonoBehaviour
     /// </summary>
     public virtual void OnAttackEnd()
     {
+        //Debug.Log("OnAttackEnd called from " + StackTraceUtility.ExtractStackTrace());
         isAttacking = false;
 
         // 启用移动脚本
         if (moveScript != null) moveScript.enabled = true;
         // 重置攻击动画
         if (anim != null) anim.SetBool("IsAttacking", false);
+
+        // Debug.Log("OnAttackEnd called");
 
         // 触发攻击结束事件 // 扩展个性化逻辑（如停止特效）
         OnAttackFinished?.Invoke();

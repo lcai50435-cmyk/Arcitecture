@@ -20,7 +20,17 @@ public class CrystalInteractHandler : MonoBehaviour, IInteractable
         var data = new ArchitecturalCrystal(type, expValue, icon, backIcon, textDescription);
         // 调用背包系统，将数据加入背包
         var player = FindObjectOfType<PlayerGetArchitectural>();
-        player.PickCrystal(data);
+
+        if (player != null)
+        {
+            player.PickCrystal(data);
+        }
+        else
+        {
+            Debug.LogError("未找到PlayerGetArchitectural组件，请挂载到玩家身上！");
+            return;
+        }
+        
         // 销毁物体
         Destroy(gameObject);
     }

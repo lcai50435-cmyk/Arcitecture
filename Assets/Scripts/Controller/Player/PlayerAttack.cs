@@ -2,13 +2,18 @@ using UnityEngine;
 
 public class PlayerAttack : CharacterAttack
 {
-    public KeyCode attackKey = KeyCode.J; // Íæ¼Òµã»÷J¼ü¹¥»÷
-     
+    private KeyCode attackKey = KeyCode.Mouse0; // Ä¬ÈÏÊó±ê×ó¼ü
+
+    private void Awake()
+    {
+
+    }
+
     private void Update()
     {
         // ¹¥»÷¶¯»­²¥·Å
-        if (Input.GetKeyDown(attackKey))
-        {
+        if (Input.GetKeyDown(attackKey) && !isAttacking)
+        {          
             TriggerAttack();
         }
     }
