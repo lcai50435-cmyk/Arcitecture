@@ -8,11 +8,11 @@ using UnityEngine;
 public class CrystalInteractHandler : MonoBehaviour, IInteractable
 {
     [Header("物品配置")]
-    public ArchitecturalType type;
-    public int expValue;
-    public Sprite icon;
-    public Sprite backIcon;
-    [TextArea] public string textDescription;
+    public ArchitecturalType type; // 建筑结构类型
+    public int expValue; // 建筑结构构建度
+    public Sprite icon; // 建筑结构场景图片
+    public Sprite backIcon; // 建筑结构背包中图片
+    [TextArea] public string textDescription; // 建筑结构介绍
 
     public void OnInteract()
     {

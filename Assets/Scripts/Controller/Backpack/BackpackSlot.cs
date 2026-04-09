@@ -8,21 +8,21 @@ public class BackpackSlot : MonoBehaviour
     [Header("长按几秒丢弃")]
     public float needHoldTime = 3f;
 
-    private BackpackMananger _backpack;
-    private SpriteRenderer _sr;
+    private BackpackMananger backpack;
+    private SpriteRenderer sr;
 
-    private bool _isHolding;
-    private float _holdTimer;
+    private bool isHolding;
+    private float holdTimer;
 
     void Start()
     {
-        _sr = GetComponent<SpriteRenderer>();
-        _backpack = BackpackMananger.Instance;
+        sr = GetComponent<SpriteRenderer>();
+        backpack = BackpackMananger.Instance;
     }
 
     void Update()
     {
-        // === 右键按下：只对当前格子生效，开始单格长按 ===
+        // 右键按下：只对当前格子生效，开始单格长按
         if (Input.GetMouseButtonDown(1) && IsMouseOverCollider())
         {
             StartSingleHold();
@@ -34,10 +34,10 @@ public class BackpackSlot : MonoBehaviour
             StopHold();
         }
 
-        if (!_isHolding) return;
+        if (!isHolding) return;
 
-        _holdTimer += Time.deltaTime;
-        if (_holdTimer >= needHoldTime)
+        holdTimer += Time.deltaTime;
+        if (holdTimer >= needHoldTime)
         {
             // 只丢当前这个格子物品
             DropSingleItem();
@@ -48,34 +48,34 @@ public class BackpackSlot : MonoBehaviour
     // 开始长按当前格子
     void StartSingleHold()
     {
-        if (_backpack == null || _backpack.GetItem(slotIndex) == null)
+        if (backpack == null || backpack.GetItem(slotIndex) == null)
         {
             Debug.Log("当前格子没有物品");
             return;
         }
-        if (_sr == null || _sr.sprite == null || !_sr.enabled)
+        if (sr == null || sr.sprite == null || !sr.enabled)
         {
             Debug.Log("格子无显示图片");
             return;
         }
 
         Debug.Log("右键长按当前单个格子");
-        _isHolding = true;
-        _holdTimer = 0;
+        isHolding = true;
+        holdTimer = 0;
     }
 
     void StopHold()
     {
-        _isHolding = false;
-        _holdTimer = 0;
+        isHolding = false;
+        holdTimer = 0;
     }
 
     // 只丢弃【当前slotIndex】这一个物品
     void DropSingleItem()
     {
-        if (_backpack == null) return;
+        if (backpack == null) return;
 
-        ArchitecturalCrystal item = _backpack.GetItem(slotIndex);
+        ArchitecturalCrystal item = backpack.GetItem(slotIndex);
         if (item == null) return;
 
         // 生成掉落物
@@ -101,7 +101,7 @@ public class BackpackSlot : MonoBehaviour
         script.textDescription = item.textDescription;
 
         // 只移除当前这一格
-        _backpack.RemoveItem(slotIndex);
+        backpack.RemoveItem(slotIndex);
         FindObjectOfType<BackpackUI>().RefreshUI();
 
         Debug.Log("当前单个物品丢弃成功");

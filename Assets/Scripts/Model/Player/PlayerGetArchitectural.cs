@@ -8,8 +8,8 @@ using static UnityEditor.Progress;
 /// </summary>
 public class PlayerGetArchitectural : MonoBehaviour
 {
-    private BackpackMananger _backpack;
-    private BackpackUI _backpackUI;
+    private BackpackMananger backpack;
+    private BackpackUI backpackUI;
 
     private void Start()
     {
@@ -18,8 +18,8 @@ public class PlayerGetArchitectural : MonoBehaviour
             Debug.LogError("背包管理器不存在！请放到场景里");
             return;
         }
-        _backpack = BackpackMananger.Instance;
-        _backpackUI = FindObjectOfType<BackpackUI>();
+        backpack = BackpackMananger.Instance;
+        backpackUI = FindObjectOfType<BackpackUI>();
     }
 
     /// <summary>
@@ -28,10 +28,21 @@ public class PlayerGetArchitectural : MonoBehaviour
     /// <param name="crystal"></param>
     public void PickCrystal(ArchitecturalCrystal crystal)
     {
-        // 调用背包的拾取方法，成功则刷新UI
-        if (_backpack.PickItem(crystal))
+
+        if (crystal == null) return;
+
+        bool first = backpack.IsFirstPick(crystal.type);
+
+        if (first)
         {
-            _backpackUI.RefreshUI();
+            // 第一次 则 触发介绍UI
+            backpack.TriggerFirstPickTip(crystal.textDescription);
+        }
+
+        // 调用背包的拾取方法，成功则刷新UI
+        if (backpack.PickItem(crystal))
+        {
+            backpackUI.RefreshUI();
         }
     }
 
@@ -40,19 +51,19 @@ public class PlayerGetArchitectural : MonoBehaviour
     /// </summary>
     public void SubmitAllCachedExp()
     {
-        if (_backpack.backpackItems.Count == 0)
+        if (backpack.backpackItems.Count == 0)
         {
             Debug.Log("背包为空，无需上交！");
             return;
         }
         // 遍历背包物品，添加经验
-        foreach (var item in _backpack.backpackItems)
+        foreach (var item in backpack.backpackItems)
         {
             ExperienceManager.Instance.AddExperience(item.type, item.expValue);
         }
         // 清空背包并刷新UI
-        _backpack.ClearAllItems();
-        _backpackUI.RefreshUI();
+        backpack.ClearAllItems();
+        backpackUI.RefreshUI();
     }
 }
    

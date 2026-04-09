@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Xml.Serialization;
 using UnityEngine;
+using UnityEngine.Windows;
 
 /// <summary>
 /// 敌人四方向移动核心脚本
@@ -14,9 +15,12 @@ public class EnemyMove : MonoBehaviour
     public Rigidbody2D rb;                // 敌人刚体组件
     public Animator animator;             // 敌人动画控制器
 
-    // 记录最后一次有效移动方向（用于动画过渡）
+    // 记录最后一次有效移动方向
     private float lastInputX;
     private float lastInputY;
+
+    [HideInInspector] public Vector2 moveDirection; // 当前移动方向
+    [HideInInspector] public Vector2 targetPos;     // 目标位置（Patrol的currentTarget）
 
     private void Awake()
     {
@@ -33,16 +37,20 @@ public class EnemyMove : MonoBehaviour
     /// <summary>
     /// 由巡逻逻辑调用 - 设置敌人移动方向
     /// </summary>
-    /// <param name="moveDir">归一化的移动方向（仅上下左右，无斜向）</param>
+    /// <param name="moveDir">敌人与玩家的距离向量</param>
     public void SetMoveDirection(Vector2 moveDir)
     {
+
+        Debug.Log($"[EnemyMove] 设置移动方向: {moveDir}");
+
         // 过滤斜向输入
         float inputX = moveDir.x;
         float inputY = moveDir.y;
-        if (Mathf.Abs(inputX) > 0.1f && Mathf.Abs(inputY) > 0.1f)
-        {
-            inputX = 0; // 斜向时优先清空X轴
-        }
+
+        if (Mathf.Abs(inputX) > Mathf.Abs(inputY))
+            inputY = 0;
+        else
+            inputX = 0;
 
         // 判断是否处于移动状态
         bool isMoving = Mathf.Abs(inputX) > 0.1f || Mathf.Abs(inputY) > 0.1f;
@@ -60,6 +68,15 @@ public class EnemyMove : MonoBehaviour
         animator.SetBool("IsMoving", isMoving);
 
         // 执行移动
-        rb.velocity = new Vector2(inputX, inputY) * moveSpeed;
+        // 移动（匀速，不减速、不滑步）
+        if (isMoving)
+        {
+            Vector2 dir = new Vector2(inputX, inputY).normalized;
+            rb.velocity = dir * moveSpeed;
+        }
+        else
+        {
+            rb.velocity = Vector2.zero;
+        }
     }
 }

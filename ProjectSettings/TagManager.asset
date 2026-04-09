@@ -6,6 +6,10 @@ TagManager:
   tags:
   - Enemy
   - Catalogue
+  - Obstacle
+  - Building
+  - Water
+  - Ground
   layers:
   - Default
   - TransparentFX
@@ -16,10 +20,10 @@ TagManager:
   - Player
   - BackpackUI
   - Catagloue
-  - 
-  - 
-  - 
-  - 
+  - Obstacle
+  - Water
+  - Building
+  - Ground
   - 
   - 
   - 

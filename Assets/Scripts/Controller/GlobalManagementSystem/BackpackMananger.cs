@@ -13,10 +13,11 @@ public class BackpackMananger : MonoBehaviour
     [HideInInspector] public List<ArchitecturalCrystal> backpackItems = new List<ArchitecturalCrystal>(); // 存储物品完整数据
 
     private int maxCapacity = 6; // 固定6个格子
-    private HashSet<ArchitecturalType> _alreadyPickedTypes = new HashSet<ArchitecturalType>(); // 记录是否第一次捡起该类型物品
 
-    public delegate void FirstPickTipEvent(ArchitecturalCrystal crystal); // 第一次捡起某类型物品触发事件
-    public event FirstPickTipEvent OnFirstTimePickItemType;
+    private HashSet<ArchitecturalType> alreadyPickedTypes = new HashSet<ArchitecturalType>(); // 记录是否第一次捡起该类型物品
+
+    public delegate void FirstPickTipEvent(string textDescription); // 第一次捡起某类型物品触发事件
+    public event FirstPickTipEvent OnFirstPick; // 第一次捡起事件
 
     /// <summary>
     /// 创建背包单例
@@ -35,6 +36,30 @@ public class BackpackMananger : MonoBehaviour
         }
     }
 
+    #region 判断是否第一次捡起物品
+    /// <summary>
+    /// 检查是否第一次拾取该类型物品
+    /// </summary>
+    public bool IsFirstPick(ArchitecturalType type)
+    {
+        // 玩家第一次捡起物品
+        if (!alreadyPickedTypes.Contains(type))
+        {
+            alreadyPickedTypes.Add(type);
+            return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// 触发第一次拾取的介绍事件
+    /// </summary>
+    public void TriggerFirstPickTip(string desc)
+    {
+        OnFirstPick?.Invoke(desc);
+    }
+    #endregion
+
     #region 对外API：物品操作（拾取/删除/获取）
     /// <summary>
     /// 拾取物品加入背包
@@ -49,12 +74,12 @@ public class BackpackMananger : MonoBehaviour
         }
 
         // 第一次捡起物品触发
-        if (!_alreadyPickedTypes.Contains(crystal.type))
+        if (!alreadyPickedTypes.Contains(crystal.type))
         {
-            _alreadyPickedTypes.Add(crystal.type);
+            alreadyPickedTypes.Add(crystal.type);
 
             // 发送第一次捡起物品的信息 // 尤其调用该物品的简介
-            OnFirstTimePickItemType?.Invoke(crystal);
+            OnFirstPick?.Invoke(crystal.textDescription);
         }
 
         // 深拷贝物品数据，避免原物体销毁导致数据丢失
