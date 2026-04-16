@@ -1,13 +1,107 @@
-using System.Collections;
-using System.Collections.Generic;
-using UnityEngine;
+ï»¿using UnityEngine;
 
-public class EnemyAttack : CharacterAttack
+/// <summary>
+/// Switches between chase and attack states and simulates attack output.
+/// </summary>
+[DisallowMultipleComponent]
+[RequireComponent(typeof(EnemyStatsManager))]
+public class EnemyAttack : MonoBehaviour
 {
+    [Header("References")]
+    public EnemyStatsManager statsManager;
+    public Transform player;
+
+    [Header("Attack Settings")]
+    [Min(0f)] public float attackRange = 1.5f;
+    [Min(0f)] public float attackInterval = 1.2f;
+
+    private float lastAttackTime;
+
+    private void Reset()
+    {
+        statsManager = GetComponent<EnemyStatsManager>();
+    }
+
+    private void Awake()
+    {
+        if (statsManager == null)
+        {
+            statsManager = GetComponent<EnemyStatsManager>();
+        }
+    }
+
+    private void OnValidate()
+    {
+        if (attackRange < 0f) attackRange = 0f;
+        if (attackInterval < 0f) attackInterval = 0f;
+    }
+
     private void Update()
     {
-        // ÈôÍæ¼Ò½øÈëµÐÈËÒ»¶¨¹¥»÷·¶Î§
-        // ÔòµÐÈË¹¥»÷Íæ¼Ò
-        // °´ÕÕµÐÈË¹¥»÷ÆµÂÊ£¬¶à¾Ã¹¥»÷Ò»´Î
+        if (statsManager == null)
+        {
+            return;
+        }
+
+        if (player == null)
+        {
+            statsManager.ResolvePlayerTargetIfMissing();
+            player = statsManager.PlayerTarget;
+        }
+
+        if (player == null)
+        {
+            return;
+        }
+
+        float sqrDistance = (player.position - transform.position).sqrMagnitude;
+        float sqrRange = attackRange * attackRange;
+
+        if (statsManager.CurrentState == EnemyState.Chase)
+        {
+            if (sqrDistance <= sqrRange)
+            {
+                statsManager.EnterAttackState();
+            }
+
+            return;
+        }
+
+        if (statsManager.CurrentState != EnemyState.Attack)
+        {
+            return;
+        }
+
+        if (sqrDistance > sqrRange)
+        {
+            statsManager.EnterChaseState();
+            return;
+        }
+
+        TryAttack();
     }
+
+    private void TryAttack()
+    {
+        if (attackInterval > 0f && Time.time - lastAttackTime < attackInterval)
+        {
+            return;
+        }
+
+        lastAttackTime = Time.time;
+        Debug.Log("æ•Œäººå¯¹çŽ©å®¶å‘èµ·è¿›æ”»");
+    }
+
+#if UNITY_EDITOR
+    private void OnDrawGizmosSelected()
+    {
+        if (attackRange <= 0f)
+        {
+            return;
+        }
+
+        UnityEditor.Handles.color = Color.red;
+        UnityEditor.Handles.DrawWireDisc(transform.position, Vector3.forward, attackRange);
+    }
+#endif
 }

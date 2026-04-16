@@ -1,65 +1,254 @@
-using System.Collections;
-using System.Collections.Generic;
-using System.Xml.Serialization;
 using UnityEngine;
 
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
+
 /// <summary>
-/// 敌人四方向移动核心脚本
-/// 负责：四方向限制、面朝移动方向、基础移动
+/// Handles only four-direction enemy movement, facing, and movement animation output.
 /// </summary>
+[DisallowMultipleComponent]
+[RequireComponent(typeof(Rigidbody2D))]
 public class EnemyMove : MonoBehaviour
 {
-    [Header("移动配置")]
-    public float moveSpeed = 2f;          // 敌人移动速度（可与玩家不同）
-    public Rigidbody2D rb;                // 敌人刚体组件
-    public Animator animator;             // 敌人动画控制器
+    private const string DefaultAnimatorControllerPath = "Assets/Animation/EnemyMove.controller";
 
-    // 记录最后一次有效移动方向（用于动画过渡）
+    [Header("Movement")]
+    public float moveSpeed = 2f;
+    public Rigidbody2D rb;
+    public float axisSwitchThreshold = 0.15f;
+    public float reverseDirectionLockTime = 0.12f;
+    public float turnLockTime = 0.05f;
+
+    [Header("Animation")]
+    public Animator animator;
+    public bool autoAssignMovementController = true;
+    public RuntimeAnimatorController movementAnimatorController;
+
+    [HideInInspector] public Vector2 moveDirection;
+
     private float lastInputX;
-    private float lastInputY;
+    private float lastInputY = -1f;
+    private float lastDirectionChangeTime = float.NegativeInfinity;
+
+    public Vector2 Position => rb != null ? rb.position : (Vector2)transform.position;
+
+    private void Reset()
+    {
+        ResolveComponents();
+        ResolveAnimationController();
+        ApplyAnimatorController();
+    }
 
     private void Awake()
     {
-        // 自动获取组件
-        if (rb == null) rb = GetComponent<Rigidbody2D>();
-        if (animator == null) animator = GetComponent<Animator>();
+        ResolveComponents();
+        ApplyAnimatorController();
     }
 
-    private void Update()
+    private void OnDisable()
     {
-        // Debug.Log(this.transform.position);
+        StopMovement();
     }
 
-    /// <summary>
-    /// 由巡逻逻辑调用 - 设置敌人移动方向
-    /// </summary>
-    /// <param name="moveDir">归一化的移动方向（仅上下左右，无斜向）</param>
-    public void SetMoveDirection(Vector2 moveDir)
+    private void OnValidate()
     {
-        // 过滤斜向输入
-        float inputX = moveDir.x;
-        float inputY = moveDir.y;
-        if (Mathf.Abs(inputX) > 0.1f && Mathf.Abs(inputY) > 0.1f)
+        if (moveSpeed < 0f) moveSpeed = 0f;
+        if (axisSwitchThreshold < 0f) axisSwitchThreshold = 0f;
+        if (reverseDirectionLockTime < 0f) reverseDirectionLockTime = 0f;
+        if (turnLockTime < 0f) turnLockTime = 0f;
+
+        ResolveComponents();
+        ResolveAnimationController();
+        ApplyAnimatorController();
+    }
+
+    public void StopMovement()
+    {
+        ApplyDirection(Vector2.zero);
+    }
+
+    public void SetMoveDirection(Vector2 rawDirection)
+    {
+        if (!enabled)
         {
-            inputX = 0; // 斜向时优先清空X轴
+            StopMovement();
+            return;
         }
 
-        // 判断是否处于移动状态
-        bool isMoving = Mathf.Abs(inputX) > 0.1f || Mathf.Abs(inputY) > 0.1f;
+        Vector2 filteredDirection = FilterToFourWay(rawDirection);
+        Vector2 stableDirection = GetStableDirection(filteredDirection);
+        ApplyDirection(stableDirection);
+    }
 
-        // 更新最后一次有效方向（用于停止时保持朝向动画）
+    public Vector2 GetDirectionTo(Vector2 destination)
+    {
+        return GetFourWayDirection(destination - Position);
+    }
+
+    public Vector2 GetFourWayDirection(Vector2 delta)
+    {
+        if (delta.sqrMagnitude <= 0.0001f)
+        {
+            return Vector2.zero;
+        }
+
+        float absX = Mathf.Abs(delta.x);
+        float absY = Mathf.Abs(delta.y);
+
+        if (moveDirection != Vector2.zero)
+        {
+            bool movingHorizontally = Mathf.Abs(moveDirection.x) > 0.1f;
+
+            if (movingHorizontally && absX + axisSwitchThreshold >= absY)
+            {
+                return delta.x >= 0f ? Vector2.right : Vector2.left;
+            }
+
+            if (!movingHorizontally && absY + axisSwitchThreshold >= absX)
+            {
+                return delta.y >= 0f ? Vector2.up : Vector2.down;
+            }
+        }
+
+        if (absX >= absY)
+        {
+            return delta.x >= 0f ? Vector2.right : Vector2.left;
+        }
+
+        return delta.y >= 0f ? Vector2.up : Vector2.down;
+    }
+
+    public bool HasArrived(Vector2 destination, float threshold)
+    {
+        return Vector2.Distance(Position, destination) <= threshold;
+    }
+
+    private void ResolveComponents()
+    {
+        if (rb == null || rb.gameObject != gameObject)
+        {
+            rb = GetComponent<Rigidbody2D>();
+        }
+
+        if (animator == null || animator.gameObject != gameObject)
+        {
+            animator = GetComponent<Animator>();
+        }
+    }
+
+    private void ResolveAnimationController()
+    {
+#if UNITY_EDITOR
+        if (!autoAssignMovementController || movementAnimatorController != null)
+        {
+            return;
+        }
+
+        movementAnimatorController = AssetDatabase.LoadAssetAtPath<RuntimeAnimatorController>(
+            DefaultAnimatorControllerPath);
+#endif
+    }
+
+    private void ApplyAnimatorController()
+    {
+        if (animator == null)
+        {
+            return;
+        }
+
+        if (movementAnimatorController == null && animator.runtimeAnimatorController != null)
+        {
+            movementAnimatorController = animator.runtimeAnimatorController;
+        }
+
+        if (movementAnimatorController == null)
+        {
+            return;
+        }
+
+        if (animator.runtimeAnimatorController != movementAnimatorController)
+        {
+            animator.runtimeAnimatorController = movementAnimatorController;
+        }
+    }
+
+    private Vector2 GetStableDirection(Vector2 desiredDirection)
+    {
+        if (desiredDirection == Vector2.zero || moveDirection == Vector2.zero || desiredDirection == moveDirection)
+        {
+            return desiredDirection;
+        }
+
+        float elapsed = Time.time - lastDirectionChangeTime;
+
+        if (desiredDirection == -moveDirection && elapsed < reverseDirectionLockTime)
+        {
+            return moveDirection;
+        }
+
+        if (desiredDirection != -moveDirection && elapsed < turnLockTime)
+        {
+            return moveDirection;
+        }
+
+        return desiredDirection;
+    }
+
+    private void ApplyDirection(Vector2 direction)
+    {
+        bool changedDirection = direction != Vector2.zero && direction != moveDirection;
+        moveDirection = direction;
+
+        if (changedDirection)
+        {
+            lastDirectionChangeTime = Time.time;
+        }
+
+        bool isMoving = direction != Vector2.zero;
         if (isMoving)
         {
-            lastInputX = inputX;
-            lastInputY = inputY;
+            lastInputX = direction.x;
+            lastInputY = direction.y;
         }
 
-        // 同步动画参数
-        animator.SetFloat("InputX", lastInputX);
-        animator.SetFloat("InputY", lastInputY);
-        animator.SetBool("IsMoving", isMoving);
+        if (animator != null)
+        {
+            animator.SetFloat("InputX", lastInputX);
+            animator.SetFloat("InputY", lastInputY);
+            animator.SetBool("IsMoving", isMoving);
+        }
 
-        // 执行移动
-        rb.velocity = new Vector2(inputX, inputY) * moveSpeed;
+        if (rb == null)
+        {
+            return;
+        }
+
+        rb.velocity = Vector2.zero;
+
+        if (!isMoving)
+        {
+            return;
+        }
+
+        rb.MovePosition(rb.position + direction * moveSpeed * Time.fixedDeltaTime);
+    }
+
+    private Vector2 FilterToFourWay(Vector2 rawDirection)
+    {
+        if (rawDirection.sqrMagnitude <= 0.0001f)
+        {
+            return Vector2.zero;
+        }
+
+        float inputX = rawDirection.x;
+        float inputY = rawDirection.y;
+
+        if (Mathf.Abs(inputX) >= Mathf.Abs(inputY))
+        {
+            return new Vector2(Mathf.Sign(inputX), 0f);
+        }
+
+        return new Vector2(0f, Mathf.Sign(inputY));
     }
 }

@@ -1,7 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
-using UnityEngine;
-using static UnityEditor.Progress;
+using UnityEngine;  
 
 /// <summary>
 /// 专门存储背包物品数据的核心类
@@ -48,12 +47,14 @@ public class BackpackMananger : MonoBehaviour
             return false;
         }
 
+        bool isFirstPick = !_alreadyPickedTypes.Contains(crystal.type);
+
         // 第一次捡起物品触发
-        if (!_alreadyPickedTypes.Contains(crystal.type))
+        if (isFirstPick)
         {
             _alreadyPickedTypes.Add(crystal.type);
-
-            // 发送第一次捡起物品的信息 // 尤其调用该物品的简介
+            Debug.Log("玩家第一次捡起该物品");
+            // 发送第一次捡起物品的信息 // 尤其调用该物品的简介   
             OnFirstTimePickItemType?.Invoke(crystal);
         }
 
@@ -104,3 +105,4 @@ public class BackpackMananger : MonoBehaviour
     }
     #endregion
 }
+

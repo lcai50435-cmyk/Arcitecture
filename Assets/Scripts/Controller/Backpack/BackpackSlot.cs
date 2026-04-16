@@ -1,121 +1,160 @@
 using UnityEngine;
+using UnityEngine.EventSystems;
+using UnityEngine.UI;
 
-public class BackpackSlot : MonoBehaviour
+public class BackpackSlot : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
 {
     [Header("格子编号 0~5")]
     public int slotIndex;
 
     [Header("长按几秒丢弃")]
-    public float needHoldTime = 3f;
+    public float needHoldTime = 1f;
 
-    private BackpackMananger _backpack;
-    private SpriteRenderer _sr;
+    private BackpackMananger backpack;
+    private Image slotImage; // 改为Image类型
+    private BackpackUI backpackUI;
 
-    private bool _isHolding;
-    private float _holdTimer;
+    private bool isHolding;
+    private float holdTimer;
 
     void Start()
     {
-        _sr = GetComponent<SpriteRenderer>();
-        _backpack = BackpackMananger.Instance;
+        slotImage = GetComponent<Image>(); // 获取Image组件
+        backpack = BackpackMananger.Instance;
+        backpackUI = FindObjectOfType<BackpackUI>();
+
+        if (slotImage == null)
+        {
+            Debug.LogError($"BackpackSlot {slotIndex}: 缺少Image组件！");
+        }
+
+        // 如果没有Image组件，自动添加
+        slotImage = GetComponent<Image>();
+        if (slotImage == null)
+        {
+            slotImage = gameObject.AddComponent<Image>();
+            Debug.Log($"自动为格子{slotIndex}添加了Image组件");
+        }
+
+        backpack = BackpackMananger.Instance;
+        backpackUI = FindObjectOfType<BackpackUI>();
     }
 
+    
     void Update()
     {
-        // === 右键按下：只对当前格子生效，开始单格长按 ===
-        if (Input.GetMouseButtonDown(1) && IsMouseOverCollider())
-        {
-            StartSingleHold();
-        }
+        if (!isHolding) return;
 
-        // 右键抬起取消
-        if (Input.GetMouseButtonUp(1))
-        {
-            StopHold();
-        }
+        holdTimer += Time.deltaTime;
 
-        if (!_isHolding) return;
-
-        _holdTimer += Time.deltaTime;
-        if (_holdTimer >= needHoldTime)
+        // 可选：长按进度反馈
+        if (holdTimer >= needHoldTime)
         {
-            // 只丢当前这个格子物品
             DropSingleItem();
             StopHold();
         }
     }
 
-    // 开始长按当前格子
+    // UI事件：按下
+    public void OnPointerDown(PointerEventData eventData)
+    {
+        // 只响应右键
+        if (eventData.button == PointerEventData.InputButton.Right)
+        {
+            StartSingleHold();
+        }
+    }
+
+    // UI事件：抬起
+    public void OnPointerUp(PointerEventData eventData)
+    {
+        if (eventData.button == PointerEventData.InputButton.Right)
+        {
+            StopHold();
+        }
+    }
+
     void StartSingleHold()
     {
-        if (_backpack == null || _backpack.GetItem(slotIndex) == null)
+        if (backpack == null)
         {
-            Debug.Log("当前格子没有物品");
+            Debug.LogError("BackpackManager未找到！");
             return;
         }
-        if (_sr == null || _sr.sprite == null || !_sr.enabled)
+
+        ArchitecturalCrystal item = backpack.GetItem(slotIndex);
+        if (item == null)
+        {
+            Debug.Log($"格子{slotIndex}没有物品，无法丢弃");
+            return;
+        }
+
+        if (slotImage == null || slotImage.sprite == null || !slotImage.enabled)
         {
             Debug.Log("格子无显示图片");
             return;
         }
 
-        Debug.Log("右键长按当前单个格子");
-        _isHolding = true;
-        _holdTimer = 0;
+        Debug.Log($"开始长按格子{slotIndex}，物品：{item.type}");
+        isHolding = true;
+        holdTimer = 0;
     }
 
     void StopHold()
     {
-        _isHolding = false;
-        _holdTimer = 0;
+        isHolding = false;
+        holdTimer = 0;
     }
 
-    // 只丢弃【当前slotIndex】这一个物品
     void DropSingleItem()
     {
-        if (_backpack == null) return;
+        if (backpack == null) return;
 
-        ArchitecturalCrystal item = _backpack.GetItem(slotIndex);
+        ArchitecturalCrystal item = backpack.GetItem(slotIndex);
         if (item == null) return;
 
-        // 生成掉落物
-        GameObject dropObj = new GameObject(item.type.ToString());
-        dropObj.transform.position = GameObject.FindWithTag("Player").transform.position;
+        // 获取玩家位置
+        GameObject player = GameObject.FindGameObjectWithTag("Player");
+        if (player == null)
+        {
+            Debug.LogError("未找到Player对象！");
+            return;
+        }
 
-        // 对物品添加图画组件
+        // 生成掉落物（场景中的2D物体，使用SpriteRenderer）
+        GameObject dropObj = new GameObject($"Drop_{item.type}");
+        dropObj.transform.position = player.transform.position;
+
+        // 添加SpriteRenderer（掉落物在场景中，不是UI）
         SpriteRenderer ren = dropObj.AddComponent<SpriteRenderer>();
-        ren.sprite = item.icon;
+        ren.sprite = item.icon; // 使用物品图标
+        ren.sortingOrder = 5;
 
-        // 对物品添加碰撞器组件
-        CircleCollider2D c = dropObj.AddComponent<CircleCollider2D>();
-        c.isTrigger = true;
+        // 添加碰撞器
+        CircleCollider2D collider = dropObj.AddComponent<CircleCollider2D>();
+        collider.isTrigger = true;
 
-        // 对物品添加可交互组件
+        // 添加交互组件
         CrystalInteractHandler script = dropObj.AddComponent<CrystalInteractHandler>();
-
-        // 对物品赋值
         script.type = item.type;
         script.expValue = item.expValue;
         script.icon = item.icon;
         script.backIcon = item.backIcon;
         script.textDescription = item.textDescription;
 
-        // 只移除当前这一格
-        _backpack.RemoveItem(slotIndex);
-        FindObjectOfType<BackpackUI>().RefreshUI();
+        // 从背包移除物品
+        backpack.RemoveItem(slotIndex);
 
-        Debug.Log("当前单个物品丢弃成功");
-    }
-
-    // 判断鼠标是否悬停在当前格子碰撞体上
-    private bool IsMouseOverCollider()
-    {
-        Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
-        if (Physics2D.Raycast(ray.origin, ray.direction, Mathf.Infinity))
+        // 刷新UI
+        if (backpackUI != null)
         {
-            RaycastHit2D hit = Physics2D.GetRayIntersection(ray);
-            return hit.collider != null && hit.collider.gameObject == gameObject;
+            backpackUI.RefreshUI();
         }
-        return false;
+        else
+        {
+            Debug.LogError("BackpackUI未找到！");
+        }
+
+        Debug.Log($"格子{slotIndex}的物品{item.type}已丢弃");
     }
 }

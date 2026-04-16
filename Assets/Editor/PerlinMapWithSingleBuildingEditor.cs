@@ -56,6 +56,12 @@ public class PerlinMapWithSingleBuildingEditor : Editor
                 ApplyBaseTerrainExample(map);
             }
 
+            if (GUILayout.Button("Initialize Example Placeable Categories"))
+            {
+                RecordUndo(map, "Initialize Example Placeable Categories");
+                InitializeExamplePlaceableCategories(map);
+            }
+
             if (GUILayout.Button("初始化推荐过渡骨架"))
             {
                 RecordUndo(map, "Initialize Recommended Transition Skeleton");
@@ -93,8 +99,14 @@ public class PerlinMapWithSingleBuildingEditor : Editor
         ReimportFolder(BlockResourcesPath);
         EnsureCatalog(map);
         TryAssignTerrainTilemap(map);
-        TryAssignBuildingTilemap(map);
+        TryAssignWaterCollisionTilemap(map);
+        TryAssignGeneratedPlaceableRoot(map);
         ApplyBaseTerrainExample(map);
+
+        if (map.placeableCategories == null || map.placeableCategories.Count == 0)
+        {
+            InitializeExamplePlaceableCategories(map);
+        }
 
         if (map.terrainTiles.soilGrassTransitions.entries == null || map.terrainTiles.soilGrassTransitions.entries.Count == 0)
         {
@@ -112,9 +124,14 @@ public class PerlinMapWithSingleBuildingEditor : Editor
             Debug.LogWarning("⚠️ 未自动找到 terrainTilemap，请手动绑定到地形层 Tilemap。");
         }
 
-        if (map.buildingTilemap == null)
+        if (map.generatedPlaceablesParent == null)
         {
-            Debug.LogWarning("⚠️ 当前场景未自动找到 buildingTilemap。若本轮只验证地形生成，可以暂时留空。");
+            Debug.LogWarning("No generated placeable root was found automatically. The system can still create one at runtime.");
+        }
+
+        if (map.generateWaterCollision && map.waterCollisionTilemap == null)
+        {
+            Debug.LogWarning("No water collision tilemap was found automatically. The system can still create one at runtime.");
         }
 
         Debug.Log("✅ 已完成迁移引用修复。请保存场景，然后进入 Play Mode 验证。");
@@ -130,6 +147,64 @@ public class PerlinMapWithSingleBuildingEditor : Editor
 
         MarkDirty(map);
         Debug.Log("✅ 已填充基础地形示例资源。");
+    }
+
+    private static void InitializeExamplePlaceableCategories(PerlinMapWithSingleBuilding map)
+    {
+        map.placeableCategories = new List<PlaceableCategoryConfig>
+        {
+            new PlaceableCategoryConfig
+            {
+                categoryName = "Buildings",
+                categoryKind = PlaceableCategoryKind.Building,
+                placementPriority = 100,
+                spawnCount = 2,
+                allowedTerrainTypes = new List<TerrainType> { TerrainType.Soil },
+                minimumClusterSize = 18,
+                footprintRadius = 1,
+                clearanceRadius = 1,
+                minDistanceFromBorder = 3,
+                borderScoreWeight = 6f,
+                clusterCenterPenaltyWeight = 2f,
+                terrainSupportWeight = 1f,
+                randomJitterWeight = 0.25f
+            },
+            new PlaceableCategoryConfig
+            {
+                categoryName = "Trees",
+                categoryKind = PlaceableCategoryKind.Decoration,
+                placementPriority = 50,
+                spawnCount = 6,
+                allowedTerrainTypes = new List<TerrainType> { TerrainType.Grass, TerrainType.Soil },
+                minimumClusterSize = 6,
+                footprintRadius = 0,
+                clearanceRadius = 1,
+                minDistanceFromBorder = 1,
+                borderScoreWeight = 2f,
+                clusterCenterPenaltyWeight = 0.5f,
+                terrainSupportWeight = 1f,
+                randomJitterWeight = 1f
+            },
+            new PlaceableCategoryConfig
+            {
+                categoryName = "Rocks",
+                categoryKind = PlaceableCategoryKind.Decoration,
+                placementPriority = 40,
+                spawnCount = 4,
+                allowedTerrainTypes = new List<TerrainType> { TerrainType.Soil, TerrainType.Grass },
+                minimumClusterSize = 4,
+                footprintRadius = 0,
+                clearanceRadius = 1,
+                minDistanceFromBorder = 1,
+                borderScoreWeight = 1.5f,
+                clusterCenterPenaltyWeight = 0.75f,
+                terrainSupportWeight = 1f,
+                randomJitterWeight = 1f
+            }
+        };
+
+        MarkDirty(map);
+        Debug.Log("Initialized example placeable categories. Assign your building, tree, and rock prefabs in the inspector.");
     }
 
     private static void InitializeRecommendedSkeleton(PerlinMapWithSingleBuilding map)
@@ -316,7 +391,7 @@ public class PerlinMapWithSingleBuildingEditor : Editor
                 continue;
             }
 
-            if (childTilemaps[i].name.IndexOf("Building", System.StringComparison.OrdinalIgnoreCase) >= 0)
+            if (!IsValidTerrainTilemapCandidate(childTilemaps[i]))
             {
                 continue;
             }
@@ -333,7 +408,7 @@ public class PerlinMapWithSingleBuildingEditor : Editor
                 continue;
             }
 
-            if (sceneTilemaps[i].name.IndexOf("Building", System.StringComparison.OrdinalIgnoreCase) >= 0)
+            if (!IsValidTerrainTilemapCandidate(sceneTilemaps[i]))
             {
                 continue;
             }
@@ -343,9 +418,9 @@ public class PerlinMapWithSingleBuildingEditor : Editor
         }
     }
 
-    private static void TryAssignBuildingTilemap(PerlinMapWithSingleBuilding map)
+    private static void TryAssignWaterCollisionTilemap(PerlinMapWithSingleBuilding map)
     {
-        if (map.buildingTilemap != null)
+        if (map.waterCollisionTilemap != null)
         {
             return;
         }
@@ -358,12 +433,37 @@ public class PerlinMapWithSingleBuildingEditor : Editor
                 continue;
             }
 
-            if (sceneTilemaps[i].name.IndexOf("Building", System.StringComparison.OrdinalIgnoreCase) < 0)
+            if (!IsWaterCollisionTilemapCandidate(sceneTilemaps[i]))
             {
                 continue;
             }
 
-            map.buildingTilemap = sceneTilemaps[i];
+            map.waterCollisionTilemap = sceneTilemaps[i];
+            return;
+        }
+    }
+
+    private static void TryAssignGeneratedPlaceableRoot(PerlinMapWithSingleBuilding map)
+    {
+        if (map.generatedPlaceablesParent != null)
+        {
+            return;
+        }
+
+        Transform[] sceneTransforms = Object.FindObjectsOfType<Transform>(true);
+        for (int i = 0; i < sceneTransforms.Length; i++)
+        {
+            if (sceneTransforms[i] == null)
+            {
+                continue;
+            }
+
+            if (sceneTransforms[i].name.IndexOf("Generated Placeables", System.StringComparison.OrdinalIgnoreCase) < 0)
+            {
+                continue;
+            }
+
+            map.generatedPlaceablesParent = sceneTransforms[i];
             return;
         }
     }
@@ -404,6 +504,38 @@ public class PerlinMapWithSingleBuildingEditor : Editor
         {
             map.terrainTiles.mixedTransitions = new TransitionTileLookup();
         }
+    }
+
+    private static bool IsValidTerrainTilemapCandidate(Tilemap tilemap)
+    {
+        if (tilemap == null)
+        {
+            return false;
+        }
+
+        string normalized = NormalizeTilemapName(tilemap.name);
+        return !normalized.Contains("building") &&
+               !normalized.Contains("collision") &&
+               !normalized.Contains("collider");
+    }
+
+    private static bool IsWaterCollisionTilemapCandidate(Tilemap tilemap)
+    {
+        if (tilemap == null)
+        {
+            return false;
+        }
+
+        string normalized = NormalizeTilemapName(tilemap.name);
+        return normalized.Contains("water") &&
+               (normalized.Contains("collision") || normalized.Contains("collider") || normalized.Contains("block"));
+    }
+
+    private static string NormalizeTilemapName(string tilemapName)
+    {
+        return string.IsNullOrWhiteSpace(tilemapName)
+            ? string.Empty
+            : tilemapName.Replace(" ", string.Empty).ToLowerInvariant();
     }
 
     private static string DescribeMask(int mask)
