@@ -1,80 +1,70 @@
-using TMPro;
+ï»¿using TMPro;
 using UnityEngine;
 
-/// <summary>
-/// ½»»¥ÅĞ¶Ï
-/// ¶Ô¿É½»»¥ÎïÌå½øĞĞÅĞ¶ÏÊÇ·ñ½øÈë·¶Î§
-/// »ñÈ¡½»»¥¶ÔÏó
-/// </summary>
 public class PlayerInteraction : MonoBehaviour
 {
-    [Header("½»»¥ÌáÊ¾UI")]
-    public GameObject interactTipUI; // "°´F½»»¥"ÌáÊ¾Ãæ°å/ÎÄ±¾
-    [Header("UI ÎÄ±¾")]
-    public TextMeshProUGUI interactTipText;  // ½»»¥ĞÅÏ¢ÌáÊ¾
+    [Header("äº¤äº’æç¤ºUI")]
+    public GameObject fImage;       // Få›¾ç‰‡
+    public GameObject boxPanel;     // æ–‡å­—æ¡†èƒŒæ™¯
+    public TextMeshProUGUI boxText; // æç¤ºæ–‡å­—ï¼ˆå¦‚"æ‹¾å–"ã€"æ‰“å¼€"ï¼‰
 
-    private IInteractable currentInteractable; // »ñÈ¡¿É½»»¥ÎïÌå
+    private IInteractable currentInteractable;
 
-    void Awake()
+    void Start()
     {
-        // ³õÊ¼Òş²ØÌáÊ¾
-        if (interactTipUI != null)
-            interactTipUI.SetActive(false);
+        if (fImage != null) fImage.SetActive(false);
+        if (boxPanel != null) boxPanel.SetActive(false);
     }
-
 
     void Update()
     {
-        // ¼ì²â½»»¥°´¼ü
         if (Input.GetKeyDown(KeyCode.F))
         {
             TryInteract();
         }
     }
 
-    // ½øÈë½»»¥·¶Î§¾ÍÏÔÊ¾ÌáÊ¾
-    private void OnTriggerEnter2D(Collider2D col) 
+    private void OnTriggerStay2D(Collider2D col)
     {
-        if (col.TryGetComponent(out IInteractable interactable)) // »ñÈ¡Åö×²¶ÔÏóÖĞµÄ½Ó¿Ú×é¼ş 
+        if (col.TryGetComponent(out IInteractable interactable))
         {
             currentInteractable = interactable;
 
-            // »ñµÃÎïÆ·ĞÅÏ¢
-            string tip = interactable.InteractionTip;
-            interactTipText.text = tip;
+            // æ˜¾ç¤ºFå›¾ç‰‡
+            if (fImage != null)
+                fImage.SetActive(true);
 
-            // ÏÔÊ¾"°´F½»»¥"ÌáÊ¾
-            if (interactTipUI != null)
-                interactTipUI.SetActive(true);
-        }
-    }
+            // ä»ç‰©å“è·å–æç¤ºæ–‡å­—ï¼ˆæ¯ä¸ªç‰©å“å¯ä»¥ä¸åŒï¼‰
+            if (boxPanel != null)
+                boxPanel.SetActive(true);
 
-    // Àë¿ª½»»¥·¶Î§¾ÍÒş²ØÌáÊ¾
-    private void OnTriggerExit2D(Collider2D col)
-    {
-        if (col.TryGetComponent(out IInteractable interactable))
-        {          
-            if (interactable == currentInteractable) // ÈôÀë¿ªµ±Ç°Ä¿±ê
-            {                              
-                currentInteractable = null;   // Çå¿Õ+Òş²Ø
-                
-                interactTipText.text = null;  // Çå¿ÕÎÄ±¾
-                if (interactTipUI != null)
-                    interactTipUI.SetActive(false);
+            if (boxText != null)
+            {
+                // ä½¿ç”¨ç‰©å“è‡ªå·±çš„ InteractionTip
+                boxText.text = currentInteractable.InteractionTip;
             }
         }
     }
 
-    // ´¥·¢½»»¥
+    private void OnTriggerExit2D(Collider2D col)
+    {
+        if (col.TryGetComponent(out IInteractable interactable))
+        {
+            if (interactable == currentInteractable)
+            {
+                currentInteractable = null;
+
+                if (fImage != null) fImage.SetActive(false);
+                if (boxPanel != null) boxPanel.SetActive(false);
+            }
+        }
+    }
+
     private void TryInteract()
     {
         if (currentInteractable != null)
         {
             currentInteractable.OnInteract();
-
-            // ½»»¥ºó×Ô¶¯Òş²ØÌáÊ¾
-            if (interactTipUI != null)
-                interactTipUI.SetActive(false);
         }
     }
 }

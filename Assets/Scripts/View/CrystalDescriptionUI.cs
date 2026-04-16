@@ -13,7 +13,7 @@ public class CrystalDescriptionUI : MonoBehaviour
     private void Start()
     {
         // 监听第一次拾取事件
-        BackpackMananger.Instance.OnFirstPick += ShowDescription;
+        BackpackMananger.Instance.OnFirstTimePickItemType += ShowDescription;
         gameObject.SetActive(false);
     }
 
@@ -21,11 +21,15 @@ public class CrystalDescriptionUI : MonoBehaviour
     /// 展示UI文本
     /// </summary>
     /// <param name="desc">介绍文本</param>
-    void ShowDescription(string desc)
+    void ShowDescription(ArchitecturalCrystal crystal)
     {
+        string desc = string.IsNullOrEmpty(crystal.textDescription)
+            ? $"获得 {crystal.type}！\n构建度 +{crystal.expValue}"
+            : crystal.textDescription;
+
         descriptionText.text = desc;
         gameObject.SetActive(true);
-        Invoke(nameof(Hide), 4f); // 4秒后隐藏UI
+        Invoke(nameof(Hide), 4f);
     }
 
     void Hide()

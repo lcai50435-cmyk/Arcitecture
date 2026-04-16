@@ -10,22 +10,25 @@ TagManager:
   - Building
   - Water
   - Ground
+  - Crack
+  - Interactive
+  - StoneEnemy
   layers:
   - Default
   - TransparentFX
   - Ignore Raycast
-  - 
+  - Building
   - Water
   - UI
   - Player
   - BackpackUI
   - Catagloue
   - Obstacle
-  - Water
-  - Building
   - Ground
-  - 
-  - 
+  - Crack
+  - Enemy
+  - Interactive
+  - Weapon
   - 
   - 
   - 

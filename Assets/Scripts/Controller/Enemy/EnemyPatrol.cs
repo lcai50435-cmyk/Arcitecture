@@ -1,142 +1,291 @@
-﻿using UnityEngine;
+using UnityEngine;
 
+/// <summary>
+/// Owns patrol spawn data, patrol targets, and wait timing.
+/// </summary>
+[DisallowMultipleComponent]
+[RequireComponent(typeof(EnemyMove))]
 public class EnemyPatrol : MonoBehaviour
 {
-    [Header("巡逻设置")]
-    public float patrolRange = 3f;
-    public float waitTime = 2f;
+    [Header("Components")]
+    public EnemyMove move;
+    public EnemyAvoidObstacle avoidObstacle;
 
-    [Header("禁止生成点配置")]
-    public LayerMask obstacleLayers;
-    public string[] forbiddenTags = new string[] { "Water", "Building" };
-    public float forbiddenCheckRadius = 1f;
+    [Header("Patrol")]
+    public Vector2 patrolRange = new Vector2(4f, 4f);
+    public float patrolPointSnap = 1f;
+    public float patrolWaitTime = 1f;
+    public float minPatrolPointDistance = 1f;
+    public int maxPatrolPointTries = 12;
+    public float stuckRepickTime = 1.25f;
+    public float minTargetLifetimeBeforeRepick = 2f;
+    public float progressEpsilon = 0.05f;
 
-    [HideInInspector] public Vector2 originPos;
-    [HideInInspector] public Vector2 currentTarget;
+    [Header("Debug")]
+    public bool showPatrolDebugGizmos = true;
+    public bool drawPatrolDebugAlways = false;
+    public float patrolTargetDebugRadius = 0.12f;
 
-    private float waitCounter;
-    private bool isWaiting;
+    public Vector2 SpawnPoint => spawnPoint;
+    public Vector2 CurrentTarget => currentTarget;
+    public bool IsWaiting => waitTimer > 0f;
+    public bool HasTarget => hasTarget;
 
-    private EnemyMove move;
-    private EnemyAvoidObstacle avoidObstacle;
+    private Vector2 spawnPoint;
+    private Vector2 currentTarget;
+    private float waitTimer;
+    private bool hasTarget;
+    private float lastDistanceToTarget = float.MaxValue;
+    private float stuckTimer;
+    private float targetSetTime;
 
-    void Awake()
+    private void Awake()
     {
-        originPos = transform.position;
-    }
-
-    void Start()
-    {
-        move = GetComponent<EnemyMove>();
-        avoidObstacle = GetComponent<EnemyAvoidObstacle>();
-        waitCounter = waitTime;
-        SetNewRandomTarget();
-    }
-
-    public void ExecutePatrol()
-    {
-        if (isWaiting)
+        if (move == null)
         {
-            if (waitCounter > 0)
+            move = GetComponent<EnemyMove>();
+        }
+
+        if (avoidObstacle == null)
+        {
+            avoidObstacle = GetComponent<EnemyAvoidObstacle>();
+        }
+
+        spawnPoint = GetAlignedPosition(move != null ? move.Position : (Vector2)transform.position);
+        currentTarget = spawnPoint;
+    }
+
+    private void OnValidate()
+    {
+        if (patrolRange.x < 0f) patrolRange.x = 0f;
+        if (patrolRange.y < 0f) patrolRange.y = 0f;
+        if (patrolPointSnap < 0.01f) patrolPointSnap = 0.01f;
+        if (patrolWaitTime < 0f) patrolWaitTime = 0f;
+        if (minPatrolPointDistance < 0f) minPatrolPointDistance = 0f;
+        if (maxPatrolPointTries < 1) maxPatrolPointTries = 1;
+        if (stuckRepickTime < 0f) stuckRepickTime = 0f;
+        if (minTargetLifetimeBeforeRepick < 0f) minTargetLifetimeBeforeRepick = 0f;
+        if (progressEpsilon < 0.001f) progressEpsilon = 0.001f;
+        if (patrolTargetDebugRadius < 0.01f) patrolTargetDebugRadius = 0.01f;
+    }
+
+    public void ResetPatrol(Vector2 currentPosition)
+    {
+        waitTimer = 0f;
+        hasTarget = false;
+        currentTarget = spawnPoint;
+        ResetProgressTracking();
+        PickNextTarget(GetReachableAlignedPosition(currentPosition, spawnPoint));
+    }
+
+    public void TickPatrol(Vector2 currentPosition, float arriveThreshold)
+    {
+        currentPosition = GetAlignedPosition(currentPosition);
+
+        if (waitTimer > 0f)
+        {
+            waitTimer -= Time.deltaTime;
+            if (waitTimer <= 0f)
             {
-                waitCounter -= Time.deltaTime;
-                move.SetMoveDirection(Vector2.zero);
+                waitTimer = 0f;
+                PickNextTarget(currentPosition);
             }
-            else
-            {
-                isWaiting = false;
-                SetNewRandomTarget();
-            }
+
             return;
         }
 
-        // 前进方向
-        Vector2 forwardDir = (currentTarget - (Vector2)transform.position).normalized;
-
-        // 避障检测：如果启动绕障，则执行绕障移动，不再继续正常移动
-        if (avoidObstacle != null && avoidObstacle.CheckAndStartAvoid(forwardDir, currentTarget))
+        if (!hasTarget)
         {
-            avoidObstacle.DoAvoidMove();
-            return;   // 关键：绕障期间不执行下面的正常移动
+            PickNextTarget(currentPosition);
         }
 
-        // 正常巡逻移动
-        move.SetMoveDirection(forwardDir);
-
-        // 到达目标点后进入等待
-        if (Vector2.Distance(transform.position, currentTarget) < 0.2f)
+        if (!hasTarget)
         {
-            isWaiting = true;
-            waitCounter = waitTime;
-        }
-    }
-
-    public void ReturnToOrigin()
-    {
-        Vector2 dir = (originPos - (Vector2)transform.position).normalized;
-
-        // 回原点时也检测避障（传入原点作为目标）
-        if (avoidObstacle != null && avoidObstacle.CheckAndStartAvoid(dir, originPos))
-        {
-            avoidObstacle.DoAvoidMove();
             return;
         }
 
-        move.SetMoveDirection(dir);
-
-        if (Vector2.Distance(transform.position, originPos) < 0.2f)
+        float distanceToTarget = Vector2.Distance(currentPosition, currentTarget);
+        if (distanceToTarget <= arriveThreshold)
         {
-            SetNewRandomTarget();
-            isWaiting = false;
+            BeginWait(currentPosition);
+            return;
+        }
+
+        TrackProgress(distanceToTarget);
+        if (stuckRepickTime > 0f && stuckTimer >= stuckRepickTime && HasHeldCurrentTargetLongEnough())
+        {
+            PickNextTarget(currentPosition);
         }
     }
 
-    public void SetNewRandomTarget()
+    public void ForcePickNextTarget(Vector2 currentPosition)
     {
-        Vector2 point;
-        int maxTry = 10;
-        bool isPointValid = false;
-
-        do
-        {
-            point = originPos + Random.insideUnitCircle * patrolRange;
-            maxTry--;
-
-            bool isObstacle = Physics2D.OverlapCircle(point, 0.15f, obstacleLayers);
-            bool hasForbiddenTag = CheckForbiddenTagsInRange(point, forbiddenCheckRadius);
-
-            isPointValid = !isObstacle && !hasForbiddenTag;
-
-        } while (maxTry > 0 && !isPointValid);
-
-        currentTarget = isPointValid ? point : originPos;
+        waitTimer = 0f;
+        PickNextTarget(GetAlignedPosition(currentPosition));
     }
 
-    private bool CheckForbiddenTagsInRange(Vector2 position, float radius)
+    private void PickNextTarget(Vector2 currentPosition)
     {
-        Collider2D[] colliders = Physics2D.OverlapCircleAll(position, radius);
-        foreach (Collider2D col in colliders)
+        // ���ĵĴ���
+        Vector2 currentAlignedPos = GetAlignedPosition(currentPosition);
+
+        float minimumDistance = Mathf.Max(patrolPointSnap * 0.5f, minPatrolPointDistance);
+        Vector2 bestCandidate = currentAlignedPos; // ԭ�������currentPosition
+        float bestDistance = 0f;
+        bool hasFallbackCandidate = false;
+
+        for (int i = 0; i < maxPatrolPointTries; i++)
         {
-            foreach (string tag in forbiddenTags)
+            Vector2 randomOffset = new Vector2(
+                Random.Range(-patrolRange.x, patrolRange.x),
+                Random.Range(-patrolRange.y, patrolRange.y));
+
+            Vector2 candidate = GetReachableAlignedPosition(
+                SnapPatrolPoint(currentAlignedPos + randomOffset), currentAlignedPos); // ԭ�������spawnPoint
+
+            if (avoidObstacle != null && avoidObstacle.IsPointBlocked(candidate))
             {
-                if (col.CompareTag(tag))
-                    return true;
+                continue;
             }
+
+            float distance = Vector2.Distance(currentPosition, candidate);
+            if (distance > bestDistance)
+            {
+                bestDistance = distance;
+                bestCandidate = candidate;
+                hasFallbackCandidate = true;
+            }
+
+            if (distance < minimumDistance)
+            {
+                continue;
+            }
+
+            SetCurrentTarget(candidate);
+            return;
         }
-        return false;
+
+        if (hasFallbackCandidate && bestDistance > 0.02f)
+        {
+            SetCurrentTarget(bestCandidate);
+            return;
+        }
+
+        hasTarget = false;
+        currentTarget = currentPosition;
+        BeginWait(currentPosition);
+    }
+
+    private Vector2 SnapPatrolPoint(Vector2 point)
+    {
+        Vector2 offset = point - spawnPoint;
+        offset.x = Mathf.Round(offset.x / patrolPointSnap) * patrolPointSnap;
+        offset.y = Mathf.Round(offset.y / patrolPointSnap) * patrolPointSnap;
+        return spawnPoint + offset;
+    }
+
+    private Vector2 GetAlignedPosition(Vector2 worldPosition)
+    {
+        if (avoidObstacle != null)
+        {
+            return avoidObstacle.SnapWorldPositionToGrid(worldPosition);
+        }
+
+        return worldPosition;
+    }
+
+    private Vector2 GetReachableAlignedPosition(Vector2 worldPosition, Vector2 referencePosition)
+    {
+        if (avoidObstacle != null)
+        {
+            return avoidObstacle.SnapWorldPositionToReachableGrid(worldPosition, referencePosition);
+        }
+
+        return worldPosition;
+    }
+
+    private void SetCurrentTarget(Vector2 target)
+    {
+        currentTarget = target;
+        hasTarget = true;
+        waitTimer = 0f;
+        targetSetTime = Time.time;
+        ResetProgressTracking();
+    }
+
+    private void BeginWait(Vector2 currentPosition)
+    {
+        currentTarget = currentPosition;
+        hasTarget = false;
+        ResetProgressTracking();
+        waitTimer = patrolWaitTime;
+    }
+
+    private void TrackProgress(float distanceToTarget)
+    {
+        if (distanceToTarget + progressEpsilon < lastDistanceToTarget)
+        {
+            lastDistanceToTarget = distanceToTarget;
+            stuckTimer = 0f;
+            return;
+        }
+
+        stuckTimer += Time.deltaTime;
+    }
+
+    private void ResetProgressTracking()
+    {
+        lastDistanceToTarget = float.MaxValue;
+        stuckTimer = 0f;
+    }
+
+    private bool HasHeldCurrentTargetLongEnough()
+    {
+        return Time.time - targetSetTime >= minTargetLifetimeBeforeRepick;
+    }
+
+    private float GetPatrolDebugRadius()
+    {
+        return Mathf.Max(patrolRange.x, patrolRange.y);
+    }
+
+    private Vector3 GetPatrolDebugCenter()
+    {
+        if (Application.isPlaying)
+        {
+            return spawnPoint;
+        }
+
+        return GetAlignedPosition(transform.position); // ԭ�������transform.position
+    }
+
+    private void OnDrawGizmos()
+    {
+        if (drawPatrolDebugAlways)
+        {
+            DrawPatrolDebugGizmos();
+        }
     }
 
     private void OnDrawGizmosSelected()
     {
-        if (!Application.isPlaying) return;
+        if (!drawPatrolDebugAlways)
+        {
+            DrawPatrolDebugGizmos();
+        }
+    }
+
+    private void DrawPatrolDebugGizmos()
+    {
+        if (!showPatrolDebugGizmos)
+        {
+            return;
+        }
 
         Gizmos.color = Color.red;
-        Gizmos.DrawSphere(currentTarget, 0.2f);
+        Gizmos.DrawWireSphere(GetPatrolDebugCenter(), GetPatrolDebugRadius());
 
-        Gizmos.color = Color.yellow;
-        Gizmos.DrawWireSphere(currentTarget, forbiddenCheckRadius);
-
-        Gizmos.color = Color.blue;
-        Gizmos.DrawWireSphere(originPos, patrolRange);
+        Vector3 targetPoint = Application.isPlaying ? (Vector3)currentTarget : transform.position;
+        Gizmos.DrawSphere(targetPoint, patrolTargetDebugRadius);
     }
 }

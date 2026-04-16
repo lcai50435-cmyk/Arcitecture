@@ -13,11 +13,13 @@ public class CrystalInteractHandler : MonoBehaviour, IInteractable
     public Sprite icon; // 建筑结构场景图片
     public Sprite backIcon; // 建筑结构背包中图片
     [TextArea] public string textDescription; // 建筑结构介绍
+    public AttributeBonusType bonusType; // 该道具提供的属性加成类型
+    public float bonusValue;             // 该道具提供的属性加成数值
 
     public void OnInteract()
     {
         // 创建数据对象
-        var data = new ArchitecturalCrystal(type, expValue, icon, backIcon, textDescription);
+        var data = new ArchitecturalCrystal(type, expValue, icon, backIcon, textDescription, bonusType, bonusValue);
         // 调用背包系统，将数据加入背包
         var player = FindObjectOfType<PlayerGetArchitectural>();
 
@@ -35,5 +37,5 @@ public class CrystalInteractHandler : MonoBehaviour, IInteractable
         Destroy(gameObject);
     }
 
-    public string InteractionTip => $"{type} 构建度 + {expValue}";
+    public string InteractionTip => $"拾取建筑结构";
 }
