@@ -1,11 +1,11 @@
 ﻿using UnityEngine;
 
 /// <summary>
-/// Switches between chase and attack states and simulates attack output.
+/// 敌人相关攻击逻辑
 /// </summary>
 [DisallowMultipleComponent]
 [RequireComponent(typeof(EnemyStatsManager))]
-public class EnemyAttack : MonoBehaviour
+public class EnemyAttack : CharacterAttack
 {
     [Header("References")]
     public EnemyStatsManager statsManager;

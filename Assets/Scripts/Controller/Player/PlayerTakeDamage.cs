@@ -1,7 +1,8 @@
 using UnityEngine;
 
 /// <summary>
-/// 玩家受击核心逻辑：播放受击动画 + 禁用/启用移动
+/// 玩家播放受击动画
+/// 禁用/启用移动
 /// </summary>
 public class PlayerTakeDamage : MonoBehaviour
 {
@@ -62,7 +63,6 @@ public class PlayerTakeDamage : MonoBehaviour
         {
             playerMovement.canMove = true; // 只关移动
         }
-
     }
 
     private void OnDestroy()

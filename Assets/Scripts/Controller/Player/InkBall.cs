@@ -47,10 +47,11 @@ public class InkBall : MonoBehaviour
         // 停止移动
         rb.velocity = Vector2.zero;
 
-        // 造成伤害
+        // 获得敌人脚本CharacterCore
         CharacterCore enemyCore = other.GetComponent<CharacterCore>();
         if (enemyCore != null && character != null)
         {
+            // 对敌人造成伤害
             enemyCore.TakeDamage(damage);
         }
 

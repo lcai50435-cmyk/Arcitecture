@@ -48,7 +48,7 @@ public class PlayerAttack : CharacterAttack
         // 获取玩家最后面朝方向
         Vector2 lastDir = directionTracker.LastDirection;
 
-        // 生成火球，并让攻击朝向最后方向
+        // 生成墨水，并让攻击朝向最后方向
         if (inkballPrefab != null && inkPoint != null)
         {
             GameObject inkball = Instantiate(inkballPrefab, inkPoint.position, Quaternion.identity);

@@ -6,6 +6,8 @@ using UnityEngine.SocialPlatforms.Impl;
 
 /// <summary>
 /// 封装角色攻击的通用逻辑
+/// 攻击期间不得再次攻击
+/// 攻击期间不得移动
 /// </summary>
 public abstract class CharacterAttack : MonoBehaviour
 {
@@ -40,11 +42,7 @@ public abstract class CharacterAttack : MonoBehaviour
     #region 角色攻击（复用核心逻辑：面朝方向 + 移动禁用 + 动画触发）
     public virtual void TriggerAttack()
     {
-        // Debug.Log("其实我触发了");
-
         if (isAttacking || core == null) return; // 攻击中或者无核心组件则拦截
-
-        Debug.Log("其实我触发了");
 
         // 根据最后面朝方向更新攻击朝向
         UpdateAttackFacingDirection();  

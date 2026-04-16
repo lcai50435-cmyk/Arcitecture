@@ -13,9 +13,8 @@ public class CharacterCore : MonoBehaviour
     [Header("角色目前血量")]
     public float currentHp; // 角色目前血量
 
-    // 受击事件
-    public event Action OnTakeDamage;
-    public event Action OnDeath;
+    public event Action OnTakeDamage; // 受击事件
+    public event Action OnDeath;  // 死亡事件
 
     [Header("朝向配置")]
     public Vector2 lastFacingDirection = Vector2.down; // 默认朝下
@@ -32,10 +31,7 @@ public class CharacterCore : MonoBehaviour
     public void TakeDamage(float damage)
     {
         float realDmg = Mathf.Max(0, damage); // 防止血量未负数
-
-        // Debug.Log($"敌人受到{damage}伤害，还剩{currentHp}");
-
-        currentHp -= realDmg;
+        currentHp -= Mathf.Max(0, realDmg - stats.defense); // 受到伤害
 
         OnTakeDamage?.Invoke(); // 播放相关被攻击逻辑
 
