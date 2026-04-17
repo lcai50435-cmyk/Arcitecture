@@ -126,11 +126,16 @@ public class EnemyPatrol : MonoBehaviour
 
     private void PickNextTarget(Vector2 currentPosition)
     {
+<<<<<<< HEAD
         // 更改的代码
         Vector2 currentAlignedPos = GetAlignedPosition(currentPosition);
 
         float minimumDistance = Mathf.Max(patrolPointSnap * 0.5f, minPatrolPointDistance);
         Vector2 bestCandidate = currentAlignedPos; // 原来是这个currentPosition
+=======
+        float minimumDistance = Mathf.Max(patrolPointSnap * 0.5f, minPatrolPointDistance);
+        Vector2 bestCandidate = currentPosition;
+>>>>>>> 149ea8bf52f63a4570e3c4931af65fd141369a58
         float bestDistance = 0f;
         bool hasFallbackCandidate = false;
 
@@ -140,9 +145,13 @@ public class EnemyPatrol : MonoBehaviour
                 Random.Range(-patrolRange.x, patrolRange.x),
                 Random.Range(-patrolRange.y, patrolRange.y));
 
+<<<<<<< HEAD
             Vector2 candidate = GetReachableAlignedPosition(
                 SnapPatrolPoint(currentAlignedPos + randomOffset), currentAlignedPos); // 原来是这个spawnPoint
 
+=======
+            Vector2 candidate = GetReachableAlignedPosition(SnapPatrolPoint(spawnPoint + randomOffset), spawnPoint);
+>>>>>>> 149ea8bf52f63a4570e3c4931af65fd141369a58
             if (avoidObstacle != null && avoidObstacle.IsPointBlocked(candidate))
             {
                 continue;
@@ -256,7 +265,11 @@ public class EnemyPatrol : MonoBehaviour
             return spawnPoint;
         }
 
+<<<<<<< HEAD
         return GetAlignedPosition(transform.position); // 原来是这个transform.position
+=======
+        return transform.position;
+>>>>>>> 149ea8bf52f63a4570e3c4931af65fd141369a58
     }
 
     private void OnDrawGizmos()

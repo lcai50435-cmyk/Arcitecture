@@ -1,5 +1,9 @@
 fileFormatVersion: 2
+<<<<<<<< HEAD:Assets/File/Prop/Crack.png.meta
 guid: a93fedda68666304da7c88cee7ac0b40
+========
+guid: be7e371825a4635439b252b9f7312510
+>>>>>>>> 149ea8bf52f63a4570e3c4931af65fd141369a58:Assets/Maps/Architecture/FuJianTuLou.png.meta
 TextureImporter:
   internalIDToNameTable: []
   externalObjects: {}

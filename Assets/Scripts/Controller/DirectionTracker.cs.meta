@@ -1,5 +1,9 @@
 fileFormatVersion: 2
+<<<<<<<< HEAD:Assets/Scripts/Controller/DirectionTracker.cs.meta
 guid: 02d2518189195194883a566e4e8c01c4
+========
+guid: d1575d9579fff4d46adf509cb70b6b34
+>>>>>>>> 149ea8bf52f63a4570e3c4931af65fd141369a58:Assets/Scripts/Controller/Enemy/EnemyAvoidObstacle.cs.meta
 MonoImporter:
   externalObjects: {}
   serializedVersion: 2

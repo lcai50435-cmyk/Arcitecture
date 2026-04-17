@@ -4,16 +4,26 @@ using UnityEngine;
 public class PlayerInteraction : MonoBehaviour
 {
     [Header("交互提示UI")]
+<<<<<<< HEAD
     public GameObject fImage;       // F图片
     public GameObject boxPanel;     // 文字框背景
     public TextMeshProUGUI boxText; // 提示文字（如"拾取"、"打开"）
+=======
+    public GameObject fImage;
+    public GameObject boxPanel;
+    public TextMeshProUGUI boxText;
+>>>>>>> 149ea8bf52f63a4570e3c4931af65fd141369a58
 
     private IInteractable currentInteractable;
 
     void Start()
     {
+<<<<<<< HEAD
         if (fImage != null) fImage.SetActive(false);
         if (boxPanel != null) boxPanel.SetActive(false);
+=======
+        HideInteractUI();
+>>>>>>> 149ea8bf52f63a4570e3c4931af65fd141369a58
     }
 
     void Update()
@@ -24,12 +34,17 @@ public class PlayerInteraction : MonoBehaviour
         }
     }
 
+<<<<<<< HEAD
     private void OnTriggerStay2D(Collider2D col)
+=======
+    private void OnTriggerEnter2D(Collider2D col)
+>>>>>>> 149ea8bf52f63a4570e3c4931af65fd141369a58
     {
         if (col.TryGetComponent(out IInteractable interactable))
         {
             currentInteractable = interactable;
 
+<<<<<<< HEAD
             // 显示F图片
             if (fImage != null)
                 fImage.SetActive(true);
@@ -46,6 +61,19 @@ public class PlayerInteraction : MonoBehaviour
         }
     }
 
+=======
+            if (fImage != null)
+                fImage.SetActive(true);
+
+            if (boxPanel != null)
+                boxPanel.SetActive(true);
+
+            if (boxText != null)
+                boxText.text = currentInteractable.InteractionTip;
+        }
+    }
+
+>>>>>>> 149ea8bf52f63a4570e3c4931af65fd141369a58
     private void OnTriggerExit2D(Collider2D col)
     {
         if (col.TryGetComponent(out IInteractable interactable))
@@ -53,9 +81,13 @@ public class PlayerInteraction : MonoBehaviour
             if (interactable == currentInteractable)
             {
                 currentInteractable = null;
+<<<<<<< HEAD
 
                 if (fImage != null) fImage.SetActive(false);
                 if (boxPanel != null) boxPanel.SetActive(false);
+=======
+                HideInteractUI();
+>>>>>>> 149ea8bf52f63a4570e3c4931af65fd141369a58
             }
         }
     }
@@ -66,5 +98,17 @@ public class PlayerInteraction : MonoBehaviour
         {
             currentInteractable.OnInteract();
         }
+    }
+
+    public void HideInteractUI()
+    {
+        if (fImage != null) fImage.SetActive(false);
+        if (boxPanel != null) boxPanel.SetActive(false);
+    }
+
+    public void ClearCurrentInteractable()
+    {
+        currentInteractable = null;
+        HideInteractUI();
     }
 }

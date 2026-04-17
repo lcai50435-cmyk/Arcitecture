@@ -1,6 +1,10 @@
 using System.Collections;
 using System.Collections.Generic;
+<<<<<<< HEAD
 using UnityEngine;
+=======
+using UnityEngine;  
+>>>>>>> 149ea8bf52f63a4570e3c4931af65fd141369a58
 
 /// <summary>
 /// 专门存储背包物品数据的核心类
@@ -48,12 +52,20 @@ public class BackpackMananger : MonoBehaviour
             return false;
         }
 
+<<<<<<< HEAD
         bool isFirstPick = !alreadyPickedTypes.Contains(crystal.type);
+=======
+        bool isFirstPick = !_alreadyPickedTypes.Contains(crystal.type);
+>>>>>>> 149ea8bf52f63a4570e3c4931af65fd141369a58
 
         // 第一次捡起物品触发
         if (isFirstPick)
         {
+<<<<<<< HEAD
             alreadyPickedTypes.Add(crystal.type);
+=======
+            _alreadyPickedTypes.Add(crystal.type);
+>>>>>>> 149ea8bf52f63a4570e3c4931af65fd141369a58
             Debug.Log("玩家第一次捡起该物品");
             // 发送第一次捡起物品的信息 // 尤其调用该物品的简介   
             OnFirstTimePickItemType?.Invoke(crystal);

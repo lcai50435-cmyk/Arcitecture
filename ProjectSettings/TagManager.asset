@@ -6,6 +6,7 @@ TagManager:
   tags:
   - Enemy
   - Catalogue
+<<<<<<< HEAD
   - Obstacle
   - Building
   - Water
@@ -14,6 +15,11 @@ TagManager:
   - Interactive
   - StoneEnemy
   - FireEnemy
+=======
+  - Building
+  - Water
+  - Obstacle
+>>>>>>> 149ea8bf52f63a4570e3c4931af65fd141369a58
   layers:
   - Default
   - TransparentFX
@@ -24,6 +30,7 @@ TagManager:
   - Player
   - BackpackUI
   - Catagloue
+<<<<<<< HEAD
   - Obstacle
   - Ground
   - Crack
@@ -31,6 +38,15 @@ TagManager:
   - Interactive
   - Weapon
   - FireBall
+=======
+  - Building
+  - Water
+  - Obstacle
+  - 
+  - 
+  - 
+  - 
+>>>>>>> 149ea8bf52f63a4570e3c4931af65fd141369a58
   - 
   - 
   - 
