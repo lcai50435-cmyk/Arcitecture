@@ -13,12 +13,7 @@ public class EnemyMove : MonoBehaviour
 {
     private const string DefaultAnimatorControllerPath = "Assets/Animation/EnemyMove.controller";
 
-<<<<<<< HEAD
     [Header("Movement")]    
-=======
-    [Header("Movement")]
-    public float moveSpeed = 2f;
->>>>>>> 149ea8bf52f63a4570e3c4931af65fd141369a58
     public Rigidbody2D rb;
     public float axisSwitchThreshold = 0.15f;
     public float reverseDirectionLockTime = 0.12f;
@@ -34,11 +29,8 @@ public class EnemyMove : MonoBehaviour
     private float lastInputX;
     private float lastInputY = -1f;
     private float lastDirectionChangeTime = float.NegativeInfinity;
-<<<<<<< HEAD
     private CharacterCore character;
     private float moveSpeed;
-=======
->>>>>>> 149ea8bf52f63a4570e3c4931af65fd141369a58
 
     public Vector2 Position => rb != null ? rb.position : (Vector2)transform.position;
 
@@ -48,7 +40,6 @@ public class EnemyMove : MonoBehaviour
         ResolveAnimationController();
         ApplyAnimatorController();
     }
-<<<<<<< HEAD
 
     private void Start()
     {
@@ -56,8 +47,6 @@ public class EnemyMove : MonoBehaviour
         // 初始化怪物速度
         moveSpeed = character.stats.moveSpeed;
     }
-=======
->>>>>>> 149ea8bf52f63a4570e3c4931af65fd141369a58
 
     private void Awake()
     {

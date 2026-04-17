@@ -47,11 +47,7 @@ public class BackpackSlot : MonoBehaviour, IPointerDownHandler, IPointerUpHandle
 
         holdTimer += Time.deltaTime;
 
-<<<<<<< HEAD
         // 长按进度反馈
-=======
-        // 可选：长按进度反馈
->>>>>>> 149ea8bf52f63a4570e3c4931af65fd141369a58
         if (holdTimer >= needHoldTime)
         {
             DropSingleItem();
@@ -127,7 +123,6 @@ public class BackpackSlot : MonoBehaviour, IPointerDownHandler, IPointerUpHandle
 
         // 生成掉落物（场景中的2D物体，使用SpriteRenderer）
         GameObject dropObj = new GameObject($"Drop_{item.type}");
-<<<<<<< HEAD
 
         // 物品生成位置：玩家位置 + 朝向偏移（避免卡在玩家身上）
         float faceDir = player.transform.localScale.x > 0 ? 1 : -1;
@@ -135,26 +130,16 @@ public class BackpackSlot : MonoBehaviour, IPointerDownHandler, IPointerUpHandle
             player.transform.position.x + faceDir * 0.2f, // X轴偏移
             player.transform.position.y // Y轴与玩家齐平
         );
-=======
-        dropObj.transform.position = player.transform.position;
->>>>>>> 149ea8bf52f63a4570e3c4931af65fd141369a58
 
         // 添加SpriteRenderer（掉落物在场景中，不是UI）
         SpriteRenderer ren = dropObj.AddComponent<SpriteRenderer>();
         ren.sprite = item.icon; // 使用物品图标
-<<<<<<< HEAD
         ren.sortingOrder = 0; // 设置图层
-=======
-        ren.sortingOrder = 5;
->>>>>>> 149ea8bf52f63a4570e3c4931af65fd141369a58
 
         // 添加碰撞器
         CircleCollider2D collider = dropObj.AddComponent<CircleCollider2D>();
         collider.isTrigger = true;
-<<<<<<< HEAD
         // collider.radius = 0.6f; // 适配2D物品大小
-=======
->>>>>>> 149ea8bf52f63a4570e3c4931af65fd141369a58
 
         // 添加交互组件
         CrystalInteractHandler script = dropObj.AddComponent<CrystalInteractHandler>();
