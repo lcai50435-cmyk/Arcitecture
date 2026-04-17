@@ -60,8 +60,10 @@ public class GameCountDownManager : MonoBehaviour
     {
         Debug.Log("倒计时归零，游戏结束！");
         // 弹窗、暂停游戏、切换场景
-        // currentTime = 0;
-        Time.timeScale = 0;
+        timer.text = $"<color=red>00:00</color>";
+
+        // 强制退出游戏
+        
     }
 
     // 外部设置是否在基地
