@@ -1,8 +1,10 @@
 using UnityEngine;
 
+/// <summary>
+/// µØÕğ¹ÖËÀÍöÏà¹ØÂß¼­
+/// </summary>
 public class StoneMonsterDeath : CharacterDeathBase
 {
-    
     protected override void Awake()
     {
         base.Awake();       

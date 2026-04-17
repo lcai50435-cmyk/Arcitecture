@@ -35,7 +35,7 @@ public class CharacterDeathBase : MonoBehaviour
 
     protected virtual void DisablePhysicsComponents()
     {
-        // ¹Ø±ÕÅö×²
+        // ¿ªÆôÅö×²
         if (characterCollider != null)
             characterCollider.enabled = true;
 

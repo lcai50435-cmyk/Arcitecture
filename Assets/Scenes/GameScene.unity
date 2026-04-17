@@ -744,6 +744,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1061403494}
   - component: {fileID: 1061403495}
+  - component: {fileID: 1061403496}
   m_Layer: 0
   m_Name: AttackRange
   m_TagString: Untagged
@@ -801,6 +802,19 @@ CircleCollider2D:
   m_Offset: {x: 0, y: 0}
   serializedVersion: 2
   m_Radius: 1
+--- !u!114 &1061403496
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1061403493}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c23734e4f56f70841b20c69129bd0607, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  playerTag: Player
 --- !u!1 &1137389304
 GameObject:
   m_ObjectHideFlags: 0
@@ -1377,7 +1391,9 @@ GameObject:
   - component: {fileID: 1378361543}
   - component: {fileID: 1378361542}
   - component: {fileID: 1378361540}
-  - component: {fileID: 1378361541}
+  - component: {fileID: 1378361549}
+  - component: {fileID: 1378361550}
+  - component: {fileID: 1378361551}
   m_Layer: 12
   m_Name: FireMonster
   m_TagString: Enemy
@@ -1394,7 +1410,7 @@ Transform:
   m_GameObject: {fileID: 1378361536}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 13.82, y: 12, z: 0}
+  m_LocalPosition: {x: 13.43, y: 13.66, z: 0}
   m_LocalScale: {x: 3, y: 3, z: 3}
   m_ConstrainProportionsScale: 1
   m_Children:
@@ -1501,24 +1517,6 @@ MonoBehaviour:
   showChaseDebugGizmos: 1
   drawChaseDebugAlways: 0
   targetPos: {x: 0, y: 0}
---- !u!114 &1378361541
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1378361536}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 32a54d5f6b979c64ca88f7c78104913e, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  anim: {fileID: 0}
-  moveScript: {fileID: 0}
-  statsManager: {fileID: 1378361542}
-  player: {fileID: 0}
-  attackRange: 1.5
-  attackInterval: 1.2
 --- !u!114 &1378361542
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1699,11 +1697,56 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   stats:
     maxHp: 100
-    attackDamage: 0
+    attackDamage: 10
     moveSpeed: 2
     defense: 0
   currentHp: 0
   lastFacingDirection: {x: 0, y: -1}
+--- !u!114 &1378361549
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1378361536}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3c2baefd6ab707943addaa8a831a8d16, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+--- !u!114 &1378361550
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1378361536}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ea2440b6448e8ec45863c63c62a04985, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  anim: {fileID: 1378361538}
+  moveScript: {fileID: 1378361545}
+  statsManager: {fileID: 1378361542}
+  player: {fileID: 1137389309}
+  attackRangeTrigger: {fileID: 1061403496}
+  attackInterval: 2
+  fireballPrefab: {fileID: 2769834015139275451, guid: 5210182e4966e1d49baa015905d5426a, type: 3}
+  firePoint: {fileID: 1378361537}
+--- !u!114 &1378361551
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1378361536}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 02d2518189195194883a566e4e8c01c4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  defaultDirection: {x: 0, y: -1}
 --- !u!1 &1412838526
 GameObject:
   m_ObjectHideFlags: 0
@@ -2490,7 +2533,7 @@ Transform:
   m_GameObject: {fileID: 2054856748}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 2.54, y: 0.5, z: 0.14215522}
+  m_LocalPosition: {x: 2.54, y: -2.3, z: 0.14215522}
   m_LocalScale: {x: 0.5, y: 0.5, z: 0.5}
   m_ConstrainProportionsScale: 1
   m_Children: []
