@@ -1,57 +1,56 @@
-using System.Collections;
-using System.Collections.Generic;
-using TMPro;
 using UnityEngine;
 
-// 建筑晶体类型
+// 建筑结构物品类型
 public enum ArchitecturalType
 {
-    BeamFrame,   // 梁架
-    Brackets,   // 托架
-    GroundMass, // 基质
-    Mortise, // 榫卯
-    TampedEarth, // 夯土
-    Tile // 瓦片
+    Gold,
+    White,
+    Green
 }
 
-// 属性加成类型枚举
 public enum AttributeBonusType
 {
-    MaxHealth,   // 血量上限
-    MoveSpeed,   // 移动速度
+    MaxHealth, // 血量上限
+    MoveSpeed, // 移动速度
     AttackPower, // 攻击力
-    Defense      // 防御力
+    Defense // 防御力
 }
 
 /// <summary>
-/// 建筑晶体道具基础信息
+/// 建筑结构物品相关信息
 /// </summary>
 public class ArchitecturalCrystal
 {
-    public ArchitecturalType type; // 晶体类型
-    public int expValue;  // 晶体经验值
-    public Sprite icon; // 道具图标
-    public Sprite backIcon; // 道具背景图标
-    public string textDescription;  // 建筑晶体描述
+    public ArchitecturalType type;   // 建筑类型
+    public int expValue;             // 建筑构建度
+    public Sprite icon;              // 场景图标
+    public Sprite backIcon;          // 背包图标
+    public string textDescription;   // 描述文本
 
-    // 属性加成相关
-    public AttributeBonusType bonusType; // 该道具提供的属性加成类型
-    public float bonusValue;             // 该道具提供的属性加成数值
+    // 属性相关加成
+    public AttributeBonusType bonusType;
+    public float bonusValue;
 
-    /// <summary>
-    /// 构造函数
-    /// </summary>
-    public ArchitecturalCrystal(ArchitecturalType type, int expValue, Sprite icon,
-        Sprite backIcon, string textDescription, AttributeBonusType bonusType, float bonusValue)
+    // 是否为专用点亮道具
+    public bool isUnlockMaterial;
+
+    public ArchitecturalCrystal(
+        ArchitecturalType type,
+        int expValue,
+        Sprite icon,
+        Sprite backIcon,
+        string textDescription, 
+        AttributeBonusType bonusType,
+        float bonusValue,
+        bool isUnlockMaterial = false)
     {
         this.type = type;
         this.expValue = expValue;
         this.icon = icon;
         this.backIcon = backIcon;
         this.textDescription = textDescription;
-
-        // 初始化属性加成
         this.bonusType = bonusType;
         this.bonusValue = bonusValue;
+        this.isUnlockMaterial = isUnlockMaterial;
     }
 }

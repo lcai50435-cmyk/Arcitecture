@@ -4,16 +4,15 @@ using UnityEngine;
 public class PlayerInteraction : MonoBehaviour
 {
     [Header("交互提示UI")]
-    public GameObject fImage;       // F图片
-    public GameObject boxPanel;     // 文字框背景
-    public TextMeshProUGUI boxText; // 提示文字（如"拾取"、"打开"）
+    public GameObject fImage;
+    public GameObject boxPanel;
+    public TextMeshProUGUI boxText;
 
     private IInteractable currentInteractable;
 
     void Start()
     {
-        if (fImage != null) fImage.SetActive(false);
-        if (boxPanel != null) boxPanel.SetActive(false);
+        HideInteractUI();
     }
 
     void Update()
@@ -30,19 +29,14 @@ public class PlayerInteraction : MonoBehaviour
         {
             currentInteractable = interactable;
 
-            // 显示F图片
             if (fImage != null)
                 fImage.SetActive(true);
 
-            // 从物品获取提示文字（每个物品可以不同）
             if (boxPanel != null)
                 boxPanel.SetActive(true);
 
             if (boxText != null)
-            {
-                // 使用物品自己的 InteractionTip
                 boxText.text = currentInteractable.InteractionTip;
-            }
         }
     }
 
@@ -53,9 +47,7 @@ public class PlayerInteraction : MonoBehaviour
             if (interactable == currentInteractable)
             {
                 currentInteractable = null;
-
-                if (fImage != null) fImage.SetActive(false);
-                if (boxPanel != null) boxPanel.SetActive(false);
+                HideInteractUI();
             }
         }
     }
@@ -66,5 +58,17 @@ public class PlayerInteraction : MonoBehaviour
         {
             currentInteractable.OnInteract();
         }
+    }
+
+    public void HideInteractUI()
+    {
+        if (fImage != null) fImage.SetActive(false);
+        if (boxPanel != null) boxPanel.SetActive(false);
+    }
+
+    public void ClearCurrentInteractable()
+    {
+        currentInteractable = null;
+        HideInteractUI();
     }
 }

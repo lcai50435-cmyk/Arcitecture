@@ -1,79 +1,172 @@
 using System.Collections;
-using TMPro;
 using UnityEngine;
+using UnityEngine.UI;
 
-/// <summary>
-/// 简单的首次拾取提示框
-/// </summary>
-public class Dialog: MonoBehaviour
+public class Dialog : MonoBehaviour
 {
     [Header("UI组件")]
-    public GameObject dialogPanel;           // 对话框面板
-    public TextMeshProUGUI descriptionText;  // 描述文本
+    public GameObject dialogPanel;
+    public Text descriptionText;
+
+    [Header("点击任意处关闭用按钮（覆盖整个弹窗区域或全屏）")]
+    public Button clickCloseButton;
 
     [Header("需要隐藏的其他UI")]
-    public GameObject[] uiToHide;            // 对话框显示时隐藏的UI
+    public GameObject[] uiToHide;
 
-    [Header("设置")]
-    public float displayDuration = 4f;       // 显示时间
+    [Header("自动关闭时间")]
+    public float displayDuration = 4f;
+
+    [Header("是否允许普通弹窗显示")]
+    public bool canShow = true;
 
     private BackpackMananger backpackManager;
+    private Coroutine currentCoroutine;
+    private bool waitingForClickClose = false;
 
-    void Start()
+    private void Start()
     {
         backpackManager = BackpackMananger.Instance;
 
         if (backpackManager != null)
         {
-            backpackManager.OnFirstTimePickItemType += ShowDialog;
+            backpackManager.OnFirstTimePickItemType += ShowDialogByCrystal;
         }
 
-        // 初始隐藏对话框
-        if (dialogPanel != null)
-            dialogPanel.SetActive(false);
+        if (clickCloseButton != null)
+        {
+            clickCloseButton.onClick.AddListener(OnClickCloseDialog);
+        }
+
+        ForceHideImmediately();
     }
 
-    void OnDestroy()
+    private void OnDestroy()
     {
         if (backpackManager != null)
         {
-            backpackManager.OnFirstTimePickItemType -= ShowDialog;
+            backpackManager.OnFirstTimePickItemType -= ShowDialogByCrystal;
+        }
+
+        if (clickCloseButton != null)
+        {
+            clickCloseButton.onClick.RemoveListener(OnClickCloseDialog);
         }
     }
 
-    void ShowDialog(ArchitecturalCrystal crystal)
+    private void ShowDialogByCrystal(ArchitecturalCrystal crystal)
     {
         if (crystal == null) return;
 
-        // 从 crystal 对象中获取描述文本
         string desc = string.IsNullOrEmpty(crystal.textDescription)
             ? $"获得 {crystal.type}！\n构建度 +{crystal.expValue}"
             : crystal.textDescription;
 
-        descriptionText.text = desc;
-
-        // 隐藏其他UI
-        HideOtherUI(true);
-
-        // 显示对话框
-        dialogPanel.SetActive(true);
-
-        // 4秒后关闭
-        StartCoroutine(HideAfterDelay());
+        // 拾取物品：自动关闭
+        ShowAutoDialog(desc);
     }
 
-    IEnumerator HideAfterDelay()
+    /// <summary>
+    /// 普通自动关闭弹窗（受 canShow 限制）
+    /// </summary>
+    public void ShowAutoDialog(string desc)
+    {
+        if (!canShow) return;
+        InternalShow(desc, true);
+    }
+
+    /// <summary>
+    /// 强制自动关闭弹窗（不受 canShow 限制）
+    /// </summary>
+    public void ShowAutoDialogForce(string desc)
+    {
+        InternalShow(desc, true);
+    }
+
+    /// <summary>
+    /// 点击任意处关闭弹窗（不受 canShow 限制）
+    /// 用于小图标介绍
+    /// </summary>
+    public void ShowClickCloseDialog(string desc)
+    {
+        InternalShow(desc, false);
+    }
+
+    private void InternalShow(string desc, bool autoClose)
+    {
+        if (!gameObject.activeInHierarchy)
+        {
+            Debug.LogWarning("Dialog脚本所在物体是 inactive，无法显示弹窗");
+            return;
+        }
+
+        if (descriptionText != null)
+        {
+            descriptionText.text = desc;
+        }
+
+        HideOtherUI(true);
+
+        if (dialogPanel != null)
+        {
+            dialogPanel.SetActive(true);
+        }
+
+        if (currentCoroutine != null)
+        {
+            StopCoroutine(currentCoroutine);
+            currentCoroutine = null;
+        }
+
+        waitingForClickClose = !autoClose;
+
+        if (clickCloseButton != null)
+        {
+            clickCloseButton.gameObject.SetActive(waitingForClickClose);
+        }
+
+        if (autoClose)
+        {
+            currentCoroutine = StartCoroutine(HideAfterDelay());
+        }
+    }
+
+    private IEnumerator HideAfterDelay()
     {
         yield return new WaitForSeconds(displayDuration);
+        ForceHideImmediately();
+    }
 
-        // 隐藏对话框
-        dialogPanel.SetActive(false);
+    private void OnClickCloseDialog()
+    {
+        if (!waitingForClickClose) return;
+        ForceHideImmediately();
+    }
 
-        // 恢复其他UI
+    public void ForceHideImmediately()
+    {
+        if (currentCoroutine != null)
+        {
+            StopCoroutine(currentCoroutine);
+            currentCoroutine = null;
+        }
+
+        waitingForClickClose = false;
+
+        if (clickCloseButton != null)
+        {
+            clickCloseButton.gameObject.SetActive(false);
+        }
+
+        if (dialogPanel != null)
+        {
+            dialogPanel.SetActive(false);
+        }
+
         HideOtherUI(false);
     }
 
-    void HideOtherUI(bool hide)
+    private void HideOtherUI(bool hide)
     {
         foreach (GameObject ui in uiToHide)
         {

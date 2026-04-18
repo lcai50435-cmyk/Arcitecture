@@ -1,5 +1,3 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
@@ -7,35 +5,63 @@ using UnityEngine;
 /// </summary>
 public class CrystalInteractHandler : MonoBehaviour, IInteractable
 {
+    [Header("是否为专用点亮道具")]
+    public bool isUnlockMaterial = false;
+
     [Header("物品配置")]
-    public ArchitecturalType type; // 建筑结构类型
-    public int expValue; // 建筑结构构建度
-    public Sprite icon; // 建筑结构场景图片
-    public Sprite backIcon; // 建筑结构背包中图片
-    [TextArea] public string textDescription; // 建筑结构介绍
-    public AttributeBonusType bonusType; // 该道具提供的属性加成类型
-    public float bonusValue;             // 该道具提供的属性加成数值
+    public ArchitecturalType type;
+    public int expValue;
+    public Sprite icon;
+    public Sprite backIcon;
+    public AttributeBonusType bonusType;
+    public float bonusValue;
+    [TextArea] public string textDescription;
+
+    // private bool pickSuccess;
 
     public void OnInteract()
     {
-        // 创建数据对象
-        var data = new ArchitecturalCrystal(type, expValue, icon, backIcon, textDescription, bonusType, bonusValue);
-        // 调用背包系统，将数据加入背包
         var player = FindObjectOfType<PlayerGetArchitectural>();
+        if (player == null) return;
 
-        if (player != null)
+        // 封装物品数据
+        var data = new ArchitecturalCrystal(
+            type,
+            expValue,
+            icon,
+            backIcon,
+            textDescription,
+            bonusType,
+            bonusValue,
+            isUnlockMaterial
+        );   
+
+        // 先判断是否拾取成功
+        bool pickSuccess = player.PickCrystal(data);
+
+        // 只有成功捡起来，才删除物品
+        if (pickSuccess)
         {
-            player.PickCrystal(data);
+            Destroy(gameObject);
         }
         else
         {
-            Debug.LogError("未找到PlayerGetArchitectural组件，请挂载到玩家身上！");
-            return;
+            // 可以加提示：背包已满
+            Debug.Log("背包满了，物品保留在地图上");
         }
-        
-        // 销毁物体
-        Destroy(gameObject);
+
     }
 
-    public string InteractionTip => $"拾取建筑结构";
+    public string InteractionTip
+    {
+        get
+        {
+            if (isUnlockMaterial)
+            {
+                return "专用点亮道具";
+            }
+
+            return $"拾起宝藏";
+        }
+    }
 }
