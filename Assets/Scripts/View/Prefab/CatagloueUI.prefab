@@ -2634,8 +2634,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: Text
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
-  m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: a83e97054ec1a63408e41e2563d42f68, type: 2}
+  m_sharedMaterial: {fileID: 3050326447611042884, guid: a83e97054ec1a63408e41e2563d42f68, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -3119,7 +3119,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: 0.04071045, y: 369.7806}
+  m_AnchoredPosition: {x: 0.040771484, y: 369.78064}
   m_SizeDelta: {x: 341.464, y: 826.8435}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &2357611733379082266
@@ -3623,7 +3623,7 @@ GameObject:
   - component: {fileID: 6958336278878319378}
   - component: {fileID: 6378094927744463623}
   - component: {fileID: 2906383243082572754}
-  - component: {fileID: 1518735911301705535}
+  - component: {fileID: 6796598419840795342}
   m_Layer: 5
   m_Name: slot_5
   m_TagString: Untagged
@@ -3688,7 +3688,7 @@ MonoBehaviour:
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
   m_PixelsPerUnitMultiplier: 1
---- !u!114 &1518735911301705535
+--- !u!114 &6796598419840795342
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -4571,7 +4571,7 @@ GameObject:
   - component: {fileID: 7176120082501557785}
   - component: {fileID: 5043206665029490176}
   - component: {fileID: 3723982886417089358}
-  - component: {fileID: 5432515742741370475}
+  - component: {fileID: 7160852781298427353}
   m_Layer: 5
   m_Name: slot_2
   m_TagString: Untagged
@@ -4636,7 +4636,7 @@ MonoBehaviour:
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
   m_PixelsPerUnitMultiplier: 1
---- !u!114 &5432515742741370475
+--- !u!114 &7160852781298427353
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -4734,7 +4734,6 @@ MonoBehaviour:
   detailedInformation: {fileID: 7932423202788300298}
   uiToHide:
   - {fileID: 5210066726340093726}
-  - {fileID: 0}
   - {fileID: 7056555107819193921}
   interactTipUI: {fileID: 7056555107819193921}
   player: {fileID: 0}
@@ -5128,7 +5127,7 @@ GameObject:
   - component: {fileID: 536083847081215362}
   - component: {fileID: 7123999085657512015}
   - component: {fileID: 273038335509460677}
-  - component: {fileID: 533853743575869830}
+  - component: {fileID: 1426198530137270249}
   m_Layer: 5
   m_Name: slot_1
   m_TagString: Untagged
@@ -5193,7 +5192,7 @@ MonoBehaviour:
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
   m_PixelsPerUnitMultiplier: 1
---- !u!114 &533853743575869830
+--- !u!114 &1426198530137270249
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -5841,7 +5840,7 @@ GameObject:
   - component: {fileID: 4002597659227939567}
   - component: {fileID: 4508941911439346794}
   - component: {fileID: 2830329627119273937}
-  - component: {fileID: 5251768272851972690}
+  - component: {fileID: 7768888335156663689}
   m_Layer: 5
   m_Name: slot_4
   m_TagString: Untagged
@@ -5906,7 +5905,7 @@ MonoBehaviour:
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
   m_PixelsPerUnitMultiplier: 1
---- !u!114 &5251768272851972690
+--- !u!114 &7768888335156663689
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -7580,7 +7579,7 @@ GameObject:
   - component: {fileID: 5566276180025757682}
   - component: {fileID: 5683221186570591651}
   - component: {fileID: 6025606604630383638}
-  - component: {fileID: 2073328818328617211}
+  - component: {fileID: 5854619462798267090}
   m_Layer: 5
   m_Name: slot_6
   m_TagString: Untagged
@@ -7645,7 +7644,7 @@ MonoBehaviour:
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
   m_PixelsPerUnitMultiplier: 1
---- !u!114 &2073328818328617211
+--- !u!114 &5854619462798267090
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -7913,7 +7912,7 @@ GameObject:
   - component: {fileID: 1542631777007699921}
   - component: {fileID: 1820145969479575410}
   - component: {fileID: 5706843813972387470}
-  - component: {fileID: 5220489483514704151}
+  - component: {fileID: 7685114542761532199}
   m_Layer: 5
   m_Name: slot_3
   m_TagString: Untagged
@@ -7978,7 +7977,7 @@ MonoBehaviour:
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
   m_PixelsPerUnitMultiplier: 1
---- !u!114 &5220489483514704151
+--- !u!114 &7685114542761532199
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -11160,7 +11159,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1045416570211162877}
   m_Layer: 0
-  m_Name: UI
+  m_Name: CatagloueUI
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -11238,7 +11237,8 @@ MonoBehaviour:
   dialogPanel: {fileID: 7837124873867967431}
   descriptionText: {fileID: 6534927949984526893}
   clickCloseButton: {fileID: 6419800831939321687}
-  uiToHide: []
+  uiToHide:
+  - {fileID: 8472837386719776241}
   displayDuration: 3
   canShow: 1
 --- !u!1 &8786109975776729651
@@ -11623,7 +11623,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: 0, y: -10.235992}
+  m_AnchoredPosition: {x: 0, y: -10.235962}
   m_SizeDelta: {x: -50, y: -20.472}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &7256136699940578229
@@ -11655,7 +11655,7 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 12800000, guid: a29f5fa9461c8a943afcb1d85a021381, type: 3}
+    m_Font: {fileID: 12800000, guid: e559bf87a0136a444ade69210937e683, type: 3}
     m_FontSize: 40
     m_FontStyle: 0
     m_BestFit: 0
