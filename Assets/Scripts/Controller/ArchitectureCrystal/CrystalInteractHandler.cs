@@ -15,6 +15,8 @@ public class CrystalInteractHandler : MonoBehaviour, IInteractable
     public Sprite backIcon;
     public AttributeBonusType bonusType;
     public float bonusValue;
+    public AttributeBonusType subBonusType;
+    public float subBonusValue;
     [TextArea] public string textDescription;
 
     // private bool pickSuccess;
@@ -33,6 +35,8 @@ public class CrystalInteractHandler : MonoBehaviour, IInteractable
             textDescription,
             bonusType,
             bonusValue,
+            subBonusType,
+            subBonusValue,
             isUnlockMaterial
         );   
 

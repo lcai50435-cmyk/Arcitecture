@@ -3,17 +3,22 @@ using UnityEngine;
 // 建筑结构物品类型
 public enum ArchitecturalType
 {
-    Gold,
-    White,
-    Green
+    MortiseAndTenonJoint,
+    GroundMass,
+    BeamFrame,
+    TampedEarth,
+    Tile,
+    Brackets
 }
 
 public enum AttributeBonusType
 {
-    MaxHealth, // 血量上限
+    CurrentHealth, // 血量
     MoveSpeed, // 移动速度
     AttackPower, // 攻击力
-    Defense // 防御力
+    Defense, // 防御力
+    Durability // 武器耐久
+
 }
 
 /// <summary>
@@ -31,6 +36,10 @@ public class ArchitecturalCrystal
     public AttributeBonusType bonusType;
     public float bonusValue;
 
+    // 副属性相关加成
+    public AttributeBonusType subBonusType;
+    public float subBonusValue;
+
     // 是否为专用点亮道具
     public bool isUnlockMaterial;
 
@@ -42,6 +51,8 @@ public class ArchitecturalCrystal
         string textDescription, 
         AttributeBonusType bonusType,
         float bonusValue,
+        AttributeBonusType subBonusType,
+        float subBonusValue,
         bool isUnlockMaterial = false)
     {
         this.type = type;
@@ -51,6 +62,8 @@ public class ArchitecturalCrystal
         this.textDescription = textDescription;
         this.bonusType = bonusType;
         this.bonusValue = bonusValue;
+        this.subBonusType = subBonusType;
+        this.subBonusValue = subBonusValue;
         this.isUnlockMaterial = isUnlockMaterial;
     }
 }

@@ -150,6 +150,8 @@ public class BackpackSlot : MonoBehaviour, IPointerDownHandler, IPointerUpHandle
         script.textDescription = item.textDescription;
         script.bonusType = item.bonusType;
         script.bonusValue = item.bonusValue;
+        script.bonusType = item.subBonusType;
+        script.bonusValue = item.subBonusValue;
 
         // 从背包移除物品
         backpack.RemoveItem(slotIndex);

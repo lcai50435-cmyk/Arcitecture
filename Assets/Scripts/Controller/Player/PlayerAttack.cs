@@ -14,6 +14,8 @@ public class PlayerAttack : CharacterAttack
     public ValueTrans weaponTrans;
     [Header("墨水数量")]
     public float ink;
+    public float maxInk = 100f; 
+
 
     protected override void Awake()
     {
@@ -60,5 +62,16 @@ public class PlayerAttack : CharacterAttack
             // 让攻击朝向最后方向
             inkball.transform.right = lastDir;
         }
+    }
+
+    public void AddInk(float value)
+    {
+        ink += value;
+
+        // 限制墨水不超过最大值
+        ink = Mathf.Min(ink, maxInk);
+
+        // 实时刷新UI
+        weaponTrans.SetValue(ink);
     }
 }

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using UnityEditorInternal.Profiling.Memory.Experimental;
 using UnityEngine;
 
 /// <summary>
@@ -80,7 +81,7 @@ public class BackpackMananger : MonoBehaviour
         if (isFirstPick)
         {
             alreadyPickedTypes.Add(crystal.type);
-            Debug.Log("玩家第一次捡起该物品");
+            Debug.Log($"玩家第一次捡起{crystal.type}物品");
             OnFirstTimePickItemType?.Invoke(crystal);
         }
 
@@ -92,6 +93,8 @@ public class BackpackMananger : MonoBehaviour
             crystal.textDescription,
             crystal.bonusType,
             crystal.bonusValue,
+            crystal.subBonusType,
+            crystal.subBonusValue,
             crystal.isUnlockMaterial
         );
 
@@ -102,7 +105,9 @@ public class BackpackMananger : MonoBehaviour
         {
             PlayerAttributeManager.Instance.AddBonus(
                 newItem.bonusType,
-                newItem.bonusValue
+                newItem.bonusValue,
+                newItem.subBonusType,
+                newItem.subBonusValue
             );
         }
 
@@ -120,7 +125,11 @@ public class BackpackMananger : MonoBehaviour
             // 移除道具时扣除相应属性加成
             if (PlayerAttributeManager.Instance != null)
             {
-                PlayerAttributeManager.Instance.RemoveBonus(backpackItems[index].bonusType, backpackItems[index].bonusValue);
+                PlayerAttributeManager.Instance.RemoveBonus(
+                    backpackItems[index].bonusType,
+                    backpackItems[index].bonusValue,
+                    backpackItems[index].subBonusType,
+                    backpackItems[index].subBonusValue);
             }
 
             backpackItems[index] = null;
