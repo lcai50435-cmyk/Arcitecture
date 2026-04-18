@@ -1818,6 +1818,7 @@ GameObject:
   - component: {fileID: 1137389314}
   - component: {fileID: 1137389320}
   - component: {fileID: 1137389321}
+  - component: {fileID: 1137389323}
   m_Layer: 6
   m_Name: Player
   m_TagString: Player
@@ -1949,7 +1950,7 @@ Transform:
   m_GameObject: {fileID: 1137389304}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 137.46, y: 15.45, z: 0}
+  m_LocalPosition: {x: 10.6, y: -44.1, z: 0}
   m_LocalScale: {x: 4, y: 4, z: 4}
   m_ConstrainProportionsScale: 1
   m_Children:
@@ -2097,6 +2098,20 @@ MonoBehaviour:
   fImage: {fileID: 540447392}
   boxPanel: {fileID: 11902400}
   boxText: {fileID: 42764071}
+--- !u!114 &1137389323
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1137389304}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c1b55f82e471db649abacc70cc2cdee3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  characterCore: {fileID: 1137389317}
+  gameOverSceneName: DeadScene
 --- !u!1 &1155654444
 GameObject:
   m_ObjectHideFlags: 0
