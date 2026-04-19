@@ -13,8 +13,6 @@ public class PlayerDeath :  CharacterDeathBase
     {
         // 触发动画机的死亡Trigger
         OnDestroy();
-
-
     }
 
     public void OnDestroy()

@@ -8,7 +8,7 @@ public class UIManager : MonoBehaviour
     public static UIManager Instance;
 
     [Header("界面")]
-    public GameObject illustratedHandbook; 
+    public GameObject illustratedHandbook;
     public GameObject detailedInformation;
 
     [Header("需要隐藏的其他UI")]
@@ -42,11 +42,6 @@ public class UIManager : MonoBehaviour
 
     void Start()
     {
-        if (illustratedHandbook != null)
-            illustratedHandbook.SetActive(false);
-        if (detailedInformation != null)
-            detailedInformation.SetActive(false);
-
         dialogUI = FindObjectOfType<Dialog>();
 
         if (player != null)
@@ -67,6 +62,9 @@ public class UIManager : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// 打开图鉴
+    /// </summary>
     public void OpenIllustratedHandbook()
     {
         if (isHandbookOpen) return;
@@ -75,9 +73,6 @@ public class UIManager : MonoBehaviour
 
         DisablePlayerMovement();
         HideOtherUI(true);
-
-        if (interactTipUI != null)
-            interactTipUI.SetActive(false);
 
         if (player != null)
         {
@@ -88,7 +83,6 @@ public class UIManager : MonoBehaviour
             }
         }
 
-        // 图鉴打开时：强制关闭弹窗，并禁用普通弹窗
         if (dialogUI == null)
             dialogUI = FindObjectOfType<Dialog>();
 
@@ -98,21 +92,25 @@ public class UIManager : MonoBehaviour
             dialogUI.canShow = false;
         }
 
-        if (illustratedHandbook != null)
-            illustratedHandbook.SetActive(true);
+        if (UIRootManager.Instance != null)
+        {
+            UIRootManager.Instance.OpenHandbookView();
+        }
 
         Debug.Log("打开图鉴，玩家移动已禁用");
     }
 
+    /// <summary>
+    /// 关闭图鉴
+    /// </summary>
     public void CloseIllustratedHandbook()
     {
         if (!isHandbookOpen) return;
 
-        if (illustratedHandbook != null)
-            illustratedHandbook.SetActive(false);
-
-        if (detailedInformation != null)
-            detailedInformation.SetActive(false);
+        if (UIRootManager.Instance != null)
+        {
+            UIRootManager.Instance.CloseAllBookUI();
+        }
 
         HideOtherUI(false);
         EnablePlayerMovement();
@@ -131,6 +129,9 @@ public class UIManager : MonoBehaviour
         Debug.Log("关闭图鉴，玩家移动已恢复");
     }
 
+    /// <summary>
+    /// 恢复所有UI和玩家控制
+    /// </summary>
     public void RestoreUI()
     {
         HideOtherUI(false);
@@ -145,12 +146,17 @@ public class UIManager : MonoBehaviour
             dialogUI.ForceHideImmediately();
         }
 
-        if (isHandbookOpen)
+        if (UIRootManager.Instance != null)
         {
-            isHandbookOpen = false;
+            UIRootManager.Instance.CloseAllBookUI();
         }
+
+        isHandbookOpen = false;
     }
 
+    /// <summary>
+    /// 禁用玩家移动
+    /// </summary>
     private void DisablePlayerMovement()
     {
         if (playerMovementScript != null)
@@ -170,6 +176,9 @@ public class UIManager : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// 恢复玩家移动
+    /// </summary>
     private void EnablePlayerMovement()
     {
         if (playerMovementScript != null)
@@ -187,6 +196,9 @@ public class UIManager : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// 隐藏/恢复其他UI
+    /// </summary>
     private void HideOtherUI(bool hide)
     {
         foreach (GameObject ui in uiToHide)

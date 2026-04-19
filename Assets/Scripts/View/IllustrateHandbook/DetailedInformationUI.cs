@@ -51,12 +51,15 @@ public class DetailedInformationUI : MonoBehaviour
             previousPageButton.onClick.RemoveListener(ShowPage1);
 
         if (closeButton1 != null)
-            closeButton1.onClick.RemoveListener(CloseAllUI);
+            closeButton1.onClick.RemoveListener(CloseDetailOnlyReturnHandbook);
 
         if (closeButton2 != null)
-            closeButton2.onClick.RemoveListener(CloseAllUI);
+            closeButton2.onClick.RemoveListener(CloseDetailOnlyReturnHandbook);
     }
 
+    /// <summary>
+    /// 显示建筑详细信息
+    /// </summary>
     public void ShowDetail(BuildingDetailData data)
     {
         if (data == null) return;
@@ -85,22 +88,38 @@ public class DetailedInformationUI : MonoBehaviour
         if (page2FinallyIntroductionText != null)
             page2FinallyIntroductionText.text = data.finalIntroduction;
 
-        if (illustratedHandbookPanel != null)
-            illustratedHandbookPanel.SetActive(false);
-
-        if (detailedInformationPanel != null)
-            detailedInformationPanel.SetActive(true);
+        // 打开详细页第一页
+        if (UIRootManager.Instance != null)
+        {
+            UIRootManager.Instance.OpenDetailViewPage1();
+        }
 
         ShowPage1Only();
     }
 
+    /// <summary>
+    /// 显示第一页
+    /// </summary>
     public void ShowPage1()
     {
+        if (UIRootManager.Instance != null)
+        {
+            UIRootManager.Instance.OpenDetailViewPage1();
+        }
+
         ShowPage1Only();
     }
 
+    /// <summary>
+    /// 显示第二页
+    /// </summary>
     public void ShowPage2()
     {
+        if (UIRootManager.Instance != null)
+        {
+            UIRootManager.Instance.OpenDetailViewPage2();
+        }
+
         if (backGround1 != null)
             backGround1.SetActive(false);
 
@@ -108,6 +127,9 @@ public class DetailedInformationUI : MonoBehaviour
             backGround2.SetActive(true);
     }
 
+    /// <summary>
+    /// 只显示第一页（本地页面状态）
+    /// </summary>
     private void ShowPage1Only()
     {
         if (backGround1 != null)
@@ -118,31 +140,29 @@ public class DetailedInformationUI : MonoBehaviour
     }
 
     /// <summary>
-    /// 关闭整个图鉴系统，恢复玩家移动和其他UI
+    /// 关闭整个图鉴系统
     /// </summary>
     public void CloseAllUI()
     {
-        if (detailedInformationPanel != null)
-            detailedInformationPanel.SetActive(false);
-
-        if (illustratedHandbookPanel != null)
-            illustratedHandbookPanel.SetActive(false);
+        if (UIRootManager.Instance != null)
+        {
+            UIRootManager.Instance.CloseAllBookUI();
+        }
 
         ShowPage1Only();
-
         UIManager.Instance?.RestoreUI();
     }
 
     /// <summary>
-    /// 只关闭详细页，回到图鉴主页（可选）
+    /// 从详细页回到图鉴主页
     /// </summary>
     public void CloseDetailOnlyReturnHandbook()
     {
-        if (detailedInformationPanel != null)
-            detailedInformationPanel.SetActive(false);
-
-        if (illustratedHandbookPanel != null)
-            illustratedHandbookPanel.SetActive(true);
+        if (UIRootManager.Instance != null)
+        {
+            UIRootManager.Instance.HideAllDetail();
+            UIRootManager.Instance.ShowHandbook();
+        }
 
         ShowPage1Only();
     }
