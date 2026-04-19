@@ -1129,6 +1129,7 @@ GameObject:
   - component: {fileID: 1137389314}
   - component: {fileID: 1137389320}
   - component: {fileID: 1137389321}
+  - component: {fileID: 1137389323}
   m_Layer: 6
   m_Name: Player
   m_TagString: Player
@@ -1409,6 +1410,20 @@ MonoBehaviour:
   fImage: {fileID: 540447392}
   boxPanel: {fileID: 11902400}
   boxText: {fileID: 42764071}
+--- !u!114 &1137389323
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1137389304}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c1b55f82e471db649abacc70cc2cdee3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  characterCore: {fileID: 1137389317}
+  gameOverSceneName: DeadScene
 --- !u!114 &1203949250 stripped
 MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 20745114417256838, guid: ec198bc90ea1d804096b39175f11af95, type: 3}

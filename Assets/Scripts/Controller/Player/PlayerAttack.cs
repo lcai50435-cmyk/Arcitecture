@@ -31,8 +31,6 @@ public class PlayerAttack : CharacterAttack
 
     private void Update()
     {
-        // ·ÀÖ¹UIÒÀ¾É´¥·¢¹¥»÷
-        if (EventSystem.current.IsPointerOverGameObject()) return;
 
         if (Input.GetKeyDown(attackKey) && !isAttacking)
         {
