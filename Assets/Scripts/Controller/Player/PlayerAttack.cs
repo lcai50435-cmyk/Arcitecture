@@ -1,5 +1,4 @@
 using UnityEngine;
-using UnityEngine.EventSystems;
 
 public class PlayerAttack : CharacterAttack
 {
@@ -10,54 +9,67 @@ public class PlayerAttack : CharacterAttack
     [Header("远程设置")]
     public GameObject inkballPrefab;
     public Transform inkPoint;
+
     [Header("血条脚本")]
     public ValueTrans weaponTrans;
+
     [Header("墨水数量")]
     public float ink;
-    public float maxInk = 100f; 
-
+    public float maxInk = 100f;
 
     protected override void Awake()
     {
         directionTracker = GetComponent<DirectionTracker>();
         animator = GetComponent<Animator>();
 
-        // 执行父类初始化
         base.Awake();
 
-        // 初始化墨水数量
-        weaponTrans.SetMaxValue(ink);
+        if (weaponTrans != null)
+        {
+            weaponTrans.SetMaxValue(maxInk);
+            weaponTrans.SetValue(ink);
+        }
     }
 
     private void Update()
     {
-
-        if (Input.GetKeyDown(attackKey) && !isAttacking)
+        if (Input.GetKeyDown(attackKey))
         {
-            TriggerAttack();
+            // 只要有操作类UI开着，就禁止攻击
+            if (UIRootManager.Instance != null && UIRootManager.Instance.IsAnyGameplayBlockingUIOpen())
+            {
+                return;
+            }
+
+            if (!isAttacking)
+            {
+                TriggerAttack();
+            }
         }
     }
 
     public override void TriggerAttack()
     {
-        if (ink <= 0) return;
+        if (ink < 5f) return;
 
-        //墨水数量减少
-        ink -= 5;
-        weaponTrans.SetValue(ink);
+        ink = Mathf.Max(0, ink - 5f);
 
-        // 动画、朝向、禁止移动
-        base.TriggerAttack(); 
+        if (weaponTrans != null)
+        {
+            weaponTrans.SetValue(ink);
+        }
 
-        // 获取玩家最后面朝方向
-        Vector2 lastDir = directionTracker.LastDirection;
+        base.TriggerAttack();
 
-        // 生成墨水，并让攻击朝向最后方向
+        Vector2 lastDir = directionTracker != null ? directionTracker.LastDirection : Vector2.right;
+        if (lastDir == Vector2.zero)
+        {
+            lastDir = Vector2.right;
+        }
+
         if (inkballPrefab != null && inkPoint != null)
         {
             GameObject inkball = Instantiate(inkballPrefab, inkPoint.position, Quaternion.identity);
-
-            // 让攻击朝向最后方向
             inkball.transform.right = lastDir;
         }
     }
@@ -65,11 +77,11 @@ public class PlayerAttack : CharacterAttack
     public void AddInk(float value)
     {
         ink += value;
-
-        // 限制墨水不超过最大值
         ink = Mathf.Min(ink, maxInk);
 
-        // 实时刷新UI
-        weaponTrans.SetValue(ink);
+        if (weaponTrans != null)
+        {
+            weaponTrans.SetValue(ink);
+        }
     }
 }

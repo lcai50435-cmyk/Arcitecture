@@ -44,29 +44,34 @@ public class SubmitSelectionPanelUI : MonoBehaviour
     }
 
     /// <summary>
-    /// 指定建筑打开窗口
+    /// 指定建筑打开/关闭窗口
     /// </summary>
     public void TogglePanelForBuilding(int buildingIndex)
     {
         CatalogueBuildingId target = (CatalogueBuildingId)buildingIndex;
 
+        // 同一个建筑再次点击：关闭
         if (isOpen && currentTargetBuilding == target)
         {
             ClosePanel();
             return;
         }
 
+        // 切换到另一个建筑窗口
         currentTargetBuilding = target;
         OpenPanel();
     }
 
+    /// <summary>
+    /// 打开提交窗口
+    /// </summary>
     public void OpenPanel()
     {
         isOpen = true;
 
-        if (panelRoot != null)
+        if (UIRootManager.Instance != null)
         {
-            panelRoot.SetActive(true);
+            UIRootManager.Instance.ShowSubmitSelection((int)currentTargetBuilding);
         }
 
         if (handbookCloseButton != null)
@@ -81,13 +86,38 @@ public class SubmitSelectionPanelUI : MonoBehaviour
         Debug.Log($"打开提交窗口，当前目标建筑：{currentTargetBuilding}");
     }
 
+    /// <summary>
+    /// 关闭提交窗口
+    /// </summary>
     public void ClosePanel()
     {
         isOpen = false;
 
-        if (panelRoot != null)
+        if (UIRootManager.Instance != null)
         {
-            panelRoot.SetActive(false);
+            UIRootManager.Instance.HideSubmitSelection((int)currentTargetBuilding);
+        }
+
+        if (handbookCloseButton != null)
+        {
+            handbookCloseButton.gameObject.SetActive(true);
+            handbookCloseButton.interactable = true;
+        }
+
+        selectedIndex = -1;
+        RefreshPanel();
+    }
+
+    /// <summary>
+    /// 初始化时直接关闭全部提交窗口
+    /// </summary>
+    private void ClosePanelImmediate()
+    {
+        isOpen = false;
+
+        if (UIRootManager.Instance != null)
+        {
+            UIRootManager.Instance.HideAllSubmitSelection();
         }
 
         if (handbookCloseButton != null)
@@ -99,22 +129,9 @@ public class SubmitSelectionPanelUI : MonoBehaviour
         selectedIndex = -1;
     }
 
-    private void ClosePanelImmediate()
-    {
-        isOpen = false;
-
-        if (panelRoot != null)
-        {
-            panelRoot.SetActive(false);
-        }
-
-        if (handbookCloseButton != null)
-        {
-            handbookCloseButton.gameObject.SetActive(true);
-            handbookCloseButton.interactable = true;
-        }
-    }
-
+    /// <summary>
+    /// 点击某个背包槽位
+    /// </summary>
     public void OnSlotClicked(int slotIndex)
     {
         if (backpack == null) return;
@@ -150,6 +167,9 @@ public class SubmitSelectionPanelUI : MonoBehaviour
         RefreshPanel();
     }
 
+    /// <summary>
+    /// 刷新窗口显示
+    /// </summary>
     public void RefreshPanel()
     {
         if (backpack == null)
