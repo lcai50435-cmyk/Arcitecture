@@ -5,7 +5,13 @@ public enum ArchitecturalType
 {
     Gold,
     White,
-    Green
+    Green,
+    MortiseAndTenonJoint,
+    GroundMass,
+    BeamFrame,
+    TampedEarth,
+    Tile,
+    Brackets
 }
 
 public enum AttributeBonusType

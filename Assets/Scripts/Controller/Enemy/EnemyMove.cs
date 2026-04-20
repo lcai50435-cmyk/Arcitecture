@@ -31,6 +31,7 @@ public class EnemyMove : MonoBehaviour
     private float lastDirectionChangeTime = float.NegativeInfinity;
     private CharacterCore character;
     private float moveSpeed;
+    private float externalSpeedMultiplier = 1f;
 
     public Vector2 Position => rb != null ? rb.position : (Vector2)transform.position;
 
@@ -74,6 +75,11 @@ public class EnemyMove : MonoBehaviour
     public void StopMovement()
     {
         ApplyDirection(Vector2.zero);
+    }
+
+    public void SetExternalSpeedMultiplier(float multiplier)
+    {
+        externalSpeedMultiplier = Mathf.Clamp(multiplier, 0.05f, 1f);
     }
 
     public void SetMoveDirection(Vector2 rawDirection)
@@ -239,7 +245,7 @@ public class EnemyMove : MonoBehaviour
             return;
         }
 
-        rb.MovePosition(rb.position + direction * moveSpeed * Time.fixedDeltaTime);
+        rb.MovePosition(rb.position + direction * moveSpeed * externalSpeedMultiplier * Time.fixedDeltaTime);
     }
 
     private Vector2 FilterToFourWay(Vector2 rawDirection)

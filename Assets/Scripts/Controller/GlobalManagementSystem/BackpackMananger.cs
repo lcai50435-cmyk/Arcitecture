@@ -117,10 +117,16 @@ public class BackpackMananger : MonoBehaviour
     {
         if (index >= 0 && index < backpackItems.Count)
         {
+            ArchitecturalCrystal item = backpackItems[index];
+            if (item == null)
+            {
+                return;
+            }
+
             // 移除道具时扣除相应属性加成
             if (PlayerAttributeManager.Instance != null)
             {
-                PlayerAttributeManager.Instance.RemoveBonus(backpackItems[index].bonusType, backpackItems[index].bonusValue);
+                PlayerAttributeManager.Instance.RemoveBonus(item.bonusType, item.bonusValue);
             }
 
             backpackItems[index] = null;
@@ -147,7 +153,7 @@ public class BackpackMananger : MonoBehaviour
     {
         for (int i = 0; i < backpackItems.Count; i++)
         {
-            backpackItems[i] = null;
+            RemoveItem(i);
         }
         Debug.Log("背包已清空");
     }

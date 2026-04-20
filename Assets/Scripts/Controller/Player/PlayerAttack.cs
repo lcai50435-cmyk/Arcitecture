@@ -3,6 +3,7 @@ using UnityEngine;
 public class PlayerAttack : CharacterAttack
 {
     private KeyCode attackKey = KeyCode.Mouse0;
+    private const float InkCostPerAttack = 5f;
     private DirectionTracker directionTracker;
     private Animator animator;
 
@@ -36,25 +37,50 @@ public class PlayerAttack : CharacterAttack
 
     public override void TriggerAttack()
     {
-        if (ink <= 0) return;
+        if (ink < InkCostPerAttack) return;
 
-        //墨水数量减少
-        ink -= 5;
-        weaponTrans.SetValue(ink);
-
-        // 动画、朝向、禁止移动
-        base.TriggerAttack(); 
-
-        // 获取玩家最后面朝方向
-        Vector2 lastDir = directionTracker.LastDirection;
-
-        // 生成墨水，并让攻击朝向最后方向
-        if (inkballPrefab != null && inkPoint != null)
+        ink = Mathf.Max(0, ink - InkCostPerAttack);
+        if (weaponTrans != null)
         {
-            GameObject inkball = Instantiate(inkballPrefab, inkPoint.position, Quaternion.identity);
+            weaponTrans.SetValue(ink);
+        }
 
-            // 让攻击朝向最后方向
-            inkball.transform.right = lastDir;
+        // 攻击动画方向、禁止移动
+        base.TriggerAttack();
+
+        Vector2 lastDir = directionTracker != null ? directionTracker.LastDirection : Vector2.right;
+        if (lastDir == Vector2.zero)
+        {
+            lastDir = Vector2.right;
+        }
+
+        InkAttackRuntimeConfig inkConfig = InkModifierRuntimeConfig.BuildFromBackpack(BackpackMananger.Instance);
+        SpawnInkBalls(lastDir.normalized, inkConfig);
+    }
+
+    private void SpawnInkBalls(Vector2 direction, InkAttackRuntimeConfig inkConfig)
+    {
+        if (inkballPrefab == null || inkPoint == null)
+        {
+            return;
+        }
+
+        int projectileCount = Mathf.Max(1, inkConfig.projectileCount);
+        float centerIndex = (projectileCount - 1) * 0.5f;
+
+        for (int i = 0; i < projectileCount; i++)
+        {
+            float angle = (i - centerIndex) * inkConfig.fanAngleStep;
+            Vector2 shotDirection = Quaternion.Euler(0f, 0f, angle) * direction;
+
+            GameObject inkball = Instantiate(inkballPrefab, inkPoint.position, Quaternion.identity);
+            inkball.transform.right = shotDirection;
+
+            InkBall inkBallComponent = inkball.GetComponent<InkBall>();
+            if (inkBallComponent != null)
+            {
+                inkBallComponent.Init(inkConfig);
+            }
         }
     }
 }

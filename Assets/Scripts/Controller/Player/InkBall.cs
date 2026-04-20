@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 public class InkBall : MonoBehaviour
@@ -12,12 +13,19 @@ public class InkBall : MonoBehaviour
     private Animator anim;
     private Rigidbody2D rb;
     private bool isHit = false;
+    private int maxHitCount = 1;
+    private InkDebuffRuntimeConfig debuffConfig;
+    private readonly HashSet<CharacterCore> hitTargets = new HashSet<CharacterCore>();
 
     private void Awake()
     {
         anim = GetComponent<Animator>();
         rb = GetComponent<Rigidbody2D>();
-        character = GameObject.FindGameObjectWithTag ("Player").GetComponent<CharacterCore>(); 
+        GameObject player = GameObject.FindGameObjectWithTag("Player");
+        if (player != null)
+        {
+            character = player.GetComponent<CharacterCore>();
+        }
 
         // 判空校验，避免空引用
         if (anim == null) Debug.LogError($"[{gameObject.name}] 缺少Animator组件！");
@@ -31,9 +39,21 @@ public class InkBall : MonoBehaviour
         Destroy(gameObject, autoDestroyTime);
     }
 
+    public void Init(InkAttackRuntimeConfig config)
+    {
+        maxHitCount = Mathf.Max(1, config.maxHitCount);
+        debuffConfig = config.debuff;
+        speed *= Mathf.Max(0.01f, config.speedMultiplier);
+        autoDestroyTime *= Mathf.Max(0.01f, config.lifetimeMultiplier);
+        transform.localScale *= Mathf.Max(0.01f, config.projectileScale);
+    }
+
     private void FixedUpdate()
     {
-        damage = character.stats.attackDamage;
+        if (character != null)
+        {
+            damage = character.stats.attackDamage;
+        }
 
         if (isHit) return;
         rb.velocity = transform.right * speed;
@@ -42,36 +62,73 @@ public class InkBall : MonoBehaviour
     private void OnTriggerEnter2D(Collider2D other)
     {
         if (isHit) return;
-        isHit = true;
 
-        // 停止移动
-        rb.velocity = Vector2.zero;
-
-        // 获得敌人脚本CharacterCore
         CharacterCore enemyCore = other.GetComponent<CharacterCore>();
-        if (enemyCore != null && character != null)
+        if (enemyCore != null && enemyCore != character && character != null)
         {
-            // 对敌人造成伤害
+            if (hitTargets.Contains(enemyCore))
+            {
+                return;
+            }
+
+            hitTargets.Add(enemyCore);
             enemyCore.TakeDamage(damage);
+            ApplyDebuff(enemyCore);
+
+            if (hitTargets.Count < maxHitCount)
+            {
+                return;
+            }
         }
 
-        // 播放命中动画（判空保护）
-        if (anim != null)
-            anim.SetTrigger("IsHit");
+        FinishHit();
+    }
 
-        // 关闭碰撞器，避免重复触发
+    private void ApplyDebuff(CharacterCore enemyCore)
+    {
+        if (!debuffConfig.HasSlow && !debuffConfig.HasKnockback)
+        {
+            return;
+        }
+
+        if (enemyCore.GetComponent<EnemyStatsManager>() == null && enemyCore.GetComponent<EnemyMove>() == null)
+        {
+            return;
+        }
+
+        InkDebuffReceiver receiver = enemyCore.GetComponent<InkDebuffReceiver>();
+        if (receiver == null)
+        {
+            receiver = enemyCore.gameObject.AddComponent<InkDebuffReceiver>();
+        }
+
+        receiver.Apply(debuffConfig, transform.right);
+    }
+
+    private void FinishHit()
+    {
+        isHit = true;
+
+        if (rb != null)
+        {
+            rb.velocity = Vector2.zero;
+        }
+
+        if (anim != null)
+        {
+            anim.SetTrigger("IsHit");
+        }
+
         Collider2D col = GetComponent<Collider2D>();
         if (col != null)
+        {
             col.enabled = false;
+        }
 
-        // 取消原本的10秒自动销毁，避免和动画事件冲突
         CancelInvoke(nameof(Destroy));
-
-        // 避免卡死
         Destroy(gameObject, hitDestroyDelay);
     }
 
-    // 命中动画播完后销毁
     public void DestroyAfterHit()
     {
         Destroy(gameObject);
