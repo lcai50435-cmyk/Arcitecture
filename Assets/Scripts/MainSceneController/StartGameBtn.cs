@@ -11,6 +11,6 @@ public class StartGameBtn : MonoBehaviour
     void OnClick()
     {
         Debug.Log("开始游戏按钮点击成功！");
-        SceneLoader.Instance.ToGame();
+        SceneLoader.Instance.ToBase();
     }
 }

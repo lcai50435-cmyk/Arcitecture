@@ -8,7 +8,8 @@ public class SceneLoader : MonoBehaviour
     [SerializeField] private Animator animator;
     [SerializeField] private float fadeDuration = 1f;
     [SerializeField] private int mainMenuIndex = 0;
-    [SerializeField] private int gameSceneIndex = 1;
+    [SerializeField] private int baseSceneIndex = 1;
+    [SerializeField] private int gameSceneIndex = 2;
 
     public static SceneLoader Instance;
     private bool isBusy;
@@ -39,6 +40,7 @@ public class SceneLoader : MonoBehaviour
         }
     }
 
+    public void ToBase() => SwitchScene(baseSceneIndex);
     public void ToGame() => SwitchScene(gameSceneIndex);
     public void ToMenu() => SwitchScene(mainMenuIndex);
 
