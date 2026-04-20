@@ -17,6 +17,7 @@ public class BaseHubBootstrapper : MonoBehaviour
     private Sprite generatedPlayerSprite;
     private Sprite generatedBookSprite;
     private Sprite generatedSpiritSprite;
+    private Sprite generatedGateSprite;
     private Sprite generatedFloorSprite;
 
     private void Start()
@@ -52,6 +53,7 @@ public class BaseHubBootstrapper : MonoBehaviour
 
         CreateBookInteractable(uiController);
         CreateSpiritInteractable(uiController);
+        CreateGameSceneInteractable();
     }
 
     private void EnsureCamera()
@@ -382,6 +384,21 @@ public class BaseHubBootstrapper : MonoBehaviour
         interact.Configure(uiController);
     }
 
+    private void CreateGameSceneInteractable()
+    {
+        GameObject gate = CreateWorldObject(
+            "GameSceneGateInteractable",
+            new Vector3(0f, 2.9f, 0f),
+            GetOrCreateGeneratedSprite(ref generatedGateSprite, new Color(0.78f, 0.58f, 0.28f, 1f)),
+            new Vector3(1.8f, 0.55f, 1f));
+
+        BoxCollider2D trigger = gate.AddComponent<BoxCollider2D>();
+        trigger.isTrigger = true;
+        trigger.size = new Vector2(1.4f, 1.2f);
+
+        gate.AddComponent<BaseHubGameSceneInteract>();
+    }
+
     private GameObject CreateWorldObject(string name, Vector3 position, Sprite sprite, Vector3 scale)
     {
         GameObject obj = new GameObject(name);
@@ -455,6 +472,7 @@ public class BaseHubBootstrapper : MonoBehaviour
         GameObject textObject = CreateUIObject(name, parent);
         TextMeshProUGUI text = textObject.AddComponent<TextMeshProUGUI>();
         text.text = value;
+        text.font = TMP_Settings.defaultFontAsset;
         text.fontSize = fontSize;
         text.color = color;
         text.alignment = alignment;
