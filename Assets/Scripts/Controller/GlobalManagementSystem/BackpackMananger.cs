@@ -3,18 +3,19 @@ using UnityEditorInternal.Profiling.Memory.Experimental;
 using UnityEngine;
 
 /// <summary>
-/// 专门存储背包物品数据的核心类
-/// 固定6格，不再使用 RemoveAt 左移
+/// 管理存储建筑道具数据的背包
+/// 固定6格，禁止使用 RemoveAt 方法
 /// </summary>
 public class BackpackMananger : MonoBehaviour
 {
     public static BackpackMananger Instance;
 
     [HideInInspector]
-    public List<ArchitecturalCrystal> backpackItems = new List<ArchitecturalCrystal>();
+    // 关键修改：改为可空结构体类型
+    public List<ArchitecturalCrystal?> backpackItems = new List<ArchitecturalCrystal?>();
 
     private int maxCapacity = 6;
-    private HashSet<ArchitecturalType> alreadyPickedTypes = new HashSet<ArchitecturalType>(); // 是否第一次捡到物品
+    private HashSet<ArchitecturalType> alreadyPickedTypes = new HashSet<ArchitecturalType>(); // 是否第一次拾取该道具
 
     public delegate void FirstPickTipEvent(ArchitecturalCrystal crystal);
     public event FirstPickTipEvent OnFirstTimePickItemType;
@@ -26,10 +27,10 @@ public class BackpackMananger : MonoBehaviour
             Instance = this;
             DontDestroyOnLoad(gameObject);
 
-            // 初始化固定6格
+            // 初始化固定6格（初始值为 null）
             while (backpackItems.Count < maxCapacity)
             {
-                backpackItems.Add(null);
+                backpackItems.Add(null); // 可空结构体支持 null 赋值
             }
         }
         else
@@ -46,7 +47,8 @@ public class BackpackMananger : MonoBehaviour
         int count = 0;
         for (int i = 0; i < backpackItems.Count; i++)
         {
-            if (backpackItems[i] != null)
+            // 关键修改：判断可空类型是否有值
+            if (backpackItems[i].HasValue)
             {
                 count++;
             }
@@ -55,7 +57,7 @@ public class BackpackMananger : MonoBehaviour
     }
 
     /// <summary>
-    /// 拾取物品加入背包（放入第一个空格）
+    /// 拾取道具并放入背包第一个空位置
     /// </summary>
     public bool PickItem(ArchitecturalCrystal crystal)
     {
@@ -63,6 +65,7 @@ public class BackpackMananger : MonoBehaviour
 
         for (int i = 0; i < backpackItems.Count; i++)
         {
+            // 关键修改：判断是否为 null（空位置）
             if (backpackItems[i] == null)
             {
                 emptyIndex = i;
@@ -72,7 +75,7 @@ public class BackpackMananger : MonoBehaviour
 
         if (emptyIndex == -1)
         {
-            Debug.LogWarning("背包已满，无法拾取！");
+            Debug.LogWarning("背包已满无法拾取");
             return false;
         }
 
@@ -81,7 +84,7 @@ public class BackpackMananger : MonoBehaviour
         if (isFirstPick)
         {
             alreadyPickedTypes.Add(crystal.type);
-            Debug.Log($"玩家第一次捡起{crystal.type}物品");
+            Debug.Log($"第一次拾取{crystal.type}道具");
             OnFirstTimePickItemType?.Invoke(crystal);
         }
 
@@ -98,9 +101,9 @@ public class BackpackMananger : MonoBehaviour
             crystal.isUnlockMaterial
         );
 
-        backpackItems[emptyIndex] = newItem;
+        backpackItems[emptyIndex] = newItem; // 可空类型接收结构体值
 
-        // 拾取道具时，根据格子索引添加属性加成
+        // 拾取道具时立即添加对应的属性加成
         if (PlayerAttributeManager.Instance != null)
         {
             PlayerAttributeManager.Instance.AddBonus(
@@ -111,51 +114,63 @@ public class BackpackMananger : MonoBehaviour
             );
         }
 
-        Debug.Log($"拾取{newItem.type}，放入背包格子：{emptyIndex}");
+        Debug.Log($"拾取{newItem.type}放入背包位置：{emptyIndex}");
         return true;
     }
 
     /// <summary>
-    /// 删除指定索引的物品（改为置空，不左移）
+    /// 删除指定索引位置的道具（置为空，不是移除）
     /// </summary>
     public void RemoveItem(int index)
     {
         if (index >= 0 && index < backpackItems.Count)
         {
-            // 移除道具时扣除相应属性加成
-            if (PlayerAttributeManager.Instance != null)
+            // 关键修改：先判断是否有值，再移除属性加成
+            if (backpackItems[index].HasValue && PlayerAttributeManager.Instance != null)
             {
+                var item = backpackItems[index].Value; // 取可空类型的实际值
                 PlayerAttributeManager.Instance.RemoveBonus(
-                    backpackItems[index].bonusType,
-                    backpackItems[index].bonusValue,
-                    backpackItems[index].subBonusType,
-                    backpackItems[index].subBonusValue);
+                    item.bonusType,
+                    item.bonusValue,
+                    item.subBonusType,
+                    item.subBonusValue);
             }
 
-            backpackItems[index] = null;
-            Debug.Log($"清空第{index}个格子物品");
+            backpackItems[index] = null; // 置为 null 标记空位置
+            Debug.Log($"移除了{index}位置的道具");
         }
     }
 
     /// <summary>
-    /// 获取指定索引的物品
+    /// 获取指定索引位置的道具
     /// </summary>
-    public ArchitecturalCrystal GetItem(int index)
+    /// <returns>有值则返回结构体，无值返回 null</returns>
+    public ArchitecturalCrystal? GetItem(int index)
     {
         if (index >= 0 && index < backpackItems.Count)
         {
-            return backpackItems[index];
+            return backpackItems[index]; // 直接返回可空类型
         }
         return null;
     }
 
     /// <summary>
-    /// 清空所有物品
+    /// 清空所有道具
     /// </summary>
     public void ClearAllItems()
     {
         for (int i = 0; i < backpackItems.Count; i++)
         {
+            // 清空时也要移除属性加成
+            if (backpackItems[i].HasValue && PlayerAttributeManager.Instance != null)
+            {
+                var item = backpackItems[i].Value;
+                PlayerAttributeManager.Instance.RemoveBonus(
+                    item.bonusType,
+                    item.bonusValue,
+                    item.subBonusType,
+                    item.subBonusValue);
+            }
             backpackItems[i] = null;
         }
         Debug.Log("背包已清空");

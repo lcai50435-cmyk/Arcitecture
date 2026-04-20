@@ -9,6 +9,7 @@ using UnityEngine;
 public class CharacterCore : MonoBehaviour
 {
     public CharacterStats stats; // 角色相关变量
+    public CharacterStats baseStats; // 记录角色相关变量
 
     [Header("角色目前血量")]
     public float currentHp; // 角色目前血量
@@ -22,6 +23,7 @@ public class CharacterCore : MonoBehaviour
     private void Awake()
     {
         currentHp = stats.maxHp; // 满血状态
+        baseStats = stats; // // 保存原始基础属性
     }
 
     /// <summary>

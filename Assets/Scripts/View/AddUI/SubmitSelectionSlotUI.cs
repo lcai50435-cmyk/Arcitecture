@@ -30,9 +30,9 @@ public class SubmitSelectionSlotUI : MonoBehaviour
         }
     }
 
-    public void Refresh(ArchitecturalCrystal item)
+    public void Refresh(ArchitecturalCrystal item, bool hasValidItem)
     {
-        if (item != null)
+        if (hasValidItem) // 替代原有的 if (item != null)
         {
             if (iconImage != null)
             {
@@ -43,11 +43,11 @@ public class SubmitSelectionSlotUI : MonoBehaviour
 
             if (button != null)
             {
-                // 专用点亮道具：不能提交，所以按钮禁用
+                // 特殊的物品判定：如果是解锁材料则按钮不可点击
                 button.interactable = !item.isUnlockMaterial;
             }
         }
-        else
+        else // 替代原有的 else (item == null)
         {
             if (iconImage != null)
             {
@@ -61,6 +61,7 @@ public class SubmitSelectionSlotUI : MonoBehaviour
             }
         }
     }
+
 
     private void OnClickSlot()
     {

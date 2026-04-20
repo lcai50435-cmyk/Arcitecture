@@ -8,13 +8,12 @@ using UnityEngine.UI;
 public class BackpackUI : MonoBehaviour
 {
     [Header("背包格子（拖入6个Image组件）")]
-    public Image[] backPackGrid; // 改为Image数组
+    public Image[] backPackGrid;
     private BackpackMananger backpack;
 
     private void Start()
     {
         backpack = BackpackMananger.Instance;
-        // 初始化UI（防止场景启动时格子有残留图片）
         RefreshUI();
     }
 
@@ -32,11 +31,16 @@ public class BackpackUI : MonoBehaviour
                 continue;
             }
 
-            ArchitecturalCrystal item = backpack.GetItem(i);
-            if (item != null)
+            // ======================
+            // 关键修改：可空结构体
+            // ======================
+            ArchitecturalCrystal? item = backpack.GetItem(i);
+
+            if (item.HasValue)
             {
                 // 有物品：显示背包图标
-                image.sprite = item.backIcon;
+                ArchitecturalCrystal crystal = item.Value;
+                image.sprite = crystal.backIcon;
                 image.enabled = true;
             }
             else

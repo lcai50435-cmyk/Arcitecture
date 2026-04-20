@@ -19,16 +19,7 @@ public class BackpackSlot : MonoBehaviour, IPointerDownHandler, IPointerUpHandle
 
     void Start()
     {
-        slotImage = GetComponent<Image>(); // 获取Image组件
-        backpack = BackpackMananger.Instance;
-        backpackUI = FindObjectOfType<BackpackUI>();
-
-        if (slotImage == null)
-        {
-            Debug.LogError($"BackpackSlot {slotIndex}: 缺少Image组件！");
-        }
-
-        // 如果没有Image组件，自动添加
+        // 修复重复获取组件的问题
         slotImage = GetComponent<Image>();
         if (slotImage == null)
         {
@@ -38,9 +29,13 @@ public class BackpackSlot : MonoBehaviour, IPointerDownHandler, IPointerUpHandle
 
         backpack = BackpackMananger.Instance;
         backpackUI = FindObjectOfType<BackpackUI>();
+
+        if (backpack == null)
+        {
+            Debug.LogError($"BackpackSlot {slotIndex}: 未找到BackpackMananger实例！");
+        }
     }
 
-    
     void Update()
     {
         if (!isHolding) return;
@@ -82,8 +77,10 @@ public class BackpackSlot : MonoBehaviour, IPointerDownHandler, IPointerUpHandle
             return;
         }
 
-        ArchitecturalCrystal item = backpack.GetItem(slotIndex);
-        if (item == null)
+        // 关键修改1：接收可空类型
+        ArchitecturalCrystal? item = backpack.GetItem(slotIndex);
+        // 关键修改2：判空改为 HasValue
+        if (!item.HasValue)
         {
             Debug.Log($"格子{slotIndex}没有物品，无法丢弃");
             return;
@@ -95,7 +92,7 @@ public class BackpackSlot : MonoBehaviour, IPointerDownHandler, IPointerUpHandle
             return;
         }
 
-        Debug.Log($"开始长按格子{slotIndex}，物品：{item.type}");
+        Debug.Log($"开始长按格子{slotIndex}，物品：{item.Value.type}");
         isHolding = true;
         holdTimer = 0;
     }
@@ -110,8 +107,13 @@ public class BackpackSlot : MonoBehaviour, IPointerDownHandler, IPointerUpHandle
     {
         if (backpack == null) return;
 
-        ArchitecturalCrystal item = backpack.GetItem(slotIndex);
-        if (item == null) return;
+        // 关键修改3：接收可空类型
+        ArchitecturalCrystal? item = backpack.GetItem(slotIndex);
+        // 关键修改4：判空改为 HasValue
+        if (!item.HasValue) return;
+
+        // 关键修改5：通过 Value 获取结构体实际值
+        var crystal = item.Value;
 
         // 获取玩家位置
         GameObject player = GameObject.FindGameObjectWithTag("Player");
@@ -121,37 +123,41 @@ public class BackpackSlot : MonoBehaviour, IPointerDownHandler, IPointerUpHandle
             return;
         }
 
-        // 生成掉落物（场景中的2D物体，使用SpriteRenderer）
-        GameObject dropObj = new GameObject($"Drop_{item.type}");
+        // 生成掉落物
+        GameObject dropObj = new GameObject($"Drop_{crystal.type}");
 
-        // 物品生成位置：玩家位置 + 朝向偏移（避免卡在玩家身上）
+        // 物品生成位置：玩家位置 + 朝向偏移
         float faceDir = player.transform.localScale.x > 0 ? 1 : -1;
         dropObj.transform.position = new Vector2(
             player.transform.position.x + faceDir * 0.2f, // X轴偏移
             player.transform.position.y // Y轴与玩家齐平
         );
 
-        // 添加SpriteRenderer（掉落物在场景中，不是UI）
+        // 添加SpriteRenderer
         SpriteRenderer ren = dropObj.AddComponent<SpriteRenderer>();
-        ren.sprite = item.icon; // 使用物品图标
+        ren.sprite = crystal.icon; // 使用物品图标
         ren.sortingOrder = 0; // 设置图层
+
+        // 设置大小
+        Transform tran = dropObj.transform;
+        tran.localScale = new Vector3(0.3f, 0.3f, 0.3f);
 
         // 添加碰撞器
         CircleCollider2D collider = dropObj.AddComponent<CircleCollider2D>();
         collider.isTrigger = true;
-        // collider.radius = 0.6f; // 适配2D物品大小
 
         // 添加交互组件
         CrystalInteractHandler script = dropObj.AddComponent<CrystalInteractHandler>();
-        script.type = item.type;
-        script.expValue = item.expValue;
-        script.icon = item.icon;
-        script.backIcon = item.backIcon;
-        script.textDescription = item.textDescription;
-        script.bonusType = item.bonusType;
-        script.bonusValue = item.bonusValue;
-        script.bonusType = item.subBonusType;
-        script.bonusValue = item.subBonusValue;
+        script.type = crystal.type;
+        script.expValue = crystal.expValue;
+        script.icon = crystal.icon;
+        script.backIcon = crystal.backIcon;
+        script.textDescription = crystal.textDescription;
+        script.bonusType = crystal.bonusType;
+        script.bonusValue = crystal.bonusValue;
+        // 修复原代码笔误：subBonusType 被覆盖的问题
+        script.subBonusType = crystal.subBonusType;
+        script.subBonusValue = crystal.subBonusValue;
 
         // 从背包移除物品
         backpack.RemoveItem(slotIndex);
@@ -166,6 +172,6 @@ public class BackpackSlot : MonoBehaviour, IPointerDownHandler, IPointerUpHandle
             Debug.LogError("BackpackUI未找到！");
         }
 
-        Debug.Log($"格子{slotIndex}的物品{item.type}已丢弃");
+        Debug.Log($"格子{slotIndex}的物品{crystal.type}已丢弃");
     }
 }

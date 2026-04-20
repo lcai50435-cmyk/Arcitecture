@@ -59,14 +59,16 @@ public class Dialog : MonoBehaviour
     /// </summary>
     private void ShowDialogByCrystal(ArchitecturalCrystal crystal)
     {
-        if (crystal == null) return;
+        // 修复点：用唯一标识判断是否为“空”（示例：假设 type 是枚举，默认值为 0/None）
+        if (crystal.type == default) return;
 
         string desc = string.IsNullOrEmpty(crystal.textDescription)
-            ? $"获得 {crystal.type}！\n构建度 +{crystal.expValue}"
+            ? $"获得 {crystal.type}！\n经验值 +{crystal.expValue}"
             : crystal.textDescription;
 
         ShowAutoDialog(desc);
     }
+
 
     /// <summary>
     /// 自动关闭弹窗（拾取提示用）

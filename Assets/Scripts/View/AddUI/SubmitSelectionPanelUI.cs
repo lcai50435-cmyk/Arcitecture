@@ -136,22 +136,25 @@ public class SubmitSelectionPanelUI : MonoBehaviour
     {
         if (backpack == null) return;
 
-        ArchitecturalCrystal item = backpack.GetItem(slotIndex);
-        if (item == null)
+        // 修复点1：接收可空值类型，并判断HasValue
+        ArchitecturalCrystal? nullableItem = backpack.GetItem(slotIndex);
+        if (!nullableItem.HasValue) // 替代 item == null 判断
         {
-            Debug.Log($"点击的背包索引 {slotIndex} 是空的");
+            Debug.Log($"背包的物品槽 {slotIndex} 是空的");
             return;
         }
+        // 提取非空值
+        ArchitecturalCrystal item = nullableItem.Value;
 
-        // 第一次点击：选中
+        // 第一次点击选中
         if (selectedIndex != slotIndex)
         {
             selectedIndex = slotIndex;
-            Debug.Log($"第一次点击，选中背包索引：{slotIndex}");
+            Debug.Log($"首次点击选中物品槽，索引：{slotIndex}");
             return;
         }
 
-        // 第二次点击同一个：提交给当前建筑
+        // 第二次点击同一物品提交到当前建筑
         if (playerGetArchitectural != null)
         {
             playerGetArchitectural.SubmitSingleItemToBuilding(slotIndex, currentTargetBuilding);
@@ -178,22 +181,24 @@ public class SubmitSelectionPanelUI : MonoBehaviour
             return;
         }
 
-        Debug.Log($"刷新提交窗口，背包数量：{backpack.GetOccupiedCount()}");
+        Debug.Log($"刷新提交面板，当前物品数{backpack.GetOccupiedCount()}");
 
         for (int i = 0; i < slotUIs.Length; i++)
         {
             if (slotUIs[i] == null)
             {
-                Debug.LogWarning($"slotUIs[{i}] 没有绑定");
+                Debug.LogWarning($"slotUIs[{i}] 未赋值");
                 continue;
             }
 
             int realIndex = slotUIs[i].slotIndex;
-            ArchitecturalCrystal item = backpack.GetItem(realIndex);
+            // 修复点2：RefreshPanel 中同样处理可空值类型
+            ArchitecturalCrystal? nullableItem = backpack.GetItem(realIndex);
+            ArchitecturalCrystal item = nullableItem.HasValue ? nullableItem.Value : default;
+            // 新增：传递「是否有有效物品」的标记（给 SlotUI 用）
+            slotUIs[i].Refresh(item, nullableItem.HasValue);
 
-            Debug.Log($"窗口格子 {slotUIs[i].gameObject.name} -> 背包索引 {realIndex} -> {(item == null ? "空" : item.type.ToString())}");
-
-            slotUIs[i].Refresh(item);
+            Debug.Log($"物品槽 {slotUIs[i].gameObject.name} -> 实际索引 {realIndex} -> {(nullableItem.HasValue ? item.type.ToString() : "空")}");
         }
     }
 }

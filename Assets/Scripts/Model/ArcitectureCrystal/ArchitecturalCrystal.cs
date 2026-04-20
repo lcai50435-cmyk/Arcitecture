@@ -24,7 +24,7 @@ public enum AttributeBonusType
 /// <summary>
 /// 建筑结构物品相关信息
 /// </summary>
-public class ArchitecturalCrystal
+public struct ArchitecturalCrystal
 {
     public ArchitecturalType type;   // 建筑类型
     public int expValue;             // 建筑构建度
