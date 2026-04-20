@@ -1,14 +1,19 @@
-using System.Collections;
-using System.Collections.Generic;
-using TMPro;
 using UnityEngine;
 
 // 建筑结构物品类型
 public enum ArchitecturalType
 {
-    Gold,   // 金色 30
-    White,  // 白色 10
-    Green   // 绿色 20
+    Gold,
+    White,
+    Green
+}
+
+public enum AttributeBonusType
+{
+    MaxHealth, // 血量上限
+    MoveSpeed, // 移动速度
+    AttackPower, // 攻击力
+    Defense // 防御力
 }
 
 /// <summary>
@@ -16,27 +21,36 @@ public enum ArchitecturalType
 /// </summary>
 public class ArchitecturalCrystal
 {
-    public ArchitecturalType type; // 建筑类型
-    public int expValue;  // 建筑构建度
-    public Sprite icon; // 物品图标
-    public Sprite backIcon; // 物品背包图标
-    public string textDescription;  // 建筑结构描述
+    public ArchitecturalType type;   // 建筑类型
+    public int expValue;             // 建筑构建度
+    public Sprite icon;              // 场景图标
+    public Sprite backIcon;          // 背包图标
+    public string textDescription;   // 描述文本
 
-    /// <summary>
-    /// 快速创建建筑结构物品
-    /// </summary>
-    /// <param name="type"></param>
-    /// <param name="expValue"></param>
-    /// <param name="icon"></param>
-    /// <param name="backIcon"></param>
-    /// <param name="textDescription"></param>
-    public ArchitecturalCrystal(ArchitecturalType type, int expValue, Sprite icon, 
-        Sprite backIcon, string textDescription)
+    // 属性相关加成
+    public AttributeBonusType bonusType;
+    public float bonusValue;
+
+    // 是否为专用点亮道具
+    public bool isUnlockMaterial;
+
+    public ArchitecturalCrystal(
+        ArchitecturalType type,
+        int expValue,
+        Sprite icon,
+        Sprite backIcon,
+        string textDescription, 
+        AttributeBonusType bonusType,
+        float bonusValue,
+        bool isUnlockMaterial = false)
     {
         this.type = type;
         this.expValue = expValue;
         this.icon = icon;
         this.backIcon = backIcon;
         this.textDescription = textDescription;
+        this.bonusType = bonusType;
+        this.bonusValue = bonusValue;
+        this.isUnlockMaterial = isUnlockMaterial;
     }
 }

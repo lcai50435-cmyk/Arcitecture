@@ -6,23 +6,31 @@ TagManager:
   tags:
   - Enemy
   - Catalogue
+  - Obstacle
+  - Building
+  - Water
+  - Ground
+  - Crack
+  - Interactive
+  - StoneEnemy
+  - FireEnemy
   layers:
   - Default
   - TransparentFX
   - Ignore Raycast
-  - 
+  - Building
   - Water
   - UI
   - Player
   - BackpackUI
   - Catagloue
-  - 
-  - 
-  - 
-  - 
-  - 
-  - 
-  - 
+  - Obstacle
+  - Ground
+  - Crack
+  - Enemy
+  - Interactive
+  - Weapon
+  - FireBall
   - 
   - 
   - 

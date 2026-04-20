@@ -18,18 +18,28 @@ public class PlayerMove : MonoBehaviour
     private float lastInputY;
 
     private float moveSpeed; // 速度
-    
+
+    [HideInInspector] public bool canMove = true;
+
+    // 挂载朝向跟踪组件
+    private DirectionTracker directionTracker;
+
     private void Awake()
     {
         core = GetComponent<CharacterCore>();
 
-        moveSpeed = core.stats.moveSpeed;
+        // 获取朝向跟踪组件
+        directionTracker = GetComponent<DirectionTracker>();
     }
 
     void Update()
     {
         // 若脚本禁用则直接不处理
-        if (!enabled) return;
+        // if (!enabled) return;
+
+        moveSpeed = core.stats.moveSpeed;
+
+        if (!canMove) return;
 
         float inputX = Input.GetAxisRaw("Horizontal"); 
         float inputY = Input.GetAxisRaw("Vertical");
@@ -41,19 +51,20 @@ public class PlayerMove : MonoBehaviour
             inputX = 0;
         }
 
+        Vector2 currentMoveDir = new Vector2(inputX, inputY);
         // 判断是否移动
         bool isMoving = Mathf.Abs(inputX) > 0.1f || Mathf.Abs(inputY) > 0.1f;
 
+        // 关键：更新朝向到工具类
         if (isMoving)
         {
-            lastInputX = inputX;
-            lastInputY = inputY;
+            directionTracker.UpdateMoveDirection(currentMoveDir);
         }
 
-
-        // 每一帧都更新动画
-        animator.SetFloat("InputX", lastInputX);
-        animator.SetFloat("InputY", lastInputY);
+        // 从工具类获取最后朝向，更新动画
+        Vector2 lastDir = directionTracker.LastDirection;
+        animator.SetFloat("InputX", lastDir.x);
+        animator.SetFloat("InputY", lastDir.y);
         animator.SetBool("IsMoving", isMoving);
 
         // 移动
