@@ -21,6 +21,11 @@ public class CharacterCore : MonoBehaviour
 
     private void Awake()
     {
+        if (stats == null)
+        {
+            stats = new CharacterStats();
+        }
+
         currentHp = stats.maxHp; // ÂúÑª×´Ì¬
     }
 

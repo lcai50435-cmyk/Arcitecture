@@ -27,6 +27,10 @@ public class PlayerMove : MonoBehaviour
     private void Awake()
     {
         core = GetComponent<CharacterCore>();
+        if (rb == null)
+        {
+            rb = GetComponent<Rigidbody2D>();
+        }
 
         // 获取朝向跟踪组件
         directionTracker = GetComponent<DirectionTracker>();
@@ -36,6 +40,8 @@ public class PlayerMove : MonoBehaviour
     {
         // 若脚本禁用则直接不处理
         // if (!enabled) return;
+
+        if (core == null || core.stats == null) return;
 
         moveSpeed = core.stats.moveSpeed;
 
@@ -58,16 +64,22 @@ public class PlayerMove : MonoBehaviour
         // 关键：更新朝向到工具类
         if (isMoving)
         {
-            directionTracker.UpdateMoveDirection(currentMoveDir);
+            directionTracker?.UpdateMoveDirection(currentMoveDir);
         }
 
         // 从工具类获取最后朝向，更新动画
-        Vector2 lastDir = directionTracker.LastDirection;
-        animator.SetFloat("InputX", lastDir.x);
-        animator.SetFloat("InputY", lastDir.y);
-        animator.SetBool("IsMoving", isMoving);
+        Vector2 lastDir = directionTracker != null ? directionTracker.LastDirection : Vector2.down;
+        if (animator != null)
+        {
+            animator.SetFloat("InputX", lastDir.x);
+            animator.SetFloat("InputY", lastDir.y);
+            animator.SetBool("IsMoving", isMoving);
+        }
 
         // 移动
-        rb.velocity = new Vector2(inputX, inputY) * moveSpeed;
+        if (rb != null)
+        {
+            rb.velocity = new Vector2(inputX, inputY) * moveSpeed;
+        }
     }
 }
