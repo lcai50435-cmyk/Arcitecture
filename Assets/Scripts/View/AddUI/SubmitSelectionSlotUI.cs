@@ -3,13 +3,13 @@ using UnityEngine.UI;
 
 public class SubmitSelectionSlotUI : MonoBehaviour
 {
-    [Header("²ÛÎ»Ë÷Òı£¨ÊÖ¶¯ÌîĞ´£©")]
+    [Header("æ§½ä½ç´¢å¼•ï¼ˆæ‰‹åŠ¨å¡«å†™ï¼‰")]
     public int slotIndex;
 
-    [Header("°´Å¥")]
+    [Header("æŒ‰é’®")]
     public Button button;
 
-    [Header("Í¼±êÍ¼Æ¬£¨ÍÏ Slot_X/Icon£©")]
+    [Header("å›¾æ ‡å›¾ç‰‡ï¼ˆæ‹– Slot_X/Iconï¼‰")]
     public Image iconImage;
 
     private SubmitSelectionPanelUI owner;
@@ -32,7 +32,7 @@ public class SubmitSelectionSlotUI : MonoBehaviour
 
     public void Refresh(ArchitecturalCrystal item, bool hasValidItem)
     {
-        if (hasValidItem) // Ìæ´úÔ­ÓĞµÄ if (item != null)
+        if (hasValidItem)
         {
             if (iconImage != null)
             {
@@ -43,11 +43,10 @@ public class SubmitSelectionSlotUI : MonoBehaviour
 
             if (button != null)
             {
-                // ÌØÊâµÄÎïÆ·ÅĞ¶¨£ºÈç¹ûÊÇ½âËø²ÄÁÏÔò°´Å¥²»¿Éµã»÷
-                button.interactable = !item.isUnlockMaterial;
+                button.interactable = item.IsCommonStructure;
             }
         }
-        else // Ìæ´úÔ­ÓĞµÄ else (item == null)
+        else
         {
             if (iconImage != null)
             {
@@ -65,7 +64,6 @@ public class SubmitSelectionSlotUI : MonoBehaviour
 
     private void OnClickSlot()
     {
-        Debug.Log($"µã»÷ÁË´°¿Ú¸ñ×Ó£¬slotIndex = {slotIndex}£¬ÎïÌåÃû = {gameObject.name}");
         owner?.OnSlotClicked(slotIndex);
     }
 }

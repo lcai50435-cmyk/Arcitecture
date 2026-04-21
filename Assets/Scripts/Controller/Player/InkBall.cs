@@ -3,17 +3,20 @@ using UnityEngine;
 
 public class InkBall : MonoBehaviour
 {
-    [Header("基础设置")]
+    [Header("鍩虹璁剧疆")]
     public float speed = 6f;
-    public float autoDestroyTime = 10f; // 未命中10秒自动销毁
-    public float hitDestroyDelay = 3f;  // 命中后兜底销毁延迟
+    public float autoDestroyTime = 10f;
+    public float hitDestroyDelay = 0.25f;
     public CharacterCore character;
 
     private float damage;
     private Animator anim;
     private Rigidbody2D rb;
-    private bool isHit = false;
+    private bool isHit;
     private int maxHitCount = 1;
+    private bool explodeOnHit;
+    private float explosionRadius = 1.35f;
+    private float explosionDamageMultiplier = 1f;
     private InkDebuffRuntimeConfig debuffConfig;
     private readonly HashSet<CharacterCore> hitTargets = new HashSet<CharacterCore>();
 
@@ -26,26 +29,24 @@ public class InkBall : MonoBehaviour
         {
             character = player.GetComponent<CharacterCore>();
         }
-
-        // 判空校验，避免空引用
-        if (anim == null) Debug.LogError($"[{gameObject.name}] 缺少Animator组件！");
-        if (rb == null) Debug.LogError($"[{gameObject.name}] 缺少Rigidbody2D组件！");
-        if (character == null) Debug.LogError($"[{gameObject.name}] 未绑定玩家CharacterCore！");
     }
 
     private void Start()
     {
-        // 未命中10秒自动销毁
-        Destroy(gameObject, autoDestroyTime);
+        ScheduleDestroyTimer();
     }
 
     public void Init(InkAttackRuntimeConfig config)
     {
         maxHitCount = Mathf.Max(1, config.maxHitCount);
         debuffConfig = config.debuff;
-        speed *= Mathf.Max(0.01f, config.speedMultiplier);
-        autoDestroyTime *= Mathf.Max(0.01f, config.lifetimeMultiplier);
+        explodeOnHit = config.explodeOnHit;
+        explosionRadius = Mathf.Max(0.25f, config.explosionRadius);
+        explosionDamageMultiplier = Mathf.Max(0f, config.explosionDamageMultiplier);
+        speed = Mathf.Max(0.01f, config.baseProjectileSpeed * config.speedMultiplier);
+        autoDestroyTime = Mathf.Max(0.05f, config.baseProjectileLifetime * config.lifetimeMultiplier);
         transform.localScale *= Mathf.Max(0.01f, config.projectileScale);
+        ScheduleDestroyTimer();
     }
 
     private void FixedUpdate()
@@ -55,13 +56,20 @@ public class InkBall : MonoBehaviour
             damage = character.stats.attackDamage;
         }
 
-        if (isHit) return;
+        if (isHit || rb == null)
+        {
+            return;
+        }
+
         rb.velocity = transform.right * speed;
     }
 
     private void OnTriggerEnter2D(Collider2D other)
     {
-        if (isHit) return;
+        if (isHit)
+        {
+            return;
+        }
 
         CharacterCore enemyCore = other.GetComponent<CharacterCore>();
         if (enemyCore != null && enemyCore != character && character != null)
@@ -71,11 +79,14 @@ public class InkBall : MonoBehaviour
                 return;
             }
 
-            hitTargets.Add(enemyCore);
-            enemyCore.TakeDamage(damage);
-            ApplyDebuff(enemyCore);
+            ApplyHit(enemyCore, damage, true);
 
-            if (hitTargets.Count < maxHitCount)
+            if (explodeOnHit)
+            {
+                ApplyExplosion();
+            }
+
+            if (!explodeOnHit && hitTargets.Count < maxHitCount)
             {
                 return;
             }
@@ -84,14 +95,40 @@ public class InkBall : MonoBehaviour
         FinishHit();
     }
 
-    private void ApplyDebuff(CharacterCore enemyCore)
+    private void ApplyExplosion()
     {
-        if (!debuffConfig.HasSlow && !debuffConfig.HasKnockback)
+        Collider2D[] hits = Physics2D.OverlapCircleAll(transform.position, explosionRadius);
+        for (int i = 0; i < hits.Length; i++)
+        {
+            CharacterCore enemyCore = hits[i].GetComponent<CharacterCore>();
+            if (enemyCore == null || enemyCore == character || hitTargets.Contains(enemyCore))
+            {
+                continue;
+            }
+
+            ApplyHit(enemyCore, damage * explosionDamageMultiplier, false);
+        }
+    }
+
+    private void ApplyHit(CharacterCore enemyCore, float hitDamage, bool countHit)
+    {
+        if (enemyCore == null)
         {
             return;
         }
 
-        if (enemyCore.GetComponent<EnemyStatsManager>() == null && enemyCore.GetComponent<EnemyMove>() == null)
+        if (countHit)
+        {
+            hitTargets.Add(enemyCore);
+        }
+
+        enemyCore.TakeDamage(hitDamage);
+        ApplyDebuff(enemyCore, hitDamage);
+    }
+
+    private void ApplyDebuff(CharacterCore enemyCore, float baseDamage)
+    {
+        if (!debuffConfig.HasSlow && !debuffConfig.HasKnockback && !debuffConfig.HasDamageOverTime)
         {
             return;
         }
@@ -102,7 +139,7 @@ public class InkBall : MonoBehaviour
             receiver = enemyCore.gameObject.AddComponent<InkDebuffReceiver>();
         }
 
-        receiver.Apply(debuffConfig, transform.right);
+        receiver.Apply(debuffConfig, transform.right, baseDamage);
     }
 
     private void FinishHit()
@@ -125,11 +162,21 @@ public class InkBall : MonoBehaviour
             col.enabled = false;
         }
 
-        CancelInvoke(nameof(Destroy));
         Destroy(gameObject, hitDestroyDelay);
     }
 
     public void DestroyAfterHit()
+    {
+        Destroy(gameObject);
+    }
+
+    private void ScheduleDestroyTimer()
+    {
+        CancelInvoke(nameof(DestroyAfterTime));
+        Invoke(nameof(DestroyAfterTime), autoDestroyTime);
+    }
+
+    private void DestroyAfterTime()
     {
         Destroy(gameObject);
     }

@@ -64,6 +64,13 @@ public class BackpackMananger : MonoBehaviour
     {
         EnsureCapacity();
 
+        if (crystal.IsInkSupply)
+        {
+            ApplyInkSupply(crystal);
+            Debug.Log($"拾取 {crystal.DisplayName}，恢复墨笔耐久 {crystal.inkRestoreValue}");
+            return true;
+        }
+
         int emptyIndex = FindEmptyIndex();
         if (emptyIndex == -1)
         {
@@ -71,7 +78,7 @@ public class BackpackMananger : MonoBehaviour
             return false;
         }
 
-        bool shouldShowFirstPick = !crystal.isUnlockMaterial && !alreadyPickedCommonTypes.Contains(crystal.type);
+        bool shouldShowFirstPick = crystal.IsCommonStructure && !alreadyPickedCommonTypes.Contains(crystal.type);
         if (shouldShowFirstPick)
         {
             alreadyPickedCommonTypes.Add(crystal.type);
@@ -87,22 +94,18 @@ public class BackpackMananger : MonoBehaviour
             crystal.bonusValue,
             crystal.subBonusType,
             crystal.subBonusValue,
-            crystal.isUnlockMaterial
-        );
+            crystal.isUnlockMaterial,
+            crystal.resourceCategory,
+            crystal.inkRestoreValue);
 
         backpackItems[emptyIndex] = newItem;
-
-        if (PlayerAttributeManager.Instance != null)
-        {
-            PlayerAttributeManager.Instance.AddBonus(newItem.bonusType, newItem.bonusValue);
-        }
 
         if (shouldShowFirstPick)
         {
             OnFirstTimePickItemType?.Invoke(newItem);
         }
 
-        Debug.Log($"拾取 {newItem.type}，放入背包格子 {emptyIndex}");
+        Debug.Log($"拾取 {newItem.DisplayName}，放入背包格子 {emptyIndex}");
         return true;
     }
 
@@ -110,12 +113,6 @@ public class BackpackMananger : MonoBehaviour
     {
         if (index < 0 || index >= backpackItems.Count) return;
         if (!backpackItems[index].HasValue) return;
-
-        ArchitecturalCrystal item = backpackItems[index].Value;
-        if (PlayerAttributeManager.Instance != null)
-        {
-            PlayerAttributeManager.Instance.RemoveBonus(item.bonusType, item.bonusValue);
-        }
 
         backpackItems[index] = null;
         Debug.Log($"清空第 {index} 个背包物品");
@@ -160,5 +157,17 @@ public class BackpackMananger : MonoBehaviour
         }
 
         return -1;
+    }
+
+    private void ApplyInkSupply(ArchitecturalCrystal crystal)
+    {
+        PlayerAttack playerAttack = FindObjectOfType<PlayerAttack>();
+        if (playerAttack == null)
+        {
+            Debug.LogWarning("拾取墨水补给时未找到 PlayerAttack，未执行恢复");
+            return;
+        }
+
+        playerAttack.AddInk(crystal.inkRestoreValue);
     }
 }

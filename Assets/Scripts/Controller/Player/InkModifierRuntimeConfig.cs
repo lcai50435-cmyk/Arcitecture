@@ -15,9 +15,13 @@ public struct InkDebuffRuntimeConfig
     public float slowRatio;
     public float slowDuration;
     public float knockbackForce;
+    public float dotDuration;
+    public float dotTickInterval;
+    public float dotDamageMultiplier;
 
     public bool HasSlow => slowRatio > 0f && slowDuration > 0f;
     public bool HasKnockback => knockbackForce > 0f;
+    public bool HasDamageOverTime => dotDuration > 0f && dotTickInterval > 0f && dotDamageMultiplier > 0f;
 }
 
 public struct InkAttackRuntimeConfig
@@ -28,6 +32,13 @@ public struct InkAttackRuntimeConfig
     public float speedMultiplier;
     public float lifetimeMultiplier;
     public float fanAngleStep;
+    public float baseProjectileSpeed;
+    public float baseProjectileLifetime;
+    public float attackInterval;
+    public int inkCost;
+    public bool explodeOnHit;
+    public float explosionRadius;
+    public float explosionDamageMultiplier;
     public InkDebuffRuntimeConfig debuff;
 
     public static InkAttackRuntimeConfig Default => new InkAttackRuntimeConfig
@@ -38,6 +49,13 @@ public struct InkAttackRuntimeConfig
         speedMultiplier = 1f,
         lifetimeMultiplier = 1f,
         fanAngleStep = 12f,
+        baseProjectileSpeed = 6f,
+        baseProjectileLifetime = 5f / 6f,
+        attackInterval = 1f,
+        inkCost = 1,
+        explodeOnHit = false,
+        explosionRadius = 1.35f,
+        explosionDamageMultiplier = 1f,
         debuff = new InkDebuffRuntimeConfig()
     };
 }
@@ -62,6 +80,7 @@ public static class InkModifierRuntimeConfig
         }
 
         int bracketCount = 0;
+        int mortiseCount = 0;
         int tileCount = 0;
         int tampedEarthCount = 0;
         int groundMassCount = 0;
@@ -76,7 +95,7 @@ public static class InkModifierRuntimeConfig
             }
 
             ArchitecturalCrystal item = nullableItem.Value;
-            if (item.isUnlockMaterial)
+            if (!item.IsCommonStructure)
             {
                 continue;
             }
@@ -90,6 +109,9 @@ public static class InkModifierRuntimeConfig
             {
                 case InkModifierType.ProjectileCount:
                     bracketCount++;
+                    break;
+                case InkModifierType.HitCount:
+                    mortiseCount++;
                     break;
                 case InkModifierType.ProjectileScale:
                     tileCount++;
@@ -107,6 +129,7 @@ public static class InkModifierRuntimeConfig
         }
 
         config.projectileCount += bracketCount;
+        config.maxHitCount += mortiseCount;
         config.projectileScale += tileCount * TileScaleBonus;
         config.speedMultiplier += beamFrameCount * BeamSpeedAndRangeBonus;
         config.lifetimeMultiplier += beamFrameCount * BeamSpeedAndRangeBonus;

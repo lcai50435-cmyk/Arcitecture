@@ -1,24 +1,40 @@
-using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// Í¼¼ø½âËøÑ¡Ôñ¹ÜÀíÆ÷
-/// ¸ºÔğ¼ÇÂ¼Íæ¼Òµ±Ç°»¹¿ÉÒÔµãÁÁ¼¸´Î
+/// å›¾é‰´è§£é”é€‰æ‹©ç®¡ç†å™¨
+/// è´Ÿè´£ç»´æŠ¤ä¸“ç”¨ç»“æ„ææ–™åº“å­˜æ˜¾ç¤ºã€‚
 /// </summary>
 public class CatalogueUnlockSelectionManager : MonoBehaviour
 {
     public static CatalogueUnlockSelectionManager Instance;
 
-    [Header("µ±Ç°¿ÉÓÃµãÁÁ´ÎÊı£¨ÔËĞĞÊ±¹Û²ì£©")]
+    [Header("å½“å‰å¯ç”¨ä¸“ç”¨ç»“æ„ææ–™ï¼ˆè¿è¡Œæ—¶è§‚å¯Ÿï¼‰")]
     public int availableUnlockCount = 0;
 
-    private readonly HashSet<string> unlockedSlotIds = new HashSet<string>();
+    public static CatalogueUnlockSelectionManager EnsureInstance()
+    {
+        if (Instance != null)
+        {
+            return Instance;
+        }
+
+        CatalogueUnlockSelectionManager existing = FindObjectOfType<CatalogueUnlockSelectionManager>();
+        if (existing != null)
+        {
+            Instance = existing;
+            return existing;
+        }
+
+        GameObject runtimeObject = new GameObject("CatalogueUnlockSelectionManager");
+        return runtimeObject.AddComponent<CatalogueUnlockSelectionManager>();
+    }
 
     private void Awake()
     {
         if (Instance == null)
         {
             Instance = this;
+            DontDestroyOnLoad(gameObject);
         }
         else
         {
@@ -26,52 +42,95 @@ public class CatalogueUnlockSelectionManager : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Ôö¼Ó¿ÉµãÁÁ´ÎÊı
-    /// </summary>
+    private void OnEnable()
+    {
+        RuntimeProgressState.EnsureInstance().OnStateChanged += RefreshInventoryValue;
+        RefreshInventoryValue();
+    }
+
+    private void OnDisable()
+    {
+        if (RuntimeProgressState.Instance != null)
+        {
+            RuntimeProgressState.Instance.OnStateChanged -= RefreshInventoryValue;
+        }
+    }
+
     public void AddUnlockCount(int count)
     {
-        if (count <= 0) return;
-
-        availableUnlockCount += count;
-        Debug.Log($"Ôö¼Ó¿ÉµãÁÁ´ÎÊı£º+{count}£¬µ±Ç°Ê£Óà£º{availableUnlockCount}");
+        RuntimeProgressState.EnsureInstance().AddSpecialStructureInventory(count);
+        RefreshInventoryValue();
     }
 
-    /// <summary>
-    /// ³¢ÊÔÏûºÄÒ»´ÎµãÁÁ´ÎÊı²¢½âËøÄ³¸ö²ÛÎ»
-    /// </summary>
     public bool TryUnlockSlot(string slotId)
     {
-        if (string.IsNullOrEmpty(slotId))
+        if (!TryResolveSlotContext(slotId, out CatalogueBuildingId buildingId, out int slotIndex))
         {
-            Debug.LogWarning("slotId Îª¿Õ£¬ÎŞ·¨½âËø");
             return false;
         }
 
-        if (unlockedSlotIds.Contains(slotId))
-        {
-            Debug.Log($"²ÛÎ» {slotId} ÒÑ¾­µãÁÁ¹ıÁË");
-            return false;
-        }
-
-        if (availableUnlockCount <= 0)
-        {
-            Debug.Log("µ±Ç°Ã»ÓĞ¿ÉÓÃµãÁÁ´ÎÊı");
-            return false;
-        }
-
-        availableUnlockCount--;
-        unlockedSlotIds.Add(slotId);
-
-        Debug.Log($"³É¹¦µãÁÁ²ÛÎ»£º{slotId}£¬Ê£Óà¿ÉµãÁÁ´ÎÊı£º{availableUnlockCount}");
-        return true;
+        bool success = RuntimeProgressState.EnsureInstance()
+            .TryUnlockSlot(buildingId, slotIndex, out _, out _);
+        RefreshInventoryValue();
+        return success;
     }
 
-    /// <summary>
-    /// Ä³¸ö²ÛÎ»ÊÇ·ñÒÑ¾­µãÁÁ
-    /// </summary>
     public bool IsSlotUnlocked(string slotId)
     {
-        return !string.IsNullOrEmpty(slotId) && unlockedSlotIds.Contains(slotId);
+        if (!TryResolveSlotContext(slotId, out CatalogueBuildingId buildingId, out int slotIndex))
+        {
+            return false;
+        }
+
+        return RuntimeProgressState.EnsureInstance().IsSlotUnlocked(buildingId, slotIndex);
+    }
+
+    public bool TryConsumeUnlockCount()
+    {
+        bool success = RuntimeProgressState.EnsureInstance().TryConsumeSpecialStructureInventory(1);
+        RefreshInventoryValue();
+        return success;
+    }
+
+    private void RefreshInventoryValue()
+    {
+        availableUnlockCount = RuntimeProgressState.EnsureInstance().AvailableSpecialStructureInventory;
+    }
+
+    private static bool TryResolveSlotContext(
+        string slotId,
+        out CatalogueBuildingId buildingId,
+        out int slotIndex)
+    {
+        buildingId = CatalogueBuildingId.Building1;
+        slotIndex = -1;
+
+        if (string.IsNullOrEmpty(slotId))
+        {
+            return false;
+        }
+
+        foreach (BuildingDefinition definition in BuildingDefinitionLibrary.GetAll())
+        {
+            if (definition.slotDefinitions == null)
+            {
+                continue;
+            }
+
+            for (int i = 0; i < definition.slotDefinitions.Length; i++)
+            {
+                BuildingSlotDefinition slotDefinition = definition.slotDefinitions[i];
+                if (slotDefinition == null || slotDefinition.slotId != slotId)
+                {
+                    continue;
+                }
+
+                buildingId = definition.buildingId;
+                slotIndex = i;
+                return true;
+            }
+        }
+
+        return false;
     }
 }

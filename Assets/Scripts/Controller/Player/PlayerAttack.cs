@@ -5,6 +5,7 @@ public class PlayerAttack : CharacterAttack
     private readonly KeyCode attackKey = KeyCode.Mouse0;
     private DirectionTracker directionTracker;
     private Animator animator;
+    private float nextAttackTime;
 
     [Header("远程攻击")]
     public GameObject inkballPrefab;
@@ -14,8 +15,9 @@ public class PlayerAttack : CharacterAttack
     public ValueTrans weaponTrans;
 
     [Header("墨水值")]
-    public float ink;
+    public float ink = 100f;
     public float maxInk = 100f;
+    public float baseMaxInk = 100f;
 
     protected override void Awake()
     {
@@ -24,23 +26,20 @@ public class PlayerAttack : CharacterAttack
         weaponTrans = GameplayStatusHudRuntime.EnsureWeaponGauge(weaponTrans);
         base.Awake();
 
-        if (weaponTrans != null)
+        baseMaxInk = Mathf.Max(1f, baseMaxInk);
+        maxInk = Mathf.Max(baseMaxInk, maxInk);
+        if (ink <= 0f)
         {
-            weaponTrans.SetMaxValue(maxInk);
-            weaponTrans.SetValue(ink);
-            GameplayStatusHudRuntime.RefreshWeaponText(ink, maxInk);
+            ink = maxInk;
         }
+
+        RefreshInkUI();
     }
 
     private void Start()
     {
         weaponTrans = GameplayStatusHudRuntime.EnsureWeaponGauge(weaponTrans);
-        if (weaponTrans != null)
-        {
-            weaponTrans.SetMaxValue(maxInk);
-            weaponTrans.SetValue(ink);
-            GameplayStatusHudRuntime.RefreshWeaponText(ink, maxInk);
-        }
+        RefreshInkUI();
     }
 
     private void Update()
@@ -52,7 +51,7 @@ public class PlayerAttack : CharacterAttack
                 return;
             }
 
-            if (!isAttacking)
+            if (!isAttacking && Time.time >= nextAttackTime)
             {
                 TriggerAttack();
             }
@@ -61,15 +60,23 @@ public class PlayerAttack : CharacterAttack
 
     public override void TriggerAttack()
     {
-        WeaponAttackProfile profile = WeaponAttackProfile.FromWeaponType(PlayerLoadoutRuntime.CurrentWeaponType);
-        if (ink < profile.inkCost) return;
-
-        ink = Mathf.Max(0f, ink - profile.inkCost);
-        if (weaponTrans != null)
+        if (inkballPrefab == null || inkPoint == null)
         {
-            weaponTrans.SetValue(ink);
-            GameplayStatusHudRuntime.RefreshWeaponText(ink, maxInk);
+            return;
         }
+
+        WeaponAttackProfile profile = WeaponAttackProfile.FromWeaponType(PlayerLoadoutRuntime.CurrentWeaponType);
+        InkAttackRuntimeConfig inkConfig = profile.ApplyToInkConfig(
+            InkModifierRuntimeConfig.BuildFromBackpack(BackpackMananger.Instance));
+
+        if (ink < inkConfig.inkCost)
+        {
+            return;
+        }
+
+        ink = Mathf.Max(0f, ink - inkConfig.inkCost);
+        nextAttackTime = Time.time + inkConfig.attackInterval;
+        RefreshInkUI();
 
         base.TriggerAttack();
 
@@ -79,23 +86,11 @@ public class PlayerAttack : CharacterAttack
             lastDir = Vector2.right;
         }
 
-        if (profile.usesMelee)
-        {
-            PerformMeleeAttack(lastDir.normalized, profile);
-            return;
-        }
-
-        InkAttackRuntimeConfig inkConfig = InkModifierRuntimeConfig.BuildFromBackpack(BackpackMananger.Instance);
-        SpawnInkBalls(lastDir.normalized, profile.ApplyToInkConfig(inkConfig));
+        SpawnInkBalls(lastDir.normalized, inkConfig);
     }
 
     private void SpawnInkBalls(Vector2 direction, InkAttackRuntimeConfig inkConfig)
     {
-        if (inkballPrefab == null || inkPoint == null)
-        {
-            return;
-        }
-
         int projectileCount = Mathf.Max(1, inkConfig.projectileCount);
         float centerIndex = (projectileCount - 1) * 0.5f;
 
@@ -115,38 +110,29 @@ public class PlayerAttack : CharacterAttack
         }
     }
 
-    private void PerformMeleeAttack(Vector2 direction, WeaponAttackProfile profile)
-    {
-        Vector2 center = (Vector2)transform.position + direction * profile.meleeRange;
-        Collider2D[] hits = Physics2D.OverlapCircleAll(center, profile.meleeRadius);
-
-        for (int i = 0; i < hits.Length; i++)
-        {
-            CharacterCore target = hits[i].GetComponent<CharacterCore>();
-            if (target == null || target == core)
-            {
-                continue;
-            }
-
-            target.TakeDamage(core.stats.attackDamage * profile.meleeDamageMultiplier);
-
-            Rigidbody2D targetBody = target.GetComponent<Rigidbody2D>();
-            if (targetBody != null && profile.meleeKnockbackForce > 0f)
-            {
-                targetBody.AddForce(direction * profile.meleeKnockbackForce, ForceMode2D.Impulse);
-            }
-        }
-    }
-
     public void AddInk(float value)
     {
-        ink += value;
-        ink = Mathf.Min(ink, maxInk);
+        ink = Mathf.Clamp(ink + value, 0f, maxInk);
+        RefreshInkUI();
+    }
 
+    public void RefreshInkUI()
+    {
         if (weaponTrans != null)
         {
+            weaponTrans.SetMaxValue(maxInk);
             weaponTrans.SetValue(ink);
-            GameplayStatusHudRuntime.RefreshWeaponText(ink, maxInk);
+        }
+
+        GameplayStatusHudRuntime.RefreshWeaponText(ink, maxInk);
+
+        PlayerProfileData profile = GetComponent<PlayerProfileData>();
+        if (profile != null)
+        {
+            profile.currentDurability = ink;
+            profile.maxDurability = maxInk;
+            profile.currentInkType = PlayerLoadoutRuntime.CurrentInkType;
+            profile.currentWeaponType = PlayerLoadoutRuntime.CurrentWeaponType;
         }
     }
 }

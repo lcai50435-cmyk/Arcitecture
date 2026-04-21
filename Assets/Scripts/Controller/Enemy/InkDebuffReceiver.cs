@@ -6,15 +6,18 @@ public class InkDebuffReceiver : MonoBehaviour
 {
     private EnemyMove enemyMove;
     private Rigidbody2D rb;
+    private CharacterCore characterCore;
     private Coroutine slowRoutine;
+    private Coroutine dotRoutine;
 
     private void Awake()
     {
         enemyMove = GetComponent<EnemyMove>();
         rb = GetComponent<Rigidbody2D>();
+        characterCore = GetComponent<CharacterCore>();
     }
 
-    public void Apply(InkDebuffRuntimeConfig config, Vector2 hitDirection)
+    public void Apply(InkDebuffRuntimeConfig config, Vector2 hitDirection, float baseDamage)
     {
         if (config.HasSlow)
         {
@@ -24,6 +27,11 @@ public class InkDebuffReceiver : MonoBehaviour
         if (config.HasKnockback)
         {
             ApplyKnockback(hitDirection, config.knockbackForce);
+        }
+
+        if (config.HasDamageOverTime)
+        {
+            ApplyDamageOverTime(config, baseDamage);
         }
     }
 
@@ -53,6 +61,43 @@ public class InkDebuffReceiver : MonoBehaviour
         slowRoutine = null;
     }
 
+    private void ApplyDamageOverTime(InkDebuffRuntimeConfig config, float baseDamage)
+    {
+        if (characterCore == null)
+        {
+            return;
+        }
+
+        if (dotRoutine != null)
+        {
+            StopCoroutine(dotRoutine);
+        }
+
+        float tickDamage = Mathf.Max(0.5f, baseDamage * config.dotDamageMultiplier);
+        dotRoutine = StartCoroutine(DamageOverTimeRoutine(config.dotDuration, config.dotTickInterval, tickDamage));
+    }
+
+    private IEnumerator DamageOverTimeRoutine(float duration, float tickInterval, float tickDamage)
+    {
+        float remaining = duration;
+        float interval = Mathf.Max(0.1f, tickInterval);
+
+        while (remaining > 0f)
+        {
+            yield return new WaitForSeconds(interval);
+
+            if (characterCore == null)
+            {
+                yield break;
+            }
+
+            characterCore.TakeDamage(tickDamage);
+            remaining -= interval;
+        }
+
+        dotRoutine = null;
+    }
+
     private void ApplyKnockback(Vector2 hitDirection, float force)
     {
         if (rb == null)
@@ -80,5 +125,6 @@ public class InkDebuffReceiver : MonoBehaviour
         }
 
         slowRoutine = null;
+        dotRoutine = null;
     }
 }

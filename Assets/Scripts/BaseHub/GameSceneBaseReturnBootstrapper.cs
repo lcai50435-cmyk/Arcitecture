@@ -84,11 +84,6 @@ public class GameSceneBaseReturnBootstrapper : MonoBehaviour
             return;
         }
 
-        if (CatalogueUnlockSelectionManager.Instance != null)
-        {
-            CatalogueUnlockSelectionManager.Instance.AddUnlockCount(itemCount);
-        }
-
         player.SubmitAllCachedExp();
     }
 }

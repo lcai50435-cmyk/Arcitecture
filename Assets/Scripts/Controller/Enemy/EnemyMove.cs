@@ -30,7 +30,6 @@ public class EnemyMove : MonoBehaviour
     private float lastInputY = -1f;
     private float lastDirectionChangeTime = float.NegativeInfinity;
     private CharacterCore character;
-    private float moveSpeed;
     private float externalSpeedMultiplier = 1f;
 
     public Vector2 Position => rb != null ? rb.position : (Vector2)transform.position;
@@ -45,8 +44,6 @@ public class EnemyMove : MonoBehaviour
     private void Start()
     {
         character = GetComponent<CharacterCore>();
-        // 初始化怪物速度
-        moveSpeed = character.stats.moveSpeed;
     }
 
     private void Awake()
@@ -62,7 +59,6 @@ public class EnemyMove : MonoBehaviour
 
     private void OnValidate()
     {
-        if (moveSpeed < 0f) moveSpeed = 0f;
         if (axisSwitchThreshold < 0f) axisSwitchThreshold = 0f;
         if (reverseDirectionLockTime < 0f) reverseDirectionLockTime = 0f;
         if (turnLockTime < 0f) turnLockTime = 0f;
@@ -244,6 +240,10 @@ public class EnemyMove : MonoBehaviour
         {
             return;
         }
+
+        float moveSpeed = character != null && character.stats != null
+            ? Mathf.Max(0f, character.stats.moveSpeed)
+            : 0f;
 
         rb.MovePosition(rb.position + direction * moveSpeed * externalSpeedMultiplier * Time.fixedDeltaTime);
     }

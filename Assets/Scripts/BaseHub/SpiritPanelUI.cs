@@ -73,7 +73,7 @@ public class SpiritPanelUI : MonoBehaviour
     public void ShowWeaponPage()
     {
         SetPage(false);
-        if (titleText != null) titleText.text = "精灵 · 武器选择";
+        if (titleText != null) titleText.text = "精灵 · 墨水基型";
     }
 
     private void SetPage(bool showStats)

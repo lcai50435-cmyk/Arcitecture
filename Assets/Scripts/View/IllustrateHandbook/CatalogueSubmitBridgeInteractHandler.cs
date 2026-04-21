@@ -29,12 +29,6 @@ public class CatalogueSubmitBridgeInteractHandler : MonoBehaviour, IInteractable
             return;
         }
 
-        int itemCount = backpack.GetOccupiedCount();
-        if (CatalogueUnlockSelectionManager.Instance != null && itemCount > 0)
-        {
-            CatalogueUnlockSelectionManager.Instance.AddUnlockCount(itemCount);
-        }
-
         player.SubmitAllCachedExp();
         UIManager.Instance?.OpenIllustratedHandbook();
     }

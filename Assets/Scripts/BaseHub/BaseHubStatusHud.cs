@@ -11,7 +11,6 @@ public class BaseHubStatusHud : MonoBehaviour
     [SerializeField] private Image weaponFillImage;
     [SerializeField] private TextMeshProUGUI healthValueText;
     [SerializeField] private TextMeshProUGUI weaponValueText;
-    [SerializeField] private float weaponGaugeValue = 100f;
 
     public void Configure(
         CharacterCore core,
@@ -63,19 +62,20 @@ public class BaseHubStatusHud : MonoBehaviour
 
     private void RefreshWeapon()
     {
+        float currentDurability = profileData != null ? profileData.currentDurability : 100f;
+        float maxDurability = profileData != null ? Mathf.Max(1f, profileData.maxDurability) : 100f;
+
         if (weaponTrans != null && weaponTrans.slider != null)
         {
-            weaponTrans.slider.maxValue = weaponGaugeValue;
-            weaponTrans.slider.value = weaponGaugeValue;
+            weaponTrans.slider.maxValue = maxDurability;
+            weaponTrans.slider.value = currentDurability;
         }
 
-        if (weaponFillImage == null)
+        if (weaponFillImage != null)
         {
-            UpdateWeaponText();
-            return;
+            weaponFillImage.color = InkTypeCatalog.GetDisplayColor(GetInkType());
         }
 
-        weaponFillImage.color = GetWeaponColor();
         UpdateWeaponText();
     }
 
@@ -89,41 +89,13 @@ public class BaseHubStatusHud : MonoBehaviour
         string durabilityText = profileData != null
             ? $"  耐久 {profileData.currentDurability:0}/{profileData.maxDurability:0}"
             : string.Empty;
-        weaponValueText.text = $"{GetWeaponDisplayName()}{durabilityText}";
+        weaponValueText.text = $"{InkTypeCatalog.GetDisplayName(GetInkType())}{durabilityText}";
     }
 
-    private WeaponType GetWeaponType()
+    private InkType GetInkType()
     {
         return profileData != null
-            ? profileData.currentWeaponType
-            : PlayerLoadoutRuntime.CurrentWeaponType;
-    }
-
-    private Color GetWeaponColor()
-    {
-        WeaponType currentWeapon = GetWeaponType();
-
-        switch (currentWeapon)
-        {
-            case WeaponType.Melee:
-                return new Color(0.88f, 0.36f, 0.22f, 1f);
-            case WeaponType.Special:
-                return new Color(0.96f, 0.78f, 0.24f, 1f);
-            default:
-                return new Color(0.26f, 0.72f, 0.90f, 1f);
-        }
-    }
-
-    private string GetWeaponDisplayName()
-    {
-        switch (GetWeaponType())
-        {
-            case WeaponType.Melee:
-                return "近战";
-            case WeaponType.Special:
-                return "特殊";
-            default:
-                return "远程";
-        }
+            ? profileData.currentInkType
+            : PlayerLoadoutRuntime.CurrentInkType;
     }
 }

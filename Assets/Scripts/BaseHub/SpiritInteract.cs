@@ -4,7 +4,7 @@ public class SpiritInteract : MonoBehaviour, IInteractable
 {
     [SerializeField] private BaseHubUIController uiController;
 
-    public string InteractionTip => "查看属性与武器";
+    public string InteractionTip => "查看属性与墨水";
 
     public void Configure(BaseHubUIController controller)
     {

@@ -1,22 +1,32 @@
-using System.Collections;
-using System.Collections.Generic;
+using System;
 using UnityEngine;
 
 /// <summary>
-/// ¹ÜÀí½ÇÉ«Ïà¹Ø±äÁ¿
+/// ç®¡ç†è§’è‰²ç›¸å…³å˜é‡ã€‚
 /// </summary>
-[System.Serializable]
+[Serializable]
 public class CharacterStats
 {
-    [Header("ÉúÃü")]
+    [Header("ç”Ÿå‘½")]
     public float maxHp = 100f;
 
-    [Header("Õ½¶·")]
-    public float attackDamage = 10f;
+    [Header("æˆ˜æ–—")]
+    public float attackDamage = 20f;
 
-    [Header("ËÙ¶È")]
+    [Header("é€Ÿåº¦")]
     public float moveSpeed = 4f;
 
-    [Header("·ÀÓù")]
+    [Header("é˜²å¾¡")]
     public float defense = 0f;
+
+    public CharacterStats Clone()
+    {
+        return new CharacterStats
+        {
+            maxHp = maxHp,
+            attackDamage = attackDamage,
+            moveSpeed = moveSpeed,
+            defense = defense
+        };
+    }
 }

@@ -11,7 +11,14 @@ public class GameCountDownManager : MonoBehaviour
     public TextMeshProUGUI timer;
 
     private float currentTime;
+    private bool hasFinished;
     public static GameCountDownManager Instance;
+
+    public event System.Action<float> OnRemainingTimeChanged;
+    public event System.Action OnCountdownFinished;
+
+    public float CurrentTime => currentTime;
+    public bool HasFinished => hasFinished;
 
     private void Awake()
     {
@@ -38,17 +45,20 @@ public class GameCountDownManager : MonoBehaviour
     private void Start()
     {
         currentTime = totalTime;
+        hasFinished = false;
         RefreshTimerText();
+        OnRemainingTimeChanged?.Invoke(currentTime);
     }
 
     private void Update()
     {
-        if (isInBase) return;
+        if (isInBase || hasFinished) return;
 
         if (currentTime > 0f)
         {
             currentTime = Mathf.Max(0f, currentTime - Time.deltaTime);
             RefreshTimerText();
+            OnRemainingTimeChanged?.Invoke(currentTime);
 
             if (currentTime <= 0f)
             {
@@ -59,8 +69,15 @@ public class GameCountDownManager : MonoBehaviour
 
     private void GameOver()
     {
+        if (hasFinished)
+        {
+            return;
+        }
+
+        hasFinished = true;
         Debug.Log("倒计时归零，游戏结束");
         RefreshTimerText();
+        OnCountdownFinished?.Invoke();
     }
 
     public void SetInBaseState(bool state)
@@ -81,7 +98,14 @@ public class GameCountDownManager : MonoBehaviour
     public void DebugSetRemainTime(float seconds)
     {
         currentTime = Mathf.Max(0f, seconds);
+        hasFinished = false;
         RefreshTimerText();
+        OnRemainingTimeChanged?.Invoke(currentTime);
+
+        if (currentTime <= 0f)
+        {
+            GameOver();
+        }
     }
 
     private void RefreshTimerText()

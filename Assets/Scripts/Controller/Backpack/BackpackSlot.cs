@@ -4,14 +4,14 @@ using UnityEngine.UI;
 
 public class BackpackSlot : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
 {
-    [Header("¸ñ×Ó±àºÅ 0~5")]
+    [Header("æ ¼å­ç¼–å· 0~5")]
     public int slotIndex;
 
-    [Header("³¤°´¼¸Ãë¶ªÆú")]
+    [Header("é•¿æŒ‰å‡ ç§’ä¸¢å¼ƒ")]
     public float needHoldTime = 1f;
 
     private BackpackMananger backpack;
-    private Image slotImage; // ¸ÄÎªImageÀàĞÍ
+    private Image slotImage; // æ”¹ä¸ºImageç±»å‹
     private BackpackUI backpackUI;
 
     private bool isHolding;
@@ -19,12 +19,12 @@ public class BackpackSlot : MonoBehaviour, IPointerDownHandler, IPointerUpHandle
 
     void Start()
     {
-        // ĞŞ¸´ÖØ¸´»ñÈ¡×é¼şµÄÎÊÌâ
+        // ä¿®å¤é‡å¤è·å–ç»„ä»¶çš„é—®é¢˜
         slotImage = GetComponent<Image>();
         if (slotImage == null)
         {
             slotImage = gameObject.AddComponent<Image>();
-            Debug.Log($"×Ô¶¯Îª¸ñ×Ó{slotIndex}Ìí¼ÓÁËImage×é¼ş");
+            Debug.Log($"è‡ªåŠ¨ä¸ºæ ¼å­{slotIndex}æ·»åŠ äº†Imageç»„ä»¶");
         }
 
         backpack = BackpackMananger.Instance;
@@ -32,7 +32,7 @@ public class BackpackSlot : MonoBehaviour, IPointerDownHandler, IPointerUpHandle
 
         if (backpack == null)
         {
-            Debug.LogError($"BackpackSlot {slotIndex}: Î´ÕÒµ½BackpackManangerÊµÀı£¡");
+            Debug.LogError($"BackpackSlot {slotIndex}: æœªæ‰¾åˆ°BackpackManangerå®ä¾‹ï¼");
         }
     }
 
@@ -42,7 +42,7 @@ public class BackpackSlot : MonoBehaviour, IPointerDownHandler, IPointerUpHandle
 
         holdTimer += Time.deltaTime;
 
-        // ³¤°´½ø¶È·´À¡
+        // é•¿æŒ‰è¿›åº¦åé¦ˆ
         if (holdTimer >= needHoldTime)
         {
             DropSingleItem();
@@ -50,17 +50,17 @@ public class BackpackSlot : MonoBehaviour, IPointerDownHandler, IPointerUpHandle
         }
     }
 
-    // UIÊÂ¼ş£º°´ÏÂ
+    // UIäº‹ä»¶ï¼šæŒ‰ä¸‹
     public void OnPointerDown(PointerEventData eventData)
     {
-        // Ö»ÏìÓ¦ÓÒ¼ü
+        // åªå“åº”å³é”®
         if (eventData.button == PointerEventData.InputButton.Right)
         {
             StartSingleHold();
         }
     }
 
-    // UIÊÂ¼ş£ºÌ§Æğ
+    // UIäº‹ä»¶ï¼šæŠ¬èµ·
     public void OnPointerUp(PointerEventData eventData)
     {
         if (eventData.button == PointerEventData.InputButton.Right)
@@ -73,26 +73,26 @@ public class BackpackSlot : MonoBehaviour, IPointerDownHandler, IPointerUpHandle
     {
         if (backpack == null)
         {
-            Debug.LogError("BackpackManagerÎ´ÕÒµ½£¡");
+            Debug.LogError("BackpackManageræœªæ‰¾åˆ°ï¼");
             return;
         }
 
-        // ¹Ø¼üĞŞ¸Ä1£º½ÓÊÕ¿É¿ÕÀàĞÍ
+        // å…³é”®ä¿®æ”¹1ï¼šæ¥æ”¶å¯ç©ºç±»å‹
         ArchitecturalCrystal? item = backpack.GetItem(slotIndex);
-        // ¹Ø¼üĞŞ¸Ä2£ºÅĞ¿Õ¸ÄÎª HasValue
+        // å…³é”®ä¿®æ”¹2ï¼šåˆ¤ç©ºæ”¹ä¸º HasValue
         if (!item.HasValue)
         {
-            Debug.Log($"¸ñ×Ó{slotIndex}Ã»ÓĞÎïÆ·£¬ÎŞ·¨¶ªÆú");
+            Debug.Log($"æ ¼å­{slotIndex}æ²¡æœ‰ç‰©å“ï¼Œæ— æ³•ä¸¢å¼ƒ");
             return;
         }
 
         if (slotImage == null || slotImage.sprite == null || !slotImage.enabled)
         {
-            Debug.Log("¸ñ×ÓÎŞÏÔÊ¾Í¼Æ¬");
+            Debug.Log("æ ¼å­æ— æ˜¾ç¤ºå›¾ç‰‡");
             return;
         }
 
-        Debug.Log($"¿ªÊ¼³¤°´¸ñ×Ó{slotIndex}£¬ÎïÆ·£º{item.Value.type}");
+        Debug.Log($"å¼€å§‹é•¿æŒ‰æ ¼å­{slotIndex}ï¼Œç‰©å“ï¼š{item.Value.type}");
         isHolding = true;
         holdTimer = 0;
     }
@@ -107,46 +107,46 @@ public class BackpackSlot : MonoBehaviour, IPointerDownHandler, IPointerUpHandle
     {
         if (backpack == null) return;
 
-        // ¹Ø¼üĞŞ¸Ä3£º½ÓÊÕ¿É¿ÕÀàĞÍ
+        // å…³é”®ä¿®æ”¹3ï¼šæ¥æ”¶å¯ç©ºç±»å‹
         ArchitecturalCrystal? item = backpack.GetItem(slotIndex);
-        // ¹Ø¼üĞŞ¸Ä4£ºÅĞ¿Õ¸ÄÎª HasValue
+        // å…³é”®ä¿®æ”¹4ï¼šåˆ¤ç©ºæ”¹ä¸º HasValue
         if (!item.HasValue) return;
 
-        // ¹Ø¼üĞŞ¸Ä5£ºÍ¨¹ı Value »ñÈ¡½á¹¹ÌåÊµ¼ÊÖµ
+        // å…³é”®ä¿®æ”¹5ï¼šé€šè¿‡ Value è·å–ç»“æ„ä½“å®é™…å€¼
         var crystal = item.Value;
 
-        // »ñÈ¡Íæ¼ÒÎ»ÖÃ
+        // è·å–ç©å®¶ä½ç½®
         GameObject player = GameObject.FindGameObjectWithTag("Player");
         if (player == null)
         {
-            Debug.LogError("Î´ÕÒµ½Player¶ÔÏó£¡");
+            Debug.LogError("æœªæ‰¾åˆ°Playerå¯¹è±¡ï¼");
             return;
         }
 
-        // Éú³ÉµôÂäÎï
+        // ç”Ÿæˆæ‰è½ç‰©
         GameObject dropObj = new GameObject($"Drop_{crystal.type}");
 
-        // ÎïÆ·Éú³ÉÎ»ÖÃ£ºÍæ¼ÒÎ»ÖÃ + ³¯ÏòÆ«ÒÆ
+        // ç‰©å“ç”Ÿæˆä½ç½®ï¼šç©å®¶ä½ç½® + æœå‘åç§»
         float faceDir = player.transform.localScale.x > 0 ? 1 : -1;
         dropObj.transform.position = new Vector2(
-            player.transform.position.x + faceDir * 0.2f, // XÖáÆ«ÒÆ
-            player.transform.position.y // YÖáÓëÍæ¼ÒÆëÆ½
+            player.transform.position.x + faceDir * 0.2f, // Xè½´åç§»
+            player.transform.position.y // Yè½´ä¸ç©å®¶é½å¹³
         );
 
-        // Ìí¼ÓSpriteRenderer
+        // æ·»åŠ SpriteRenderer
         SpriteRenderer ren = dropObj.AddComponent<SpriteRenderer>();
-        ren.sprite = crystal.icon; // Ê¹ÓÃÎïÆ·Í¼±ê
-        ren.sortingOrder = 0; // ÉèÖÃÍ¼²ã
+        ren.sprite = crystal.icon; // ä½¿ç”¨ç‰©å“å›¾æ ‡
+        ren.sortingOrder = 0; // è®¾ç½®å›¾å±‚
 
-        // ÉèÖÃ´óĞ¡
+        // è®¾ç½®å¤§å°
         Transform tran = dropObj.transform;
         tran.localScale = new Vector3(0.3f, 0.3f, 0.3f);
 
-        // Ìí¼ÓÅö×²Æ÷
+        // æ·»åŠ ç¢°æ’å™¨
         CircleCollider2D collider = dropObj.AddComponent<CircleCollider2D>();
         collider.isTrigger = true;
 
-        // Ìí¼Ó½»»¥×é¼ş
+        // æ·»åŠ äº¤äº’ç»„ä»¶
         CrystalInteractHandler script = dropObj.AddComponent<CrystalInteractHandler>();
         script.type = crystal.type;
         script.expValue = crystal.expValue;
@@ -155,23 +155,25 @@ public class BackpackSlot : MonoBehaviour, IPointerDownHandler, IPointerUpHandle
         script.textDescription = crystal.textDescription;
         script.bonusType = crystal.bonusType;
         script.bonusValue = crystal.bonusValue;
-        // ĞŞ¸´Ô­´úÂë±ÊÎó£ºsubBonusType ±»¸²¸ÇµÄÎÊÌâ
         script.subBonusType = crystal.subBonusType;
         script.subBonusValue = crystal.subBonusValue;
+        script.isUnlockMaterial = crystal.isUnlockMaterial;
+        script.resourceCategory = crystal.resourceCategory;
+        script.inkRestoreValue = crystal.inkRestoreValue;
 
-        // ´Ó±³°üÒÆ³ıÎïÆ·
+        // ä»èƒŒåŒ…ç§»é™¤ç‰©å“
         backpack.RemoveItem(slotIndex);
 
-        // Ë¢ĞÂUI
+        // åˆ·æ–°UI
         if (backpackUI != null)
         {
             backpackUI.RefreshUI();
         }
         else
         {
-            Debug.LogError("BackpackUIÎ´ÕÒµ½£¡");
+            Debug.LogError("BackpackUIæœªæ‰¾åˆ°ï¼");
         }
 
-        Debug.Log($"¸ñ×Ó{slotIndex}µÄÎïÆ·{crystal.type}ÒÑ¶ªÆú");
+        Debug.Log($"æ ¼å­{slotIndex}çš„ç‰©å“{crystal.type}å·²ä¸¢å¼ƒ");
     }
 }

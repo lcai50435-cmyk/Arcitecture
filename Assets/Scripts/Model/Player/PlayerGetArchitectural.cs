@@ -43,80 +43,24 @@ public class PlayerGetArchitectural : MonoBehaviour
             return;
         }
 
-        foreach (ArchitecturalCrystal? item in backpack.backpackItems)
-        {
-            if (!item.HasValue)
-            {
-                continue;
-            }
-
-            ArchitecturalCrystal crystal = item.Value;
-            if (crystal.isUnlockMaterial)
-            {
-                continue;
-            }
-
-            ExperienceManager.Instance.AddExperience(crystal.type, crystal.expValue);
-        }
-
-        backpack.ClearAllItems();
+        CatalogueAutoSubmitResult result = CatalogueSubmissionService.SubmitAllAuto(backpack);
         if (backpackUI != null)
         {
             backpackUI.RefreshUI();
         }
+
+        Debug.Log(
+            $"自动提交完成：专用结构 {result.specialStructureCount}，补给 {result.inkSupplyCount}，剩余普通结构 {result.remainingCommonStructureCount}");
     }
 
     public void SubmitSingleItem(int index)
     {
-        if (!ResolveRuntimeDependencies() || backpack == null)
-        {
-            return;
-        }
-
-        ArchitecturalCrystal? item = backpack.GetItem(index);
-        if (!item.HasValue)
-        {
-            return;
-        }
-
-        ArchitecturalCrystal crystal = item.Value;
-        if (crystal.isUnlockMaterial)
-        {
-            return;
-        }
-
-        ExperienceManager.Instance.AddExperience(crystal.type, crystal.expValue);
-        backpack.RemoveItem(index);
-        if (backpackUI != null)
-        {
-            backpackUI.RefreshUI();
-        }
+        Debug.LogWarning("普通结构提交需要指定目标建筑，请使用 SubmitSingleItemToBuilding。");
     }
 
     public bool ConsumeOneUnlockMaterial()
     {
-        if (!ResolveRuntimeDependencies() || backpack == null)
-        {
-            return false;
-        }
-
-        for (int i = 0; i < backpack.backpackItems.Count; i++)
-        {
-            if (!backpack.backpackItems[i].HasValue || !backpack.backpackItems[i].Value.isUnlockMaterial)
-            {
-                continue;
-            }
-
-            backpack.RemoveItem(i);
-            if (backpackUI != null)
-            {
-                backpackUI.RefreshUI();
-            }
-
-            return true;
-        }
-
-        return false;
+        return RuntimeProgressState.EnsureInstance().TryConsumeSpecialStructureInventory(1);
     }
 
     public void SubmitSingleItemToBuilding(int index, CatalogueBuildingId buildingId)
@@ -126,45 +70,25 @@ public class PlayerGetArchitectural : MonoBehaviour
             return;
         }
 
-        ArchitecturalCrystal? item = backpack.GetItem(index);
-        if (!item.HasValue)
+        bool submitted = CatalogueSubmissionService.SubmitSingleCommonStructure(
+            backpack,
+            index,
+            buildingId,
+            out BuildingRewardDefinition completionReward);
+
+        if (!submitted)
         {
             return;
         }
 
-        ArchitecturalCrystal crystal = item.Value;
-        if (crystal.isUnlockMaterial)
-        {
-            return;
-        }
-
-        BuildingProgressController[] allControllers = FindObjectsOfType<BuildingProgressController>();
-        BuildingProgressController targetController = null;
-        for (int i = 0; i < allControllers.Length; i++)
-        {
-            if (allControllers[i].buildingId == buildingId)
-            {
-                targetController = allControllers[i];
-                break;
-            }
-        }
-
-        if (targetController == null)
-        {
-            Debug.LogError($"Missing BuildingProgressController for {buildingId}");
-            return;
-        }
-
-        if (targetController.IsFull())
-        {
-            return;
-        }
-
-        targetController.AddProgress(crystal.expValue);
-        backpack.RemoveItem(index);
         if (backpackUI != null)
         {
             backpackUI.RefreshUI();
+        }
+
+        if (completionReward != null)
+        {
+            ShowRewardDialog(completionReward);
         }
     }
 
@@ -194,5 +118,21 @@ public class PlayerGetArchitectural : MonoBehaviour
         }
 
         return true;
+    }
+
+    private void ShowRewardDialog(BuildingRewardDefinition reward)
+    {
+        if (reward == null)
+        {
+            return;
+        }
+
+        Dialog dialog = FindObjectOfType<Dialog>(true);
+        if (dialog == null)
+        {
+            return;
+        }
+
+        dialog.ShowClickCloseDialog($"{reward.title}\n{reward.description}");
     }
 }

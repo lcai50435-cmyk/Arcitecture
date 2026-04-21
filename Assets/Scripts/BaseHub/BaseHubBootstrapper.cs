@@ -477,23 +477,8 @@ public class BaseHubBootstrapper : MonoBehaviour
         if (illustratedHandbook != null) illustratedHandbook.SetActive(false);
         if (detailedInformation != null) detailedInformation.SetActive(false);
 
-        if (ExperienceManager.Instance == null)
-        {
-            GameObject manager = new GameObject("BaseExperienceManager");
-            manager.AddComponent<ExperienceManager>();
-        }
-
-        if (FindObjectOfType<CatalogueAddExp>() == null)
-        {
-            GameObject manager = new GameObject("BaseCatalogueAddExp");
-            manager.AddComponent<CatalogueAddExp>();
-        }
-
-        if (CatalogueUnlockSelectionManager.Instance == null)
-        {
-            GameObject manager = new GameObject("BaseCatalogueUnlockSelectionManager");
-            manager.AddComponent<CatalogueUnlockSelectionManager>();
-        }
+        RuntimeProgressState.EnsureInstance();
+        CatalogueUnlockSelectionManager.EnsureInstance();
 
         UIManager uiManager = UIManager.Instance;
         if (uiManager == null)
@@ -654,7 +639,7 @@ public class BaseHubBootstrapper : MonoBehaviour
         Button statsTabButton = CreateButton("StatsTabButton", panel.transform, "属性", new Color(0.38f, 0.25f, 0.12f, 1f), new Vector2(140f, 48f));
         statsTabButton.GetComponent<RectTransform>().anchoredPosition = new Vector2(-90f, 176f);
 
-        Button weaponTabButton = CreateButton("WeaponTabButton", panel.transform, "武器", new Color(0.22f, 0.18f, 0.14f, 1f), new Vector2(140f, 48f));
+        Button weaponTabButton = CreateButton("WeaponTabButton", panel.transform, "墨水", new Color(0.22f, 0.18f, 0.14f, 1f), new Vector2(140f, 48f));
         weaponTabButton.GetComponent<RectTransform>().anchoredPosition = new Vector2(90f, 176f);
 
         GameObject statsPage = CreateUIObject("StatsPage", panel.transform);
@@ -708,15 +693,16 @@ public class BaseHubBootstrapper : MonoBehaviour
     private void BuildWeaponPage(Transform parent, WeaponSelectionPanelUI weaponPanel)
     {
         GameObject list = CreateUIObject("WeaponOptions", parent);
-        SetCenteredRect(list.GetComponent<RectTransform>(), Vector2.zero, new Vector2(680f, 330f));
+        SetCenteredRect(list.GetComponent<RectTransform>(), Vector2.zero, new Vector2(680f, 440f));
         VerticalLayoutGroup layout = list.AddComponent<VerticalLayoutGroup>();
         layout.spacing = 18f;
         layout.childForceExpandHeight = false;
         layout.childForceExpandWidth = true;
 
-        CreateWeaponOption(list.transform, weaponPanel, WeaponType.Melee, "近战", "稳定直接，适合贴身输出。");
-        CreateWeaponOption(list.transform, weaponPanel, WeaponType.Ranged, "远程", "保持距离，使用墨水弹攻击。");
-        CreateWeaponOption(list.transform, weaponPanel, WeaponType.Special, "特殊", "预留给机关、召唤或功能型武器。");
+        CreateWeaponOption(list.transform, weaponPanel, WeaponType.DirectInk, "直墨", "标准墨迹，稳定直射，适合作为通用基型。");
+        CreateWeaponOption(list.transform, weaponPanel, WeaponType.BurstInk, "爆墨", "命中后爆散成片，擅长处理聚集敌人。");
+        CreateWeaponOption(list.transform, weaponPanel, WeaponType.PierceInk, "贯墨", "初始可连续命中 3 次，更适合打穿一列目标。");
+        CreateWeaponOption(list.transform, weaponPanel, WeaponType.FlowInk, "流墨", "命中后附带持续 3 秒的流墨侵蚀。");
     }
 
     private void CreateWeaponOption(
@@ -794,10 +780,10 @@ public class BaseHubBootstrapper : MonoBehaviour
         CharacterCore core = playerObject.AddComponent<CharacterCore>();
         core.stats = new CharacterStats
         {
-            maxHp = 120f,
-            attackDamage = 18f,
+            maxHp = 100f,
+            attackDamage = 20f,
             moveSpeed = 4.5f,
-            defense = 6f
+            defense = 5f
         };
         core.currentHp = core.stats.maxHp;
 
@@ -805,7 +791,13 @@ public class BaseHubBootstrapper : MonoBehaviour
         profile.avatar = avatarSprite ?? playerVisual;
         profile.currentDurability = 100f;
         profile.maxDurability = 100f;
+        profile.currentInkType = PlayerLoadoutRuntime.CurrentInkType;
         profile.currentWeaponType = PlayerLoadoutRuntime.CurrentWeaponType;
+
+        if (playerObject.GetComponent<PlayerAttributeManager>() == null)
+        {
+            playerObject.AddComponent<PlayerAttributeManager>();
+        }
 
         if (playerObject.GetComponent<PlayerGetArchitectural>() == null)
         {
@@ -929,6 +921,7 @@ public class BaseHubBootstrapper : MonoBehaviour
         core.currentHp = core.stats.maxHp;
 
         dummy.AddComponent<BaseHubTrainingDummy>();
+        dummy.AddComponent<EnemyCombatFeedback>();
     }
 
     private GameObject CreateInteractionAnchor(string name, Vector3 position)

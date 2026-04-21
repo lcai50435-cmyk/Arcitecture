@@ -4,22 +4,35 @@ using UnityEngine.UI;
 [RequireComponent(typeof(Button))]
 public class CatalogueUnlockSlotButton : MonoBehaviour
 {
-    [Header("≤€ŒªŒ®“ªID")]
+    [Header("ÊßΩ‰ΩçÂîØ‰∏ÄID")]
     public string slotId;
 
-    [Header("“™øÿ÷∆—’…´µƒÕº∆¨£®Õœ∏∏ŒÔÃÂ Progress_X µƒ Image£©")]
+    [Header("ËøêË°åÊó∂ÊßΩ‰ΩçÁ¥¢Âºï")]
+    public int slotIndex = -1;
+
+    [Header("Ë¶ÅÊéßÂà∂È¢úËâ≤ÁöÑÂõæÁâáÔºàÊãñÁà∂Áâ©‰Ωì Progress_X ÁöÑ ImageÔºâ")]
     public Image targetImage;
 
-    [Header("Àµ√˜ ˝æ›")]
+    [Header("ËØ¥ÊòéÊï∞ÊçÆ")]
     public UnlockSlotDescriptionData descriptionData;
 
-    [Header("µØ¥∞“˝”√")]
+    [Header("ÂºπÁ™óÂºïÁî®")]
     public Dialog dialogUI;
 
     private Button button;
-    private bool isUnlocked = false;
 
-    public bool IsUnlocked => isUnlocked;
+    public bool IsUnlocked
+    {
+        get
+        {
+            if (!TryResolveContext(out CatalogueBuildingUnlockState buildingState, out int resolvedSlotIndex))
+            {
+                return false;
+            }
+
+            return RuntimeProgressState.EnsureInstance().IsSlotUnlocked(buildingState.BuildingId, resolvedSlotIndex);
+        }
+    }
 
     private void Awake()
     {
@@ -51,48 +64,43 @@ public class CatalogueUnlockSlotButton : MonoBehaviour
 
     private void OnClickSlot()
     {
-        // “—Ω‚À¯£∫œ‘ æΩÈ…‹
-        if (isUnlocked)
+        if (!TryResolveContext(out CatalogueBuildingUnlockState buildingState, out int resolvedSlotIndex))
+        {
+            return;
+        }
+
+        if (RuntimeProgressState.EnsureInstance().IsSlotUnlocked(buildingState.BuildingId, resolvedSlotIndex))
         {
             ShowDescription();
             return;
         }
 
-        // Œ¥Ω‚À¯£∫≥¢ ‘œ˚∫ƒ“ª∏ˆ◊®”√µ„¡¡µ¿æﬂ
-        PlayerGetArchitectural player = FindObjectOfType<PlayerGetArchitectural>();
-        if (player == null)
-        {
-            Debug.LogError("√ª”–’“µΩ PlayerGetArchitectural");
-            return;
-        }
+        bool success = RuntimeProgressState.EnsureInstance().TryUnlockSlot(
+            buildingState.BuildingId,
+            resolvedSlotIndex,
+            out BuildingRewardDefinition slotReward,
+            out BuildingRewardDefinition completionReward);
 
-        bool success = player.ConsumeOneUnlockMaterial();
         if (!success)
         {
-            Debug.Log("√ª”–◊®”√µ„¡¡µ¿æﬂ£¨Œﬁ∑®µ„¡¡∏√–°Õº±Í");
+            Debug.Log("Ê≤°Êúâ‰∏ìÁî®ÁªìÊûÑÊùêÊñôÔºåÊó†Ê≥ïÁÇπ‰∫ÆËØ•Â∞èÂõæÊ†á");
             return;
         }
 
-        // µ„¡¡≥…π¶
-        isUnlocked = true;
         RefreshVisual();
-
-        CatalogueBuildingUnlockState buildingState = GetComponentInParent<CatalogueBuildingUnlockState>();
-        if (buildingState != null)
-        {
-            buildingState.RefreshState();
-        }
+        ShowRewardDialog(slotReward, completionReward);
+        buildingState.RefreshState();
     }
 
     private void ShowDescription()
     {
         if (dialogUI == null)
         {
-            Debug.LogWarning("Dialog Œ¥∞Û∂®");
+            Debug.LogWarning("Dialog Êú™ÁªëÂÆö");
             return;
         }
 
-        string content = "‘›ŒﬁΩÈ…‹";
+        string content = "ÊöÇÊó†‰ªãÁªç";
 
         if (descriptionData != null)
         {
@@ -105,6 +113,19 @@ public class CatalogueUnlockSlotButton : MonoBehaviour
                 content = descriptionData.slotName;
             }
         }
+        else if (TryResolveContext(out CatalogueBuildingUnlockState buildingState, out int resolvedSlotIndex))
+        {
+            BuildingDefinition definition = BuildingDefinitionLibrary.Get(buildingState.BuildingId);
+            if (definition.slotDefinitions != null &&
+                resolvedSlotIndex >= 0 &&
+                resolvedSlotIndex < definition.slotDefinitions.Length)
+            {
+                BuildingSlotDefinition slotDefinition = definition.slotDefinitions[resolvedSlotIndex];
+                content = !string.IsNullOrEmpty(slotDefinition.description)
+                    ? slotDefinition.description
+                    : slotDefinition.slotName;
+            }
+        }
 
         dialogUI.ShowClickCloseDialog(content);
     }
@@ -113,14 +134,59 @@ public class CatalogueUnlockSlotButton : MonoBehaviour
     {
         if (targetImage != null)
         {
-            if (isUnlocked)
+            targetImage.color = IsUnlocked
+                ? new Color(1f, 1f, 1f, 1f)
+                : new Color(0.5f, 0.5f, 0.5f, 1f);
+        }
+    }
+
+    private bool TryResolveContext(out CatalogueBuildingUnlockState buildingState, out int resolvedSlotIndex)
+    {
+        buildingState = GetComponentInParent<CatalogueBuildingUnlockState>();
+        resolvedSlotIndex = slotIndex;
+
+        if (buildingState == null)
+        {
+            return false;
+        }
+
+        if (resolvedSlotIndex < 0 && buildingState.slotButtons != null)
+        {
+            for (int i = 0; i < buildingState.slotButtons.Length; i++)
             {
-                targetImage.color = new Color(1f, 1f, 1f, 1f);
-            }
-            else
-            {
-                targetImage.color = new Color(0.5f, 0.5f, 0.5f, 1f);
+                if (buildingState.slotButtons[i] == this)
+                {
+                    resolvedSlotIndex = i;
+                    slotIndex = i;
+                    break;
+                }
             }
         }
+
+        return resolvedSlotIndex >= 0;
+    }
+
+    private void ShowRewardDialog(BuildingRewardDefinition slotReward, BuildingRewardDefinition completionReward)
+    {
+        if (dialogUI == null)
+        {
+            dialogUI = FindObjectOfType<Dialog>();
+        }
+
+        if (dialogUI == null)
+        {
+            return;
+        }
+
+        string content = slotReward != null
+            ? $"{slotReward.title}\n{slotReward.description}"
+            : "ÊßΩ‰ΩçÂ∑≤ÁÇπ‰∫Æ„ÄÇ";
+
+        if (completionReward != null)
+        {
+            content += $"\n\n{completionReward.title}\n{completionReward.description}";
+        }
+
+        dialogUI.ShowClickCloseDialog(content);
     }
 }

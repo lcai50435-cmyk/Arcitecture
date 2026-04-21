@@ -9,17 +9,29 @@ public class PlayerProfileData : MonoBehaviour
     public float currentDurability = 100f;
     public float maxDurability = 100f;
 
-    [Header("当前武器")]
-    public WeaponType currentWeaponType = WeaponType.Ranged;
+    [Header("当前墨水基型")]
+    public InkType currentInkType = InkType.DirectInk;
+
+    [Header("兼容旧字段")]
+    public WeaponType currentWeaponType = WeaponType.DirectInk;
 
     private void Awake()
     {
+        currentInkType = PlayerLoadoutRuntime.CurrentInkType;
         currentWeaponType = PlayerLoadoutRuntime.CurrentWeaponType;
     }
 
     public void SelectWeapon(WeaponType weaponType)
     {
         currentWeaponType = weaponType;
+        currentInkType = weaponType.ToInkType();
         PlayerLoadoutRuntime.CurrentWeaponType = weaponType;
+    }
+
+    public void SelectInkType(InkType inkType)
+    {
+        currentInkType = inkType;
+        currentWeaponType = inkType.ToWeaponType();
+        PlayerLoadoutRuntime.CurrentInkType = inkType;
     }
 }

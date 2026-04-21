@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 public class PlayerAttributeManager : MonoBehaviour
@@ -7,114 +8,288 @@ public class PlayerAttributeManager : MonoBehaviour
     public CharacterCore characterCore;
     public PlayerAttack playerAttack;
     public PlayerTakeDamage playerTakeDamage;
+    public PlayerProfileData profileData;
 
-    private float bonusCurrentHp;
-    private float bonusMaxHp;
-    private float bonusMoveSpeed;
-    private float bonusAttackDamage;
-    private float bonusDefense;
-    private float bonusDurability;
+    private readonly Dictionary<AttributeBonusType, float> temporaryBonuses =
+        new Dictionary<AttributeBonusType, float>();
+
+    private readonly Dictionary<AttributeBonusType, float> permanentBonuses =
+        new Dictionary<AttributeBonusType, float>();
 
     private void Awake()
     {
         if (Instance == null)
+        {
             Instance = this;
+        }
         else
+        {
             Destroy(gameObject);
+            return;
+        }
+
+        ResolveReferences();
+        EnsureDesignBaseline();
+        RebuildPermanentBonuses();
+        ApplyAllBonus();
+    }
+
+    private void OnEnable()
+    {
+        ResolveReferences();
+        RuntimeProgressState.EnsureInstance().OnStateChanged += HandleRuntimeStateChanged;
+        RebuildPermanentBonuses();
+        ApplyAllBonus();
+    }
+
+    private void OnDisable()
+    {
+        if (RuntimeProgressState.Instance != null)
+        {
+            RuntimeProgressState.Instance.OnStateChanged -= HandleRuntimeStateChanged;
+        }
     }
 
     public void AddBonus(AttributeBonusType type, float value)
     {
-        Accumulate(type, value);
+        AddToBonusMap(temporaryBonuses, type, value);
         ApplyAllBonus();
     }
 
     public void AddBonus(AttributeBonusType type, float value, AttributeBonusType subType, float subValue)
     {
-        Accumulate(type, value);
-        Accumulate(subType, subValue);
+        AddToBonusMap(temporaryBonuses, type, value);
+        AddToBonusMap(temporaryBonuses, subType, subValue);
         ApplyAllBonus();
     }
 
     public void RemoveBonus(AttributeBonusType type, float value)
     {
-        Accumulate(type, -value);
+        AddToBonusMap(temporaryBonuses, type, -value);
         ApplyAllBonus();
     }
 
     public void RemoveBonus(AttributeBonusType type, float value, AttributeBonusType subType, float subValue)
     {
-        Accumulate(type, -value);
-        Accumulate(subType, -subValue);
+        AddToBonusMap(temporaryBonuses, type, -value);
+        AddToBonusMap(temporaryBonuses, subType, -subValue);
         ApplyAllBonus();
-    }
-
-    private void Accumulate(AttributeBonusType type, float value)
-    {
-        switch (type)
-        {
-            case AttributeBonusType.CurrentHealth:
-                bonusCurrentHp += value;
-                break;
-            case AttributeBonusType.MaxHealth:
-                bonusMaxHp += value;
-                break;
-            case AttributeBonusType.MoveSpeed:
-                bonusMoveSpeed += value;
-                break;
-            case AttributeBonusType.AttackPower:
-                bonusAttackDamage += value;
-                break;
-            case AttributeBonusType.Defense:
-                bonusDefense += value;
-                break;
-            case AttributeBonusType.Durability:
-                bonusDurability += value;
-                break;
-        }
     }
 
     public void ApplyAllBonus()
     {
-        if (characterCore != null && characterCore.stats != null)
+        ResolveReferences();
+        EnsureDesignBaseline();
+
+        if (characterCore == null || characterCore.baseStats == null)
         {
-            characterCore.stats.maxHp = Mathf.Max(1f, characterCore.stats.maxHp + bonusMaxHp);
-            characterCore.currentHp = Mathf.Clamp(characterCore.currentHp + bonusCurrentHp, 0f, characterCore.stats.maxHp);
-            characterCore.stats.moveSpeed = Mathf.Max(0f, characterCore.stats.moveSpeed + bonusMoveSpeed);
-            characterCore.stats.attackDamage = Mathf.Max(0f, characterCore.stats.attackDamage + bonusAttackDamage);
-            characterCore.stats.defense = Mathf.Max(0f, characterCore.stats.defense + bonusDefense);
+            return;
         }
+
+        float currentMaxHp = characterCore.stats != null ? Mathf.Max(1f, characterCore.stats.maxHp) : 1f;
+        float healthRatio = currentMaxHp > 0f ? Mathf.Clamp01(characterCore.currentHp / currentMaxHp) : 1f;
+
+        CharacterStats recalculated = characterCore.baseStats.Clone();
+        recalculated.maxHp = Mathf.Max(1f, recalculated.maxHp + GetTotalBonus(AttributeBonusType.MaxHealth));
+        recalculated.attackDamage = Mathf.Max(
+            Mathf.Max(recalculated.attackDamage, InkTypeCatalog.Get(PlayerLoadoutRuntime.CurrentWeaponType).baseDamage) +
+            GetTotalBonus(AttributeBonusType.AttackPower),
+            0f);
+        recalculated.moveSpeed = Mathf.Max(0f, recalculated.moveSpeed + GetTotalBonus(AttributeBonusType.MoveSpeed));
+        recalculated.defense = Mathf.Max(0f, recalculated.defense + GetTotalBonus(AttributeBonusType.Defense));
+
+        characterCore.stats = recalculated;
+
+        float currentHpBonus = GetTotalBonus(AttributeBonusType.CurrentHealth);
+        float expectedCurrentHp = recalculated.maxHp * healthRatio + currentHpBonus;
+        characterCore.currentHp = Mathf.Clamp(expectedCurrentHp, 0f, recalculated.maxHp);
+
+        RefreshAttackDurability();
+        RefreshHealthUi();
+        SyncProfileData();
+    }
+
+    public void ClearAllBonus()
+    {
+        temporaryBonuses.Clear();
+        ApplyAllBonus();
+    }
+
+    private void HandleRuntimeStateChanged()
+    {
+        RebuildPermanentBonuses();
+        ApplyAllBonus();
+    }
+
+    private void RebuildPermanentBonuses()
+    {
+        permanentBonuses.Clear();
+
+        RuntimeProgressState runtimeState = RuntimeProgressState.EnsureInstance();
+        foreach (BuildingRewardDefinition reward in runtimeState.GetGrantedRewards())
+        {
+            if (reward == null)
+            {
+                continue;
+            }
+
+            AddToBonusMap(permanentBonuses, reward.bonusType, reward.bonusValue);
+            AddToBonusMap(permanentBonuses, reward.subBonusType, reward.subBonusValue);
+        }
+    }
+
+    private void RefreshAttackDurability()
+    {
+        float durabilityBonus = GetTotalBonus(AttributeBonusType.Durability);
+        float durabilityBase = 100f;
 
         if (playerAttack != null)
         {
-            playerAttack.maxInk = Mathf.Max(0f, playerAttack.maxInk + bonusDurability);
+            playerAttack.baseMaxInk = Mathf.Max(playerAttack.baseMaxInk, 100f);
+            durabilityBase = playerAttack.baseMaxInk;
+            playerAttack.maxInk = Mathf.Max(1f, playerAttack.baseMaxInk + durabilityBonus);
             playerAttack.ink = Mathf.Clamp(playerAttack.ink, 0f, playerAttack.maxInk);
-
-            if (playerAttack.weaponTrans != null)
-            {
-                playerAttack.weaponTrans.SetMaxValue(playerAttack.maxInk);
-                playerAttack.weaponTrans.SetValue(playerAttack.ink);
-                GameplayStatusHudRuntime.RefreshWeaponText(playerAttack.ink, playerAttack.maxInk);
-            }
+            playerAttack.RefreshInkUI();
         }
 
+        if (profileData != null)
+        {
+            profileData.maxDurability = Mathf.Max(1f, durabilityBase + durabilityBonus);
+            profileData.currentDurability = Mathf.Clamp(profileData.currentDurability, 0f, profileData.maxDurability);
+        }
+    }
+
+    private void RefreshHealthUi()
+    {
         if (playerTakeDamage != null && playerTakeDamage.healthTrans != null && characterCore != null)
         {
             playerTakeDamage.healthTrans.SetMaxValue(characterCore.stats.maxHp);
             playerTakeDamage.healthTrans.SetValue(characterCore.currentHp);
             GameplayStatusHudRuntime.RefreshHealthText(characterCore.currentHp, characterCore.stats.maxHp);
         }
-
-        ClearAllBonus();
     }
 
-    public void ClearAllBonus()
+    private void SyncProfileData()
     {
-        bonusCurrentHp = 0f;
-        bonusMaxHp = 0f;
-        bonusMoveSpeed = 0f;
-        bonusAttackDamage = 0f;
-        bonusDefense = 0f;
-        bonusDurability = 0f;
+        if (profileData == null)
+        {
+            profileData = FindObjectOfType<PlayerProfileData>();
+        }
+
+        if (profileData == null || characterCore == null)
+        {
+            return;
+        }
+
+        if (playerAttack != null)
+        {
+            profileData.maxDurability = playerAttack.maxInk;
+            profileData.currentDurability = playerAttack.ink;
+        }
+
+        profileData.currentInkType = PlayerLoadoutRuntime.CurrentInkType;
+        profileData.currentWeaponType = PlayerLoadoutRuntime.CurrentWeaponType;
+    }
+
+    private void ResolveReferences()
+    {
+        if (characterCore == null)
+        {
+            characterCore = GetComponent<CharacterCore>();
+        }
+
+        if (playerAttack == null)
+        {
+            playerAttack = GetComponent<PlayerAttack>();
+        }
+
+        if (playerTakeDamage == null)
+        {
+            playerTakeDamage = GetComponent<PlayerTakeDamage>();
+        }
+
+        if (profileData == null)
+        {
+            profileData = GetComponent<PlayerProfileData>();
+        }
+    }
+
+    private void EnsureDesignBaseline()
+    {
+        if (characterCore == null)
+        {
+            return;
+        }
+
+        if (characterCore.baseStats == null)
+        {
+            characterCore.baseStats = characterCore.stats != null ? characterCore.stats.Clone() : new CharacterStats();
+        }
+
+        InkTypeDefinition inkDefinition = InkTypeCatalog.Get(PlayerLoadoutRuntime.CurrentWeaponType);
+        if (characterCore.baseStats.attackDamage < inkDefinition.baseDamage)
+        {
+            characterCore.baseStats.attackDamage = inkDefinition.baseDamage;
+        }
+
+        if (playerAttack != null)
+        {
+            playerAttack.baseMaxInk = Mathf.Max(playerAttack.baseMaxInk, 100f);
+            if (playerAttack.maxInk <= 0f)
+            {
+                playerAttack.maxInk = playerAttack.baseMaxInk;
+            }
+
+            if (playerAttack.ink <= 0f)
+            {
+                playerAttack.ink = playerAttack.maxInk;
+            }
+        }
+    }
+
+    private float GetTotalBonus(AttributeBonusType type)
+    {
+        if (type == AttributeBonusType.None)
+        {
+            return 0f;
+        }
+
+        float total = 0f;
+        if (temporaryBonuses.TryGetValue(type, out float temporaryValue))
+        {
+            total += temporaryValue;
+        }
+
+        if (permanentBonuses.TryGetValue(type, out float permanentValue))
+        {
+            total += permanentValue;
+        }
+
+        return total;
+    }
+
+    private static void AddToBonusMap(Dictionary<AttributeBonusType, float> target, AttributeBonusType type, float value)
+    {
+        if (target == null || type == AttributeBonusType.None || Mathf.Approximately(value, 0f))
+        {
+            return;
+        }
+
+        if (target.TryGetValue(type, out float currentValue))
+        {
+            float nextValue = currentValue + value;
+            if (Mathf.Approximately(nextValue, 0f))
+            {
+                target.Remove(type);
+            }
+            else
+            {
+                target[type] = nextValue;
+            }
+        }
+        else
+        {
+            target[type] = value;
+        }
     }
 }

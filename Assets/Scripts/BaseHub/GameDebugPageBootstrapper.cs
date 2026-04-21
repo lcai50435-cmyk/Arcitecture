@@ -13,7 +13,7 @@ public class GameDebugPageBootstrapper : MonoBehaviour
     private const string BaseSceneName = "BaseScene";
     private const string GameSceneName = "GameScene";
     private const float RefreshInterval = 0.2f;
-    private const string RequiredDebugCharacters = "调试面板按住显示当前场景基地允许攻击生命上限耐久攻击力移动速度防御建筑结构材料武器属性技能关闭开关预留版本暂不启用穿透效果命中TabEsc";
+    private const string RequiredDebugCharacters = "调试面板按住显示当前场景基地允许攻击生命上限耐久攻击力移动速度防御建筑结构材料武器墨水属性技能关闭开关预留版本穿透效果命中图鉴进度专用福建土楼赵州桥安徽水乡民居槽位完成总TabEsc";
     private static readonly string[] DebugFontNames =
     {
         "Arial Unicode MS",
@@ -120,6 +120,7 @@ public class GameDebugPageBootstrapper : MonoBehaviour
         Transform content = CreateScrollContent(panelRoot.transform);
         BuildStatusSection(content);
         BuildLoadoutSection(content);
+        BuildProgressSection(content);
 
         if (IsBaseScene())
         {
@@ -153,17 +154,18 @@ public class GameDebugPageBootstrapper : MonoBehaviour
         GameObject section = CreateSection(parent, "实时状态");
         statusText = CreateText("Status", section.transform, string.Empty, 22, new Color(0.88f, 0.86f, 0.78f, 1f), TextAlignmentOptions.TopLeft);
         LayoutElement layout = statusText.gameObject.AddComponent<LayoutElement>();
-        layout.preferredHeight = 220f;
+        layout.preferredHeight = 340f;
         RefreshStatus();
     }
 
     private void BuildLoadoutSection(Transform parent)
     {
-        GameObject section = CreateSection(parent, "武器方案");
-        CreateActionRow(section.transform, "当前武器",
-            ("近战", () => SetWeaponType(WeaponType.Melee)),
-            ("远程", () => SetWeaponType(WeaponType.Ranged)),
-            ("特殊", () => SetWeaponType(WeaponType.Special)));
+        GameObject section = CreateSection(parent, "墨水方案");
+        CreateActionRow(section.transform, "当前墨水",
+            ("直墨", () => SetWeaponType(WeaponType.DirectInk)),
+            ("爆墨", () => SetWeaponType(WeaponType.BurstInk)),
+            ("贯墨", () => SetWeaponType(WeaponType.PierceInk)),
+            ("流墨", () => SetWeaponType(WeaponType.FlowInk)));
     }
 
     private void BuildBaseSection(Transform parent)
@@ -188,13 +190,22 @@ public class GameDebugPageBootstrapper : MonoBehaviour
 
     private void BuildSkillSection(Transform parent)
     {
-        GameObject section = CreateSection(parent, "技能与结构");
-        CreateActionRow(section.transform, "弹道数量", ("加斗拱", () => AddSkill(ArchitecturalType.Brackets)), ("经验+50", () => AddExperience(ArchitecturalType.Brackets, 50)), ("清空背包", ClearBackpack));
-        CreateActionRow(section.transform, "榫卯预留", ("加榫卯", () => AddSkill(ArchitecturalType.MortiseAndTenonJoint)), ("经验+50", () => AddExperience(ArchitecturalType.MortiseAndTenonJoint, 50)));
-        CreateActionRow(section.transform, "弹体尺寸", ("加瓦片", () => AddSkill(ArchitecturalType.Tile)), ("经验+50", () => AddExperience(ArchitecturalType.Tile, 50)));
-        CreateActionRow(section.transform, "减速效果", ("加夯土", () => AddSkill(ArchitecturalType.TampedEarth)), ("经验+50", () => AddExperience(ArchitecturalType.TampedEarth, 50)));
-        CreateActionRow(section.transform, "击退效果", ("加台基", () => AddSkill(ArchitecturalType.GroundMass)), ("经验+50", () => AddExperience(ArchitecturalType.GroundMass, 50)));
-        CreateActionRow(section.transform, "速度射程", ("加梁架", () => AddSkill(ArchitecturalType.BeamFrame)), ("经验+50", () => AddExperience(ArchitecturalType.BeamFrame, 50)));
+        GameObject section = CreateSection(parent, "临时构筑");
+        CreateActionRow(section.transform, "斗拱", ("加1个", () => AddSkill(ArchitecturalType.Brackets, 1)), ("加2个", () => AddSkill(ArchitecturalType.Brackets, 2)), ("清空背包", ClearBackpack));
+        CreateActionRow(section.transform, "榫卯", ("加1个", () => AddSkill(ArchitecturalType.MortiseAndTenonJoint, 1)), ("加2个", () => AddSkill(ArchitecturalType.MortiseAndTenonJoint, 2)));
+        CreateActionRow(section.transform, "瓦", ("加1个", () => AddSkill(ArchitecturalType.Tile, 1)), ("加2个", () => AddSkill(ArchitecturalType.Tile, 2)));
+        CreateActionRow(section.transform, "夯土", ("加1个", () => AddSkill(ArchitecturalType.TampedEarth, 1)), ("加2个", () => AddSkill(ArchitecturalType.TampedEarth, 2)));
+        CreateActionRow(section.transform, "台基", ("加1个", () => AddSkill(ArchitecturalType.GroundMass, 1)), ("加2个", () => AddSkill(ArchitecturalType.GroundMass, 2)));
+        CreateActionRow(section.transform, "梁架", ("加1个", () => AddSkill(ArchitecturalType.BeamFrame, 1)), ("加2个", () => AddSkill(ArchitecturalType.BeamFrame, 2)));
+    }
+
+    private void BuildProgressSection(Transform parent)
+    {
+        GameObject section = CreateSection(parent, "图鉴进度");
+        CreateActionRow(section.transform, "福建土楼", ("+25", () => AddBuildingProgress(CatalogueBuildingId.Building1, 25)), ("+100", () => AddBuildingProgress(CatalogueBuildingId.Building1, 100)));
+        CreateActionRow(section.transform, "赵州桥", ("+25", () => AddBuildingProgress(CatalogueBuildingId.Building2, 25)), ("+100", () => AddBuildingProgress(CatalogueBuildingId.Building2, 100)));
+        CreateActionRow(section.transform, "安徽民居", ("+25", () => AddBuildingProgress(CatalogueBuildingId.Building3, 25)), ("+100", () => AddBuildingProgress(CatalogueBuildingId.Building3, 100)));
+        CreateActionRow(section.transform, "专用材料", ("+1", () => AddSpecialStructureMaterial(1)), ("+3", () => AddSpecialStructureMaterial(3)));
     }
 
     private void BuildTimeSection(Transform parent)
@@ -224,13 +235,22 @@ public class GameDebugPageBootstrapper : MonoBehaviour
         BackpackMananger backpack = EnsureBackpackManager();
         GameCountDownManager countdown = IsBaseScene() ? null : EnsureCountdownManager();
         InkAttackRuntimeConfig inkConfig = InkModifierRuntimeConfig.BuildFromBackpack(backpack);
+        RuntimeProgressState runtimeState = RuntimeProgressState.EnsureInstance();
 
         StringBuilder builder = new StringBuilder();
         builder.AppendLine($"场景：{GetSceneDisplayName(SceneManager.GetActiveScene().name)}    速度：{Time.timeScale:0.##}倍");
-        builder.AppendLine($"武器：{GetWeaponDisplayName(PlayerLoadoutRuntime.CurrentWeaponType)}    基地攻击：{(PlayerLoadoutRuntime.AllowBaseAttack ? "开启" : "关闭")}");
+        builder.AppendLine($"墨水：{GetWeaponDisplayName(PlayerLoadoutRuntime.CurrentWeaponType)}    基地攻击：{(PlayerLoadoutRuntime.AllowBaseAttack ? "开启" : "关闭")}");
         builder.AppendLine(core != null
             ? $"生命：{core.currentHp:0}/{core.stats.maxHp:0}    攻击：{core.stats.attackDamage:0}    防御：{core.stats.defense:0}    移速：{core.stats.moveSpeed:0.0}"
             : "玩家属性：未找到 CharacterCore");
+        builder.AppendLine($"图鉴总进度：{runtimeState.GetTotalProgress()}/{runtimeState.GetTotalMaxProgress()}    专用材料：{runtimeState.AvailableSpecialStructureInventory}");
+
+        foreach (BuildingDefinition definition in BuildingDefinitionLibrary.GetAll())
+        {
+            int unlockedSlots = runtimeState.GetUnlockedSlotCount(definition.buildingId);
+            builder.AppendLine(
+                $"{definition.displayName}：{runtimeState.GetBuildingProgress(definition.buildingId)}/{definition.requiredProgress}    槽位：{unlockedSlots}/{definition.slotDefinitions.Length}    完成：{(runtimeState.IsBuildingUnlocked(definition.buildingId) ? "是" : "否")}");
+        }
 
         if (!IsBaseScene())
         {
@@ -267,6 +287,11 @@ public class GameDebugPageBootstrapper : MonoBehaviour
         if (panel != null)
         {
             panel.RefreshSelected();
+        }
+
+        if (PlayerAttributeManager.Instance != null)
+        {
+            PlayerAttributeManager.Instance.ApplyAllBonus();
         }
 
         RefreshStatus();
@@ -384,85 +409,57 @@ public class GameDebugPageBootstrapper : MonoBehaviour
         PlayerAttack attack = GetPlayerAttack();
         if (attack == null) return;
 
-        attack.ink = Mathf.Max(0f, value);
-        if (attack.weaponTrans != null)
-        {
-            attack.weaponTrans.SetValue(attack.ink);
-        }
+        attack.ink = Mathf.Clamp(value, 0f, attack.maxInk);
+        attack.RefreshInkUI();
 
         RefreshStatus();
     }
 
-    private void AddSkill(ArchitecturalType type)
+    private void AddSkill(ArchitecturalType type, int count)
     {
         BackpackMananger backpack = EnsureBackpackManager();
-        if (backpack == null || backpack.backpackItems == null) return;
+        if (backpack == null) return;
 
-        for (int i = 0; i < backpack.backpackItems.Count; i++)
+        for (int i = 0; i < count; i++)
         {
-            if (backpack.backpackItems[i] != null) continue;
-
-            ArchitecturalCrystal item = CreateDebugCrystal(type);
-            backpack.backpackItems[i] = item;
-
-            if (PlayerAttributeManager.Instance != null)
+            if (!backpack.PickItem(CreateDebugCrystal(type)))
             {
-                PlayerAttributeManager.Instance.AddBonus(item.bonusType, item.bonusValue);
+                Debug.LogWarning("背包已满，无法继续添加调试结构");
+                break;
             }
-
-            RefreshBackpackUI();
-            RefreshStatus();
-            return;
         }
 
-        Debug.LogWarning("背包已满，无法添加调试结构");
+        RefreshBackpackUI();
+        RefreshStatus();
     }
 
     private ArchitecturalCrystal CreateDebugCrystal(ArchitecturalType type)
     {
         Sprite icon = GetSkillIcon(type);
-        AttributeBonusType bonusType;
-        float bonusValue;
-
-        switch (type)
-        {
-            case ArchitecturalType.MortiseAndTenonJoint:
-                bonusType = AttributeBonusType.MaxHealth;
-                bonusValue = 10f;
-                break;
-            case ArchitecturalType.GroundMass:
-            case ArchitecturalType.TampedEarth:
-                bonusType = AttributeBonusType.Defense;
-                bonusValue = 2f;
-                break;
-            case ArchitecturalType.BeamFrame:
-                bonusType = AttributeBonusType.MoveSpeed;
-                bonusValue = 0.4f;
-                break;
-            default:
-                bonusType = AttributeBonusType.AttackPower;
-                bonusValue = 4f;
-                break;
-        }
-
-        return new ArchitecturalCrystal(
-            type,
-            50,
-            icon,
-            icon,
-            GetSkillDescription(type),
-            bonusType,
-            bonusValue,
-            AttributeBonusType.CurrentHealth,
-            0f,
-            false);
+        ArchitecturalCrystal crystal = ArchitecturalCrystalFactory.CreateCommonStructure(type, icon, icon);
+        crystal.textDescription = GetSkillDescription(type);
+        return crystal;
     }
 
-    private void AddExperience(ArchitecturalType type, int value)
+    private void AddBuildingProgress(CatalogueBuildingId buildingId, int value)
     {
-        if (ExperienceManager.Instance == null) return;
+        if (value <= 0)
+        {
+            return;
+        }
 
-        ExperienceManager.Instance.AddExperience(type, value);
+        RuntimeProgressState.EnsureInstance().AddBuildingProgress(buildingId, value, out _);
+        RefreshStatus();
+    }
+
+    private void AddSpecialStructureMaterial(int count)
+    {
+        if (count <= 0)
+        {
+            return;
+        }
+
+        RuntimeProgressState.EnsureInstance().AddSpecialStructureInventory(count);
         RefreshStatus();
     }
 
@@ -602,7 +599,7 @@ public class GameDebugPageBootstrapper : MonoBehaviour
             case ArchitecturalType.Brackets:
                 return "斗拱：增加墨水弹数量。";
             case ArchitecturalType.MortiseAndTenonJoint:
-                return "榫卯：当前版本暂不启用穿透效果。";
+                return "榫卯：提升单发命中次数，让墨迹继续向前穿透。";
             case ArchitecturalType.Tile:
                 return "瓦片：放大墨水弹体积。";
             case ArchitecturalType.TampedEarth:
@@ -830,12 +827,7 @@ public class GameDebugPageBootstrapper : MonoBehaviour
 
     private static string GetWeaponDisplayName(WeaponType weaponType)
     {
-        switch (weaponType)
-        {
-            case WeaponType.Melee: return "近战";
-            case WeaponType.Special: return "特殊";
-            default: return "远程";
-        }
+        return InkTypeCatalog.GetDisplayName(weaponType);
     }
 
     private static void EnsureEventSystem()

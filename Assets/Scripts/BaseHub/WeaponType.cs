@@ -1,6 +1,7 @@
 public enum WeaponType
 {
-    Melee,
-    Ranged,
-    Special
+    DirectInk,
+    BurstInk,
+    PierceInk,
+    FlowInk
 }

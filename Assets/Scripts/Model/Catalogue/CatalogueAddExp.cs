@@ -3,25 +3,25 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// ½¨ÖşÍ¼Â¼½ø¶ÈÊı¾İ
-/// ¸ºÔğÀÛ¼Æ²»Í¬½¨ÖşÀàĞÍµÄ¹¹½¨¶È£¬²¢Ìá¹©×Ü½ø¶È¸øUI¶ÁÈ¡
+/// å»ºç­‘å›¾å½•è¿›åº¦æ•°æ®
+/// è´Ÿè´£ç´¯è®¡ä¸åŒå»ºç­‘ç±»å‹çš„æ„å»ºåº¦ï¼Œå¹¶æä¾›æ€»è¿›åº¦ç»™UIè¯»å–
 /// </summary>
 public class CatalogueAddExp : MonoBehaviour
 {
-    [Header("×Ü½ø¶ÈÉÏÏŞ")]
+    [Header("æ€»è¿›åº¦ä¸Šé™")]
     public int totalMaxProgress = 100;
 
-    // Ã¿¸ö½¨Öş½á¹¹ÎïÆ·µÄ¹¹½¨¶È
+    // æ¯ä¸ªå»ºç­‘ç»“æ„ç‰©å“çš„æ„å»ºåº¦
     private Dictionary<ArchitecturalType, int> expDict = new Dictionary<ArchitecturalType, int>();
 
     /// <summary>
-    /// µ±½ø¶È±ä»¯Ê±£¬Í¨ÖªUIË¢ĞÂ
+    /// å½“è¿›åº¦å˜åŒ–æ—¶ï¼Œé€šçŸ¥UIåˆ·æ–°
     /// </summary>
     public event Action OnProgressChanged;
 
     private void Start()
     {
-        // ³õÊ¼»¯ËùÓĞÀàĞÍµÄ¾­ÑéÎª0
+        // åˆå§‹åŒ–æ‰€æœ‰ç±»å‹çš„ç»éªŒä¸º0
         foreach (ArchitecturalType type in Enum.GetValues(typeof(ArchitecturalType)))
         {
             expDict[type] = 0;
@@ -33,7 +33,7 @@ public class CatalogueAddExp : MonoBehaviour
         }
         else
         {
-            Debug.LogError("ExperienceManager.Instance ²»´æÔÚ£¬ÎŞ·¨¼àÌı¾­Ñé±ä»¯£¡");
+            Debug.LogError("ExperienceManager.Instance ä¸å­˜åœ¨ï¼Œæ— æ³•ç›‘å¬ç»éªŒå˜åŒ–ï¼");
         }
     }
 
@@ -46,7 +46,7 @@ public class CatalogueAddExp : MonoBehaviour
     }
 
     /// <summary>
-    /// ¶ÔÓ¦½¨Öş½á¹¹Ôö¼Ó¹¹½¨¶È
+    /// å¯¹åº”å»ºç­‘ç»“æ„å¢åŠ æ„å»ºåº¦
     /// </summary>
     private void HandleExperienceChange(ArchitecturalType type, int newExperience)
     {
@@ -57,14 +57,14 @@ public class CatalogueAddExp : MonoBehaviour
 
         expDict[type] += newExperience;
 
-        Debug.Log($"»ùµØÊÕµ½£º{type} +{newExperience}£¬µ±Ç°×ÜÁ¿£º{expDict[type]}");
+        Debug.Log($"åŸºåœ°æ”¶åˆ°ï¼š{type} +{newExperience}ï¼Œå½“å‰æ€»é‡ï¼š{expDict[type]}");
 
-        // Í¨ÖªUIË¢ĞÂ
+        // é€šçŸ¥UIåˆ·æ–°
         OnProgressChanged?.Invoke();
     }
 
     /// <summary>
-    /// »ñÈ¡Ä³¸öÀàĞÍµ±Ç°µÄ¹¹½¨¶È
+    /// è·å–æŸä¸ªç±»å‹å½“å‰çš„æ„å»ºåº¦
     /// </summary>
     public int GetProgress(ArchitecturalType type)
     {
@@ -77,7 +77,7 @@ public class CatalogueAddExp : MonoBehaviour
     }
 
     /// <summary>
-    /// »ñÈ¡×Ü¹¹½¨¶È£¨Gold + Green + White£©
+    /// è·å–æ€»æ„å»ºåº¦ï¼ˆGold + Green + Whiteï¼‰
     /// </summary>
     public int GetTotalProgress()
     {
@@ -92,7 +92,7 @@ public class CatalogueAddExp : MonoBehaviour
     }
 
     /// <summary>
-    /// »ñÈ¡ÏŞÖÆÔÚ×ÜÉÏÏŞÄÚµÄ×Ü½ø¶È
+    /// è·å–é™åˆ¶åœ¨æ€»ä¸Šé™å†…çš„æ€»è¿›åº¦
     /// </summary>
     public int GetClampedTotalProgress()
     {

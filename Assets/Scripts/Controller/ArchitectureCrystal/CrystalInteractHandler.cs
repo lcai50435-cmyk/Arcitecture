@@ -8,6 +8,9 @@ public class CrystalInteractHandler : MonoBehaviour, IInteractable
     [Header("是否为专用材料")]
     public bool isUnlockMaterial = false;
 
+    [Header("资源分类")]
+    public ArchitecturalResourceCategory resourceCategory = ArchitecturalResourceCategory.CommonStructure;
+
     [Header("晶体配置")]
     public ArchitecturalType type;
     public int expValue;
@@ -17,6 +20,8 @@ public class CrystalInteractHandler : MonoBehaviour, IInteractable
     public float bonusValue;
     public AttributeBonusType subBonusType;
     public float subBonusValue;
+    [Header("墨水补给恢复量")]
+    public int inkRestoreValue;
     [TextArea] public string textDescription;
 
     public void OnInteract()
@@ -37,7 +42,9 @@ public class CrystalInteractHandler : MonoBehaviour, IInteractable
             bonusValue,
             subBonusType,
             subBonusValue,
-            isUnlockMaterial
+            isUnlockMaterial,
+            resourceCategory,
+            inkRestoreValue
         );
 
         bool pickSuccess = player.PickCrystal(data);
@@ -56,9 +63,20 @@ public class CrystalInteractHandler : MonoBehaviour, IInteractable
     {
         get
         {
-            if (isUnlockMaterial)
+            ArchitecturalResourceCategory category = resourceCategory;
+            if (category != ArchitecturalResourceCategory.InkSupply && isUnlockMaterial)
+            {
+                category = ArchitecturalResourceCategory.SpecialStructure;
+            }
+
+            if (category == ArchitecturalResourceCategory.SpecialStructure)
             {
                 return "拾取材料";
+            }
+
+            if (category == ArchitecturalResourceCategory.InkSupply)
+            {
+                return "拾取补给";
             }
 
             return "拾取晶体";
