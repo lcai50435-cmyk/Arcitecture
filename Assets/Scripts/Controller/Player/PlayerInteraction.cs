@@ -9,10 +9,10 @@ public class PlayerInteraction : MonoBehaviour
     public TextMeshProUGUI boxText;
 
     [Header("最大交互距离")]
-    public float interactDistance = 2.2f;
+    public float interactDistance = 1.2f;
 
     private IInteractable currentInteractable;
-    private Transform currentInteractableTransform;
+    private Collider2D currentInteractableCollider;
 
     void Start()
     {
@@ -21,8 +21,7 @@ public class PlayerInteraction : MonoBehaviour
 
     void Update()
     {
-        // 每帧检查当前交互对象是否还在有效距离内
-        ValidateCurrentInteractable();
+        UpdateCurrentInteractable();
 
         if (Input.GetKeyDown(KeyCode.F))
         {
@@ -30,64 +29,66 @@ public class PlayerInteraction : MonoBehaviour
         }
     }
 
-    private void OnTriggerStay2D(Collider2D col)
+    private void UpdateCurrentInteractable()
     {
-        if (!col.TryGetComponent(out IInteractable interactable))
-            return;
+        Collider2D[] hits = Physics2D.OverlapCircleAll(transform.position, interactDistance);
 
-        float distance = Vector2.Distance(transform.position, col.transform.position);
+        IInteractable nearestInteractable = null;
+        Collider2D nearestCollider = null;
+        float nearestDistance = float.MaxValue;
 
-        // 超出真实交互距离，不记录
-        if (distance > interactDistance)
-            return;
-
-        currentInteractable = interactable;
-        currentInteractableTransform = col.transform;
-
-        ShowInteractUI(currentInteractable.InteractionTip);
-    }
-
-    private void OnTriggerExit2D(Collider2D col)
-    {
-        if (!col.TryGetComponent(out IInteractable interactable))
-            return;
-
-        if (interactable == currentInteractable)
+        for (int i = 0; i < hits.Length; i++)
         {
-            ClearCurrentInteractable();
+            Collider2D hit = hits[i];
+            if (hit == null) continue;
+            if (hit.gameObject == gameObject) continue;
+
+            if (hit.TryGetComponent(out IInteractable interactable))
+            {
+                Vector2 closestPoint = hit.ClosestPoint(transform.position);
+                float distance = Vector2.Distance(transform.position, closestPoint);
+
+                if (distance <= interactDistance && distance < nearestDistance)
+                {
+                    nearestDistance = distance;
+                    nearestInteractable = interactable;
+                    nearestCollider = hit;
+                }
+            }
+        }
+
+        currentInteractable = nearestInteractable;
+        currentInteractableCollider = nearestCollider;
+
+        if (currentInteractable != null)
+        {
+            ShowInteractUI(currentInteractable.InteractionTip);
+        }
+        else
+        {
+            HideInteractUI();
         }
     }
 
     private void TryInteract()
     {
-        // 再做一次交互前校验
-        if (!IsCurrentInteractableValid())
+        if (currentInteractable == null || currentInteractableCollider == null)
         {
             ClearCurrentInteractable();
             return;
         }
 
-        if (currentInteractable != null)
-        {
-            currentInteractable.OnInteract();
-        }
-    }
+        Vector2 closestPoint = currentInteractableCollider.ClosestPoint(transform.position);
+        float distance = Vector2.Distance(transform.position, closestPoint);
 
-    private void ValidateCurrentInteractable()
-    {
-        if (!IsCurrentInteractableValid())
+        if (distance > interactDistance)
         {
             ClearCurrentInteractable();
+            return;
         }
-    }
 
-    private bool IsCurrentInteractableValid()
-    {
-        if (currentInteractable == null || currentInteractableTransform == null)
-            return false;
-
-        float distance = Vector2.Distance(transform.position, currentInteractableTransform.position);
-        return distance <= interactDistance;
+        Debug.Log("开始交互");
+        currentInteractable.OnInteract();
     }
 
     private void ShowInteractUI(string tip)
@@ -111,7 +112,13 @@ public class PlayerInteraction : MonoBehaviour
     public void ClearCurrentInteractable()
     {
         currentInteractable = null;
-        currentInteractableTransform = null;
+        currentInteractableCollider = null;
         HideInteractUI();
+    }
+
+    private void OnDrawGizmosSelected()
+    {
+        Gizmos.color = Color.yellow;
+        Gizmos.DrawWireSphere(transform.position, interactDistance);
     }
 }

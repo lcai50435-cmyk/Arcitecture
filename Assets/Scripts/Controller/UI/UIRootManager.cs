@@ -54,11 +54,17 @@ public class UIRootManager : MonoBehaviour
             return;
         }
 
+        // 关键：显示时强制确保物体本身激活
+        if (active && !cg.gameObject.activeSelf)
+        {
+            cg.gameObject.SetActive(true);
+        }
+
         cg.alpha = active ? 1f : 0f;
         cg.interactable = active;
         cg.blocksRaycasts = active;
 
-        Debug.Log($"{name} -> active={active}, blocksRaycasts={cg.blocksRaycasts}");
+        Debug.Log($"{name} -> active={active}, gameObjectActive={cg.gameObject.activeSelf}, alpha={cg.alpha}, blocksRaycasts={cg.blocksRaycasts}");
     }
 
     // ========= 图鉴主页 =========

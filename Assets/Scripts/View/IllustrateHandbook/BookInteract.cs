@@ -9,7 +9,7 @@ public class BookInteract : MonoBehaviour, IInteractable
 
     public void OnInteract()
     {
-        Debug.Log("书本被交互！");  // 调试日志
+        Debug.Log("书本被交互！");
 
         if (illustratedHandbook != null)
         {
