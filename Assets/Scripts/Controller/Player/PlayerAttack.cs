@@ -3,7 +3,6 @@ using UnityEngine;
 public class PlayerAttack : CharacterAttack
 {
     private readonly KeyCode attackKey = KeyCode.Mouse0;
-    private const float InkCostPerAttack = 5f;
     private DirectionTracker directionTracker;
     private Animator animator;
 
@@ -22,7 +21,6 @@ public class PlayerAttack : CharacterAttack
     {
         directionTracker = GetComponent<DirectionTracker>();
         animator = GetComponent<Animator>();
-
         base.Awake();
 
         if (weaponTrans != null)
@@ -50,9 +48,10 @@ public class PlayerAttack : CharacterAttack
 
     public override void TriggerAttack()
     {
-        if (ink < InkCostPerAttack) return;
+        WeaponAttackProfile profile = WeaponAttackProfile.FromWeaponType(PlayerLoadoutRuntime.CurrentWeaponType);
+        if (ink < profile.inkCost) return;
 
-        ink = Mathf.Max(0f, ink - InkCostPerAttack);
+        ink = Mathf.Max(0f, ink - profile.inkCost);
         if (weaponTrans != null)
         {
             weaponTrans.SetValue(ink);
@@ -66,8 +65,14 @@ public class PlayerAttack : CharacterAttack
             lastDir = Vector2.right;
         }
 
+        if (profile.usesMelee)
+        {
+            PerformMeleeAttack(lastDir.normalized, profile);
+            return;
+        }
+
         InkAttackRuntimeConfig inkConfig = InkModifierRuntimeConfig.BuildFromBackpack(BackpackMananger.Instance);
-        SpawnInkBalls(lastDir.normalized, inkConfig);
+        SpawnInkBalls(lastDir.normalized, profile.ApplyToInkConfig(inkConfig));
     }
 
     private void SpawnInkBalls(Vector2 direction, InkAttackRuntimeConfig inkConfig)
@@ -92,6 +97,29 @@ public class PlayerAttack : CharacterAttack
             if (inkBallComponent != null)
             {
                 inkBallComponent.Init(inkConfig);
+            }
+        }
+    }
+
+    private void PerformMeleeAttack(Vector2 direction, WeaponAttackProfile profile)
+    {
+        Vector2 center = (Vector2)transform.position + direction * profile.meleeRange;
+        Collider2D[] hits = Physics2D.OverlapCircleAll(center, profile.meleeRadius);
+
+        for (int i = 0; i < hits.Length; i++)
+        {
+            CharacterCore target = hits[i].GetComponent<CharacterCore>();
+            if (target == null || target == core)
+            {
+                continue;
+            }
+
+            target.TakeDamage(core.stats.attackDamage * profile.meleeDamageMultiplier);
+
+            Rigidbody2D targetBody = target.GetComponent<Rigidbody2D>();
+            if (targetBody != null && profile.meleeKnockbackForce > 0f)
+            {
+                targetBody.AddForce(direction * profile.meleeKnockbackForce, ForceMode2D.Impulse);
             }
         }
     }

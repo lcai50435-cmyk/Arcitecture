@@ -8,16 +8,12 @@ public class PlayerAttributeManager : MonoBehaviour
     public PlayerAttack playerAttack;
     public PlayerTakeDamage playerTakeDamage;
 
-    private float baseMoveSpeed;
-    private float baseAttackDamage;
-    private float baseDefense;
-    private float baseInk;
-
-    private float bonusHp;
+    private float bonusCurrentHp;
+    private float bonusMaxHp;
     private float bonusMoveSpeed;
     private float bonusAttackDamage;
     private float bonusDefense;
-    private float bonusInk;
+    private float bonusDurability;
 
     private void Awake()
     {
@@ -27,69 +23,95 @@ public class PlayerAttributeManager : MonoBehaviour
             Destroy(gameObject);
     }
 
-    private void Start()
+    public void AddBonus(AttributeBonusType type, float value)
     {
-        baseMoveSpeed = characterCore.stats.moveSpeed;
-        baseAttackDamage = characterCore.stats.attackDamage;
-        baseDefense = characterCore.stats.defense;
-        baseInk = playerAttack.ink;
-        Refresh();
+        Accumulate(type, value);
+        ApplyAllBonus();
     }
 
     public void AddBonus(AttributeBonusType type, float value, AttributeBonusType subType, float subValue)
     {
-        Add(type, value);
-        Add(subType, subValue);
-        Refresh();
+        Accumulate(type, value);
+        Accumulate(subType, subValue);
+        ApplyAllBonus();
+    }
+
+    public void RemoveBonus(AttributeBonusType type, float value)
+    {
+        Accumulate(type, -value);
+        ApplyAllBonus();
     }
 
     public void RemoveBonus(AttributeBonusType type, float value, AttributeBonusType subType, float subValue)
     {
-        Add(type, -value);
-        Add(subType, -subValue);
-        Refresh();
+        Accumulate(type, -value);
+        Accumulate(subType, -subValue);
+        ApplyAllBonus();
     }
 
-    private void Add(AttributeBonusType t, float v)
+    private void Accumulate(AttributeBonusType type, float value)
     {
-        switch (t)
+        switch (type)
         {
-            case AttributeBonusType.CurrentHealth: bonusHp += v; break;
-            case AttributeBonusType.MoveSpeed: bonusMoveSpeed += v; break;
-            case AttributeBonusType.AttackPower: bonusAttackDamage += v; break;
-            case AttributeBonusType.Defense: bonusDefense += v; break;
-            case AttributeBonusType.Durability: bonusInk += v; break;
+            case AttributeBonusType.CurrentHealth:
+                bonusCurrentHp += value;
+                break;
+            case AttributeBonusType.MaxHealth:
+                bonusMaxHp += value;
+                break;
+            case AttributeBonusType.MoveSpeed:
+                bonusMoveSpeed += value;
+                break;
+            case AttributeBonusType.AttackPower:
+                bonusAttackDamage += value;
+                break;
+            case AttributeBonusType.Defense:
+                bonusDefense += value;
+                break;
+            case AttributeBonusType.Durability:
+                bonusDurability += value;
+                break;
         }
     }
 
-    private void Refresh()
+    public void ApplyAllBonus()
     {
-        // HP
-        float hp = characterCore.currentHp + bonusHp;
-        characterCore.currentHp = Mathf.Clamp(hp, 0f, 100f);
-        playerTakeDamage.healthTrans.SetValue(characterCore.currentHp);
+        if (characterCore != null && characterCore.stats != null)
+        {
+            characterCore.stats.maxHp = Mathf.Max(1f, characterCore.stats.maxHp + bonusMaxHp);
+            characterCore.currentHp = Mathf.Clamp(characterCore.currentHp + bonusCurrentHp, 0f, characterCore.stats.maxHp);
+            characterCore.stats.moveSpeed = Mathf.Max(0f, characterCore.stats.moveSpeed + bonusMoveSpeed);
+            characterCore.stats.attackDamage = Mathf.Max(0f, characterCore.stats.attackDamage + bonusAttackDamage);
+            characterCore.stats.defense = Mathf.Max(0f, characterCore.stats.defense + bonusDefense);
+        }
 
-        // 移动速度
-        characterCore.stats.moveSpeed = Mathf.Max(baseMoveSpeed + bonusMoveSpeed, 1f);
+        if (playerAttack != null)
+        {
+            playerAttack.maxInk = Mathf.Max(0f, playerAttack.maxInk + bonusDurability);
+            playerAttack.ink = Mathf.Clamp(playerAttack.ink, 0f, playerAttack.maxInk);
 
-        // 攻击
-        characterCore.stats.attackDamage = Mathf.Max(baseAttackDamage + bonusAttackDamage, 1f);
+            if (playerAttack.weaponTrans != null)
+            {
+                playerAttack.weaponTrans.SetMaxValue(playerAttack.maxInk);
+                playerAttack.weaponTrans.SetValue(playerAttack.ink);
+            }
+        }
 
-        // 防御
-        characterCore.stats.defense = Mathf.Max(baseDefense + bonusDefense, 0f);
+        if (playerTakeDamage != null && playerTakeDamage.healthTrans != null && characterCore != null)
+        {
+            playerTakeDamage.healthTrans.SetValue(characterCore.currentHp);
+        }
 
-        // 墨水
-        playerAttack.ink = Mathf.Max(baseInk + bonusInk, 0f);
-        playerAttack.weaponTrans.SetValue(playerAttack.ink);
+        ClearAllBonus();
     }
 
     public void ClearAllBonus()
     {
-        bonusHp = 0;
-        bonusMoveSpeed = 0;
-        bonusAttackDamage = 0;
-        bonusDefense = 0;
-        bonusInk = 0;
-        Refresh();
+        bonusCurrentHp = 0f;
+        bonusMaxHp = 0f;
+        bonusMoveSpeed = 0f;
+        bonusAttackDamage = 0f;
+        bonusDefense = 0f;
+        bonusDurability = 0f;
     }
 }

@@ -1,80 +1,82 @@
 using TMPro;
 using UnityEngine;
-using static Unity.Burst.Intrinsics.X86.Avx;
 
 public class GameCountDownManager : MonoBehaviour
 {
-    [Header("×Üµ¹¼ÆÊ±Ê±³¤")]
+    [Header("æ€»å€’è®¡æ—¶æ—¶é—´")]
     public float totalTime = 300f;
-    [Header("ÊÇ·ñÔÚ»ùµØÄÚ(ÔİÍ£µ¹¼ÆÊ±)")]
+    [Header("æ˜¯å¦åœ¨åŸºåœ°å†…ï¼Œæš‚åœå€’è®¡æ—¶")]
     public bool isInBase = true;
-    [Header("µ¹¼ÆÊ±×é¼ş")]
+    [Header("å€’è®¡æ—¶æ–‡æœ¬")]
     public TextMeshProUGUI timer;
 
     private float currentTime;
     public static GameCountDownManager Instance;
 
-    void Awake()
+    private void Awake()
     {
-        // µ¥Àı
         if (Instance == null) Instance = this;
         else Destroy(gameObject);
     }
 
-    void Start()
+    private void Start()
     {
         currentTime = totalTime;
+        RefreshTimerText();
     }
 
-    void Update()
+    private void Update()
     {
-        // ²»¿ÛÊ±¼ä
         if (isInBase) return;
 
-        // µ¹¼ÆÊ±ÔËĞĞ
-        if (currentTime > 0)
-        {          
-            currentTime -= Time.deltaTime;
-           
-            // ¸ñÊ½»¯ 0:00
-            int min = Mathf.FloorToInt(currentTime / 60);
-            int sec = Mathf.FloorToInt(currentTime % 60);
-            timer.text = $"{min}:{sec:00}";
-
-            // Ê±¼äĞ¡ÓÚ60Ãë Ôò ±äºì
-            if (currentTime <= 60)
-            {
-                timer.text = $"<color=red>{min}:{sec:00}</color>";
-            }
-
-        }
-        else
+        if (currentTime > 0f)
         {
-            // µ¹¼ÆÊ±¹éÁã Ôò ÓÎÏ·½áÊø
-            GameOver();
+            currentTime = Mathf.Max(0f, currentTime - Time.deltaTime);
+            RefreshTimerText();
+
+            if (currentTime <= 0f)
+            {
+                GameOver();
+            }
         }
     }
 
-    // ÓÎÏ·½áÊøÂß¼­
-    void GameOver()
+    private void GameOver()
     {
-        Debug.Log("µ¹¼ÆÊ±¹éÁã£¬ÓÎÏ·½áÊø£¡");
-        // µ¯´°¡¢ÔİÍ£ÓÎÏ·¡¢ÇĞ»»³¡¾°
-        timer.text = $"<color=red>00:00</color>";
-
-        // Ç¿ÖÆÍË³öÓÎÏ·
-        
+        Debug.Log("å€’è®¡æ—¶å½’é›¶ï¼Œæ¸¸æˆç»“æŸ");
+        RefreshTimerText();
     }
 
-    // Íâ²¿ÉèÖÃÊÇ·ñÔÚ»ùµØ
     public void SetInBaseState(bool state)
     {
         isInBase = state;
     }
 
-    // ²é¿´Ê£ÓàÊ±¼ä
     public float GetRemainTime()
     {
-        return Mathf.Max(currentTime, 0);
+        return Mathf.Max(currentTime, 0f);
+    }
+
+    public void DebugAddRemainTime(float seconds)
+    {
+        DebugSetRemainTime(currentTime + seconds);
+    }
+
+    public void DebugSetRemainTime(float seconds)
+    {
+        currentTime = Mathf.Max(0f, seconds);
+        RefreshTimerText();
+    }
+
+    private void RefreshTimerText()
+    {
+        if (timer == null) return;
+
+        int min = Mathf.FloorToInt(currentTime / 60f);
+        int sec = Mathf.FloorToInt(currentTime % 60f);
+        string value = $"{min}:{sec:00}";
+        timer.text = currentTime <= 60f
+            ? $"<color=red>{value}</color>"
+            : value;
     }
 }

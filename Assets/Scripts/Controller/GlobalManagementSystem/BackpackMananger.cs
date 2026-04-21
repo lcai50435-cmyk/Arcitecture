@@ -1,10 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-/// <summary>
-/// 专门存储背包物品数据的管理器。
-/// 固定 6 格，禁止使用 RemoveAt 改变槽位结构。
-/// </summary>
 public class BackpackMananger : MonoBehaviour
 {
     public static BackpackMananger Instance;
@@ -13,7 +9,7 @@ public class BackpackMananger : MonoBehaviour
     public List<ArchitecturalCrystal?> backpackItems = new List<ArchitecturalCrystal?>();
 
     private const int MaxCapacity = 6;
-    private readonly HashSet<ArchitecturalType> alreadyPickedTypes = new HashSet<ArchitecturalType>();
+    private readonly HashSet<ArchitecturalType> alreadyPickedCommonTypes = new HashSet<ArchitecturalType>();
 
     public delegate void FirstPickTipEvent(ArchitecturalCrystal crystal);
     public event FirstPickTipEvent OnFirstTimePickItemType;
@@ -32,9 +28,6 @@ public class BackpackMananger : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// 当前实际占用的背包格数。
-    /// </summary>
     public int GetOccupiedCount()
     {
         int count = 0;
@@ -49,35 +42,21 @@ public class BackpackMananger : MonoBehaviour
         return count;
     }
 
-    /// <summary>
-    /// 拾取道具并放入背包的第一个空位。
-    /// </summary>
     public bool PickItem(ArchitecturalCrystal crystal)
     {
         EnsureCapacity();
 
-        int emptyIndex = -1;
-        for (int i = 0; i < backpackItems.Count; i++)
-        {
-            if (!backpackItems[i].HasValue)
-            {
-                emptyIndex = i;
-                break;
-            }
-        }
-
+        int emptyIndex = FindEmptyIndex();
         if (emptyIndex == -1)
         {
             Debug.LogWarning("背包已满，无法拾取");
             return false;
         }
 
-        bool isFirstPick = !alreadyPickedTypes.Contains(crystal.type);
-        if (isFirstPick)
+        bool shouldShowFirstPick = !crystal.isUnlockMaterial && !alreadyPickedCommonTypes.Contains(crystal.type);
+        if (shouldShowFirstPick)
         {
-            alreadyPickedTypes.Add(crystal.type);
-            Debug.Log($"第一次拾取 {crystal.type} 结构道具");
-            OnFirstTimePickItemType?.Invoke(crystal);
+            alreadyPickedCommonTypes.Add(crystal.type);
         }
 
         ArchitecturalCrystal newItem = new ArchitecturalCrystal(
@@ -97,51 +76,33 @@ public class BackpackMananger : MonoBehaviour
 
         if (PlayerAttributeManager.Instance != null)
         {
-            PlayerAttributeManager.Instance.AddBonus(
-                newItem.bonusType,
-                newItem.bonusValue,
-                newItem.subBonusType,
-                newItem.subBonusValue
-            );
+            PlayerAttributeManager.Instance.AddBonus(newItem.bonusType, newItem.bonusValue);
+        }
+
+        if (shouldShowFirstPick)
+        {
+            OnFirstTimePickItemType?.Invoke(newItem);
         }
 
         Debug.Log($"拾取 {newItem.type}，放入背包格子 {emptyIndex}");
         return true;
     }
 
-    /// <summary>
-    /// 清空指定槽位中的道具，但不移除槽位本身。
-    /// </summary>
     public void RemoveItem(int index)
     {
-        if (index < 0 || index >= backpackItems.Count)
-        {
-            return;
-        }
-
-        if (!backpackItems[index].HasValue)
-        {
-            return;
-        }
+        if (index < 0 || index >= backpackItems.Count) return;
+        if (!backpackItems[index].HasValue) return;
 
         ArchitecturalCrystal item = backpackItems[index].Value;
         if (PlayerAttributeManager.Instance != null)
         {
-            PlayerAttributeManager.Instance.RemoveBonus(
-                item.bonusType,
-                item.bonusValue,
-                item.subBonusType,
-                item.subBonusValue
-            );
+            PlayerAttributeManager.Instance.RemoveBonus(item.bonusType, item.bonusValue);
         }
 
         backpackItems[index] = null;
         Debug.Log($"清空第 {index} 个背包物品");
     }
 
-    /// <summary>
-    /// 获取指定槽位中的道具；空槽位返回 null。
-    /// </summary>
     public ArchitecturalCrystal? GetItem(int index)
     {
         if (index >= 0 && index < backpackItems.Count)
@@ -152,9 +113,6 @@ public class BackpackMananger : MonoBehaviour
         return null;
     }
 
-    /// <summary>
-    /// 清空所有背包内容。
-    /// </summary>
     public void ClearAllItems()
     {
         for (int i = 0; i < backpackItems.Count; i++)
@@ -171,5 +129,18 @@ public class BackpackMananger : MonoBehaviour
         {
             backpackItems.Add(null);
         }
+    }
+
+    private int FindEmptyIndex()
+    {
+        for (int i = 0; i < backpackItems.Count; i++)
+        {
+            if (!backpackItems[i].HasValue)
+            {
+                return i;
+            }
+        }
+
+        return -1;
     }
 }
