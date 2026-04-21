@@ -29,9 +29,15 @@ public class PlayerProfileData : MonoBehaviour
             return;
         }
 
+        if (currentWeaponType == weaponType)
+        {
+            return;
+        }
+
         currentWeaponType = weaponType;
         currentInkType = weaponType.ToInkType();
         PlayerLoadoutRuntime.CurrentWeaponType = weaponType;
+        GameProgressPersistence.SaveIfReady();
     }
 
     public void SelectInkType(InkType inkType)
@@ -42,8 +48,14 @@ public class PlayerProfileData : MonoBehaviour
             return;
         }
 
+        if (currentWeaponType == weaponType)
+        {
+            return;
+        }
+
         currentInkType = inkType;
         currentWeaponType = weaponType;
         PlayerLoadoutRuntime.CurrentInkType = inkType;
+        GameProgressPersistence.SaveIfReady();
     }
 }

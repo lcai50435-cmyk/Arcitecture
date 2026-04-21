@@ -11,7 +11,6 @@ using UnityEngine.UI;
 public class GameDebugPageBootstrapper : MonoBehaviour
 {
     private const string BaseSceneName = "BaseScene";
-    private const string GameSceneName = "GameScene";
     private const float RefreshInterval = 0.2f;
     private const string RequiredDebugCharacters = "调试面板按住显示当前场景基地允许攻击生命上限耐久攻击力移动速度防御建筑结构材料武器墨水属性技能关闭开关预留版本穿透效果命中图鉴进度专用福建土楼赵州桥安徽水乡民居槽位完成总TabEsc";
     private static readonly string[] DebugFontNames =
@@ -48,7 +47,7 @@ public class GameDebugPageBootstrapper : MonoBehaviour
 
     private static void TryCreate(Scene scene)
     {
-        if (scene.name != BaseSceneName && scene.name != GameSceneName) return;
+        if (scene.name != BaseSceneName && !GameplayStageCatalog.IsGameplayScene(scene.name)) return;
         if (FindObjectOfType<GameDebugPageBootstrapper>() != null) return;
 
         GameObject bootstrapper = new GameObject("RuntimeDebugPage");
@@ -817,12 +816,13 @@ public class GameDebugPageBootstrapper : MonoBehaviour
 
     private static string GetSceneDisplayName(string sceneName)
     {
-        switch (sceneName)
+        if (sceneName == BaseSceneName)
         {
-            case BaseSceneName: return "基地";
-            case GameSceneName: return "关卡";
-            default: return sceneName;
+            return "基地";
         }
+
+        GameplayStageDefinition stage = GameplayStageCatalog.GetStageByScene(sceneName);
+        return stage != null ? stage.displayName : sceneName;
     }
 
     private static string GetWeaponDisplayName(WeaponType weaponType)

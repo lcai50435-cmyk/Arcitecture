@@ -33,7 +33,6 @@ public class DropTableConfig
 
 public class RunStageDirector : MonoBehaviour
 {
-    private const string GameSceneName = "GameScene";
     private const float StageRefreshInterval = 0.2f;
     private const float SpawnProbeRadius = 3.5f;
     private const int SpawnProbeAttempts = 16;
@@ -52,7 +51,6 @@ public class RunStageDirector : MonoBehaviour
 
     private readonly List<EnemySpawnTemplate> spawnTemplates = new List<EnemySpawnTemplate>();
     private readonly List<RunStageConfig> stageConfigs = new List<RunStageConfig>();
-    private readonly Dictionary<string, Sprite> dropSpriteCache = new Dictionary<string, Sprite>();
 
     [SerializeField] private DropTableConfig dropTable = new DropTableConfig();
 
@@ -62,6 +60,7 @@ public class RunStageDirector : MonoBehaviour
     private float spawnTimer;
     private float stageRefreshTimer;
     private bool countdownFinishedHandled;
+    private bool runtimeSuspended;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void Bootstrap()
@@ -78,7 +77,7 @@ public class RunStageDirector : MonoBehaviour
 
     private static void TryCreate(Scene scene)
     {
-        if (scene.name != GameSceneName)
+        if (!GameplayStageCatalog.IsGameplayScene(scene.name))
         {
             return;
         }
@@ -101,6 +100,8 @@ public class RunStageDirector : MonoBehaviour
     {
         EnsureStageConfigs();
         RuntimeMiniMapHud.EnsureInstance();
+        GameplayStatusHudRuntime.EnsureHealthGauge(null);
+        GameplayStatusHudRuntime.EnsureWeaponGauge(null);
         BindCountdownManager();
         CaptureExistingEnemiesAsTemplates();
 
@@ -111,6 +112,11 @@ public class RunStageDirector : MonoBehaviour
 
     private void Update()
     {
+        if (runtimeSuspended)
+        {
+            return;
+        }
+
         if (countdownManager == null)
         {
             BindCountdownManager();
@@ -170,7 +176,23 @@ public class RunStageDirector : MonoBehaviour
 
     public void HandleEnemyDeath(Vector3 position)
     {
+        if (runtimeSuspended)
+        {
+            return;
+        }
+
         SpawnDrop(position);
+    }
+
+    public static bool TryTriggerPickupAmbush(Vector3 pickupPosition)
+    {
+        RunStageDirector director = FindObjectOfType<RunStageDirector>();
+        return director != null && director.TrySpawnPickupAmbush(pickupPosition);
+    }
+
+    public void SuspendRuntime()
+    {
+        runtimeSuspended = true;
     }
 
     private void EnsureStageConfigs()
@@ -455,6 +477,70 @@ public class RunStageDirector : MonoBehaviour
         return false;
     }
 
+    private bool TrySpawnPickupAmbush(Vector3 pickupPosition)
+    {
+        if (runtimeSuspended)
+        {
+            return false;
+        }
+
+        CaptureExistingEnemiesAsTemplates();
+        if (spawnTemplates.Count == 0)
+        {
+            return false;
+        }
+
+        float elapsedTime = GetElapsedTime();
+        RefreshResolvedStage(elapsedTime, true);
+
+        int startIndex = UnityEngine.Random.Range(0, spawnTemplates.Count);
+        for (int i = 0; i < spawnTemplates.Count; i++)
+        {
+            EnemySpawnTemplate template = spawnTemplates[(startIndex + i) % spawnTemplates.Count];
+            if (template.template == null)
+            {
+                continue;
+            }
+
+            if (!TryResolvePickupAmbushPosition(template, pickupPosition, out Vector3 spawnPosition))
+            {
+                continue;
+            }
+
+            GameObject enemyObject = Instantiate(template.template, spawnPosition, template.rotation);
+            enemyObject.name = template.template.name.Replace("_Template", string.Empty);
+            enemyObject.SetActive(true);
+            PrepareEnemyInstance(enemyObject);
+            return true;
+        }
+
+        return false;
+    }
+
+    private bool TryResolvePickupAmbushPosition(EnemySpawnTemplate template, Vector3 pickupPosition, out Vector3 spawnPosition)
+    {
+        EnemyAvoidObstacle avoidObstacle = template.template.GetComponent<EnemyAvoidObstacle>();
+        Vector2 pickupPoint = new Vector2(pickupPosition.x, pickupPosition.y);
+
+        if (TryGetValidSpawnPoint(pickupPoint, pickupPoint, template.position.z, avoidObstacle, out spawnPosition))
+        {
+            return true;
+        }
+
+        const float ambushProbeRadius = 1.9f;
+        for (int attempt = 0; attempt < SpawnProbeAttempts; attempt++)
+        {
+            Vector2 candidate = pickupPoint + UnityEngine.Random.insideUnitCircle * ambushProbeRadius;
+            if (TryGetValidSpawnPoint(candidate, pickupPoint, template.position.z, avoidObstacle, out spawnPosition))
+            {
+                return true;
+            }
+        }
+
+        spawnPosition = default;
+        return false;
+    }
+
     private bool TryGetValidSpawnPoint(
         Vector2 candidate,
         Vector2 templateOrigin,
@@ -545,70 +631,14 @@ public class RunStageDirector : MonoBehaviour
 
     private void CreateDropObject(ArchitecturalCrystal crystal, Vector3 position)
     {
-        GameObject dropObject = new GameObject($"StageDrop_{crystal.DisplayName}");
-        dropObject.transform.position = position;
-        dropObject.transform.localScale = new Vector3(0.35f, 0.35f, 1f);
-
-        SpriteRenderer renderer = dropObject.AddComponent<SpriteRenderer>();
-        Sprite dropSprite = GetDropSprite(crystal);
-        renderer.sprite = dropSprite;
-        renderer.sortingOrder = 4;
-
-        CircleCollider2D collider = dropObject.AddComponent<CircleCollider2D>();
-        collider.isTrigger = true;
-
-        CrystalInteractHandler handler = dropObject.AddComponent<CrystalInteractHandler>();
-        handler.type = crystal.type;
-        handler.expValue = crystal.expValue;
-        handler.icon = crystal.icon != null ? crystal.icon : dropSprite;
-        handler.backIcon = crystal.backIcon != null ? crystal.backIcon : dropSprite;
-        handler.bonusType = crystal.bonusType;
-        handler.bonusValue = crystal.bonusValue;
-        handler.subBonusType = crystal.subBonusType;
-        handler.subBonusValue = crystal.subBonusValue;
-        handler.isUnlockMaterial = crystal.isUnlockMaterial;
-        handler.resourceCategory = crystal.resourceCategory;
-        handler.inkRestoreValue = crystal.inkRestoreValue;
-        handler.textDescription = crystal.textDescription;
-        handler.persistCollectedAcrossSceneLoads = false;
-    }
-
-    private Sprite GetDropSprite(ArchitecturalCrystal crystal)
-    {
-        if (crystal.icon != null)
-        {
-            return crystal.icon;
-        }
-
-        string key = $"{crystal.Category}_{crystal.type}";
-        if (dropSpriteCache.TryGetValue(key, out Sprite cached))
-        {
-            return cached;
-        }
-
-        Color color = crystal.IsSpecialStructure
-            ? new Color(0.98f, 0.82f, 0.26f, 1f)
-            : crystal.IsInkSupply
-                ? new Color(0.24f, 0.74f, 0.92f, 1f)
-                : new Color(0.92f, 0.92f, 0.92f, 1f);
-
-        Texture2D texture = new Texture2D(16, 16, TextureFormat.RGBA32, false);
-        texture.filterMode = FilterMode.Point;
-        Vector2 center = new Vector2(7.5f, 7.5f);
-
-        for (int y = 0; y < 16; y++)
-        {
-            for (int x = 0; x < 16; x++)
-            {
-                float distance = Vector2.Distance(new Vector2(x, y), center);
-                texture.SetPixel(x, y, distance <= 6.8f ? color : Color.clear);
-            }
-        }
-
-        texture.Apply();
-        Sprite sprite = Sprite.Create(texture, new Rect(0f, 0f, 16f, 16f), new Vector2(0.5f, 0.5f), 16f);
-        dropSpriteCache[key] = sprite;
-        return sprite;
+        RuntimeCrystalDropFactory.CreateInteractiveDrop(
+            crystal,
+            position,
+            0.35f,
+            4,
+            transform,
+            $"StageDrop_{crystal.DisplayName}",
+            RuntimeDropPresentation.ClosedLootBag);
     }
 
     private RunStageConfig GetStageForElapsed(float elapsedTime)
@@ -648,18 +678,24 @@ public class RunStageDirector : MonoBehaviour
 
     private void HandleCountdownFinished()
     {
-        if (countdownFinishedHandled)
+        if (countdownFinishedHandled || runtimeSuspended)
         {
             return;
         }
 
         countdownFinishedHandled = true;
-        Invoke(nameof(ReturnToBaseAfterCountdown), 0.75f);
-    }
+        if (!RuntimeGameplayFailureBridge.TryTriggerFailure("TimeExpired", "DeadScene"))
+        {
+            Time.timeScale = 1f;
+            SceneLoader loader = SceneLoader.EnsureInstance();
+            if (loader != null)
+            {
+                loader.ToScene("DeadScene");
+                return;
+            }
 
-    private void ReturnToBaseAfterCountdown()
-    {
-        GameSceneBaseReturnBootstrapper.SubmitCatalogueAndReturnToBase();
+            SceneManager.LoadScene("DeadScene");
+        }
     }
 
     private sealed class EnemySpawnTemplate
@@ -683,14 +719,18 @@ public class RunStageDirector : MonoBehaviour
 
 public class RunStageEnemyBinding : MonoBehaviour
 {
+    private const float FallbackDestroyDelay = 1.5f;
+
     private RunStageDirector director;
     private CharacterCore characterCore;
+    private CharacterDeathBase deathBehaviour;
     private bool handledDeath;
 
     public void Configure(RunStageDirector owner)
     {
         director = owner;
         characterCore = GetComponent<CharacterCore>();
+        deathBehaviour = GetComponent<CharacterDeathBase>();
         handledDeath = false;
 
         if (characterCore != null)
@@ -717,6 +757,68 @@ public class RunStageEnemyBinding : MonoBehaviour
 
         handledDeath = true;
         director?.HandleEnemyDeath(transform.position);
-        Destroy(gameObject, 1f);
+        if (deathBehaviour == null)
+        {
+            Destroy(gameObject, FallbackDestroyDelay);
+        }
+    }
+}
+
+public static class RuntimeGameplayFailureBridge
+{
+    private const string ControllerTypeName = "GameplayFailureController";
+    private const string ReasonTypeName = "GameplayFailureReason";
+    private const string TryTriggerFailureMethodName = "TryTriggerFailure";
+
+    public static bool TryTriggerFailure(string reasonName, string gameOverSceneName)
+    {
+        Type controllerType = ResolveType(ControllerTypeName);
+        Type reasonType = ResolveType(ReasonTypeName);
+        if (controllerType == null || reasonType == null)
+        {
+            return false;
+        }
+
+        object parsedReason;
+        try
+        {
+            parsedReason = Enum.Parse(reasonType, reasonName);
+        }
+        catch
+        {
+            return false;
+        }
+
+        System.Reflection.MethodInfo method = controllerType.GetMethod(
+            TryTriggerFailureMethodName,
+            System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
+        if (method == null)
+        {
+            return false;
+        }
+
+        object result = method.Invoke(null, new[] { parsedReason, gameOverSceneName });
+        return result is bool triggered && triggered;
+    }
+
+    private static Type ResolveType(string typeName)
+    {
+        Type type = Type.GetType(typeName);
+        if (type != null)
+        {
+            return type;
+        }
+
+        System.Reflection.Assembly[] assemblies = AppDomain.CurrentDomain.GetAssemblies();
+        for (int i = 0; i < assemblies.Length; i++)
+        {
+            type = assemblies[i].GetType(typeName);
+            if (type != null)
+            {
+                return type;
+            }
+        }
+
+        return null;
     }
 }

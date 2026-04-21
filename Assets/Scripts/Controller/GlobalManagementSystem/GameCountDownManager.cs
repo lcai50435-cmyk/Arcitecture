@@ -44,6 +44,7 @@ public class GameCountDownManager : MonoBehaviour
 
     private void Start()
     {
+        timer = GameplayStatusHudRuntime.EnsureCountdownText(timer);
         currentTime = totalTime;
         hasFinished = false;
         RefreshTimerText();
@@ -110,6 +111,7 @@ public class GameCountDownManager : MonoBehaviour
 
     private void RefreshTimerText()
     {
+        timer = GameplayStatusHudRuntime.EnsureCountdownText(timer);
         if (timer == null) return;
 
         int min = Mathf.FloorToInt(currentTime / 60f);

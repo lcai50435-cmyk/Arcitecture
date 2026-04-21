@@ -275,6 +275,76 @@ public class RuntimeProgressState : MonoBehaviour
         }
     }
 
+    public BuildingRuntimeStateSaveData[] ExportSaveData()
+    {
+        InitializeDefinitions();
+
+        List<BuildingRuntimeStateSaveData> exportedStates = new List<BuildingRuntimeStateSaveData>();
+        foreach (BuildingDefinition definition in BuildingDefinitionLibrary.GetAll())
+        {
+            BuildingRuntimeStateData state = GetBuildingState(definition.buildingId);
+            exportedStates.Add(new BuildingRuntimeStateSaveData
+            {
+                buildingId = state.buildingId,
+                progress = state.progress,
+                unlockedSlots = CloneBoolArray(state.unlockedSlots),
+                grantedSlotRewards = CloneBoolArray(state.grantedSlotRewards),
+                grantedCompletionReward = state.grantedCompletionReward
+            });
+        }
+
+        return exportedStates.ToArray();
+    }
+
+    public void ResetProgress(bool notifyListeners = true)
+    {
+        availableSpecialStructureInventory = 0;
+        buildingStates.Clear();
+        InitializeDefinitions();
+
+        if (notifyListeners)
+        {
+            NotifyStateChanged(false);
+        }
+    }
+
+    public void ImportFromSaveData(
+        BuildingRuntimeStateSaveData[] savedStates,
+        int specialStructureInventory,
+        bool notifyListeners = true)
+    {
+        availableSpecialStructureInventory = Mathf.Max(0, specialStructureInventory);
+        buildingStates.Clear();
+        InitializeDefinitions();
+
+        if (savedStates != null)
+        {
+            for (int i = 0; i < savedStates.Length; i++)
+            {
+                BuildingRuntimeStateSaveData savedState = savedStates[i];
+                if (savedState == null || !buildingStates.TryGetValue(savedState.buildingId, out BuildingRuntimeStateData state))
+                {
+                    continue;
+                }
+
+                BuildingDefinition definition = BuildingDefinitionLibrary.Get(savedState.buildingId);
+                int slotCount = definition.slotDefinitions != null ? definition.slotDefinitions.Length : 0;
+                state.EnsureSlotCapacity(slotCount);
+                state.progress = Mathf.Clamp(savedState.progress, 0, definition.requiredProgress);
+                CopyBoolArray(savedState.unlockedSlots, state.unlockedSlots);
+                CopyBoolArray(savedState.grantedSlotRewards, state.grantedSlotRewards);
+                state.grantedCompletionReward = savedState.grantedCompletionReward;
+            }
+        }
+
+        InitializeDefinitions();
+
+        if (notifyListeners)
+        {
+            NotifyStateChanged(false);
+        }
+    }
+
     private void InitializeDefinitions()
     {
         foreach (BuildingDefinition definition in BuildingDefinitionLibrary.GetAll())
@@ -345,8 +415,41 @@ public class RuntimeProgressState : MonoBehaviour
         return count;
     }
 
-    private void NotifyStateChanged()
+    private static bool[] CloneBoolArray(bool[] source)
+    {
+        if (source == null)
+        {
+            return null;
+        }
+
+        bool[] clone = new bool[source.Length];
+        Array.Copy(source, clone, source.Length);
+        return clone;
+    }
+
+    private static void CopyBoolArray(bool[] source, bool[] target)
+    {
+        if (target == null)
+        {
+            return;
+        }
+
+        Array.Clear(target, 0, target.Length);
+        if (source == null)
+        {
+            return;
+        }
+
+        Array.Copy(source, target, Mathf.Min(source.Length, target.Length));
+    }
+
+    private void NotifyStateChanged(bool shouldPersist = true)
     {
         OnStateChanged?.Invoke();
+
+        if (shouldPersist)
+        {
+            GameProgressPersistence.SaveIfReady();
+        }
     }
 }

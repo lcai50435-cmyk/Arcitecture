@@ -78,23 +78,23 @@ public class BaseHubBootstrapper : MonoBehaviour
         }
 
         Canvas canvas = CreateCanvas();
+        BaseHubUIController uiController = new GameObject("BaseHubUIController").AddComponent<BaseHubUIController>();
         InteractPrompt prompt = CreateInteractPrompt(canvas.transform);
+        StageSelectionPanelUI stageSelectionPanel = CreateStageSelectionPanel(canvas.transform, uiController);
         SpiritPanelUI spiritPanel = CreateSpiritPanel(canvas.transform);
 
-        BaseHubUIController uiController = new GameObject("BaseHubUIController").AddComponent<BaseHubUIController>();
         GameObject player = CreatePlayer(prompt);
         CharacterCore characterCore = player.GetComponent<CharacterCore>();
         PlayerProfileData profileData = player.GetComponent<PlayerProfileData>();
-        CreateStatusHud(canvas.transform, characterCore, profileData);
         GameObject handbookPanel = CreateBaseHandbookUI(player, prompt.Root);
 
         spiritPanel.Bind(characterCore, profileData);
-        uiController.Configure(player, handbookPanel, spiritPanel, prompt.Root);
+        uiController.Configure(player, handbookPanel, spiritPanel, stageSelectionPanel, prompt.Root);
         spiritPanel.SetCloseAction(uiController.CloseAll);
 
         CreateBookInteractable(uiController);
         CreateSpiritInteractable(uiController);
-        CreateGameSceneInteractable();
+        CreateGameSceneInteractable(uiController);
         CreateTrainingDummies();
     }
 
@@ -767,6 +767,265 @@ public class BaseHubBootstrapper : MonoBehaviour
         return spiritPanel;
     }
 
+    private StageSelectionPanelUI CreateStageSelectionPanel(Transform parent, BaseHubUIController uiController)
+    {
+        GameObject root = CreateModalRoot("StageSelectionPanel", parent);
+        GameObject panel = CreateCenteredPanel("StageSelectionContent", root.transform, new Vector2(1080f, 640f));
+        Image panelBackground = panel.GetComponent<Image>();
+        RuntimeUiSpriteFactory.ApplyRoundedSprite(
+            panelBackground,
+            new Color(0.10f, 0.08f, 0.06f, 0.97f),
+            18,
+            18,
+            1.2f);
+
+        TextMeshProUGUI title = CreateText(
+            "Title",
+            panel.transform,
+            "关卡选择",
+            42,
+            new Color(0.96f, 0.83f, 0.52f, 1f),
+            TextAlignmentOptions.Center);
+        SetCenteredRect(title.rectTransform, new Vector2(0f, 252f), new Vector2(520f, 64f));
+
+        TextMeshProUGUI headerTitle = CreateText(
+            "HeaderTitle",
+            panel.transform,
+            "第一关 · 福建土楼",
+            30,
+            new Color(0.93f, 0.88f, 0.78f, 1f),
+            TextAlignmentOptions.Center);
+        SetCenteredRect(headerTitle.rectTransform, new Vector2(0f, 192f), new Vector2(560f, 42f));
+
+        TextMeshProUGUI headerStatus = CreateText(
+            "HeaderStatus",
+            panel.transform,
+            "地图：GameScene    状态：可进入",
+            22,
+            new Color(0.84f, 0.80f, 0.72f, 1f),
+            TextAlignmentOptions.Center);
+        SetCenteredRect(headerStatus.rectTransform, new Vector2(0f, 154f), new Vector2(720f, 36f));
+
+        TextMeshProUGUI switchHint = CreateText(
+            "SwitchHint",
+            panel.transform,
+            "左右拖动卡片，或使用两侧按钮切换关卡",
+            20,
+            new Color(0.76f, 0.74f, 0.68f, 1f),
+            TextAlignmentOptions.Center);
+        SetCenteredRect(switchHint.rectTransform, new Vector2(0f, 118f), new Vector2(560f, 28f));
+
+        TextMeshProUGUI pageIndicator = CreateText(
+            "PageIndicator",
+            panel.transform,
+            "1 / 3",
+            22,
+            new Color(0.96f, 0.91f, 0.80f, 1f),
+            TextAlignmentOptions.Center);
+        SetCenteredRect(pageIndicator.rectTransform, new Vector2(0f, -238f), new Vector2(120f, 30f));
+
+        Button closeButton = CreateButton(
+            "CloseButton",
+            panel.transform,
+            "×",
+            new Color(0.19f, 0.24f, 0.17f, 0.92f),
+            new Vector2(58f, 42f));
+        RuntimeUiSpriteFactory.ApplyRoundedSprite(
+            closeButton.GetComponent<Image>(),
+            new Color(0.19f, 0.24f, 0.17f, 0.92f),
+            12,
+            12,
+            1.2f);
+        closeButton.GetComponent<RectTransform>().anchoredPosition = new Vector2(470f, 264f);
+
+        Button previousButton = CreateButton(
+            "PreviousButton",
+            panel.transform,
+            "←",
+            new Color(0.28f, 0.24f, 0.18f, 0.96f),
+            new Vector2(62f, 48f));
+        previousButton.GetComponent<RectTransform>().anchoredPosition = new Vector2(-464f, -14f);
+
+        Button nextButton = CreateButton(
+            "NextButton",
+            panel.transform,
+            "→",
+            new Color(0.28f, 0.24f, 0.18f, 0.96f),
+            new Vector2(62f, 48f));
+        nextButton.GetComponent<RectTransform>().anchoredPosition = new Vector2(464f, -14f);
+
+        GameObject scrollRoot = CreateUIObject("StageScrollView", panel.transform);
+        SetCenteredRect(scrollRoot.GetComponent<RectTransform>(), new Vector2(0f, -18f), new Vector2(880f, 360f));
+        Image scrollBackground = scrollRoot.AddComponent<Image>();
+        RuntimeUiSpriteFactory.ApplyRoundedSprite(
+            scrollBackground,
+            new Color(0.15f, 0.18f, 0.14f, 0.22f),
+            18,
+            16,
+            1.2f);
+
+        GameObject viewport = CreateUIObject("Viewport", scrollRoot.transform);
+        SetStretch(viewport.GetComponent<RectTransform>(), 12f, 12f, 12f, 12f);
+        Image viewportImage = viewport.AddComponent<Image>();
+        viewportImage.color = new Color(1f, 1f, 1f, 0.01f);
+        viewportImage.raycastTarget = true;
+        viewport.AddComponent<RectMask2D>();
+
+        GameObject content = CreateUIObject("Content", viewport.transform);
+        RectTransform contentRect = content.GetComponent<RectTransform>();
+        contentRect.anchorMin = new Vector2(0f, 0.5f);
+        contentRect.anchorMax = new Vector2(0f, 0.5f);
+        contentRect.pivot = new Vector2(0f, 0.5f);
+        contentRect.anchoredPosition = Vector2.zero;
+        contentRect.sizeDelta = new Vector2(0f, 320f);
+
+        HorizontalLayoutGroup layout = content.AddComponent<HorizontalLayoutGroup>();
+        layout.childAlignment = TextAnchor.MiddleLeft;
+        layout.spacing = 26f;
+        layout.padding = new RectOffset(44, 44, 12, 12);
+        layout.childForceExpandWidth = false;
+        layout.childForceExpandHeight = false;
+        layout.childControlWidth = false;
+        layout.childControlHeight = false;
+
+        ContentSizeFitter fitter = content.AddComponent<ContentSizeFitter>();
+        fitter.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
+        fitter.verticalFit = ContentSizeFitter.FitMode.Unconstrained;
+
+        ScrollRect scrollRect = scrollRoot.AddComponent<ScrollRect>();
+        scrollRect.horizontal = true;
+        scrollRect.vertical = false;
+        scrollRect.movementType = ScrollRect.MovementType.Clamped;
+        scrollRect.inertia = true;
+        scrollRect.scrollSensitivity = 24f;
+        scrollRect.viewport = viewport.GetComponent<RectTransform>();
+        scrollRect.content = contentRect;
+
+        StageSelectionPanelUI stagePanel = root.AddComponent<StageSelectionPanelUI>();
+        stagePanel.Configure(
+            uiController,
+            scrollRect,
+            closeButton,
+            previousButton,
+            nextButton,
+            headerTitle,
+            headerStatus,
+            pageIndicator);
+
+        IReadOnlyList<GameplayStageDefinition> stageDefinitions = GameplayStageCatalog.GetAll();
+        for (int i = 0; i < stageDefinitions.Count; i++)
+        {
+            CreateStageCard(content.transform, stagePanel, stageDefinitions[i], i + 1);
+        }
+
+        root.SetActive(false);
+        return stagePanel;
+    }
+
+    private void CreateStageCard(
+        Transform parent,
+        StageSelectionPanelUI stagePanel,
+        GameplayStageDefinition definition,
+        int stageNumber)
+    {
+        GameObject cardRoot = CreateUIObject($"{definition.stageId}_Card", parent);
+        RectTransform cardRect = cardRoot.GetComponent<RectTransform>();
+        cardRect.sizeDelta = new Vector2(320f, 300f);
+        LayoutElement layoutElement = cardRoot.gameObject.AddComponent<LayoutElement>();
+        layoutElement.preferredWidth = 320f;
+        layoutElement.preferredHeight = 300f;
+
+        Image cardBackground = cardRoot.AddComponent<Image>();
+        RuntimeUiSpriteFactory.ApplyRoundedSprite(
+            cardBackground,
+            new Color(0.19f, 0.22f, 0.18f, 0.92f),
+            18,
+            16,
+            1.2f);
+
+        Button selectButton = CreateButton(
+            "SelectButton",
+            cardRoot.transform,
+            string.Empty,
+            new Color(1f, 1f, 1f, 0.001f),
+            new Vector2(280f, 220f));
+        selectButton.GetComponent<RectTransform>().anchoredPosition = new Vector2(0f, 28f);
+        Image selectBackground = selectButton.GetComponent<Image>();
+        selectBackground.color = new Color(1f, 1f, 1f, 0.001f);
+
+        TextMeshProUGUI chapterText = CreateText(
+            "Chapter",
+            selectButton.transform,
+            $"第 {stageNumber} 关",
+            18,
+            new Color(0.86f, 0.80f, 0.70f, 1f),
+            TextAlignmentOptions.Center);
+        SetCenteredRect(chapterText.rectTransform, new Vector2(0f, 108f), new Vector2(120f, 24f));
+
+        TextMeshProUGUI titleText = CreateText(
+            "Title",
+            selectButton.transform,
+            definition.displayName,
+            26,
+            new Color(0.96f, 0.83f, 0.52f, 1f),
+            TextAlignmentOptions.Center);
+        SetCenteredRect(titleText.rectTransform, new Vector2(0f, 64f), new Vector2(260f, 56f));
+
+        TextMeshProUGUI sceneText = CreateText(
+            "Scene",
+            selectButton.transform,
+            $"地图 Scene：{definition.sceneName}",
+            18,
+            new Color(0.92f, 0.90f, 0.84f, 1f),
+            TextAlignmentOptions.Center);
+        SetCenteredRect(sceneText.rectTransform, new Vector2(0f, 18f), new Vector2(260f, 24f));
+
+        TextMeshProUGUI statusText = CreateText(
+            "Status",
+            selectButton.transform,
+            "已解锁",
+            20,
+            new Color(0.84f, 0.94f, 0.82f, 1f),
+            TextAlignmentOptions.Center);
+        SetCenteredRect(statusText.rectTransform, new Vector2(0f, -28f), new Vector2(220f, 28f));
+
+        TextMeshProUGUI lockHintText = CreateText(
+            "LockHint",
+            selectButton.transform,
+            definition.lockedHint,
+            17,
+            new Color(0.82f, 0.78f, 0.72f, 1f),
+            TextAlignmentOptions.Center);
+        SetCenteredRect(lockHintText.rectTransform, new Vector2(0f, -78f), new Vector2(250f, 56f));
+
+        Button enterButton = CreateButton(
+            "EnterButton",
+            cardRoot.transform,
+            "进入关卡",
+            new Color(0.53f, 0.24f, 0.16f, 1f),
+            new Vector2(168f, 48f));
+        RuntimeUiSpriteFactory.ApplyRoundedSprite(
+            enterButton.GetComponent<Image>(),
+            new Color(0.53f, 0.24f, 0.16f, 1f),
+            12,
+            12,
+            1.2f);
+        enterButton.GetComponent<RectTransform>().anchoredPosition = new Vector2(0f, -118f);
+
+        stagePanel.RegisterCard(new StageCardView
+        {
+            definition = definition,
+            root = cardRect,
+            background = cardBackground,
+            selectButton = selectButton,
+            enterButton = enterButton,
+            titleText = titleText,
+            sceneNameText = sceneText,
+            statusText = statusText,
+            lockHintText = lockHintText
+        });
+    }
+
     private void BuildStatsPage(Transform parent, PlayerStatsPanelUI statsPanel, Image avatarImage)
     {
         GameObject rows = CreateUIObject("StatRows", parent);
@@ -964,7 +1223,7 @@ public class BaseHubBootstrapper : MonoBehaviour
         interact.Configure(uiController);
     }
 
-    private void CreateGameSceneInteractable()
+    private void CreateGameSceneInteractable(BaseHubUIController uiController)
     {
         GameObject gate = useDetailedHubMap
             ? CreateInteractionAnchor("GameSceneGateInteractable", DetailedGatePosition)
@@ -980,7 +1239,8 @@ public class BaseHubBootstrapper : MonoBehaviour
             ? new Vector2(2.2f, 1.6f)
             : new Vector2(1.4f, 1.2f);
 
-        gate.AddComponent<BaseHubGameSceneInteract>();
+        BaseHubGameSceneInteract interact = gate.AddComponent<BaseHubGameSceneInteract>();
+        interact.Configure(uiController);
     }
 
     private void CreateTrainingDummies()

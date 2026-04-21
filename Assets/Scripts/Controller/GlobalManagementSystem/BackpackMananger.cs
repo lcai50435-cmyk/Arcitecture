@@ -10,6 +10,7 @@ public class BackpackMananger : MonoBehaviour
 
     private const int MaxCapacity = 6;
     private readonly HashSet<ArchitecturalType> alreadyPickedCommonTypes = new HashSet<ArchitecturalType>();
+    private int nextRuntimePickupOrder = 1;
 
     public delegate void FirstPickTipEvent(ArchitecturalCrystal crystal);
     public event FirstPickTipEvent OnFirstTimePickItemType;
@@ -73,6 +74,14 @@ public class BackpackMananger : MonoBehaviour
             return true;
         }
 
+        if (crystal.IsSpecialStructure)
+        {
+            RuntimeProgressState.EnsureInstance().AddSpecialStructureInventory(1);
+            OnInventoryChanged?.Invoke();
+            Debug.Log($"拾取 {crystal.DisplayName}，已加入专用材料库存");
+            return true;
+        }
+
         int emptyIndex = FindEmptyIndex();
         if (emptyIndex == -1)
         {
@@ -99,6 +108,7 @@ public class BackpackMananger : MonoBehaviour
             crystal.isUnlockMaterial,
             crystal.resourceCategory,
             crystal.inkRestoreValue);
+        newItem.runtimePickupOrder = nextRuntimePickupOrder++;
 
         backpackItems[emptyIndex] = newItem;
         RefreshPlayerTemporaryAttributes();

@@ -38,9 +38,14 @@ public class PlayerDeathSceneLoader : MonoBehaviour
 
     private void HandlePlayerDeath()
     {
-        Debug.Log("玩家死亡，进入 GameOver 场景");
+        Debug.Log("玩家死亡，进入失败结算");
 
-        Time.timeScale = 1f; // 防止你之前暂停过时间，导致新场景按钮不能点
+        if (RuntimeGameplayFailureBridge.TryTriggerFailure("PlayerDeath", gameOverSceneName))
+        {
+            return;
+        }
+
+        Time.timeScale = 1f;
 
         SceneLoader loader = SceneLoader.EnsureInstance();
         if (loader != null)

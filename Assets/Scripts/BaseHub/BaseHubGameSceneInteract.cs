@@ -3,19 +3,37 @@ using UnityEngine.SceneManagement;
 
 public class BaseHubGameSceneInteract : MonoBehaviour, IInteractable
 {
-    [SerializeField] private string gameSceneName = "GameScene";
+    [SerializeField] private BaseHubUIController uiController;
 
-    public string InteractionTip => "进入关卡";
+    public string InteractionTip => "选择关卡";
+
+    public void Configure(BaseHubUIController controller)
+    {
+        uiController = controller;
+    }
 
     public void OnInteract()
     {
-        SceneLoader loader = SceneLoader.EnsureInstance();
-        if (loader != null)
+        if (uiController == null)
         {
-            loader.ToScene(gameSceneName);
+            uiController = FindObjectOfType<BaseHubUIController>();
+        }
+
+        if (uiController != null)
+        {
+            uiController.OpenStageSelectionPanel();
             return;
         }
 
-        SceneManager.LoadScene(gameSceneName);
+        GameplayStageRuntime.EnsureSelectedStageUnlocked();
+        string sceneName = GameplayStageRuntime.GetSelectedSceneName();
+        SceneLoader loader = SceneLoader.EnsureInstance();
+        if (loader != null)
+        {
+            loader.ToScene(sceneName);
+            return;
+        }
+
+        SceneManager.LoadScene(sceneName);
     }
 }

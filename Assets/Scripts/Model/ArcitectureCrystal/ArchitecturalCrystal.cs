@@ -1,4 +1,9 @@
+using System.Collections.Generic;
+using System.IO;
 using UnityEngine;
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
 
 // 建筑结构物品类型
 public enum ArchitecturalType
@@ -54,6 +59,7 @@ public struct ArchitecturalCrystal
     public bool isUnlockMaterial;
     public ArchitecturalResourceCategory resourceCategory;
     public int inkRestoreValue;
+    public int runtimePickupOrder;
 
     public ArchitecturalResourceCategory Category
     {
@@ -130,6 +136,7 @@ public struct ArchitecturalCrystal
         bool isUnlockMaterial,
         ArchitecturalResourceCategory resourceCategory,
         int inkRestoreValue)
+        : this()
     {
         this.type = type;
         this.expValue = expValue;
@@ -143,28 +150,137 @@ public struct ArchitecturalCrystal
         this.isUnlockMaterial = isUnlockMaterial;
         this.resourceCategory = resourceCategory;
         this.inkRestoreValue = inkRestoreValue;
+        this.runtimePickupOrder = 0;
+    }
+}
+
+public readonly struct CommonStructureCrystalDefinition
+{
+    public readonly int expValue;
+    public readonly AttributeBonusType bonusType;
+    public readonly float bonusValue;
+    public readonly AttributeBonusType subBonusType;
+    public readonly float subBonusValue;
+    public readonly string description;
+
+    public CommonStructureCrystalDefinition(
+        int expValue,
+        AttributeBonusType bonusType,
+        float bonusValue,
+        AttributeBonusType subBonusType,
+        float subBonusValue,
+        string description)
+    {
+        this.expValue = expValue;
+        this.bonusType = bonusType;
+        this.bonusValue = bonusValue;
+        this.subBonusType = subBonusType;
+        this.subBonusValue = subBonusValue;
+        this.description = description;
+    }
+}
+
+public readonly struct ArchitecturalCrystalVisualSet
+{
+    public readonly Sprite icon;
+    public readonly Sprite backIcon;
+
+    public ArchitecturalCrystalVisualSet(Sprite icon, Sprite backIcon)
+    {
+        this.icon = icon;
+        this.backIcon = backIcon;
     }
 }
 
 public static class ArchitecturalCrystalFactory
 {
     private static Sprite runtimeSpecialStructureSprite;
+    private static readonly Dictionary<ArchitecturalType, CommonStructureCrystalDefinition> commonStructureDefinitions =
+        new Dictionary<ArchitecturalType, CommonStructureCrystalDefinition>
+        {
+            {
+                ArchitecturalType.MortiseAndTenonJoint,
+                new CommonStructureCrystalDefinition(
+                    30,
+                    AttributeBonusType.AttackPower,
+                    3f,
+                    AttributeBonusType.MoveSpeed,
+                    3f,
+                    "榫卯可提升命中次数，让墨迹继续向前穿透。")
+            },
+            {
+                ArchitecturalType.GroundMass,
+                new CommonStructureCrystalDefinition(
+                    30,
+                    AttributeBonusType.Defense,
+                    5f,
+                    AttributeBonusType.MoveSpeed,
+                    -3f,
+                    "台基让墨迹附带击退，帮你拉开安全距离。")
+            },
+            {
+                ArchitecturalType.BeamFrame,
+                new CommonStructureCrystalDefinition(
+                    30,
+                    AttributeBonusType.AttackPower,
+                    3f,
+                    AttributeBonusType.MoveSpeed,
+                    3f,
+                    "梁架会同步提升弹道速度与射程。")
+            },
+            {
+                ArchitecturalType.TampedEarth,
+                new CommonStructureCrystalDefinition(
+                    30,
+                    AttributeBonusType.CurrentHealth,
+                    10f,
+                    AttributeBonusType.Defense,
+                    5f,
+                    "夯土会附带减速，让敌人行动迟缓。")
+            },
+            {
+                ArchitecturalType.Tile,
+                new CommonStructureCrystalDefinition(
+                    30,
+                    AttributeBonusType.Durability,
+                    10f,
+                    AttributeBonusType.MoveSpeed,
+                    3f,
+                    "瓦可增大墨迹体积，提升命中覆盖面。")
+            },
+            {
+                ArchitecturalType.Brackets,
+                new CommonStructureCrystalDefinition(
+                    30,
+                    AttributeBonusType.Defense,
+                    5f,
+                    AttributeBonusType.CurrentHealth,
+                    10f,
+                    "斗拱可增加弹体数量，让一次攻击覆盖更大区域。")
+            }
+        };
 
     public static ArchitecturalCrystal CreateCommonStructure(
         ArchitecturalType type,
         Sprite icon = null,
         Sprite backIcon = null)
     {
+        CommonStructureCrystalDefinition definition = GetCommonStructureDefinition(type);
+        ArchitecturalCrystalVisualSet visuals = ArchitecturalCrystalVisualResolver.Resolve(
+            type,
+            ArchitecturalResourceCategory.CommonStructure,
+            icon,
+            backIcon);
         return new ArchitecturalCrystal(
             type,
-            30,
-            icon,
-            backIcon != null ? backIcon : icon,
-            GetDefaultDescription(type),
-            AttributeBonusType.None,
-            0f,
-            AttributeBonusType.None,
-            0f,
+            definition.expValue,
+            visuals.icon,
+            visuals.backIcon,
+            definition.description,
+            definition.bonusType,
+            definition.bonusValue,
+            definition.subBonusType,
+            definition.subBonusValue,
             false,
             ArchitecturalResourceCategory.CommonStructure,
             0);
@@ -174,8 +290,13 @@ public static class ArchitecturalCrystalFactory
         Sprite icon = null,
         Sprite backIcon = null)
     {
-        Sprite specialIcon = icon != null ? icon : GetOrCreateSpecialStructureSprite();
-        Sprite specialBackIcon = backIcon != null ? backIcon : specialIcon;
+        ArchitecturalCrystalVisualSet visuals = ArchitecturalCrystalVisualResolver.Resolve(
+            ArchitecturalType.MortiseAndTenonJoint,
+            ArchitecturalResourceCategory.SpecialStructure,
+            icon,
+            backIcon);
+        Sprite specialIcon = visuals.icon != null ? visuals.icon : GetOrCreateSpecialStructureSprite();
+        Sprite specialBackIcon = visuals.backIcon != null ? visuals.backIcon : specialIcon;
 
         return new ArchitecturalCrystal(
             ArchitecturalType.MortiseAndTenonJoint,
@@ -260,11 +381,18 @@ public static class ArchitecturalCrystalFactory
         Sprite icon = null,
         Sprite backIcon = null)
     {
-        return new ArchitecturalCrystal(
-            largeBottle ? ArchitecturalType.LargeInkBottle : ArchitecturalType.SmallInkBottle,
-            0,
+        ArchitecturalType type = largeBottle ? ArchitecturalType.LargeInkBottle : ArchitecturalType.SmallInkBottle;
+        ArchitecturalCrystalVisualSet visuals = ArchitecturalCrystalVisualResolver.Resolve(
+            type,
+            ArchitecturalResourceCategory.InkSupply,
             icon,
-            backIcon != null ? backIcon : icon,
+            backIcon);
+
+        return new ArchitecturalCrystal(
+            type,
+            0,
+            visuals.icon,
+            visuals.backIcon,
             largeBottle ? "大墨瓶，可恢复 50 点墨笔耐久。" : "小墨瓶，可恢复 20 点墨笔耐久。",
             AttributeBonusType.None,
             0f,
@@ -325,5 +453,311 @@ public static class ArchitecturalCrystalFactory
             default:
                 return $"拾取 {GetDisplayName(type)} 后会立即生效。";
         }
+    }
+
+    public static CommonStructureCrystalDefinition GetCommonStructureDefinition(ArchitecturalType type)
+    {
+        if (commonStructureDefinitions.TryGetValue(type, out CommonStructureCrystalDefinition definition))
+        {
+            return definition;
+        }
+
+        return new CommonStructureCrystalDefinition(
+            30,
+            AttributeBonusType.None,
+            0f,
+            AttributeBonusType.None,
+            0f,
+            GetDefaultDescription(type));
+    }
+}
+
+public static class ArchitecturalCrystalVisualResolver
+{
+    private readonly struct VisualConfig
+    {
+        public readonly string iconPath;
+        public readonly string backIconPath;
+        public readonly Color32 primaryColor;
+        public readonly Color32 secondaryColor;
+
+        public VisualConfig(string iconPath, string backIconPath, Color32 primaryColor, Color32 secondaryColor)
+        {
+            this.iconPath = iconPath;
+            this.backIconPath = backIconPath;
+            this.primaryColor = primaryColor;
+            this.secondaryColor = secondaryColor;
+        }
+    }
+
+    private static readonly Dictionary<string, Sprite> spriteCache = new Dictionary<string, Sprite>();
+    private static readonly Dictionary<ArchitecturalType, VisualConfig> commonVisualConfigs =
+        new Dictionary<ArchitecturalType, VisualConfig>
+        {
+            {
+                ArchitecturalType.MortiseAndTenonJoint,
+                new VisualConfig(
+                    "Assets/File/Prop/Prop/MortiseandTenon.png",
+                    "Assets/File/Prop/Prop/MortiseandTenonBackground.png",
+                    new Color32(219, 177, 122, 255),
+                    new Color32(108, 74, 45, 255))
+            },
+            {
+                ArchitecturalType.GroundMass,
+                new VisualConfig(
+                    null,
+                    "Assets/File/Prop/Prop/StonBaseBackground.png",
+                    new Color32(170, 177, 187, 255),
+                    new Color32(76, 85, 97, 255))
+            },
+            {
+                ArchitecturalType.BeamFrame,
+                new VisualConfig(
+                    "Assets/File/Prop/Prop/BeamFramework.png",
+                    "Assets/File/Prop/Prop/BeamFrameworkBackground.png",
+                    new Color32(199, 143, 94, 255),
+                    new Color32(88, 56, 34, 255))
+            },
+            {
+                ArchitecturalType.TampedEarth,
+                new VisualConfig(
+                    "Assets/File/UIResources/RammedEarthUI.png",
+                    "Assets/File/Prop/Prop/HangTuBackground.png",
+                    new Color32(199, 112, 76, 255),
+                    new Color32(102, 53, 40, 255))
+            },
+            {
+                ArchitecturalType.Tile,
+                new VisualConfig(
+                    "Assets/File/Prop/Prop/RoofTile.png",
+                    "Assets/File/Prop/Prop/RoofTileBackground.png",
+                    new Color32(116, 139, 173, 255),
+                    new Color32(56, 75, 104, 255))
+            },
+            {
+                ArchitecturalType.Brackets,
+                new VisualConfig(
+                    null,
+                    "Assets/File/Prop/Prop/DouGongBackground.png",
+                    new Color32(183, 95, 77, 255),
+                    new Color32(106, 49, 40, 255))
+            }
+        };
+
+    private static readonly VisualConfig smallInkVisualConfig = new VisualConfig(
+        null,
+        null,
+        new Color32(71, 154, 216, 255),
+        new Color32(30, 76, 125, 255));
+    private static readonly VisualConfig specialStructureVisualConfig = new VisualConfig(
+        "Assets/File/Prop/Prop/ItemBag_2.png",
+        "Assets/File/Prop/Prop/LightBall.png",
+        new Color32(243, 199, 96, 255),
+        new Color32(125, 83, 26, 255));
+    private static readonly VisualConfig largeInkVisualConfig = new VisualConfig(
+        null,
+        null,
+        new Color32(89, 190, 236, 255),
+        new Color32(31, 98, 142, 255));
+
+    public static ArchitecturalCrystalVisualSet Resolve(
+        ArchitecturalType type,
+        ArchitecturalResourceCategory category,
+        Sprite icon = null,
+        Sprite backIcon = null)
+    {
+        Sprite resolvedIcon = icon;
+        Sprite resolvedBackIcon = backIcon;
+
+        if (category == ArchitecturalResourceCategory.CommonStructure)
+        {
+            VisualConfig config = GetCommonVisualConfig(type);
+            resolvedIcon ??= ResolveSprite(
+                type,
+                category,
+                config.iconPath,
+                config.primaryColor,
+                config.secondaryColor,
+                false);
+            resolvedBackIcon ??= ResolveSprite(
+                type,
+                category,
+                config.backIconPath,
+                config.primaryColor,
+                config.secondaryColor,
+                true);
+        }
+        else if (category == ArchitecturalResourceCategory.InkSupply)
+        {
+            VisualConfig config = type == ArchitecturalType.LargeInkBottle
+                ? largeInkVisualConfig
+                : smallInkVisualConfig;
+            resolvedIcon ??= ResolveSprite(type, category, config.iconPath, config.primaryColor, config.secondaryColor, false);
+            resolvedBackIcon ??= ResolveSprite(type, category, config.backIconPath, config.primaryColor, config.secondaryColor, true);
+        }
+        else if (category == ArchitecturalResourceCategory.SpecialStructure)
+        {
+            resolvedIcon ??= ResolveSprite(
+                type,
+                category,
+                specialStructureVisualConfig.iconPath,
+                specialStructureVisualConfig.primaryColor,
+                specialStructureVisualConfig.secondaryColor,
+                false);
+            resolvedBackIcon ??= ResolveSprite(
+                type,
+                category,
+                specialStructureVisualConfig.backIconPath,
+                specialStructureVisualConfig.primaryColor,
+                specialStructureVisualConfig.secondaryColor,
+                true);
+        }
+
+        resolvedIcon ??= resolvedBackIcon;
+        resolvedBackIcon ??= resolvedIcon;
+        return new ArchitecturalCrystalVisualSet(resolvedIcon, resolvedBackIcon);
+    }
+
+    private static VisualConfig GetCommonVisualConfig(ArchitecturalType type)
+    {
+        if (commonVisualConfigs.TryGetValue(type, out VisualConfig config))
+        {
+            return config;
+        }
+
+        return new VisualConfig(
+            null,
+            null,
+            new Color32(215, 215, 215, 255),
+            new Color32(97, 97, 97, 255));
+    }
+
+    private static Sprite ResolveSprite(
+        ArchitecturalType type,
+        ArchitecturalResourceCategory category,
+        string assetPath,
+        Color32 primaryColor,
+        Color32 secondaryColor,
+        bool isBackgroundVariant)
+    {
+        string cacheKey = $"{category}_{type}_{(isBackgroundVariant ? "Back" : "Icon")}";
+        if (spriteCache.TryGetValue(cacheKey, out Sprite cachedSprite))
+        {
+            return cachedSprite;
+        }
+
+        Sprite resolvedSprite = LoadProjectSprite(assetPath);
+        if (resolvedSprite == null)
+        {
+            resolvedSprite = CreateFallbackSprite(cacheKey, primaryColor, secondaryColor, isBackgroundVariant);
+        }
+
+        spriteCache[cacheKey] = resolvedSprite;
+        return resolvedSprite;
+    }
+
+    private static Sprite LoadProjectSprite(string assetPath)
+    {
+        if (string.IsNullOrWhiteSpace(assetPath))
+        {
+            return null;
+        }
+
+#if UNITY_EDITOR
+        Sprite editorSprite = AssetDatabase.LoadAssetAtPath<Sprite>(assetPath);
+        if (editorSprite != null)
+        {
+            return editorSprite;
+        }
+#endif
+
+        if (!assetPath.StartsWith("Assets/"))
+        {
+            return null;
+        }
+
+        string relativePath = assetPath.Substring("Assets/".Length).Replace('/', Path.DirectorySeparatorChar);
+        string absolutePath = Path.Combine(Application.dataPath, relativePath);
+        if (!File.Exists(absolutePath))
+        {
+            return null;
+        }
+
+        byte[] bytes = File.ReadAllBytes(absolutePath);
+        if (bytes == null || bytes.Length == 0)
+        {
+            return null;
+        }
+
+        Texture2D texture = new Texture2D(2, 2, TextureFormat.RGBA32, false);
+        if (!texture.LoadImage(bytes))
+        {
+            Object.Destroy(texture);
+            return null;
+        }
+
+        texture.name = Path.GetFileNameWithoutExtension(assetPath);
+        texture.filterMode = FilterMode.Point;
+        texture.wrapMode = TextureWrapMode.Clamp;
+
+        Rect rect = new Rect(0f, 0f, texture.width, texture.height);
+        Sprite sprite = Sprite.Create(texture, rect, new Vector2(0.5f, 0.5f), 100f);
+        sprite.name = texture.name;
+        return sprite;
+    }
+
+    private static Sprite CreateFallbackSprite(
+        string cacheKey,
+        Color32 primaryColor,
+        Color32 secondaryColor,
+        bool isBackgroundVariant)
+    {
+        const int size = 48;
+        Texture2D texture = new Texture2D(size, size, TextureFormat.RGBA32, false);
+        texture.filterMode = FilterMode.Point;
+        texture.wrapMode = TextureWrapMode.Clamp;
+
+        Vector2 center = new Vector2((size - 1) * 0.5f, (size - 1) * 0.5f);
+        float outerRadius = isBackgroundVariant ? 20.5f : 17.5f;
+        float innerRadius = isBackgroundVariant ? 16.5f : 13.5f;
+
+        for (int y = 0; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                float dx = Mathf.Abs(x - center.x);
+                float dy = Mathf.Abs(y - center.y);
+                float diamondDistance = dx + dy * 1.08f;
+                Color color = Color.clear;
+
+                if (diamondDistance <= outerRadius)
+                {
+                    color = secondaryColor;
+                }
+
+                if (diamondDistance <= innerRadius)
+                {
+                    color = primaryColor;
+                }
+
+                if (!isBackgroundVariant && Mathf.Abs(dx - dy) <= 1.6f && diamondDistance <= innerRadius - 1.8f)
+                {
+                    color = Color.Lerp(primaryColor, Color.white, 0.26f);
+                }
+
+                if (isBackgroundVariant && diamondDistance <= innerRadius - 4f)
+                {
+                    color = Color.Lerp(primaryColor, Color.white, 0.14f);
+                }
+
+                texture.SetPixel(x, y, color);
+            }
+        }
+
+        texture.Apply();
+        texture.name = $"RuntimeCrystalVisual_{cacheKey}";
+        Sprite sprite = Sprite.Create(texture, new Rect(0f, 0f, size, size), new Vector2(0.5f, 0.5f), 100f);
+        sprite.name = texture.name;
+        return sprite;
     }
 }

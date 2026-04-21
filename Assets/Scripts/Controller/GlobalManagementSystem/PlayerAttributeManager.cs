@@ -85,6 +85,7 @@ public class PlayerAttributeManager : MonoBehaviour
         PlayerLoadoutRuntime.EnsureCurrentWeaponUnlocked();
         EnsureDesignBaseline();
         RebuildBackpackBonuses();
+        WeaponType effectiveWeaponType = RuntimeWeaponTypeResolver.ResolveEffectiveWeaponType(BackpackMananger.Instance);
 
         if (characterCore == null || characterCore.baseStats == null)
         {
@@ -97,7 +98,7 @@ public class PlayerAttributeManager : MonoBehaviour
         CharacterStats recalculated = characterCore.baseStats.Clone();
         recalculated.maxHp = Mathf.Max(1f, recalculated.maxHp + GetTotalBonus(AttributeBonusType.MaxHealth));
         recalculated.attackDamage = Mathf.Max(
-            Mathf.Max(recalculated.attackDamage, InkTypeCatalog.Get(PlayerLoadoutRuntime.CurrentWeaponType).baseDamage) +
+            Mathf.Max(recalculated.attackDamage, InkTypeCatalog.Get(effectiveWeaponType).baseDamage) +
             GetTotalBonus(AttributeBonusType.AttackPower),
             0f);
         recalculated.moveSpeed = Mathf.Max(0f, recalculated.moveSpeed + GetTotalBonus(AttributeBonusType.MoveSpeed));
@@ -111,7 +112,7 @@ public class PlayerAttributeManager : MonoBehaviour
 
         RefreshAttackDurability();
         RefreshHealthUi();
-        SyncProfileData();
+        SyncProfileData(effectiveWeaponType);
     }
 
     public void ClearAllBonus()
@@ -203,7 +204,7 @@ public class PlayerAttributeManager : MonoBehaviour
         }
     }
 
-    private void SyncProfileData()
+    private void SyncProfileData(WeaponType effectiveWeaponType)
     {
         if (profileData == null)
         {
@@ -221,8 +222,8 @@ public class PlayerAttributeManager : MonoBehaviour
             profileData.currentDurability = playerAttack.ink;
         }
 
-        profileData.currentInkType = PlayerLoadoutRuntime.CurrentInkType;
-        profileData.currentWeaponType = PlayerLoadoutRuntime.CurrentWeaponType;
+        profileData.currentInkType = effectiveWeaponType.ToInkType();
+        profileData.currentWeaponType = effectiveWeaponType;
     }
 
     private void ResolveReferences()

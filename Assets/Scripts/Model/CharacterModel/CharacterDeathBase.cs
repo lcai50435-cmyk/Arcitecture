@@ -6,6 +6,7 @@ public class CharacterDeathBase : MonoBehaviour
     protected Rigidbody2D characterRigidbody;
     protected Animator anim;
     protected CharacterCore core;
+    private bool deathTriggered;
 
     protected virtual void Awake()
     {
@@ -17,8 +18,15 @@ public class CharacterDeathBase : MonoBehaviour
 
     public void TriggerCharacterDie()
     {
-        DisablePhysicsComponents(); 
-        OnCharacterDie();              
+        if (deathTriggered)
+        {
+            return;
+        }
+
+        deathTriggered = true;
+        DisablePhysicsComponents();
+        OnCharacterDie();
+        StartCoroutine(DestroyAfterDelayRoutine());
     }
 
     protected virtual void OnEnable()
@@ -35,20 +43,39 @@ public class CharacterDeathBase : MonoBehaviour
 
     protected virtual void DisablePhysicsComponents()
     {
-        // 开启碰撞
+        // 鍏抽棴纰版挒
         if (characterCollider != null)
-            characterCollider.enabled = true;
+            characterCollider.enabled = false;
 
         if (characterRigidbody != null)
         {
-            characterRigidbody.velocity = Vector2.zero;      // 清空速度
-            characterRigidbody.angularVelocity = 0f;         // 清空旋转速度
-            characterRigidbody.bodyType = RigidbodyType2D.Static; // 完全静止
+            characterRigidbody.velocity = Vector2.zero;
+            characterRigidbody.angularVelocity = 0f;
+            characterRigidbody.bodyType = RigidbodyType2D.Static;
         }
     }
 
     protected virtual void OnCharacterDie()
     {
-        // 特殊怪物的死亡方法
+        // 浜ょ敱瀛愮被鎾斁姝讳骸琛ㄧ幇
+    }
+
+    protected virtual float GetDeathFallbackDelay()
+    {
+        return 1.5f;
+    }
+
+    protected void CompleteDeathDestroy()
+    {
+        Destroy(gameObject);
+    }
+
+    private System.Collections.IEnumerator DestroyAfterDelayRoutine()
+    {
+        yield return new WaitForSecondsRealtime(GetDeathFallbackDelay());
+        if (this != null)
+        {
+            CompleteDeathDestroy();
+        }
     }
 }

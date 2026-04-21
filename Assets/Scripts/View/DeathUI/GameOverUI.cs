@@ -45,23 +45,23 @@ public class GameOverUI : MonoBehaviour
 
     public void RestartGame()
     {
-        Time.timeScale = 1f;
-        RuntimeCollectedCrystalRegistry.EnsureInstance().Clear();
+        ResetRuntimeState();
+        GameplayStageRuntime.EnsureSelectedStageUnlocked();
+        string targetSceneName = GameplayStageRuntime.GetSelectedSceneName();
 
         SceneLoader loader = SceneLoader.EnsureInstance();
         if (loader != null)
         {
-            loader.ToScene(gameSceneName);
+            loader.ToScene(string.IsNullOrWhiteSpace(targetSceneName) ? gameSceneName : targetSceneName);
             return;
         }
 
-        SceneManager.LoadScene(gameSceneName);
+        SceneManager.LoadScene(string.IsNullOrWhiteSpace(targetSceneName) ? gameSceneName : targetSceneName);
     }
 
     public void GoToMainMenu()
     {
-        Time.timeScale = 1f;
-        RuntimeCollectedCrystalRegistry.EnsureInstance().Clear();
+        ResetRuntimeState();
 
         SceneLoader loader = SceneLoader.EnsureInstance();
         if (loader != null)
@@ -71,5 +71,12 @@ public class GameOverUI : MonoBehaviour
         }
 
         SceneManager.LoadScene(mainMenuSceneName);
+    }
+
+    private static void ResetRuntimeState()
+    {
+        Time.timeScale = 1f;
+        RuntimeCollectedCrystalRegistry.EnsureInstance().Clear();
+        BackpackMananger.Instance?.ClearAllItems();
     }
 }

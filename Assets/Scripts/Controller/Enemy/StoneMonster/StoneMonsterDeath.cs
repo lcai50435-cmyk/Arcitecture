@@ -1,23 +1,23 @@
 using UnityEngine;
 
 /// <summary>
-/// µØÕğ¹ÖËÀÍöÏà¹ØÂß¼­
+/// åœ°éœ‡æ€ªæ­»äº¡ç›¸å…³é€»è¾‘
 /// </summary>
 public class StoneMonsterDeath : CharacterDeathBase
 {
     protected override void Awake()
     {
-        base.Awake();       
+        base.Awake();
     }
 
     protected override void OnCharacterDie()
     {
-        // ´¥·¢¶¯»­»úµÄËÀÍöTrigger
+        // è§¦å‘åŠ¨ç”»æœºçš„æ­»äº¡Trigger
         anim.SetTrigger("IsDeath");
     }
 
-    public void OnDestroy()
+    public void DestroyAfterDeathAnimation()
     {
-        Destroy(gameObject);
+        CompleteDeathDestroy();
     }
 }

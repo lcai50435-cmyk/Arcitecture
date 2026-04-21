@@ -21,6 +21,7 @@ public class CharacterCore : MonoBehaviour
     public Vector2 lastFacingDirection = Vector2.down;
 
     public float LastDamageTaken { get; private set; }
+    public bool IsDead { get; private set; }
 
     private void Awake()
     {
@@ -44,6 +45,11 @@ public class CharacterCore : MonoBehaviour
 
     public void TakeDamage(float damage)
     {
+        if (IsDead)
+        {
+            return;
+        }
+
         float realDamage = Mathf.Max(0f, damage - Mathf.Max(0f, stats.defense));
         LastDamageTaken = realDamage;
         currentHp -= realDamage;
@@ -59,6 +65,12 @@ public class CharacterCore : MonoBehaviour
 
     private void Die()
     {
+        if (IsDead)
+        {
+            return;
+        }
+
+        IsDead = true;
         OnDeath?.Invoke();
     }
 

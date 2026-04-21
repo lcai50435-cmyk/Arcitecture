@@ -43,7 +43,7 @@ public class CrystalDescriptionUI : MonoBehaviour
         string desc = InkModifierRuntimeConfig.BuildCrystalActivationText(
             crystal,
             BackpackMananger.Instance,
-            PlayerLoadoutRuntime.CurrentWeaponType);
+            RuntimeWeaponTypeResolver.ResolveEffectiveWeaponType(BackpackMananger.Instance));
 
         if (string.IsNullOrEmpty(desc))
         {

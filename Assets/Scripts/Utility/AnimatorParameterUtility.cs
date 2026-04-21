@@ -6,6 +6,7 @@ public static class AnimatorParameterUtility
     {
         return animator != null
             && animator.isActiveAndEnabled
+            && animator.isInitialized
             && animator.gameObject.activeInHierarchy
             && animator.runtimeAnimatorController != null;
     }

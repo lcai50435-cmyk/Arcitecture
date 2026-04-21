@@ -199,8 +199,8 @@ public class EnemyCombatFeedback : MonoBehaviour
         textMesh.text = value;
         textMesh.anchor = TextAnchor.MiddleCenter;
         textMesh.alignment = TextAlignment.Center;
-        textMesh.fontSize = 28;
-        textMesh.characterSize = 0.06f;
+        textMesh.fontSize = 32;
+        textMesh.characterSize = 0.068f;
         textMesh.fontStyle = FontStyle.Bold;
         textMesh.color = color;
     }

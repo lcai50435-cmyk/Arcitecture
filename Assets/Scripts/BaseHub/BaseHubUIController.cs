@@ -4,6 +4,7 @@ public class BaseHubUIController : MonoBehaviour
 {
     [SerializeField] private GameObject illustratedHandbookPanel;
     [SerializeField] private SpiritPanelUI spiritPanel;
+    [SerializeField] private StageSelectionPanelUI stageSelectionPanel;
     [SerializeField] private GameObject interactTipUI;
     [SerializeField] private GameObject player;
 
@@ -22,11 +23,13 @@ public class BaseHubUIController : MonoBehaviour
         GameObject playerObject,
         GameObject handbookPanel,
         SpiritPanelUI spirit,
+        StageSelectionPanelUI stagePanel,
         GameObject interactTip)
     {
         player = playerObject;
         illustratedHandbookPanel = handbookPanel;
         spiritPanel = spirit;
+        stageSelectionPanel = stagePanel;
         interactTipUI = interactTip;
 
         playerMove = player != null ? player.GetComponent<PlayerMove>() : null;
@@ -39,7 +42,7 @@ public class BaseHubUIController : MonoBehaviour
 
     private void Update()
     {
-        if (isModalOpen && Input.GetKeyDown(KeyCode.Escape))
+        if (isModalOpen && Input.GetKeyDown(GameSettingsStore.GetKeyBinding(GameInputAction.Pause)))
         {
             CloseAll();
         }
@@ -54,6 +57,12 @@ public class BaseHubUIController : MonoBehaviour
     {
         OpenModal(spiritPanel != null ? spiritPanel.gameObject : null);
         spiritPanel?.Open();
+    }
+
+    public void OpenStageSelectionPanel()
+    {
+        OpenModal(stageSelectionPanel != null ? stageSelectionPanel.gameObject : null);
+        stageSelectionPanel?.Open();
     }
 
     public void CloseAll()
@@ -82,6 +91,9 @@ public class BaseHubUIController : MonoBehaviour
 
         if (spiritPanel != null)
             spiritPanel.gameObject.SetActive(false);
+
+        if (stageSelectionPanel != null)
+            stageSelectionPanel.gameObject.SetActive(false);
     }
 
     private void LockPlayer()

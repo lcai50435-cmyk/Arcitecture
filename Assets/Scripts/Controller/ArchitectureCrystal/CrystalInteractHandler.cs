@@ -7,6 +7,8 @@ using UnityEngine;
 /// </summary>
 public class CrystalInteractHandler : MonoBehaviour, IInteractable
 {
+    private const float PickupAmbushProbability = 0.3f;
+
     [Header("是否为专用材料")]
     public bool isUnlockMaterial = false;
 
@@ -29,8 +31,14 @@ public class CrystalInteractHandler : MonoBehaviour, IInteractable
     [Header("跨场景保留拾取状态")]
     public bool persistCollectedAcrossSceneLoads = true;
 
+    [Header("掉落包装")]
+    public bool startClosedAsLootBag = false;
+    public Sprite closedLootBagSprite;
+    public Sprite revealedLootSprite;
+
     private string runtimeCollectionId;
     private bool collectionIdResolved;
+    private bool lootBagOpened;
 
     private void Awake()
     {
@@ -54,20 +62,20 @@ public class CrystalInteractHandler : MonoBehaviour, IInteractable
             return;
         }
 
-        ArchitecturalCrystal data = new ArchitecturalCrystal(
-            type,
-            expValue,
-            icon,
-            backIcon,
-            textDescription,
-            bonusType,
-            bonusValue,
-            subBonusType,
-            subBonusValue,
-            isUnlockMaterial,
-            resourceCategory,
-            inkRestoreValue
-        );
+        if (startClosedAsLootBag && !lootBagOpened)
+        {
+            OpenLootBag();
+            return;
+        }
+
+        if (ShouldTriggerPickupAmbush())
+        {
+            RegisterCollectedState();
+            Destroy(gameObject);
+            return;
+        }
+
+        ArchitecturalCrystal data = BuildRuntimeCrystalData();
 
         bool pickSuccess = player.PickCrystal(data);
 
@@ -86,6 +94,11 @@ public class CrystalInteractHandler : MonoBehaviour, IInteractable
     {
         get
         {
+            if (startClosedAsLootBag && !lootBagOpened)
+            {
+                return "打开锦囊";
+            }
+
             ArchitecturalResourceCategory category = resourceCategory;
             if (category != ArchitecturalResourceCategory.InkSupply && isUnlockMaterial)
             {
@@ -104,6 +117,97 @@ public class CrystalInteractHandler : MonoBehaviour, IInteractable
 
             return "拾取晶体";
         }
+    }
+
+    private void OpenLootBag()
+    {
+        lootBagOpened = true;
+        startClosedAsLootBag = false;
+
+        SpriteRenderer spriteRenderer = GetComponent<SpriteRenderer>();
+        if (spriteRenderer != null)
+        {
+            Sprite revealedSprite = revealedLootSprite != null
+                ? revealedLootSprite
+                : (icon != null ? icon : spriteRenderer.sprite);
+            spriteRenderer.sprite = revealedSprite;
+        }
+
+        transform.localScale *= 1.08f;
+        Debug.Log($"打开锦囊，露出了 {BuildRuntimeCrystalData().DisplayName}");
+    }
+
+    private ArchitecturalCrystal BuildRuntimeCrystalData()
+    {
+        ArchitecturalResourceCategory category = ResolveCategory();
+
+        if (category == ArchitecturalResourceCategory.SpecialStructure)
+        {
+            ArchitecturalCrystal crystal = ArchitecturalCrystalFactory.CreateSpecialStructureMaterial(icon, backIcon);
+            OverrideCrystalPresentation(ref crystal);
+            return crystal;
+        }
+
+        if (category == ArchitecturalResourceCategory.InkSupply)
+        {
+            bool largeBottle = type == ArchitecturalType.LargeInkBottle || inkRestoreValue >= 50;
+            ArchitecturalCrystal crystal = ArchitecturalCrystalFactory.CreateInkSupply(largeBottle, icon, backIcon);
+            OverrideCrystalPresentation(ref crystal);
+            return crystal;
+        }
+
+        ArchitecturalCrystal commonCrystal = ArchitecturalCrystalFactory.CreateCommonStructure(type, icon, backIcon);
+        OverrideCrystalPresentation(ref commonCrystal);
+        return commonCrystal;
+    }
+
+    private void OverrideCrystalPresentation(ref ArchitecturalCrystal crystal)
+    {
+        if (icon != null)
+        {
+            crystal.icon = icon;
+        }
+
+        if (backIcon != null)
+        {
+            crystal.backIcon = backIcon;
+        }
+        else if (icon != null && crystal.backIcon == null)
+        {
+            crystal.backIcon = icon;
+        }
+
+        if (!string.IsNullOrEmpty(textDescription))
+        {
+            crystal.textDescription = textDescription;
+        }
+    }
+
+    private bool ShouldTriggerPickupAmbush()
+    {
+        if (UnityEngine.Random.value > PickupAmbushProbability)
+        {
+            return false;
+        }
+
+        bool spawned = RunStageDirector.TryTriggerPickupAmbush(transform.position);
+        if (spawned)
+        {
+            Debug.Log($"拾取 {type} 触发伏击怪");
+        }
+
+        return spawned;
+    }
+
+    private ArchitecturalResourceCategory ResolveCategory()
+    {
+        ArchitecturalResourceCategory category = resourceCategory;
+        if (category != ArchitecturalResourceCategory.InkSupply && isUnlockMaterial)
+        {
+            category = ArchitecturalResourceCategory.SpecialStructure;
+        }
+
+        return category;
     }
 
     private void RegisterCollectedState()

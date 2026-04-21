@@ -5,7 +5,6 @@ public class PlayerAttack : CharacterAttack
 {
     private const float MultiShotLateralSpacing = 0.22f;
 
-    private readonly KeyCode attackKey = KeyCode.Mouse0;
     private DirectionTracker directionTracker;
     private Animator animator;
     private float nextAttackTime;
@@ -49,7 +48,7 @@ public class PlayerAttack : CharacterAttack
 
     private void Update()
     {
-        if (Input.GetKeyDown(attackKey))
+        if (Input.GetKeyDown(GameSettingsStore.GetKeyBinding(GameInputAction.Attack)))
         {
             if (UIRootManager.Instance != null && UIRootManager.Instance.IsAnyGameplayBlockingUIOpen())
             {
@@ -70,7 +69,8 @@ public class PlayerAttack : CharacterAttack
             return;
         }
 
-        WeaponAttackProfile profile = WeaponAttackProfile.FromWeaponType(PlayerLoadoutRuntime.CurrentWeaponType);
+        WeaponType effectiveWeaponType = RuntimeWeaponTypeResolver.ResolveEffectiveWeaponType(BackpackMananger.Instance);
+        WeaponAttackProfile profile = WeaponAttackProfile.FromWeaponType(effectiveWeaponType);
         InkAttackRuntimeConfig inkConfig = profile.ApplyToInkConfig(
             InkModifierRuntimeConfig.BuildFromBackpack(BackpackMananger.Instance));
 
@@ -164,21 +164,23 @@ public class PlayerAttack : CharacterAttack
 
     public void RefreshInkUI()
     {
+        WeaponType effectiveWeaponType = RuntimeWeaponTypeResolver.ResolveEffectiveWeaponType(BackpackMananger.Instance);
+
         if (weaponTrans != null)
         {
             weaponTrans.SetMaxValue(maxInk);
             weaponTrans.SetValue(ink);
         }
 
-        GameplayStatusHudRuntime.RefreshWeaponText(ink, maxInk);
+        GameplayStatusHudRuntime.RefreshWeaponText(ink, maxInk, effectiveWeaponType);
 
         PlayerProfileData profile = GetComponent<PlayerProfileData>();
         if (profile != null)
         {
             profile.currentDurability = ink;
             profile.maxDurability = maxInk;
-            profile.currentInkType = PlayerLoadoutRuntime.CurrentInkType;
-            profile.currentWeaponType = PlayerLoadoutRuntime.CurrentWeaponType;
+            profile.currentInkType = effectiveWeaponType.ToInkType();
+            profile.currentWeaponType = effectiveWeaponType;
         }
     }
 }

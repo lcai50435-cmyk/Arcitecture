@@ -139,6 +139,17 @@ CanvasGroup:
   m_Interactable: 1
   m_BlocksRaycasts: 1
   m_IgnoreParentGroups: 0
+--- !u!114 &42764071 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 1012963031715468638, guid: 22b88ab0514320d448b19bb7f925f60d, type: 3}
+  m_PrefabInstance: {fileID: 216821525}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f4688fdb7df04437aeb418b961361dc5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!4 &54756556 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 7213563691037737986, guid: d5166668bb094f74d93e73a66bd0fc38, type: 3}
@@ -1541,7 +1552,7 @@ MonoBehaviour:
   moveScript: {fileID: 1137389306}
   inkballPrefab: {fileID: 5062398561791524683, guid: 193950fd6cdd66447a692e7a83637123, type: 3}
   inkPoint: {fileID: 1137389309}
-  weaponTrans: {fileID: 0}
+  weaponTrans: {fileID: 1309422541}
   ink: 100
   maxInk: 100
 --- !u!114 &1137389317
@@ -1583,7 +1594,7 @@ MonoBehaviour:
   playerAnim: {fileID: 1137389307}
   playerMovement: {fileID: 1137389306}
   hurtAnimParam: IsHurt
-  healthTrans: {fileID: 0}
+  healthTrans: {fileID: 1203949250}
 --- !u!114 &1137389320
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1623,7 +1634,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   fImage: {fileID: 540447392}
   boxPanel: {fileID: 11902400}
-  boxText: {fileID: 0}
+  boxText: {fileID: 42764071}
   interactDistance: 2.2
 --- !u!114 &1137389323
 MonoBehaviour:
@@ -1770,6 +1781,17 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1203949250 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 20745114417256838, guid: ec198bc90ea1d804096b39175f11af95, type: 3}
+  m_PrefabInstance: {fileID: 494212451}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c5cc875a50bbef648b3443dfd86e341b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1001 &1226647705
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -2127,6 +2149,17 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 4297530229552866462, guid: b86419f0d0f75e4499ec149045e7d867, type: 3}
   m_PrefabInstance: {fileID: 1305604376}
   m_PrefabAsset: {fileID: 0}
+--- !u!114 &1309422541 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 8462465106249550236, guid: ec198bc90ea1d804096b39175f11af95, type: 3}
+  m_PrefabInstance: {fileID: 494212451}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c5cc875a50bbef648b3443dfd86e341b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!4 &1314713324 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 5799417526743472407, guid: 06b25643d1a4e0145b290bce2cc3c52a, type: 3}
@@ -2263,7 +2296,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   fImage: {fileID: 540447392}
   boxPanel: {fileID: 11902400}
-  boxText: {fileID: 0}
+  boxText: {fileID: 42764071}
   interactDistance: 2.2
 --- !u!58 &1412838529
 CircleCollider2D:
@@ -2305,6 +2338,17 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 6252217199598303312, guid: a6961c2a6de5e124a86dbb261d941eca, type: 3}
   m_PrefabInstance: {fileID: 1872974578}
   m_PrefabAsset: {fileID: 0}
+--- !u!114 &1529129986 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 260089117918730997, guid: ec198bc90ea1d804096b39175f11af95, type: 3}
+  m_PrefabInstance: {fileID: 494212451}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f4688fdb7df04437aeb418b961361dc5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!4 &1547379200 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 7496386107463514872, guid: 3f3478535945db14e847c6f8f2bf938d, type: 3}
@@ -3055,7 +3099,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   totalTime: 300
   isInBase: 0
-  timer: {fileID: 0}
+  timer: {fileID: 1529129986}
 --- !u!224 &1926786811
 RectTransform:
   m_ObjectHideFlags: 0

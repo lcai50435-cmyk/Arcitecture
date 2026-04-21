@@ -4,7 +4,6 @@ using UnityEngine.SceneManagement;
 
 public class GameSceneBaseReturnBootstrapper : MonoBehaviour
 {
-    private const string GameSceneName = "GameScene";
     private const string BaseSceneName = "BaseScene";
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
@@ -22,7 +21,7 @@ public class GameSceneBaseReturnBootstrapper : MonoBehaviour
 
     private static void TryCreate(Scene scene)
     {
-        if (scene.name != GameSceneName) return;
+        if (!GameplayStageCatalog.IsGameplayScene(scene.name)) return;
         if (FindObjectOfType<GameSceneBaseReturnBootstrapper>() != null) return;
 
         GameObject bootstrapper = new GameObject("GameSceneBaseReturnUI");
@@ -45,7 +44,7 @@ public class GameSceneBaseReturnBootstrapper : MonoBehaviour
 
     public static bool IsGameSceneActive()
     {
-        return SceneManager.GetActiveScene().name == GameSceneName;
+        return GameplayStageCatalog.IsGameplayScene(SceneManager.GetActiveScene().name);
     }
 
     public static void SubmitCatalogueAndReturnToBase()
