@@ -60,6 +60,14 @@ public class UIManager : MonoBehaviour
         {
             Debug.LogWarning("UIManager: 未拖入玩家物体，无法控制玩家移动");
         }
+
+        // 开局强制收起全部图鉴相关UI
+        if (UIRootManager.Instance != null)
+        {
+            UIRootManager.Instance.CloseAllBookUI();
+        }
+
+        isHandbookOpen = false;
     }
 
     /// <summary>
@@ -67,7 +75,12 @@ public class UIManager : MonoBehaviour
     /// </summary>
     public void OpenIllustratedHandbook()
     {
-        if (isHandbookOpen) return;
+        // 如果图鉴已经开着，就不要重复打开
+        if (isHandbookOpen)
+        {
+            Debug.Log("图鉴已打开，忽略重复打开");
+            return;
+        }
 
         isHandbookOpen = true;
 
@@ -94,7 +107,11 @@ public class UIManager : MonoBehaviour
 
         if (UIRootManager.Instance != null)
         {
-            UIRootManager.Instance.OpenHandbookView();
+            UIRootManager.Instance.HideAllDetail();
+            UIRootManager.Instance.HideAllSubmitSelection();
+            UIRootManager.Instance.HideDialog();
+            UIRootManager.Instance.ShowHandbook();
+            UIRootManager.Instance.HideInteractTip();
         }
 
         Debug.Log("打开图鉴，玩家移动已禁用");
@@ -105,7 +122,11 @@ public class UIManager : MonoBehaviour
     /// </summary>
     public void CloseIllustratedHandbook()
     {
-        if (!isHandbookOpen) return;
+        if (!isHandbookOpen)
+        {
+            Debug.Log("图鉴本来就是关闭状态");
+            return;
+        }
 
         if (UIRootManager.Instance != null)
         {
@@ -154,9 +175,6 @@ public class UIManager : MonoBehaviour
         isHandbookOpen = false;
     }
 
-    /// <summary>
-    /// 禁用玩家移动
-    /// </summary>
     private void DisablePlayerMovement()
     {
         if (playerMovementScript != null)
@@ -176,9 +194,6 @@ public class UIManager : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// 恢复玩家移动
-    /// </summary>
     private void EnablePlayerMovement()
     {
         if (playerMovementScript != null)
@@ -196,9 +211,6 @@ public class UIManager : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// 隐藏/恢复其他UI
-    /// </summary>
     private void HideOtherUI(bool hide)
     {
         foreach (GameObject ui in uiToHide)
