@@ -4,6 +4,11 @@ using UnityEngine.UI;
 [RequireComponent(typeof(Button))]
 public class CatalogueUnlockSlotButton : MonoBehaviour
 {
+    private const float DoubleClickWindow = 0.32f;
+    private static readonly Color LockedColor = new Color(0.5f, 0.5f, 0.5f, 1f);
+    private static readonly Color ArmedColor = new Color(0.82f, 0.78f, 0.62f, 1f);
+    private static readonly Color ArmedOutlineColor = new Color(0.98f, 0.86f, 0.48f, 0.95f);
+
     [Header("槽位唯一ID")]
     public string slotId;
 
@@ -20,6 +25,9 @@ public class CatalogueUnlockSlotButton : MonoBehaviour
     public Dialog dialogUI;
 
     private Button button;
+    private Outline armedOutline;
+    private bool pendingUnlockArmed;
+    private float lastLockedClickTime = -10f;
 
     public bool IsUnlocked
     {
@@ -51,6 +59,22 @@ public class CatalogueUnlockSlotButton : MonoBehaviour
         RefreshVisual();
     }
 
+    private void Update()
+    {
+        if (!pendingUnlockArmed)
+        {
+            return;
+        }
+
+        if (Time.unscaledTime - lastLockedClickTime <= DoubleClickWindow)
+        {
+            return;
+        }
+
+        pendingUnlockArmed = false;
+        RefreshVisual();
+    }
+
     private void OnDestroy()
     {
         if (button != null)
@@ -72,10 +96,32 @@ public class CatalogueUnlockSlotButton : MonoBehaviour
 
         if (RuntimeProgressState.EnsureInstance().IsSlotUnlocked(buildingId, resolvedSlotIndex))
         {
+            pendingUnlockArmed = false;
             ShowDescription(buildingId, resolvedSlotIndex);
             return;
         }
 
+        int remainingInventory = RuntimeProgressState.EnsureInstance().AvailableSpecialStructureInventory;
+        if (remainingInventory <= 0)
+        {
+            pendingUnlockArmed = false;
+            RefreshVisual();
+            ShowUnlockRequirementPrompt(buildingId, resolvedSlotIndex);
+            return;
+        }
+
+        float now = Time.unscaledTime;
+        bool isDoubleClick = pendingUnlockArmed && now - lastLockedClickTime <= DoubleClickWindow;
+        if (!isDoubleClick)
+        {
+            pendingUnlockArmed = true;
+            lastLockedClickTime = now;
+            RefreshVisual();
+            return;
+        }
+
+        pendingUnlockArmed = false;
+        lastLockedClickTime = -10f;
         bool success = RuntimeProgressState.EnsureInstance().TryUnlockSlot(
             buildingId,
             resolvedSlotIndex,
@@ -84,7 +130,7 @@ public class CatalogueUnlockSlotButton : MonoBehaviour
 
         if (!success)
         {
-            Debug.Log("没有专用结构材料，无法点亮该小图标");
+            ShowUnlockRequirementPrompt(buildingId, resolvedSlotIndex);
             return;
         }
 
@@ -123,8 +169,10 @@ public class CatalogueUnlockSlotButton : MonoBehaviour
             targetImage.raycastTarget = true;
             targetImage.color = IsUnlocked
                 ? new Color(1f, 1f, 1f, 1f)
-                : new Color(0.5f, 0.5f, 0.5f, 1f);
+                : (pendingUnlockArmed ? ArmedColor : LockedColor);
         }
+
+        RefreshArmedOutline();
     }
 
     private bool TryResolveRuntimeSlotContext(
@@ -145,7 +193,7 @@ public class CatalogueUnlockSlotButton : MonoBehaviour
 
         buildingId = buildingState.BuildingId;
 
-        if (resolvedSlotIndex < 0 && buildingState.slotButtons != null)
+        if (buildingState.slotButtons != null)
         {
             for (int i = 0; i < buildingState.slotButtons.Length; i++)
             {
@@ -158,7 +206,8 @@ public class CatalogueUnlockSlotButton : MonoBehaviour
             }
         }
 
-        if (IsResolvedSlotConsistent(buildingId, resolvedSlotIndex))
+        // 运行时优先信任父建筑配置里的槽位顺序，兼容 prefab 里仍保留旧 slotId 的情况。
+        if (IsResolvedSlotIndexValid(buildingId, resolvedSlotIndex))
         {
             return true;
         }
@@ -172,7 +221,7 @@ public class CatalogueUnlockSlotButton : MonoBehaviour
         return resolvedBySlotId;
     }
 
-    private bool IsResolvedSlotConsistent(CatalogueBuildingId buildingId, int resolvedSlotIndex)
+    private static bool IsResolvedSlotIndexValid(CatalogueBuildingId buildingId, int resolvedSlotIndex)
     {
         if (resolvedSlotIndex < 0)
         {
@@ -185,13 +234,7 @@ public class CatalogueUnlockSlotButton : MonoBehaviour
             return false;
         }
 
-        if (string.IsNullOrEmpty(slotId))
-        {
-            return true;
-        }
-
-        return definition.slotDefinitions[resolvedSlotIndex] != null &&
-               definition.slotDefinitions[resolvedSlotIndex].slotId == slotId;
+        return definition.slotDefinitions[resolvedSlotIndex] != null;
     }
 
     private bool TryResolveBySlotId(out CatalogueBuildingId buildingId, out int resolvedSlotIndex)
@@ -288,6 +331,36 @@ public class CatalogueUnlockSlotButton : MonoBehaviour
         dialogUI.ShowClickCloseDialog(content);
     }
 
+    private void ShowUnlockRequirementPrompt(CatalogueBuildingId buildingId, int resolvedSlotIndex)
+    {
+        int remainingInventory = RuntimeProgressState.EnsureInstance().AvailableSpecialStructureInventory;
+        string slotName = ResolveSlotName(buildingId, resolvedSlotIndex);
+        string content = $"点亮 {slotName} 需要 1 个专用结构材料。\n当前库存：{remainingInventory}";
+
+        if (!ResolveDialogReference())
+        {
+            Debug.Log(content);
+            return;
+        }
+
+        dialogUI.ShowAutoDialogForce(content);
+    }
+
+    private static string ResolveSlotName(CatalogueBuildingId buildingId, int resolvedSlotIndex)
+    {
+        BuildingDefinition definition = BuildingDefinitionLibrary.Get(buildingId);
+        if (definition.slotDefinitions == null ||
+            resolvedSlotIndex < 0 ||
+            resolvedSlotIndex >= definition.slotDefinitions.Length ||
+            definition.slotDefinitions[resolvedSlotIndex] == null)
+        {
+            return "该槽位";
+        }
+
+        string slotName = definition.slotDefinitions[resolvedSlotIndex].slotName;
+        return string.IsNullOrWhiteSpace(slotName) ? "该槽位" : slotName;
+    }
+
     private bool ResolveDialogReference()
     {
         if (dialogUI != null)
@@ -297,5 +370,27 @@ public class CatalogueUnlockSlotButton : MonoBehaviour
 
         dialogUI = FindObjectOfType<Dialog>(true);
         return dialogUI != null;
+    }
+
+    private void RefreshArmedOutline()
+    {
+        Image outlineTarget = targetImage != null
+            ? targetImage
+            : (button != null ? button.targetGraphic as Image : null);
+        if (outlineTarget == null)
+        {
+            return;
+        }
+
+        armedOutline = outlineTarget.GetComponent<Outline>();
+        if (armedOutline == null)
+        {
+            armedOutline = outlineTarget.gameObject.AddComponent<Outline>();
+        }
+
+        armedOutline.effectColor = ArmedOutlineColor;
+        armedOutline.effectDistance = new Vector2(4f, 4f);
+        armedOutline.useGraphicAlpha = true;
+        armedOutline.enabled = pendingUnlockArmed && !IsUnlocked;
     }
 }

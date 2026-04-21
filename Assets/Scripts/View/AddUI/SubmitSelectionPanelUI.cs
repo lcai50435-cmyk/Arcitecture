@@ -3,6 +3,8 @@ using UnityEngine.UI;
 
 public class SubmitSelectionPanelUI : MonoBehaviour
 {
+    private const float DoubleClickWindow = 0.32f;
+
     public GameObject panelRoot;
     public Button handbookCloseButton;
     public SubmitSelectionSlotUI[] slotUIs;
@@ -11,6 +13,7 @@ public class SubmitSelectionPanelUI : MonoBehaviour
     private PlayerGetArchitectural playerGetArchitectural;
     private BackpackUI backpackUI;
     private int selectedIndex = -1;
+    private float lastSelectedClickTime = -10f;
     private bool isOpen;
     private CatalogueBuildingId currentTargetBuilding;
 
@@ -66,6 +69,7 @@ public class SubmitSelectionPanelUI : MonoBehaviour
         }
 
         selectedIndex = -1;
+        lastSelectedClickTime = -10f;
         RefreshPanel();
     }
 
@@ -89,6 +93,7 @@ public class SubmitSelectionPanelUI : MonoBehaviour
         }
 
         selectedIndex = -1;
+        lastSelectedClickTime = -10f;
         RefreshPanel();
     }
 
@@ -112,9 +117,10 @@ public class SubmitSelectionPanelUI : MonoBehaviour
         }
 
         selectedIndex = -1;
+        lastSelectedClickTime = -10f;
     }
 
-    public void OnSlotClicked(int slotIndex)
+    public void OnSlotPressed(int slotIndex, int clickCount)
     {
         ResolveRuntimeDependencies();
         if (backpack == null)
@@ -125,12 +131,23 @@ public class SubmitSelectionPanelUI : MonoBehaviour
         ArchitecturalCrystal? nullableItem = backpack.GetItem(slotIndex);
         if (!nullableItem.HasValue)
         {
+            selectedIndex = -1;
+            lastSelectedClickTime = -10f;
+            RefreshPanel();
             return;
         }
 
-        if (selectedIndex != slotIndex)
+        float now = Time.unscaledTime;
+        bool isSameSlot = selectedIndex == slotIndex;
+        bool isDoubleClick = clickCount >= 2 ||
+                             (isSameSlot && now - lastSelectedClickTime <= DoubleClickWindow);
+
+        selectedIndex = slotIndex;
+        lastSelectedClickTime = now;
+        RefreshPanel();
+
+        if (!isDoubleClick)
         {
-            selectedIndex = slotIndex;
             return;
         }
 
@@ -140,6 +157,7 @@ public class SubmitSelectionPanelUI : MonoBehaviour
         }
 
         selectedIndex = -1;
+        lastSelectedClickTime = -10f;
         if (backpackUI != null)
         {
             backpackUI.RefreshUI();
@@ -162,8 +180,6 @@ public class SubmitSelectionPanelUI : MonoBehaviour
             return;
         }
 
-        int specialInventory = RuntimeProgressState.EnsureInstance().AvailableSpecialStructureInventory;
-
         for (int i = 0; i < slotUIs.Length; i++)
         {
             SubmitSelectionSlotUI slot = slotUIs[i];
@@ -174,20 +190,13 @@ public class SubmitSelectionPanelUI : MonoBehaviour
 
             int realIndex = slot.slotIndex;
             ArchitecturalCrystal? nullableItem = backpack.GetItem(realIndex);
-            if (nullableItem.HasValue)
+            if (nullableItem.HasValue && nullableItem.Value.IsCommonStructure)
             {
-                slot.Refresh(nullableItem.Value, true);
+                slot.Refresh(nullableItem.Value, true, selectedIndex == realIndex);
                 continue;
             }
 
-            if (specialInventory > 0)
-            {
-                slot.Refresh(ArchitecturalCrystalFactory.CreateSpecialStructureMaterial(), true);
-                specialInventory--;
-                continue;
-            }
-
-            slot.Refresh(default, false);
+            slot.Refresh(default, false, false);
         }
     }
 
