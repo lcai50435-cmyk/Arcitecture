@@ -16,11 +16,18 @@ public static class GameplayStatusHudRuntime
     private static Graphic weaponFillGraphic;
     private static TextMeshProUGUI healthValueText;
     private static TextMeshProUGUI weaponValueText;
+    private static TextMeshProUGUI countdownText;
 
     public static ValueTrans EnsureHealthGauge(ValueTrans currentGauge)
     {
         if (currentGauge != null)
         {
+            if (IsRuntimeGauge(currentGauge))
+            {
+                EnsureRoot();
+                return currentGauge;
+            }
+
             UseLegacyHealthGauge(currentGauge);
             return currentGauge;
         }
@@ -33,6 +40,12 @@ public static class GameplayStatusHudRuntime
     {
         if (currentGauge != null)
         {
+            if (IsRuntimeGauge(currentGauge))
+            {
+                EnsureRoot();
+                return currentGauge;
+            }
+
             UseLegacyWeaponGauge(currentGauge);
             return currentGauge;
         }
@@ -49,17 +62,59 @@ public static class GameplayStatusHudRuntime
         }
     }
 
-    public static void RefreshWeaponText(float current, float max)
+    public static void RefreshWeaponText(float current, float max, WeaponType weaponType)
     {
         if (weaponFillGraphic != null)
         {
-            weaponFillGraphic.color = InkTypeCatalog.GetDisplayColor(PlayerLoadoutRuntime.CurrentInkType);
+            weaponFillGraphic.color = InkTypeCatalog.GetDisplayColor(weaponType);
         }
 
         if (weaponValueText != null)
         {
             weaponValueText.text = $"{current:0}/{max:0}";
         }
+    }
+
+    public static TextMeshProUGUI EnsureCountdownText(TextMeshProUGUI currentText)
+    {
+        if (currentText != null)
+        {
+            countdownText = currentText;
+            return currentText;
+        }
+
+        EnsureHudCanvas();
+
+        if (countdownText != null)
+        {
+            return countdownText;
+        }
+
+        GameObject textObject = GameObject.Find("GameplayCountdownText");
+        if (textObject == null)
+        {
+            textObject = new GameObject("GameplayCountdownText", typeof(RectTransform), typeof(TextMeshProUGUI));
+            textObject.transform.SetParent(hudCanvas.transform, false);
+        }
+
+        RectTransform rect = textObject.GetComponent<RectTransform>();
+        rect.anchorMin = new Vector2(0.5f, 1f);
+        rect.anchorMax = new Vector2(0.5f, 1f);
+        rect.pivot = new Vector2(0.5f, 1f);
+        rect.anchoredPosition = new Vector2(0f, -24f);
+        rect.sizeDelta = new Vector2(220f, 52f);
+        rect.localScale = Vector3.one;
+        rect.SetAsLastSibling();
+
+        countdownText = textObject.GetComponent<TextMeshProUGUI>();
+        countdownText.font = ResolveHudFont();
+        countdownText.fontSize = 30f;
+        countdownText.color = Color.white;
+        countdownText.alignment = TextAlignmentOptions.Center;
+        countdownText.enableWordWrapping = false;
+        countdownText.raycastTarget = false;
+
+        return countdownText;
     }
 
     private static void EnsureRoot()
@@ -118,6 +173,14 @@ public static class GameplayStatusHudRuntime
         weaponGauge = gauge;
         weaponFillGraphic = ResolveGaugeFillGraphic(gauge);
         HideRuntimeHudIfPresent();
+    }
+
+    private static bool IsRuntimeGauge(ValueTrans gauge)
+    {
+        return gauge != null
+            && rootRect != null
+            && gauge.transform != null
+            && gauge.transform.IsChildOf(rootRect);
     }
 
     private static void CreateRows(Transform parent)
@@ -251,6 +314,12 @@ public static class GameplayStatusHudRuntime
 
     private static TMP_FontAsset ResolveHudFont()
     {
+        if (hudFontAsset != null)
+        {
+            return hudFontAsset;
+        }
+
+        hudFontAsset = TmpRuntimeFontFallback.EnsureChineseFallback();
         if (hudFontAsset != null)
         {
             return hudFontAsset;

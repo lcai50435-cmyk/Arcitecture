@@ -1,15 +1,19 @@
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
 public class BackpackUI : MonoBehaviour
 {
     private const float ToggleHotspotY = -168f;
-    private const float ToggleHotspotWidth = 112f;
-    private const float ToggleHotspotHeight = 40f;
+    private const float ToggleHotspotWidth = 138f;
+    private const float ToggleHotspotHeight = 44f;
     private const float CollapseSlideDistance = 150f;
     private const float SlideSmoothTime = 0.08f;
-    private const float CollapsedHintScalePulse = 0.06f;
-    private const float CollapsedHintPulseSpeed = 4.2f;
+    private const float CollapsedHintScalePulse = 0.04f;
+    private const float CollapsedHintPulseSpeed = 4.4f;
+    private static readonly Color ToggleButtonColor = new Color(0.17f, 0.12f, 0.07f, 0.88f);
+    private static readonly Color ToggleButtonColorCollapsed = new Color(0.20f, 0.13f, 0.05f, 0.94f);
+    private static readonly Color ToggleTextColor = new Color(0.98f, 0.89f, 0.67f, 1f);
 
     public Image[] backPackGrid;
     private BackpackMananger backpack;
@@ -17,7 +21,7 @@ public class BackpackUI : MonoBehaviour
     private RectTransform rectTransform;
     private RectTransform toggleHotspotRect;
     private Image toggleHotspotImage;
-    private Text toggleHintText;
+    private TextMeshProUGUI toggleHintText;
     private Vector2 expandedAnchoredPosition;
     private Vector2 currentTargetPosition;
     private Vector2 slideVelocity;
@@ -48,12 +52,10 @@ public class BackpackUI : MonoBehaviour
     {
         ResolveBackpackManager();
 
-        if (backPackGrid == null)
+        if (backPackGrid == null || backpack == null)
         {
             return;
         }
-
-        int specialInventory = RuntimeProgressState.EnsureInstance().AvailableSpecialStructureInventory;
 
         for (int i = 0; i < backPackGrid.Length; i++)
         {
@@ -67,17 +69,11 @@ public class BackpackUI : MonoBehaviour
             if (item.HasValue)
             {
                 ArchitecturalCrystal crystal = item.Value;
-                image.sprite = crystal.backIcon;
+                image.sprite = crystal.backIcon != null
+                    ? crystal.backIcon
+                    : (crystal.icon != null ? crystal.icon : RuntimeCrystalDropFactory.ResolveSprite(crystal));
                 image.color = Color.white;
                 image.enabled = true;
-            }
-            else if (specialInventory > 0)
-            {
-                ArchitecturalCrystal specialCrystal = ArchitecturalCrystalFactory.CreateSpecialStructureMaterial();
-                image.sprite = specialCrystal.backIcon;
-                image.color = Color.white;
-                image.enabled = image.sprite != null;
-                specialInventory--;
             }
             else
             {
@@ -90,6 +86,8 @@ public class BackpackUI : MonoBehaviour
 
     private void Update()
     {
+        HandleToggleShortcut();
+
         if (!slideInitialized || rectTransform == null)
         {
             return;
@@ -110,6 +108,31 @@ public class BackpackUI : MonoBehaviour
             Time.unscaledDeltaTime);
 
         RefreshToggleHintVisual();
+    }
+
+    private void HandleToggleShortcut()
+    {
+        if (!Input.GetKeyDown(KeyCode.B))
+        {
+            return;
+        }
+
+        if (RuntimePauseMenu.IsPauseOpen)
+        {
+            return;
+        }
+
+        if (RuntimeMiniMapHud.Instance != null && RuntimeMiniMapHud.Instance.IsExpandedViewVisible)
+        {
+            return;
+        }
+
+        if (UIRootManager.Instance != null && UIRootManager.Instance.IsAnyGameplayBlockingUIOpen())
+        {
+            return;
+        }
+
+        ToggleCollapsedState();
     }
 
     private void ResolveBackpackManager()
@@ -218,29 +241,28 @@ public class BackpackUI : MonoBehaviour
             Transform existing = toggleHotspotRect.Find("HintText");
             if (existing != null)
             {
-                toggleHintText = existing.GetComponent<Text>();
+                toggleHintText = existing.GetComponent<TextMeshProUGUI>();
             }
         }
 
         if (toggleHintText == null)
         {
-            GameObject textObject = new GameObject("HintText", typeof(RectTransform), typeof(CanvasRenderer), typeof(Text));
+            GameObject textObject = new GameObject("HintText", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
             RectTransform textRect = textObject.GetComponent<RectTransform>();
             textRect.SetParent(toggleHotspotRect, false);
             textRect.anchorMin = Vector2.zero;
             textRect.anchorMax = Vector2.one;
             textRect.offsetMin = Vector2.zero;
             textRect.offsetMax = Vector2.zero;
-            toggleHintText = textObject.GetComponent<Text>();
+            toggleHintText = textObject.GetComponent<TextMeshProUGUI>();
         }
 
-        toggleHintText.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
-        toggleHintText.fontSize = 17;
-        toggleHintText.alignment = TextAnchor.MiddleCenter;
-        toggleHintText.horizontalOverflow = HorizontalWrapMode.Overflow;
-        toggleHintText.verticalOverflow = VerticalWrapMode.Overflow;
+        toggleHintText.font = TmpRuntimeFontFallback.WarmupCharacters("背包展开收起[B]") ?? TMP_Settings.defaultFontAsset;
+        toggleHintText.fontSize = 20f;
+        toggleHintText.alignment = TextAlignmentOptions.Center;
+        toggleHintText.enableWordWrapping = false;
         toggleHintText.raycastTarget = false;
-        toggleHintText.text = "展开";
+        toggleHintText.text = "收起 [B]";
     }
 
     private void RefreshToggleHintVisual()
@@ -254,10 +276,10 @@ public class BackpackUI : MonoBehaviour
         {
             RuntimeUiSpriteFactory.ApplyRoundedSprite(
                 toggleHotspotImage,
-                new Color(0.17f, 0.12f, 0.07f, 0.92f),
-                10,
+                ToggleButtonColorCollapsed,
                 12,
-                1.2f);
+                14,
+                1.4f);
 
             float pulse = 1f + Mathf.Sin(Time.unscaledTime * CollapsedHintPulseSpeed) * CollapsedHintScalePulse;
             toggleHotspotRect.localScale = new Vector3(pulse, pulse, 1f);
@@ -265,24 +287,26 @@ public class BackpackUI : MonoBehaviour
             if (toggleHintText != null)
             {
                 toggleHintText.enabled = true;
-                toggleHintText.color = new Color(0.98f, 0.89f, 0.67f, 1f);
-                toggleHintText.text = "展开";
+                toggleHintText.color = ToggleTextColor;
+                toggleHintText.text = "展开 [B]";
             }
         }
         else
         {
             RuntimeUiSpriteFactory.ApplyRoundedSprite(
                 toggleHotspotImage,
-                new Color(1f, 1f, 1f, 0.01f),
-                10,
+                ToggleButtonColor,
                 12,
-                1.2f);
+                14,
+                1.3f);
 
             toggleHotspotRect.localScale = Vector3.one;
 
             if (toggleHintText != null)
             {
-                toggleHintText.enabled = false;
+                toggleHintText.enabled = true;
+                toggleHintText.color = ToggleTextColor;
+                toggleHintText.text = "收起 [B]";
             }
         }
     }

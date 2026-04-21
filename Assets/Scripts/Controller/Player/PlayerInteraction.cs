@@ -14,8 +14,14 @@ public class PlayerInteraction : MonoBehaviour
     private IInteractable currentInteractable;
     private Collider2D currentInteractableCollider;
 
+    private void Awake()
+    {
+        ResolveRuntimeReferences();
+    }
+
     void Start()
     {
+        ResolveRuntimeReferences();
         HideInteractUI();
     }
 
@@ -29,7 +35,7 @@ public class PlayerInteraction : MonoBehaviour
 
         UpdateCurrentInteractable();
 
-        if (Input.GetKeyDown(KeyCode.F))
+        if (Input.GetKeyDown(GameSettingsStore.GetKeyBinding(GameInputAction.Interact)))
         {
             TryInteract();
         }
@@ -98,6 +104,8 @@ public class PlayerInteraction : MonoBehaviour
 
     private void ShowInteractUI(string tip)
     {
+        ResolveRuntimeReferences();
+
         if (fImage != null)
             fImage.SetActive(true);
 
@@ -135,5 +143,13 @@ public class PlayerInteraction : MonoBehaviour
     {
         Gizmos.color = Color.yellow;
         Gizmos.DrawWireSphere(transform.position, interactDistance);
+    }
+
+    private void ResolveRuntimeReferences()
+    {
+        if (boxText == null && boxPanel != null)
+        {
+            boxText = boxPanel.GetComponentInChildren<TextMeshProUGUI>(true);
+        }
     }
 }

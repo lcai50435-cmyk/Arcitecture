@@ -1,7 +1,13 @@
+using System;
+using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using UnityEngine.TextCore.LowLevel;
 using UnityEngine.UI;
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
 
 public class UIRootManager : MonoBehaviour
 {
@@ -214,7 +220,6 @@ public class UIRootManager : MonoBehaviour
 
 public class RuntimePauseMenu : MonoBehaviour
 {
-    private const string GameSceneName = "GameScene";
     private const string CanvasName = "RuntimePauseMenuCanvas";
     private const int SortingOrder = 280;
 
@@ -229,12 +234,9 @@ public class RuntimePauseMenu : MonoBehaviour
     public static RuntimePauseMenu Instance { get; private set; }
     public static bool IsPauseOpen => Instance != null && Instance.isOpen;
 
-    private Canvas canvas;
-    private CanvasGroup canvasGroup;
-    private Button continueButton;
+    private RuntimeSettingsPanel settingsPanel;
     private bool isOpen;
     private bool visible;
-    private float timeScaleBeforePause = 1f;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void Bootstrap()
@@ -249,13 +251,13 @@ public class RuntimePauseMenu : MonoBehaviour
         EnsureInstance();
         if (Instance != null && !Instance.visible)
         {
-            Instance.HideImmediate(true);
+            Instance.HideImmediate();
         }
     }
 
     public static RuntimePauseMenu EnsureInstance()
     {
-        bool supportedScene = SceneManager.GetActiveScene().name == GameSceneName;
+        bool supportedScene = GameplayStageCatalog.IsGameplayScene(SceneManager.GetActiveScene().name);
 
         if (Instance != null)
         {
@@ -288,13 +290,19 @@ public class RuntimePauseMenu : MonoBehaviour
         Instance = this;
         DontDestroyOnLoad(gameObject);
         EnsureUi();
-        SetVisible(SceneManager.GetActiveScene().name == GameSceneName);
-        HideImmediate(true);
+        SetVisible(GameplayStageCatalog.IsGameplayScene(SceneManager.GetActiveScene().name));
+        HideImmediate();
     }
 
     private void Update()
     {
-        if (!visible || !Input.GetKeyDown(KeyCode.Escape))
+        if (!visible)
+        {
+            return;
+        }
+
+        KeyCode pauseKey = GameSettingsStore.GetKeyBinding(GameInputAction.Pause);
+        if (!Input.GetKeyDown(pauseKey))
         {
             return;
         }
@@ -304,9 +312,22 @@ public class RuntimePauseMenu : MonoBehaviour
             return;
         }
 
+        if (isOpen && settingsPanel != null && settingsPanel.IsCapturingBinding)
+        {
+            return;
+        }
+
         if (isOpen)
         {
-            ResumeGame();
+            if (settingsPanel != null)
+            {
+                settingsPanel.RequestContinueGame();
+            }
+            else
+            {
+                ResumeGame();
+            }
+
             return;
         }
 
@@ -320,14 +341,13 @@ public class RuntimePauseMenu : MonoBehaviour
 
     private void OnDestroy()
     {
-        if (continueButton != null)
+        if (settingsPanel != null)
         {
-            continueButton.onClick.RemoveListener(ResumeGame);
+            settingsPanel.ContinueRequested -= ResumeGame;
         }
 
         if (Instance == this)
         {
-            Time.timeScale = 1f;
             Instance = null;
         }
     }
@@ -339,8 +359,6 @@ public class RuntimePauseMenu : MonoBehaviour
             return;
         }
 
-        timeScaleBeforePause = Time.timeScale <= 0f ? 1f : Time.timeScale;
-        Time.timeScale = 0f;
         isOpen = true;
         ApplyVisibility(true);
     }
@@ -352,129 +370,58 @@ public class RuntimePauseMenu : MonoBehaviour
             return;
         }
 
-        HideImmediate(false);
+        HideImmediate();
     }
 
-    private void HideImmediate(bool resetTimeScale)
+    private void HideImmediate()
     {
         isOpen = false;
         ApplyVisibility(false);
-
-        if (resetTimeScale)
-        {
-            Time.timeScale = 1f;
-        }
-        else
-        {
-            Time.timeScale = timeScaleBeforePause <= 0f ? 1f : timeScaleBeforePause;
-        }
     }
 
     private void SetVisible(bool shouldShow)
     {
         visible = shouldShow;
 
-        if (canvas != null)
+        if (settingsPanel != null)
         {
-            canvas.gameObject.SetActive(shouldShow);
+            settingsPanel.SetVisible(shouldShow);
         }
 
         if (!shouldShow)
         {
-            HideImmediate(true);
+            HideImmediate();
         }
     }
 
     private void EnsureUi()
     {
-        if (canvas != null)
+        if (settingsPanel != null)
         {
             return;
         }
 
-        GameObject canvasObject = new GameObject(
-            CanvasName,
-            typeof(RectTransform),
-            typeof(Canvas),
-            typeof(CanvasScaler),
-            typeof(GraphicRaycaster),
-            typeof(CanvasGroup));
-        canvasObject.transform.SetParent(transform, false);
-
-        canvas = canvasObject.GetComponent<Canvas>();
-        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-        canvas.overrideSorting = true;
-        canvas.sortingOrder = SortingOrder;
-
-        CanvasScaler scaler = canvasObject.GetComponent<CanvasScaler>();
-        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-        scaler.referenceResolution = new Vector2(1920f, 1080f);
-        scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
-        scaler.matchWidthOrHeight = 0.5f;
-
-        canvasGroup = canvasObject.GetComponent<CanvasGroup>();
-
-        RectTransform canvasRect = canvasObject.GetComponent<RectTransform>();
-        StretchRect(canvasRect);
-
-        Image overlay = CreateImage("Overlay", canvasObject.transform, OverlayColor, 18, 18);
-        StretchRect(overlay.rectTransform);
-
-        Image panel = CreateImage("Panel", canvasObject.transform, PanelColor, 18, 18);
-        RectTransform panelRect = panel.rectTransform;
-        panelRect.anchorMin = new Vector2(0.5f, 0.5f);
-        panelRect.anchorMax = new Vector2(0.5f, 0.5f);
-        panelRect.pivot = new Vector2(0.5f, 0.5f);
-        panelRect.sizeDelta = new Vector2(420f, 220f);
-
-        Outline panelOutline = panel.gameObject.AddComponent<Outline>();
-        panelOutline.effectColor = BorderColor;
-        panelOutline.effectDistance = new Vector2(1f, -1f);
-
-        TextMeshProUGUI title = CreateText(
-            "Title",
-            panel.transform,
-            "游戏已暂停",
-            34f,
-            TitleColor,
-            TextAlignmentOptions.Center);
-        title.rectTransform.anchoredPosition = new Vector2(0f, 56f);
-        title.rectTransform.sizeDelta = new Vector2(300f, 42f);
-
-        TextMeshProUGUI hint = CreateText(
-            "Hint",
-            panel.transform,
-            "按 Esc 或点击下方按钮继续游戏",
-            22f,
-            HintColor,
-            TextAlignmentOptions.Center);
-        hint.rectTransform.anchoredPosition = new Vector2(0f, 10f);
-        hint.rectTransform.sizeDelta = new Vector2(320f, 30f);
-
-        continueButton = CreateButton(
-            "ContinueButton",
-            panel.transform,
-            "继续游戏",
-            ButtonColor,
-            ButtonTextColor,
-            new Vector2(220f, 58f));
-        RectTransform buttonRect = continueButton.GetComponent<RectTransform>();
-        buttonRect.anchoredPosition = new Vector2(0f, -58f);
-        continueButton.onClick.AddListener(ResumeGame);
-
-        ApplyVisibility(false);
+        settingsPanel = RuntimeSettingsPanel.EnsureInstance();
+        settingsPanel.ContinueRequested -= ResumeGame;
+        settingsPanel.ContinueRequested += ResumeGame;
+        settingsPanel.SetVisible(visible);
+        settingsPanel.HideImmediate();
     }
 
     private void ApplyVisibility(bool show)
     {
-        if (canvasGroup == null)
+        if (settingsPanel == null)
         {
             return;
         }
 
-        canvasGroup.alpha = show ? 1f : 0f;
-        canvasGroup.interactable = show;
-        canvasGroup.blocksRaycasts = show;
+        if (show)
+        {
+            settingsPanel.Show();
+            return;
+        }
+
+        settingsPanel.HideImmediate();
     }
 
     private static Image CreateImage(string name, Transform parent, Color color, int radius, int border)
@@ -511,7 +458,7 @@ public class RuntimePauseMenu : MonoBehaviour
         GameObject textObject = new GameObject("Label", typeof(RectTransform), typeof(TextMeshProUGUI));
         textObject.transform.SetParent(buttonObject.transform, false);
         TextMeshProUGUI text = textObject.GetComponent<TextMeshProUGUI>();
-        text.font = TMP_Settings.defaultFontAsset;
+        text.font = TmpRuntimeFontFallback.EnsureChineseFallback() ?? TMP_Settings.defaultFontAsset;
         text.text = label;
         text.fontSize = 28f;
         text.color = textColor;
@@ -535,7 +482,7 @@ public class RuntimePauseMenu : MonoBehaviour
         textObject.transform.SetParent(parent, false);
 
         TextMeshProUGUI text = textObject.GetComponent<TextMeshProUGUI>();
-        text.font = TMP_Settings.defaultFontAsset;
+        text.font = TmpRuntimeFontFallback.EnsureChineseFallback() ?? TMP_Settings.defaultFontAsset;
         text.text = value;
         text.fontSize = fontSize;
         text.color = color;
@@ -555,5 +502,320 @@ public class RuntimePauseMenu : MonoBehaviour
         rectTransform.anchorMax = Vector2.one;
         rectTransform.offsetMin = Vector2.zero;
         rectTransform.offsetMax = Vector2.zero;
+    }
+}
+
+public static class TmpRuntimeFontFallback
+{
+    private static readonly string[] PreferredFontAssetPaths =
+    {
+        "Assets/File/Fonts/NotoSansSC-Black SDF.asset",
+        "Assets/File/Fonts/Fonts_1 SDF.asset"
+    };
+
+    private static readonly string[] PreferredSourceFontPaths =
+    {
+        "Assets/File/Fonts/NotoSansSC-Black.ttf",
+        "Assets/File/Fonts/Fonts_1.ttf"
+    };
+
+    private static readonly string[] PreferredFontKeywords =
+    {
+        "NotoSansSC",
+        "Noto Sans SC",
+        "PingFang",
+        "Hiragino Sans GB"
+    };
+
+    private const string RequiredCharacters =
+        "按住或轻点查看大地图松开预览收起继续游戏设置返回基地关卡暂停分辨率显示模式窗口全屏比例当前地图交互攻击点击继续返回总音量音乐音量控制全部游戏声音背景音乐单独强度分辨率显示模式当前比例屏幕适配自动根据窗口大小匹配视野生命构筑建筑结构图鉴背包专用材料普通结构解锁消耗数量剩余详情说明近战远程耐久防御速度倍率0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-+/():.% x";
+
+    private static readonly string[] RuntimeFontNames =
+    {
+        "Noto Sans SC",
+        "PingFang SC",
+        "Hiragino Sans GB",
+        "Songti SC",
+        "Arial Unicode MS"
+    };
+
+    private static TMP_FontAsset runtimeFallbackFont;
+    private static bool ensured;
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+    private static void Bootstrap()
+    {
+        EnsureChineseFallback();
+    }
+
+    public static TMP_FontAsset EnsureChineseFallback()
+    {
+        if (ensured)
+        {
+            return runtimeFallbackFont;
+        }
+
+        ensured = true;
+
+        TMP_FontAsset defaultFont = TMP_Settings.defaultFontAsset;
+        if (defaultFont == null)
+        {
+            return null;
+        }
+
+        TryWarmupFontCharacters(defaultFont);
+        if (IsUsablePreferredFont(defaultFont))
+        {
+            runtimeFallbackFont = defaultFont;
+            return runtimeFallbackFont;
+        }
+
+        runtimeFallbackFont = ResolveProjectFallback();
+        if (runtimeFallbackFont == null)
+        {
+            runtimeFallbackFont = ResolveLoadedFallback();
+        }
+
+        if (runtimeFallbackFont == null)
+        {
+            runtimeFallbackFont = ResolveSystemFallback();
+        }
+
+        if (runtimeFallbackFont == null)
+        {
+            return defaultFont;
+        }
+
+        if (defaultFont.fallbackFontAssetTable == null)
+        {
+            defaultFont.fallbackFontAssetTable = new List<TMP_FontAsset>();
+        }
+
+        if (!defaultFont.fallbackFontAssetTable.Contains(runtimeFallbackFont))
+        {
+            defaultFont.fallbackFontAssetTable.Add(runtimeFallbackFont);
+        }
+
+        return runtimeFallbackFont;
+    }
+
+    public static TMP_FontAsset WarmupCharacters(string text)
+    {
+        TMP_FontAsset primaryFont = EnsureChineseFallback();
+        if (string.IsNullOrEmpty(text))
+        {
+            return primaryFont;
+        }
+
+        WarmupCharactersInternal(primaryFont, text);
+
+        TMP_FontAsset defaultFont = TMP_Settings.defaultFontAsset;
+        if (defaultFont != null && defaultFont != primaryFont)
+        {
+            WarmupCharactersInternal(defaultFont, text);
+        }
+
+        if (defaultFont != null && defaultFont.fallbackFontAssetTable != null)
+        {
+            for (int i = 0; i < defaultFont.fallbackFontAssetTable.Count; i++)
+            {
+                WarmupCharactersInternal(defaultFont.fallbackFontAssetTable[i], text);
+            }
+        }
+
+        return primaryFont;
+    }
+
+    private static TMP_FontAsset ResolveLoadedFallback()
+    {
+        TMP_FontAsset[] loadedFontAssets = Resources.FindObjectsOfTypeAll<TMP_FontAsset>();
+        for (int i = 0; i < loadedFontAssets.Length; i++)
+        {
+            TMP_FontAsset fontAsset = loadedFontAssets[i];
+            if (!IsPreferredFont(fontAsset))
+            {
+                continue;
+            }
+
+            TryWarmupFontCharacters(fontAsset);
+            if (IsUsablePreferredFont(fontAsset))
+            {
+                return fontAsset;
+            }
+        }
+
+        return null;
+    }
+
+    private static TMP_FontAsset ResolveProjectFallback()
+    {
+#if UNITY_EDITOR
+        for (int i = 0; i < PreferredSourceFontPaths.Length; i++)
+        {
+            Font sourceFont = AssetDatabase.LoadAssetAtPath<Font>(PreferredSourceFontPaths[i]);
+            TMP_FontAsset fontAsset = CreateDynamicFontAsset(sourceFont);
+            if (!IsPreferredFont(fontAsset))
+            {
+                continue;
+            }
+
+            TryWarmupFontCharacters(fontAsset);
+            if (IsUsablePreferredFont(fontAsset))
+            {
+                return fontAsset;
+            }
+        }
+
+        for (int i = 0; i < PreferredFontAssetPaths.Length; i++)
+        {
+            TMP_FontAsset fontAsset = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(PreferredFontAssetPaths[i]);
+            if (!IsPreferredFont(fontAsset))
+            {
+                continue;
+            }
+
+            TryWarmupFontCharacters(fontAsset);
+            if (IsUsablePreferredFont(fontAsset))
+            {
+                return fontAsset;
+            }
+        }
+#endif
+
+        return null;
+    }
+
+    private static TMP_FontAsset ResolveSystemFallback()
+    {
+        for (int i = 0; i < RuntimeFontNames.Length; i++)
+        {
+            Font font;
+            try
+            {
+                font = Font.CreateDynamicFontFromOSFont(RuntimeFontNames[i], 90);
+            }
+            catch (Exception)
+            {
+                continue;
+            }
+
+            TMP_FontAsset fontAsset = CreateDynamicFontAsset(font);
+            if (!IsPreferredFont(fontAsset))
+            {
+                continue;
+            }
+
+            TryWarmupFontCharacters(fontAsset);
+            if (IsUsablePreferredFont(fontAsset))
+            {
+                return fontAsset;
+            }
+        }
+
+        return null;
+    }
+
+    private static TMP_FontAsset CreateDynamicFontAsset(Font font)
+    {
+        if (font == null)
+        {
+            return null;
+        }
+
+        TMP_FontAsset fontAsset = TMP_FontAsset.CreateFontAsset(
+            font,
+            90,
+            9,
+            GlyphRenderMode.SDFAA,
+            1024,
+            1024,
+            AtlasPopulationMode.Dynamic,
+            true);
+        if (fontAsset == null)
+        {
+            return null;
+        }
+
+        fontAsset.hideFlags = HideFlags.DontUnloadUnusedAsset;
+        fontAsset.fallbackFontAssetTable = new List<TMP_FontAsset>();
+        return fontAsset;
+    }
+
+    private static bool IsPreferredFont(TMP_FontAsset fontAsset)
+    {
+        if (fontAsset == null)
+        {
+            return false;
+        }
+
+        if (ContainsPreferredKeyword(fontAsset.name))
+        {
+            return true;
+        }
+
+        if (ContainsPreferredKeyword(fontAsset.faceInfo.familyName))
+        {
+            return true;
+        }
+
+        return ContainsPreferredKeyword(fontAsset.sourceFontFile != null ? fontAsset.sourceFontFile.name : string.Empty);
+    }
+
+    private static bool IsUsablePreferredFont(TMP_FontAsset fontAsset)
+    {
+        if (!IsPreferredFont(fontAsset))
+        {
+            return false;
+        }
+
+        if (fontAsset.HasCharacters(RequiredCharacters))
+        {
+            return true;
+        }
+
+        return fontAsset.atlasPopulationMode == AtlasPopulationMode.Dynamic;
+    }
+
+    private static bool ContainsPreferredKeyword(string fontName)
+    {
+        if (string.IsNullOrEmpty(fontName))
+        {
+            return false;
+        }
+
+        for (int i = 0; i < PreferredFontKeywords.Length; i++)
+        {
+            if (fontName.IndexOf(PreferredFontKeywords[i], StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static void TryWarmupFontCharacters(TMP_FontAsset fontAsset)
+    {
+        if (fontAsset == null || fontAsset.atlasPopulationMode != AtlasPopulationMode.Dynamic)
+        {
+            return;
+        }
+
+        fontAsset.TryAddCharacters(RequiredCharacters);
+    }
+
+    private static void WarmupCharactersInternal(TMP_FontAsset fontAsset, string text)
+    {
+        if (fontAsset == null || string.IsNullOrEmpty(text))
+        {
+            return;
+        }
+
+        if (fontAsset.atlasPopulationMode != AtlasPopulationMode.Dynamic)
+        {
+            return;
+        }
+
+        fontAsset.TryAddCharacters(text);
     }
 }

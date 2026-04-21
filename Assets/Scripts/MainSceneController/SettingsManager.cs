@@ -1,107 +1,135 @@
 using UnityEngine;
 using UnityEngine.UI;
-using TMPro;
 
-public class SettingsManager : MonoBehaviour
+public sealed class SettingsManager : MonoBehaviour
 {
-    [Header("√Ê∞Â“˝”√")]
+    [Header("ËÆæÁΩÆÈù¢Êùø")]
     public GameObject settingsPanel;
     public Button closeButton;
 
-    [Header("“Ù¡øøÿ÷∆")]
+    [Header("Èü≥ÈáèÊéßÂà∂")]
     public Slider volumeSlider;
-    public UnityEngine.UI.Text volumeText;
+    public Text volumeText;
 
-    [Header("∑÷±Ê¬ øÿ÷∆")]
+    [Header("ÂàÜËæ®ÁéáÊéßÂà∂")]
     public Dropdown resolutionDropdown;
 
-    void Start()
+    private GameSettingsDraft currentDraft;
+
+    private void Start()
     {
         InitializeVolume();
         InitializeResolution();
 
-        closeButton.onClick.AddListener(CloseSettings);
-        settingsPanel.SetActive(false);
+        if (closeButton != null)
+        {
+            closeButton.onClick.AddListener(CloseSettings);
+        }
+
+        if (settingsPanel != null)
+        {
+            settingsPanel.SetActive(false);
+        }
     }
 
     public void OpenSettings()
     {
-        settingsPanel.SetActive(true);
-        LoadCurrentSettings();
+        currentDraft = GameSettingsStore.CreateDraftFromSaved();
+        RefreshPanelValues();
+
+        if (settingsPanel != null)
+        {
+            settingsPanel.SetActive(true);
+        }
     }
 
     public void CloseSettings()
     {
-        settingsPanel.SetActive(false);
-        SaveSettings();
-    }
-
-    void InitializeVolume()
-    {
-        float savedVolume = PlayerPrefs.GetFloat("GameVolume", 1f);
-        volumeSlider.value = savedVolume;
-        UpdateVolumeDisplay(savedVolume);
-        volumeSlider.onValueChanged.AddListener(OnVolumeChanged);
-    }
-
-    void OnVolumeChanged(float value)
-    {
-        AudioListener.volume = value;
-        if (MusicManager.Instance != null)
-            MusicManager.Instance.SetVolume(value);
-        UpdateVolumeDisplay(value);
-    }
-
-    void UpdateVolumeDisplay(float value)
-    {
-        volumeText.text = Mathf.RoundToInt(value * 100) + "%";
-    }
-
-    void InitializeResolution()
-    {
-        if (ResolutionManager.Instance == null)
+        if (currentDraft != null)
         {
-            Debug.LogError("ResolutionManager ≤ª¥Ê‘⁄£°");
+            GameSettingsStore.ApplyDraft(currentDraft);
+            currentDraft = GameSettingsStore.CreateDraftFromSaved();
+        }
+
+        if (settingsPanel != null)
+        {
+            settingsPanel.SetActive(false);
+        }
+    }
+
+    private void InitializeVolume()
+    {
+        if (volumeSlider == null)
+        {
             return;
         }
 
-        string[] options = ResolutionManager.Instance.GetResolutionOptions();
+        volumeSlider.onValueChanged.AddListener(OnVolumeChanged);
+    }
 
-        resolutionDropdown.ClearOptions();
-        var dropdownOptions = new System.Collections.Generic.List<string>();
-        foreach (string opt in options)
+    private void InitializeResolution()
+    {
+        if (resolutionDropdown == null)
         {
-            dropdownOptions.Add(opt);
+            return;
         }
 
-        resolutionDropdown.AddOptions(dropdownOptions);
+        if (ResolutionManager.Instance == null)
+        {
+            Debug.LogError("ResolutionManager ‰∏çÂ≠òÂú®„ÄÇ");
+            return;
+        }
 
-        int currentIndex = ResolutionManager.Instance.GetCurrentResolutionIndex();
-        resolutionDropdown.value = currentIndex;
-        resolutionDropdown.RefreshShownValue();
-
+        resolutionDropdown.ClearOptions();
+        resolutionDropdown.AddOptions(new System.Collections.Generic.List<string>(ResolutionManager.Instance.GetResolutionOptions()));
         resolutionDropdown.onValueChanged.AddListener(OnResolutionChanged);
+        RefreshPanelValues();
+    }
+
+    private void RefreshPanelValues()
+    {
+        GameSettingsDraft draft = currentDraft ?? GameSettingsStore.CreateDraftFromSaved();
+
+        if (volumeSlider != null)
+        {
+            volumeSlider.SetValueWithoutNotify(draft.masterVolume);
+            UpdateVolumeDisplay(draft.masterVolume);
+        }
+
+        if (resolutionDropdown != null)
+        {
+            resolutionDropdown.SetValueWithoutNotify(Mathf.Clamp(draft.resolutionIndex, 0, GameSettingsStore.ResolutionOptionCount - 1));
+            resolutionDropdown.RefreshShownValue();
+        }
+    }
+
+    private void OnVolumeChanged(float value)
+    {
+        if (currentDraft == null)
+        {
+            currentDraft = GameSettingsStore.CreateDraftFromSaved();
+        }
+
+        currentDraft.masterVolume = Mathf.Clamp01(value);
+        GameSettingsStore.PreviewDraftAudio(currentDraft);
+        UpdateVolumeDisplay(currentDraft.masterVolume);
+    }
+
+    private void UpdateVolumeDisplay(float value)
+    {
+        if (volumeText != null)
+        {
+            volumeText.text = $"{Mathf.RoundToInt(value * 100f)}%";
+        }
     }
 
     public void OnResolutionChanged(int index)
     {
-        if (ResolutionManager.Instance != null)
+        if (currentDraft == null)
         {
-            ResolutionManager.Instance.SetResolution(index);
+            currentDraft = GameSettingsStore.CreateDraftFromSaved();
         }
-    }
 
-    void SaveSettings()
-    {
-        PlayerPrefs.SetFloat("GameVolume", volumeSlider.value);
-        PlayerPrefs.SetInt("ResolutionIndex", resolutionDropdown.value);
-        PlayerPrefs.Save();
-    }
-
-    void LoadCurrentSettings()
-    {
-        float vol = PlayerPrefs.GetFloat("GameVolume", 1f);
-        volumeSlider.value = vol;
-        AudioListener.volume = vol;
+        currentDraft.resolutionIndex = Mathf.Clamp(index, 0, GameSettingsStore.ResolutionOptionCount - 1);
     }
 }

@@ -6,7 +6,6 @@ using UnityEngine.UI;
 public class RuntimeMiniMapHud : MonoBehaviour
 {
     private const string BaseSceneName = "BaseScene";
-    private const string GameSceneName = "GameScene";
     private const string CameraName = "RuntimeMiniMapCamera";
     private const string OverlayCanvasName = "RuntimeMiniMapOverlayCanvas";
     private const string SmallMapRootName = "RuntimeMiniMapRoot";
@@ -28,10 +27,11 @@ public class RuntimeMiniMapHud : MonoBehaviour
     private const int TextureHeight = 768;
     private const float ExpandSmoothTime = 0.14f;
     private const float CollapseSmoothTime = 0.09f;
-    private const float SmallFramePaddingX = 12f;
-    private const float SmallFramePaddingY = 12f;
-    private const float LargeFramePaddingX = 20f;
-    private const float LargeFramePaddingY = 18f;
+    private const float SmallFramePaddingX = 8f;
+    private const float SmallFramePaddingY = 8f;
+    private const float LargeFramePaddingX = 16f;
+    private const float LargeFramePaddingY = 14f;
+    private const float ExpandedMoveSpeedMultiplier = 0.1f;
 
     private static readonly Color PanelColor = new Color(0.07f, 0.10f, 0.14f, 0.86f);
     private static readonly Color ExpandedPanelColor = new Color(0.07f, 0.10f, 0.14f, 0.96f);
@@ -51,6 +51,7 @@ public class RuntimeMiniMapHud : MonoBehaviour
     private Camera cachedMainCamera;
     private Transform cachedPlayer;
     private SpriteRenderer cachedPlayerSpriteRenderer;
+    private PlayerMove cachedPlayerMove;
     private RectTransform smallMapRoot;
     private RectTransform smallMapViewportRect;
     private RectTransform smallMapImageRect;
@@ -71,6 +72,7 @@ public class RuntimeMiniMapHud : MonoBehaviour
     private float mKeyPressedAt = -1f;
     private float expandProgress;
     private float expandVelocity;
+    private bool sceneBindingsReady;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void Bootstrap()
@@ -82,7 +84,11 @@ public class RuntimeMiniMapHud : MonoBehaviour
 
     private static void HandleSceneLoaded(Scene scene, LoadSceneMode mode)
     {
-        EnsureInstance();
+        RuntimeMiniMapHud hud = EnsureInstance();
+        if (hud != null)
+        {
+            hud.PrepareForScene(scene.name);
+        }
     }
 
     public static RuntimeMiniMapHud EnsureInstance()
@@ -145,20 +151,33 @@ public class RuntimeMiniMapHud : MonoBehaviour
     private void LateUpdate()
     {
         bool supportedScene = IsSupportedScene(SceneManager.GetActiveScene().name);
-        SetVisible(supportedScene);
         if (!supportedScene)
         {
+            sceneBindingsReady = false;
+            RestorePlayerMoveSpeed();
+            SetVisible(false);
             return;
         }
 
         EnsureInfrastructure();
 
-        if (cachedMainCamera == null || cachedPlayer == null)
+        if (!sceneBindingsReady || cachedMainCamera == null || cachedPlayer == null)
         {
-            RefreshSceneBindings();
+            if (!RefreshSceneBindings())
+            {
+                RestorePlayerMoveSpeed();
+                SetVisible(true);
+                UpdateSmallMapOverlay();
+                return;
+            }
         }
 
-        if (Input.GetKeyDown(KeyCode.M))
+        SetVisible(true);
+
+        KeyCode mapKey = GameSettingsStore.GetKeyBinding(GameInputAction.OpenMap);
+        KeyCode pauseKey = GameSettingsStore.GetKeyBinding(GameInputAction.Pause);
+
+        if (Input.GetKeyDown(mapKey))
         {
             if (pinnedExpanded)
             {
@@ -172,7 +191,7 @@ public class RuntimeMiniMapHud : MonoBehaviour
             }
         }
 
-        if (Input.GetKeyUp(KeyCode.M))
+        if (Input.GetKeyUp(mapKey))
         {
             if (suppressHoldExpandUntilMReleased)
             {
@@ -191,7 +210,7 @@ public class RuntimeMiniMapHud : MonoBehaviour
             }
         }
 
-        if (Input.GetKeyDown(KeyCode.Escape))
+        if (Input.GetKeyDown(pauseKey))
         {
             pinnedExpanded = false;
             suppressHoldExpandUntilMReleased = false;
@@ -203,9 +222,10 @@ public class RuntimeMiniMapHud : MonoBehaviour
             suppressHoldExpandUntilMReleased = false;
         }
 
-        bool holdExpanded = Input.GetKey(KeyCode.M) && !suppressHoldExpandUntilMReleased;
+        bool holdExpanded = Input.GetKey(mapKey) && !suppressHoldExpandUntilMReleased;
         expanded = !ShouldHideForGameplayOverlay() && (holdExpanded || pinnedExpanded);
         UpdateExpansionState();
+        ApplyExpandedMovementSlow();
         UpdateCameraPose();
 
         if (miniMapCamera != null && renderTexture != null)
@@ -220,6 +240,7 @@ public class RuntimeMiniMapHud : MonoBehaviour
     private void OnGUI()
     {
         if (!visible ||
+            !sceneBindingsReady ||
             renderTexture == null ||
             !IsSupportedScene(SceneManager.GetActiveScene().name) ||
             ShouldHideForGameplayOverlay())
@@ -227,91 +248,42 @@ public class RuntimeMiniMapHud : MonoBehaviour
             return;
         }
 
-        EnsureStyles();
-
         float easedExpandProgress = GetEasedExpandProgress();
-        bool showExpandedState = expanded || easedExpandProgress > 0.5f;
-        string title = $"{GetSceneDisplayName()} {(showExpandedState ? "大地图" : "小地图")}";
-        string hint = showExpandedState ? "松开 M 预览 / Esc 收起" : "按住或轻点 M 查看大地图";
-        float chromeAlpha = Mathf.Clamp01(Mathf.InverseLerp(0.04f, 0.22f, easedExpandProgress));
-
         Rect smallMapSlotRect = new Rect(
             Screen.width - SmallMapSize - Margin,
             Margin,
             SmallMapSize,
             SmallMapSize);
         Rect smallMapRect = GetAspectFitRect(smallMapSlotRect, MapAspect);
-        Rect smallMapFrameRect = ExpandRect(smallMapRect, SmallFramePaddingX, SmallFramePaddingY);
-        Rect smallPanelRect = smallMapSlotRect;
-        Rect largePanelRect = new Rect(
-            (Screen.width - LargePanelWidth) * 0.5f,
-            (Screen.height - LargePanelHeight) * 0.5f,
-            LargePanelWidth,
-            LargePanelHeight);
-        Rect panelRect = LerpRect(smallPanelRect, largePanelRect, easedExpandProgress);
-
         Rect largeMapSlotRect = new Rect(
-            largePanelRect.x + (largePanelRect.width - LargeMapWidth) * 0.5f,
-            largePanelRect.y + 64f,
+            (Screen.width - LargeMapWidth) * 0.5f,
+            (Screen.height - LargeMapHeight) * 0.5f,
             LargeMapWidth,
             LargeMapHeight);
         Rect largeMapRect = GetAspectFitRect(largeMapSlotRect, MapAspect);
-        Rect largeMapFrameRect = ExpandRect(largeMapRect, LargeFramePaddingX, LargeFramePaddingY);
         Rect mapRect = LerpRect(smallMapRect, largeMapRect, easedExpandProgress);
-        Rect mapFrameRect = LerpRect(smallMapFrameRect, largeMapFrameRect, easedExpandProgress);
 
         if (easedExpandProgress <= 0.001f)
         {
             return;
         }
 
-        if (easedExpandProgress > 0.001f)
-        {
-            Color overlayColor = OverlayColor;
-            overlayColor.a *= easedExpandProgress;
-            GUI.color = overlayColor;
-            GUI.DrawTexture(new Rect(0f, 0f, Screen.width, Screen.height), Texture2D.whiteTexture);
-            GUI.color = Color.white;
-        }
-
-        if (chromeAlpha > 0.001f)
-        {
-            Color panelFillColor = Color.Lerp(PanelColor, ExpandedPanelColor, easedExpandProgress);
-            panelFillColor.a *= chromeAlpha;
-
-            Color borderColor = BorderColor;
-            borderColor.a *= chromeAlpha;
-
-            DrawPanel(panelRect, panelFillColor, borderColor);
-        }
-
-        if (chromeAlpha > 0.001f)
-        {
-            float currentFramePaddingX = Mathf.Lerp(SmallFramePaddingX, LargeFramePaddingX, easedExpandProgress);
-            float currentFramePaddingY = Mathf.Lerp(SmallFramePaddingY, LargeFramePaddingY, easedExpandProgress);
-            DrawMapFrame(mapFrameRect, currentFramePaddingX, currentFramePaddingY, chromeAlpha);
-        }
+        float framePaddingX = Mathf.Lerp(SmallFramePaddingX, LargeFramePaddingX, easedExpandProgress);
+        float framePaddingY = Mathf.Lerp(SmallFramePaddingY, LargeFramePaddingY, easedExpandProgress);
+        Rect frameRect = ExpandRect(mapRect, framePaddingX, framePaddingY);
+        float frameBorderWidth = Mathf.Lerp(10f, 20f, easedExpandProgress);
+        float frameBorderHeight = Mathf.Lerp(10f, 18f, easedExpandProgress);
+        float frameAlpha = Mathf.Lerp(0.25f, 1f, easedExpandProgress);
+        DrawMapFrame(frameRect, frameBorderWidth, frameBorderHeight, frameAlpha);
 
         GUI.DrawTexture(mapRect, renderTexture, ScaleMode.StretchToFill, false);
-
-        if (chromeAlpha > 0.001f)
-        {
-            Color previousGuiColor = GUI.color;
-            Color labelTint = Color.white;
-            labelTint.a = chromeAlpha;
-            GUI.color = labelTint;
-            GUI.Label(new Rect(panelRect.x + 16f, panelRect.y + 12f, panelRect.width * 0.55f, 26f), title, titleStyle);
-            GUI.Label(new Rect(panelRect.x + panelRect.width - 236f, panelRect.y + 14f, 220f, 22f), hint, hintStyle);
-            GUI.color = previousGuiColor;
-        }
-
         DrawPlayerMarker(mapRect);
-
-        GUI.color = Color.white;
     }
 
     private void OnDestroy()
     {
+        RestorePlayerMoveSpeed();
+
         if (Instance == this)
         {
             Instance = null;
@@ -339,6 +311,7 @@ public class RuntimeMiniMapHud : MonoBehaviour
 
     private void EnsureInfrastructure()
     {
+        TmpRuntimeFontFallback.EnsureChineseFallback();
         EnsureRenderTexture();
         EnsureMiniMapCamera();
         EnsureSmallMapOverlay();
@@ -385,27 +358,42 @@ public class RuntimeMiniMapHud : MonoBehaviour
         renderTexture.Create();
     }
 
-    private void RefreshSceneBindings()
+    private void PrepareForScene(string sceneName)
+    {
+        cachedMainCamera = null;
+        cachedPlayer = null;
+        cachedPlayerSpriteRenderer = null;
+        cachedPlayerMove = null;
+        sceneBindingsReady = false;
+        RestorePlayerMoveSpeed();
+        SetVisible(IsSupportedScene(sceneName));
+    }
+
+    private bool RefreshSceneBindings()
     {
         cachedMainCamera = Camera.main;
         cachedPlayer = null;
         cachedPlayerSpriteRenderer = null;
+        cachedPlayerMove = null;
 
         GameObject playerObject = GameObject.FindGameObjectWithTag("Player");
         if (playerObject != null)
         {
             cachedPlayer = playerObject.transform;
             cachedPlayerSpriteRenderer = ResolvePlayerSpriteRenderer(playerObject.transform);
+            cachedPlayerMove = playerObject.GetComponent<PlayerMove>();
         }
+
+        sceneBindingsReady = cachedMainCamera != null && cachedPlayer != null;
 
         if (miniMapCamera == null)
         {
             EnsureMiniMapCamera();
         }
 
-        if (miniMapCamera == null)
+        if (miniMapCamera == null || !sceneBindingsReady)
         {
-            return;
+            return false;
         }
 
         if (cachedMainCamera != null)
@@ -423,6 +411,7 @@ public class RuntimeMiniMapHud : MonoBehaviour
         }
 
         UpdateCameraPose();
+        return true;
     }
 
     private void EnsureSmallMapOverlay()
@@ -505,12 +494,15 @@ public class RuntimeMiniMapHud : MonoBehaviour
         StretchRect(frameRect);
         smallMapFrameImage = frameObject.AddComponent<Image>();
         RuntimeUiSpriteFactory.ApplyMapFrameSprite(smallMapFrameImage, Color.white);
+        smallMapFrameImage.fillCenter = false;
         smallMapFrameImage.enabled = true;
         smallMapFrameImage.raycastTarget = false;
 
         GameObject viewportObject = CreateOverlayUIObject("Viewport", smallMapRoot);
         smallMapViewportRect = viewportObject.GetComponent<RectTransform>();
         viewportObject.AddComponent<RectMask2D>();
+        frameRect.SetAsFirstSibling();
+        smallMapViewportRect.SetAsLastSibling();
 
         GameObject mapObject = CreateOverlayUIObject("Map", smallMapViewportRect);
         smallMapImageRect = mapObject.GetComponent<RectTransform>();
@@ -558,7 +550,7 @@ public class RuntimeMiniMapHud : MonoBehaviour
         }
 
         float easedExpandProgress = GetEasedExpandProgress();
-        float smallMapAlpha = visible && !ShouldHideForGameplayOverlay()
+        float smallMapAlpha = visible && sceneBindingsReady && !ShouldHideForGameplayOverlay()
             ? 1f - Mathf.Clamp01(Mathf.InverseLerp(0f, 0.24f, easedExpandProgress))
             : 0f;
         bool shouldShow = smallMapAlpha > 0.001f;
@@ -648,6 +640,29 @@ public class RuntimeMiniMapHud : MonoBehaviour
             ? Mathf.Max(referenceCamera.orthographicSize, 4f)
             : 8f;
         miniMapCamera.orthographicSize = Mathf.Lerp(baseSize * 1.65f, baseSize * 2.6f, GetEasedExpandProgress());
+    }
+
+    private void ApplyExpandedMovementSlow()
+    {
+        PlayerMove playerMove = ResolvePlayerMove();
+        if (playerMove == null)
+        {
+            return;
+        }
+
+        float slowdownMultiplier = Mathf.Lerp(1f, ExpandedMoveSpeedMultiplier, GetEasedExpandProgress());
+        playerMove.SetExternalMoveSpeedMultiplier(slowdownMultiplier);
+    }
+
+    private void RestorePlayerMoveSpeed()
+    {
+        PlayerMove playerMove = ResolvePlayerMove();
+        if (playerMove == null)
+        {
+            return;
+        }
+
+        playerMove.SetExternalMoveSpeedMultiplier(1f);
     }
 
     private void DrawPlayerMarker(Rect mapRect)
@@ -788,12 +803,24 @@ public class RuntimeMiniMapHud : MonoBehaviour
         {
             Sprite sprite = spriteRenderer.sprite;
             Vector4 outerUv = DataUtility.GetOuterUV(sprite);
+            Vector3 lossyScale = spriteRenderer.transform.lossyScale;
 
             markerTexture = sprite.texture;
             uvRect = new Rect(outerUv.x, outerUv.y, outerUv.z - outerUv.x, outerUv.w - outerUv.y);
             aspect = sprite.rect.width / Mathf.Max(1f, sprite.rect.height);
             flipX = spriteRenderer.flipX;
             flipY = spriteRenderer.flipY;
+
+            if (lossyScale.x < 0f)
+            {
+                flipX = !flipX;
+            }
+
+            if (lossyScale.y < 0f)
+            {
+                flipY = !flipY;
+            }
+
             return;
         }
 
@@ -831,6 +858,33 @@ public class RuntimeMiniMapHud : MonoBehaviour
         return cachedPlayerSpriteRenderer;
     }
 
+    private PlayerMove ResolvePlayerMove()
+    {
+        if (cachedPlayerMove != null)
+        {
+            return cachedPlayerMove;
+        }
+
+        if (cachedPlayer != null)
+        {
+            cachedPlayerMove = cachedPlayer.GetComponent<PlayerMove>();
+            if (cachedPlayerMove != null)
+            {
+                return cachedPlayerMove;
+            }
+        }
+
+        GameObject playerObject = GameObject.FindGameObjectWithTag("Player");
+        if (playerObject == null)
+        {
+            return null;
+        }
+
+        cachedPlayer = playerObject.transform;
+        cachedPlayerMove = playerObject.GetComponent<PlayerMove>();
+        return cachedPlayerMove;
+    }
+
     private static SpriteRenderer ResolvePlayerSpriteRenderer(Transform playerTransform)
     {
         if (playerTransform == null)
@@ -851,15 +905,21 @@ public class RuntimeMiniMapHud : MonoBehaviour
     private void SetVisible(bool shouldShow)
     {
         visible = shouldShow;
+        bool active = shouldShow && sceneBindingsReady;
+
+        if (!active)
+        {
+            RestorePlayerMoveSpeed();
+        }
 
         if (miniMapCamera != null)
         {
-            miniMapCamera.gameObject.SetActive(shouldShow);
+            miniMapCamera.gameObject.SetActive(active);
         }
 
         if (overlayCanvas != null)
         {
-            overlayCanvas.gameObject.SetActive(shouldShow);
+            overlayCanvas.gameObject.SetActive(active);
         }
     }
 
@@ -939,9 +999,6 @@ public class RuntimeMiniMapHud : MonoBehaviour
         DrawMapFrameSlice(frameTexture, tint,
             new Rect(rect.x, rect.y + bottom, left, centerHeight),
             new Rect(sourceRect.x, sourceRect.y + srcBottom, srcLeft, srcCenterHeight));
-        DrawMapFrameSlice(frameTexture, tint,
-            new Rect(rect.x + left, rect.y + bottom, centerWidth, centerHeight),
-            new Rect(sourceRect.x + srcLeft, sourceRect.y + srcBottom, srcCenterWidth, srcCenterHeight));
         DrawMapFrameSlice(frameTexture, tint,
             new Rect(rect.xMax - right, rect.y + bottom, right, centerHeight),
             new Rect(sourceRect.xMax - srcRight, sourceRect.y + srcBottom, srcRight, srcCenterHeight));
@@ -1136,7 +1193,7 @@ public class RuntimeMiniMapHud : MonoBehaviour
 
     private static bool IsSupportedScene(string sceneName)
     {
-        return sceneName == BaseSceneName || sceneName == GameSceneName;
+        return sceneName == BaseSceneName || GameplayStageCatalog.IsGameplayScene(sceneName);
     }
 
     private static string GetSceneDisplayName()
@@ -1147,9 +1204,10 @@ public class RuntimeMiniMapHud : MonoBehaviour
             return "基地";
         }
 
-        if (sceneName == GameSceneName)
+        GameplayStageDefinition stage = GameplayStageCatalog.GetStageByScene(sceneName);
+        if (stage != null)
         {
-            return "关卡";
+            return stage.displayName;
         }
 
         return sceneName;

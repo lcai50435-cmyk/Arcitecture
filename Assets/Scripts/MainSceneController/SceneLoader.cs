@@ -67,7 +67,11 @@ public class SceneLoader : MonoBehaviour
     }
 
     public void ToBase() => SwitchScene(baseSceneName, baseSceneIndex);
-    public void ToGame() => SwitchScene(gameSceneName, gameSceneIndex);
+    public void ToGame()
+    {
+        string selectedSceneName = GameplayStageRuntime.GetSelectedSceneName();
+        SwitchScene(string.IsNullOrWhiteSpace(selectedSceneName) ? gameSceneName : selectedSceneName, gameSceneIndex);
+    }
     public void ToMenu() => SwitchScene(mainMenuSceneName, mainMenuIndex);
     public void ToScene(string sceneName) => SwitchScene(sceneName, -1);
 
