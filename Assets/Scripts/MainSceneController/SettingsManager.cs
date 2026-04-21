@@ -13,7 +13,7 @@ public class SettingsManager : MonoBehaviour
     public UnityEngine.UI.Text volumeText;
 
     [Header("·Ö±æÂÊ¿ØÖÆ")]
-    public TMP_Dropdown resolutionDropdown;
+    public Dropdown resolutionDropdown;
 
     void Start()
     {
@@ -83,7 +83,7 @@ public class SettingsManager : MonoBehaviour
         resolutionDropdown.onValueChanged.AddListener(OnResolutionChanged);
     }
 
-    void OnResolutionChanged(int index)
+    public void OnResolutionChanged(int index)
     {
         if (ResolutionManager.Instance != null)
         {
