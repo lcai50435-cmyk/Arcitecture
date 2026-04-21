@@ -30,12 +30,15 @@ public struct InkAttackRuntimeConfig
     public InkType inkType;
     public Color displayColor;
     public int projectileCount;
+    public int burstShotCount;
     public int maxHitCount;
     public float projectileScale;
     public Vector2 projectileStretch;
     public float speedMultiplier;
     public float lifetimeMultiplier;
     public float fanAngleStep;
+    public float fanAngleBonus;
+    public float burstInterval;
     public float baseProjectileSpeed;
     public float baseProjectileLifetime;
     public float attackInterval;
@@ -46,18 +49,32 @@ public struct InkAttackRuntimeConfig
     public float impactPulseScale;
     public float impactPulseDuration;
     public InkDebuffRuntimeConfig debuff;
+    public bool enableTrailAfterImage;
+    public float trailSpawnInterval;
+    public float trailLifetime;
+    public float trailScaleMultiplier;
+    public float trailAlpha;
+    public bool enableHeavyShockwave;
+    public float heavyShockwaveScale;
+    public float heavyShockwaveDurationMultiplier;
+    public bool enableSlowResidue;
+    public float slowResidueScale;
+    public float slowResidueDuration;
 
     public static InkAttackRuntimeConfig Default => new InkAttackRuntimeConfig
     {
         inkType = InkType.DirectInk,
         displayColor = Color.white,
         projectileCount = 1,
+        burstShotCount = 1,
         maxHitCount = 1,
         projectileScale = 1f,
         projectileStretch = Vector2.one,
         speedMultiplier = 1f,
         lifetimeMultiplier = 1f,
         fanAngleStep = 12f,
+        fanAngleBonus = 0f,
+        burstInterval = 0.09f,
         baseProjectileSpeed = 6f,
         baseProjectileLifetime = 5f / 6f,
         attackInterval = 1f,
@@ -67,20 +84,41 @@ public struct InkAttackRuntimeConfig
         explosionDamageMultiplier = 1f,
         impactPulseScale = 0.9f,
         impactPulseDuration = 0.16f,
-        debuff = new InkDebuffRuntimeConfig()
+        debuff = new InkDebuffRuntimeConfig(),
+        enableTrailAfterImage = false,
+        trailSpawnInterval = 0.05f,
+        trailLifetime = 0.18f,
+        trailScaleMultiplier = 0.82f,
+        trailAlpha = 0.28f,
+        enableHeavyShockwave = false,
+        heavyShockwaveScale = 1.45f,
+        heavyShockwaveDurationMultiplier = 1.25f,
+        enableSlowResidue = false,
+        slowResidueScale = 1.1f,
+        slowResidueDuration = 0.55f
     };
 }
 
 public static class InkModifierRuntimeConfig
 {
-    private const float TileScaleBonus = 0.15f;
-    private const float BeamSpeedAndRangeBonus = 0.1f;
+    private const float TileScaleBonus = 0.28f;
+    private const float BeamSpeedAndRangeBonus = 0.14f;
+    private const float MortiseStretchBonus = 0.55f;
+    private const float MortiseHeightCompression = 0.12f;
+    private const float BracketDualShotAngleBonus = 14f;
+    private const float BracketTripleFanAngleBonus = 22f;
+    private const float BracketQuintFanAngleBonus = 30f;
     private const float SlowPerModifier = 0.2f;
     private const float MaxSlowRatio = 0.5f;
     private const float BaseSlowDuration = 2f;
     private const float ExtraSlowDuration = 0.5f;
     private const float BaseKnockbackForce = 1.5f;
     private const float ExtraKnockbackForce = 0.5f;
+    private const float GroundMassProjectileScaleBonus = 0.14f;
+    private const float GroundMassImpactPulseBonus = 0.28f;
+    private const float GroundMassHeavyShockwaveBonus = 0.22f;
+    private const float SlowResidueScaleBonus = 0.2f;
+    private const float SlowResidueDurationBonus = 0.18f;
 
     public static InkAttackRuntimeConfig BuildFromBackpack(BackpackMananger backpack)
     {
@@ -139,21 +177,67 @@ public static class InkModifierRuntimeConfig
             }
         }
 
-        config.projectileCount += bracketCount;
         config.maxHitCount += mortiseCount;
+        config.projectileStretch.x += mortiseCount * MortiseStretchBonus;
+        config.projectileStretch.y *= Mathf.Max(0.62f, 1f - mortiseCount * MortiseHeightCompression);
         config.projectileScale += tileCount * TileScaleBonus;
         config.speedMultiplier += beamFrameCount * BeamSpeedAndRangeBonus;
         config.lifetimeMultiplier += beamFrameCount * BeamSpeedAndRangeBonus;
+
+        if (mortiseCount > 0)
+        {
+            config.enableTrailAfterImage = true;
+            config.trailSpawnInterval = Mathf.Min(config.trailSpawnInterval, 0.045f);
+            config.trailLifetime = Mathf.Max(config.trailLifetime, 0.22f + (mortiseCount - 1) * 0.04f);
+            config.trailScaleMultiplier = Mathf.Max(config.trailScaleMultiplier, 0.92f);
+            config.trailAlpha = Mathf.Clamp01(config.trailAlpha + mortiseCount * 0.08f);
+        }
+
+        if (bracketCount == 1)
+        {
+            config.projectileCount = Mathf.Max(config.projectileCount, 2);
+            config.fanAngleBonus += BracketDualShotAngleBonus;
+        }
+        else if (bracketCount == 2)
+        {
+            config.projectileCount = Mathf.Max(config.projectileCount, 3);
+            config.fanAngleBonus += BracketTripleFanAngleBonus;
+        }
+        else if (bracketCount >= 3)
+        {
+            config.projectileCount = Mathf.Max(config.projectileCount, 5);
+            config.fanAngleBonus += BracketQuintFanAngleBonus;
+            config.burstShotCount = 2;
+            config.burstInterval = 0.07f;
+        }
 
         if (tampedEarthCount > 0)
         {
             config.debuff.slowRatio = Mathf.Min(tampedEarthCount * SlowPerModifier, MaxSlowRatio);
             config.debuff.slowDuration = BaseSlowDuration + (tampedEarthCount - 1) * ExtraSlowDuration;
+            config.enableSlowResidue = true;
+            config.slowResidueScale += tampedEarthCount * SlowResidueScaleBonus;
+            config.slowResidueDuration += (tampedEarthCount - 1) * SlowResidueDurationBonus;
+            config.impactPulseScale += tampedEarthCount * 0.08f;
         }
 
         if (groundMassCount > 0)
         {
             config.debuff.knockbackForce = BaseKnockbackForce + (groundMassCount - 1) * ExtraKnockbackForce;
+            config.projectileScale += groundMassCount * GroundMassProjectileScaleBonus;
+            config.impactPulseScale += groundMassCount * GroundMassImpactPulseBonus;
+            config.impactPulseDuration += groundMassCount * 0.03f;
+            config.enableHeavyShockwave = true;
+            config.heavyShockwaveScale += groundMassCount * GroundMassHeavyShockwaveBonus;
+            config.heavyShockwaveDurationMultiplier += groundMassCount * 0.08f;
+        }
+
+        if (beamFrameCount > 0)
+        {
+            config.enableTrailAfterImage = true;
+            config.trailSpawnInterval = Mathf.Min(config.trailSpawnInterval, 0.034f);
+            config.trailLifetime = Mathf.Max(config.trailLifetime, 0.18f + (beamFrameCount - 1) * 0.03f);
+            config.trailAlpha = Mathf.Clamp01(config.trailAlpha + beamFrameCount * 0.05f);
         }
 
         return config;
@@ -205,45 +289,70 @@ public static class InkModifierRuntimeConfig
         }
     }
 
+    public static string GetAttackPatternLabel(InkAttackRuntimeConfig config)
+    {
+        if (config.projectileCount >= 5 && config.burstShotCount > 1)
+        {
+            return $"{config.projectileCount}发扇形连击";
+        }
+
+        if (config.projectileCount >= 3)
+        {
+            return $"{config.projectileCount}发扇形";
+        }
+
+        if (config.projectileCount == 2)
+        {
+            return "双弹齐射";
+        }
+
+        if (config.burstShotCount > 1)
+        {
+            return $"{config.burstShotCount}连击";
+        }
+
+        return "单发";
+    }
+
     public static string BuildActiveModifierSummary(BackpackMananger backpack, WeaponType weaponType)
     {
         WeaponAttackProfile profile = WeaponAttackProfile.FromWeaponType(weaponType);
         InkAttackRuntimeConfig config = profile.ApplyToInkConfig(BuildFromBackpack(backpack));
         List<string> parts = new List<string>();
 
-        if (config.projectileCount > 1)
+        if (config.burstShotCount > 1 || config.projectileCount > 1)
         {
-            parts.Add(GetVolleyLabel(config.projectileCount));
+            parts.Add(GetAttackPatternLabel(config));
         }
 
         if (config.maxHitCount > 1)
         {
-            parts.Add($"命中上限 {config.maxHitCount}");
+            parts.Add($"贯穿 x{config.maxHitCount}");
         }
 
         if (config.projectileScale > 1.01f)
         {
-            parts.Add($"体积 x{config.projectileScale:0.00}");
+            parts.Add($"大墨团 x{config.projectileScale:0.00}");
         }
 
         if (config.debuff.slowRatio > 0f)
         {
-            parts.Add($"减速 {config.debuff.slowRatio:P0}");
+            parts.Add($"滞留减速 {config.debuff.slowRatio:P0}");
         }
 
         if (config.debuff.knockbackForce > 0f)
         {
-            parts.Add($"击退 {config.debuff.knockbackForce:0.0}");
+            parts.Add($"重击震退 {config.debuff.knockbackForce:0.0}");
         }
 
         if (config.speedMultiplier > 1.01f)
         {
-            parts.Add($"速度 x{config.speedMultiplier:0.00}");
+            parts.Add($"疾射 x{config.speedMultiplier:0.00}");
         }
 
         if (config.lifetimeMultiplier > 1.01f)
         {
-            parts.Add($"射程 x{config.lifetimeMultiplier:0.00}");
+            parts.Add($"长程 x{config.lifetimeMultiplier:0.00}");
         }
 
         return parts.Count > 0 ? string.Join(" / ", parts) : "当前无临时构筑效果";
@@ -263,22 +372,22 @@ public static class InkModifierRuntimeConfig
         switch (crystal.type)
         {
             case ArchitecturalType.Brackets:
-                effectLine = $"已生效：{GetVolleyLabel(config.projectileCount)}";
+                effectLine = $"已生效：{GetAttackPatternLabel(config)}";
                 break;
             case ArchitecturalType.MortiseAndTenonJoint:
-                effectLine = $"已生效：命中上限 {config.maxHitCount}";
+                effectLine = $"已生效：贯穿墨矛 x{config.maxHitCount}";
                 break;
             case ArchitecturalType.Tile:
-                effectLine = $"已生效：墨迹体积 x{config.projectileScale:0.00}";
+                effectLine = $"已生效：大墨团 x{config.projectileScale:0.00}";
                 break;
             case ArchitecturalType.TampedEarth:
-                effectLine = $"已生效：减速 {config.debuff.slowRatio:P0}";
+                effectLine = $"已生效：滞留减速 {config.debuff.slowRatio:P0}";
                 break;
             case ArchitecturalType.GroundMass:
-                effectLine = $"已生效：击退 {config.debuff.knockbackForce:0.0}";
+                effectLine = $"已生效：重击冲波 / 击退 {config.debuff.knockbackForce:0.0}";
                 break;
             case ArchitecturalType.BeamFrame:
-                effectLine = $"已生效：速度 x{config.speedMultiplier:0.00} / 射程 x{config.lifetimeMultiplier:0.00}";
+                effectLine = $"已生效：疾射 x{config.speedMultiplier:0.00} / 长程 x{config.lifetimeMultiplier:0.00}";
                 break;
             default:
                 effectLine = "已生效";

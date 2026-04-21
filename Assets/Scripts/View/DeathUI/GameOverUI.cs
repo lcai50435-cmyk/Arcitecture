@@ -46,6 +46,7 @@ public class GameOverUI : MonoBehaviour
     public void RestartGame()
     {
         Time.timeScale = 1f;
+        RuntimeCollectedCrystalRegistry.EnsureInstance().Clear();
 
         SceneLoader loader = SceneLoader.EnsureInstance();
         if (loader != null)
@@ -60,6 +61,7 @@ public class GameOverUI : MonoBehaviour
     public void GoToMainMenu()
     {
         Time.timeScale = 1f;
+        RuntimeCollectedCrystalRegistry.EnsureInstance().Clear();
 
         SceneLoader loader = SceneLoader.EnsureInstance();
         if (loader != null)

@@ -160,6 +160,7 @@ public class BackpackSlot : MonoBehaviour, IPointerDownHandler, IPointerUpHandle
         script.isUnlockMaterial = crystal.isUnlockMaterial;
         script.resourceCategory = crystal.resourceCategory;
         script.inkRestoreValue = crystal.inkRestoreValue;
+        script.persistCollectedAcrossSceneLoads = false;
 
         // 从背包移除物品
         backpack.RemoveItem(slotIndex);

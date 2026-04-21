@@ -1,11 +1,15 @@
 using UnityEngine;
+using System.Collections;
 
 public class PlayerAttack : CharacterAttack
 {
+    private const float MultiShotLateralSpacing = 0.22f;
+
     private readonly KeyCode attackKey = KeyCode.Mouse0;
     private DirectionTracker directionTracker;
     private Animator animator;
     private float nextAttackTime;
+    private Coroutine attackSequenceCoroutine;
 
     [Header("远程攻击")]
     public GameObject inkballPrefab;
@@ -87,20 +91,50 @@ public class PlayerAttack : CharacterAttack
             lastDir = Vector2.right;
         }
 
-        SpawnInkBalls(lastDir.normalized, inkConfig);
+        if (attackSequenceCoroutine != null)
+        {
+            StopCoroutine(attackSequenceCoroutine);
+        }
+
+        attackSequenceCoroutine = StartCoroutine(FireAttackSequence(lastDir.normalized, inkConfig));
+    }
+
+    private IEnumerator FireAttackSequence(Vector2 direction, InkAttackRuntimeConfig inkConfig)
+    {
+        int burstShotCount = Mathf.Max(1, inkConfig.burstShotCount);
+        float burstInterval = Mathf.Max(0.01f, inkConfig.burstInterval);
+
+        for (int shotIndex = 0; shotIndex < burstShotCount; shotIndex++)
+        {
+            SpawnInkBalls(direction, inkConfig);
+
+            if (shotIndex < burstShotCount - 1)
+            {
+                yield return new WaitForSeconds(burstInterval);
+            }
+        }
+
+        attackSequenceCoroutine = null;
     }
 
     private void SpawnInkBalls(Vector2 direction, InkAttackRuntimeConfig inkConfig)
     {
         int projectileCount = Mathf.Max(1, inkConfig.projectileCount);
         float centerIndex = (projectileCount - 1) * 0.5f;
+        Vector2 lateral = new Vector2(-direction.y, direction.x);
 
         for (int i = 0; i < projectileCount; i++)
         {
             float angle = (i - centerIndex) * inkConfig.fanAngleStep;
             Vector2 shotDirection = Quaternion.Euler(0f, 0f, angle) * direction;
+            Vector3 spawnPosition = inkPoint.position;
+            if (projectileCount > 1)
+            {
+                float lateralOffset = (i - centerIndex) * MultiShotLateralSpacing;
+                spawnPosition += (Vector3)(lateral * lateralOffset);
+            }
 
-            GameObject inkball = Instantiate(inkballPrefab, inkPoint.position, Quaternion.identity);
+            GameObject inkball = Instantiate(inkballPrefab, spawnPosition, Quaternion.identity);
             inkball.transform.right = shotDirection;
 
             InkBall inkBallComponent = inkball.GetComponent<InkBall>();
@@ -109,6 +143,17 @@ public class PlayerAttack : CharacterAttack
                 inkBallComponent.Init(inkConfig);
             }
         }
+    }
+
+    protected override void OnDisable()
+    {
+        if (attackSequenceCoroutine != null)
+        {
+            StopCoroutine(attackSequenceCoroutine);
+            attackSequenceCoroutine = null;
+        }
+
+        base.OnDisable();
     }
 
     public void AddInk(float value)

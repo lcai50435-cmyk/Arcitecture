@@ -21,6 +21,9 @@ public readonly struct WeaponAttackProfile
     {
         InkAttackRuntimeConfig config = baseConfig;
         InkTypeDefinition definition = inkDefinition ?? InkTypeCatalog.Get(InkType.DirectInk);
+        InkAttackRuntimeConfig defaultConfig = InkAttackRuntimeConfig.Default;
+        float impactPulseScaleBonus = Mathf.Max(0f, config.impactPulseScale - defaultConfig.impactPulseScale);
+        float impactPulseDurationBonus = Mathf.Max(0f, config.impactPulseDuration - defaultConfig.impactPulseDuration);
 
         config.inkType = definition.inkType;
         config.displayColor = definition.displayColor;
@@ -28,7 +31,7 @@ public readonly struct WeaponAttackProfile
         config.maxHitCount = Mathf.Max(config.maxHitCount, definition.baseHitCount);
         config.projectileScale *= Mathf.Max(0.01f, definition.projectileScale);
         config.projectileStretch = Vector2.Scale(config.projectileStretch, definition.projectileStretch);
-        config.fanAngleStep = definition.fanAngleStep;
+        config.fanAngleStep = definition.fanAngleStep + config.fanAngleBonus;
         config.baseProjectileSpeed = definition.projectileSpeed;
         config.baseProjectileLifetime = definition.projectileSpeed > 0.01f
             ? definition.attackRange / definition.projectileSpeed
@@ -38,8 +41,8 @@ public readonly struct WeaponAttackProfile
         config.explodeOnHit = definition.explodeOnHit;
         config.explosionRadius = definition.explosionRadius;
         config.explosionDamageMultiplier = definition.explosionDamageMultiplier;
-        config.impactPulseScale = definition.impactPulseScale;
-        config.impactPulseDuration = definition.impactPulseDuration;
+        config.impactPulseScale = definition.impactPulseScale + impactPulseScaleBonus;
+        config.impactPulseDuration = definition.impactPulseDuration + impactPulseDurationBonus;
 
         if (definition.hasDamageOverTime)
         {

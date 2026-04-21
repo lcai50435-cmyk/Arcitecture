@@ -27,6 +27,7 @@ public class RuntimeMiniMapHud : MonoBehaviour
     private const int TextureWidth = 1024;
     private const int TextureHeight = 768;
     private const float ExpandSmoothTime = 0.14f;
+    private const float CollapseSmoothTime = 0.09f;
     private const float SmallFramePaddingX = 12f;
     private const float SmallFramePaddingY = 12f;
     private const float LargeFramePaddingX = 20f;
@@ -55,6 +56,7 @@ public class RuntimeMiniMapHud : MonoBehaviour
     private RectTransform smallMapImageRect;
     private RawImage smallMapImage;
     private Image smallMapFrameImage;
+    private CanvasGroup smallMapCanvasGroup;
     private RectTransform smallMarkerRoot;
     private RawImage smallMarkerGlowImage;
     private RawImage[] smallMarkerOutlineImages;
@@ -65,6 +67,7 @@ public class RuntimeMiniMapHud : MonoBehaviour
     private bool expanded;
     private bool visible = true;
     private bool pinnedExpanded;
+    private bool suppressHoldExpandUntilMReleased;
     private float mKeyPressedAt = -1f;
     private float expandProgress;
     private float expandVelocity;
@@ -157,40 +160,61 @@ public class RuntimeMiniMapHud : MonoBehaviour
 
         if (Input.GetKeyDown(KeyCode.M))
         {
-            mKeyPressedAt = Time.unscaledTime;
+            if (pinnedExpanded)
+            {
+                pinnedExpanded = false;
+                suppressHoldExpandUntilMReleased = true;
+                mKeyPressedAt = -1f;
+            }
+            else
+            {
+                mKeyPressedAt = Time.unscaledTime;
+            }
         }
 
         if (Input.GetKeyUp(KeyCode.M))
         {
-            float pressedDuration = mKeyPressedAt < 0f ? 0f : Time.unscaledTime - mKeyPressedAt;
-            if (pressedDuration <= 0.22f)
+            if (suppressHoldExpandUntilMReleased)
             {
-                pinnedExpanded = !pinnedExpanded;
+                suppressHoldExpandUntilMReleased = false;
+                mKeyPressedAt = -1f;
             }
+            else
+            {
+                float pressedDuration = mKeyPressedAt < 0f ? 0f : Time.unscaledTime - mKeyPressedAt;
+                if (pressedDuration <= 0.22f)
+                {
+                    pinnedExpanded = !pinnedExpanded;
+                }
 
-            mKeyPressedAt = -1f;
+                mKeyPressedAt = -1f;
+            }
         }
 
         if (Input.GetKeyDown(KeyCode.Escape))
         {
             pinnedExpanded = false;
+            suppressHoldExpandUntilMReleased = false;
         }
 
         if (ShouldHideForGameplayOverlay())
         {
             pinnedExpanded = false;
+            suppressHoldExpandUntilMReleased = false;
         }
 
-        expanded = !ShouldHideForGameplayOverlay() && (Input.GetKey(KeyCode.M) || pinnedExpanded);
+        bool holdExpanded = Input.GetKey(KeyCode.M) && !suppressHoldExpandUntilMReleased;
+        expanded = !ShouldHideForGameplayOverlay() && (holdExpanded || pinnedExpanded);
         UpdateExpansionState();
         UpdateCameraPose();
-        UpdateSmallMapOverlay();
 
         if (miniMapCamera != null && renderTexture != null)
         {
             miniMapCamera.targetTexture = renderTexture;
             miniMapCamera.Render();
         }
+
+        UpdateSmallMapOverlay();
     }
 
     private void OnGUI()
@@ -238,7 +262,6 @@ public class RuntimeMiniMapHud : MonoBehaviour
 
         if (easedExpandProgress <= 0.001f)
         {
-            DrawMapFrame(smallMapFrameRect, SmallFramePaddingX, SmallFramePaddingY, 1f);
             return;
         }
 
@@ -468,13 +491,21 @@ public class RuntimeMiniMapHud : MonoBehaviour
 
         GameObject rootObject = CreateOverlayUIObject(SmallMapRootName, overlayCanvas.transform);
         smallMapRoot = rootObject.GetComponent<RectTransform>();
+        smallMapCanvasGroup = rootObject.GetComponent<CanvasGroup>();
+        if (smallMapCanvasGroup == null)
+        {
+            smallMapCanvasGroup = rootObject.AddComponent<CanvasGroup>();
+        }
+
+        smallMapCanvasGroup.interactable = false;
+        smallMapCanvasGroup.blocksRaycasts = false;
 
         GameObject frameObject = CreateOverlayUIObject("Frame", smallMapRoot);
         RectTransform frameRect = frameObject.GetComponent<RectTransform>();
         StretchRect(frameRect);
         smallMapFrameImage = frameObject.AddComponent<Image>();
         RuntimeUiSpriteFactory.ApplyMapFrameSprite(smallMapFrameImage, Color.white);
-        smallMapFrameImage.enabled = false;
+        smallMapFrameImage.enabled = true;
         smallMapFrameImage.raycastTarget = false;
 
         GameObject viewportObject = CreateOverlayUIObject("Viewport", smallMapRoot);
@@ -526,10 +557,20 @@ public class RuntimeMiniMapHud : MonoBehaviour
             return;
         }
 
-        bool shouldShow = visible && !ShouldHideForGameplayOverlay() && expandProgress <= 0.001f;
+        float easedExpandProgress = GetEasedExpandProgress();
+        float smallMapAlpha = visible && !ShouldHideForGameplayOverlay()
+            ? 1f - Mathf.Clamp01(Mathf.InverseLerp(0f, 0.24f, easedExpandProgress))
+            : 0f;
+        bool shouldShow = smallMapAlpha > 0.001f;
+
         if (smallMapRoot.gameObject.activeSelf != shouldShow)
         {
             smallMapRoot.gameObject.SetActive(shouldShow);
+        }
+
+        if (smallMapCanvasGroup != null)
+        {
+            smallMapCanvasGroup.alpha = smallMapAlpha;
         }
 
         if (!shouldShow)
@@ -825,11 +866,12 @@ public class RuntimeMiniMapHud : MonoBehaviour
     private void UpdateExpansionState()
     {
         float target = expanded ? 1f : 0f;
+        float smoothTime = expanded ? ExpandSmoothTime : CollapseSmoothTime;
         expandProgress = Mathf.SmoothDamp(
             expandProgress,
             target,
             ref expandVelocity,
-            ExpandSmoothTime,
+            smoothTime,
             Mathf.Infinity,
             Time.unscaledDeltaTime);
 

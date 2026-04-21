@@ -19,9 +19,9 @@ public static class GameplayStatusHudRuntime
 
     public static ValueTrans EnsureHealthGauge(ValueTrans currentGauge)
     {
-        if (IsUsableGauge(currentGauge))
+        if (currentGauge != null)
         {
-            RegisterExistingGauge(currentGauge, false);
+            UseLegacyHealthGauge(currentGauge);
             return currentGauge;
         }
 
@@ -31,9 +31,9 @@ public static class GameplayStatusHudRuntime
 
     public static ValueTrans EnsureWeaponGauge(ValueTrans currentGauge)
     {
-        if (IsUsableGauge(currentGauge))
+        if (currentGauge != null)
         {
-            RegisterExistingGauge(currentGauge, true);
+            UseLegacyWeaponGauge(currentGauge);
             return currentGauge;
         }
 
@@ -107,6 +107,19 @@ public static class GameplayStatusHudRuntime
         }
     }
 
+    private static void UseLegacyHealthGauge(ValueTrans gauge)
+    {
+        healthGauge = gauge;
+        HideRuntimeHudIfPresent();
+    }
+
+    private static void UseLegacyWeaponGauge(ValueTrans gauge)
+    {
+        weaponGauge = gauge;
+        weaponFillGraphic = ResolveGaugeFillGraphic(gauge);
+        HideRuntimeHudIfPresent();
+    }
+
     private static void CreateRows(Transform parent)
     {
         ClearRow(parent, "HealthRow");
@@ -141,7 +154,7 @@ public static class GameplayStatusHudRuntime
         rowRect.anchorMax = new Vector2(0f, 1f);
         rowRect.pivot = new Vector2(0f, 1f);
         rowRect.anchoredPosition = anchoredPosition;
-        rowRect.sizeDelta = new Vector2(392f, 30f);
+        rowRect.sizeDelta = new Vector2(364f, 28f);
 
         Image background = rowObject.AddComponent<Image>();
         RuntimeUiSpriteFactory.ApplyRoundedSprite(
@@ -150,7 +163,7 @@ public static class GameplayStatusHudRuntime
             8,
             10);
 
-        TextMeshProUGUI titleText = CreateText("Label", rowObject.transform, title, 18f, new Vector2(12f, -4f), new Vector2(54f, 20f), TextAlignmentOptions.MidlineLeft);
+        TextMeshProUGUI titleText = CreateText("Label", rowObject.transform, title, 17f, new Vector2(10f, -4f), new Vector2(48f, 20f), TextAlignmentOptions.MidlineLeft);
         titleText.fontStyle = FontStyles.Bold;
 
         GameObject barObject = CreateUIObject("Bar", rowObject.transform);
@@ -158,8 +171,8 @@ public static class GameplayStatusHudRuntime
         barRect.anchorMin = new Vector2(0f, 0.5f);
         barRect.anchorMax = new Vector2(0f, 0.5f);
         barRect.pivot = new Vector2(0f, 0.5f);
-        barRect.anchoredPosition = new Vector2(62f, 0f);
-        barRect.sizeDelta = new Vector2(224f, 14f);
+        barRect.anchoredPosition = new Vector2(56f, 0f);
+        barRect.sizeDelta = new Vector2(206f, 14f);
 
         Image barBackground = barObject.AddComponent<Image>();
         RuntimeUiSpriteFactory.ApplyRoundedSprite(
@@ -196,7 +209,7 @@ public static class GameplayStatusHudRuntime
         ValueTrans gauge = barObject.AddComponent<ValueTrans>();
         gauge.slider = slider;
 
-        TextMeshProUGUI valueText = CreateText("Value", rowObject.transform, "100/100", 16f, new Vector2(294f, -4f), new Vector2(84f, 20f), TextAlignmentOptions.MidlineRight);
+        TextMeshProUGUI valueText = CreateText("Value", rowObject.transform, "100/100", 15f, new Vector2(268f, -4f), new Vector2(72f, 20f), TextAlignmentOptions.MidlineRight);
 
         return new StatusRow(gauge, valueText);
     }
@@ -332,77 +345,36 @@ public static class GameplayStatusHudRuntime
         rootRect.anchorMax = new Vector2(0f, 1f);
         rootRect.pivot = new Vector2(0f, 1f);
         rootRect.anchoredPosition = new Vector2(24f, -24f);
-        rootRect.sizeDelta = new Vector2(420f, 82f);
+        rootRect.sizeDelta = new Vector2(392f, 80f);
         rootRect.localScale = Vector3.one;
         rootRect.SetAsLastSibling();
     }
 
-    private static bool IsUsableGauge(ValueTrans gauge)
+    private static Graphic ResolveGaugeFillGraphic(ValueTrans gauge)
     {
-        return gauge != null && gauge.slider != null;
-    }
-
-    private static bool IsSceneGauge(ValueTrans gauge)
-    {
-        return IsUsableGauge(gauge) && (hudCanvas == null || gauge.transform.root != hudCanvas.transform);
-    }
-
-    private static void RegisterExistingGauge(ValueTrans gauge, bool cacheWeaponFill)
-    {
-        if (!IsUsableGauge(gauge))
+        if (gauge == null)
         {
-            return;
+            return null;
         }
 
-        DisableRaycastTargets(gauge.gameObject);
-
-        if (cacheWeaponFill)
+        if (gauge.slider != null && gauge.slider.fillRect != null)
         {
-            weaponGauge = gauge;
-            weaponFillGraphic = gauge.slider.fillRect != null
-                ? gauge.slider.fillRect.GetComponent<Graphic>()
-                : null;
-        }
-        else
-        {
-            healthGauge = gauge;
+            return gauge.slider.fillRect.GetComponent<Graphic>();
         }
 
-        UpdatePresentationMode();
+        return gauge.GetComponentInChildren<Graphic>(true);
     }
 
-    private static void UpdatePresentationMode()
+    private static void HideRuntimeHudIfPresent()
     {
-        bool useSceneGaugeSet = IsSceneGauge(healthGauge) && IsSceneGauge(weaponGauge);
         if (rootRect != null)
         {
-            rootRect.gameObject.SetActive(!useSceneGaugeSet);
+            rootRect.gameObject.SetActive(false);
         }
 
-        if (useSceneGaugeSet)
+        if (hudCanvas != null)
         {
-            healthValueText = null;
-            weaponValueText = null;
-        }
-    }
-
-    private static void DisableRaycastTargets(GameObject root)
-    {
-        if (root == null)
-        {
-            return;
-        }
-
-        Graphic[] graphics = root.GetComponentsInChildren<Graphic>(true);
-        for (int i = 0; i < graphics.Length; i++)
-        {
-            graphics[i].raycastTarget = false;
-        }
-
-        Selectable[] selectables = root.GetComponentsInChildren<Selectable>(true);
-        for (int i = 0; i < selectables.Length; i++)
-        {
-            selectables[i].interactable = false;
+            hudCanvas.gameObject.SetActive(false);
         }
     }
 

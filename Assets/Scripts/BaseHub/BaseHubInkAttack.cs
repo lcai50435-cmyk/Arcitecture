@@ -1,9 +1,13 @@
 using UnityEngine;
+using System.Collections;
 
 public class BaseHubInkAttack : MonoBehaviour
 {
+    private const float MultiShotLateralSpacing = 0.22f;
+
     private DirectionTracker directionTracker;
     private float cooldownTimer;
+    private Coroutine fireSequenceCoroutine;
 
     private void Awake()
     {
@@ -42,13 +46,37 @@ public class BaseHubInkAttack : MonoBehaviour
             direction = Vector2.right;
         }
 
-        SpawnProjectiles(direction.normalized, config);
+        if (fireSequenceCoroutine != null)
+        {
+            StopCoroutine(fireSequenceCoroutine);
+        }
+
+        fireSequenceCoroutine = StartCoroutine(FireSequence(direction.normalized, config));
+    }
+
+    private IEnumerator FireSequence(Vector2 direction, InkAttackRuntimeConfig config)
+    {
+        int burstShotCount = Mathf.Max(1, config.burstShotCount);
+        float burstInterval = Mathf.Max(0.01f, config.burstInterval);
+
+        for (int shotIndex = 0; shotIndex < burstShotCount; shotIndex++)
+        {
+            SpawnProjectiles(direction, config);
+
+            if (shotIndex < burstShotCount - 1)
+            {
+                yield return new WaitForSeconds(burstInterval);
+            }
+        }
+
+        fireSequenceCoroutine = null;
     }
 
     private void SpawnProjectiles(Vector2 direction, InkAttackRuntimeConfig config)
     {
         int projectileCount = Mathf.Max(1, config.projectileCount);
         float centerIndex = (projectileCount - 1) * 0.5f;
+        Vector2 lateral = new Vector2(-direction.y, direction.x);
 
         for (int i = 0; i < projectileCount; i++)
         {
@@ -56,7 +84,14 @@ public class BaseHubInkAttack : MonoBehaviour
             Vector2 shotDirection = Quaternion.Euler(0f, 0f, angle) * direction;
 
             GameObject projectile = new GameObject("BaseHubInkProjectile");
-            projectile.transform.position = transform.position + (Vector3)(shotDirection.normalized * 0.62f);
+            Vector3 spawnPosition = transform.position + (Vector3)(shotDirection.normalized * 0.62f);
+            if (projectileCount > 1)
+            {
+                float lateralOffset = (i - centerIndex) * MultiShotLateralSpacing;
+                spawnPosition += (Vector3)(lateral * lateralOffset);
+            }
+
+            projectile.transform.position = spawnPosition;
             projectile.transform.right = shotDirection;
 
             SpriteRenderer renderer = projectile.AddComponent<SpriteRenderer>();
@@ -75,6 +110,15 @@ public class BaseHubInkAttack : MonoBehaviour
             InkBall inkBall = projectile.AddComponent<InkBall>();
             inkBall.character = GetComponent<CharacterCore>();
             inkBall.Init(config);
+        }
+    }
+
+    private void OnDisable()
+    {
+        if (fireSequenceCoroutine != null)
+        {
+            StopCoroutine(fireSequenceCoroutine);
+            fireSequenceCoroutine = null;
         }
     }
 

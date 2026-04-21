@@ -25,12 +25,12 @@ public class CatalogueUnlockSlotButton : MonoBehaviour
     {
         get
         {
-            if (!TryResolveContext(out CatalogueBuildingUnlockState buildingState, out int resolvedSlotIndex))
+            if (!TryResolveRuntimeSlotContext(out _, out _, out CatalogueBuildingId buildingId, out int resolvedSlotIndex))
             {
                 return false;
             }
 
-            return RuntimeProgressState.EnsureInstance().IsSlotUnlocked(buildingState.BuildingId, resolvedSlotIndex);
+            return RuntimeProgressState.EnsureInstance().IsSlotUnlocked(buildingId, resolvedSlotIndex);
         }
     }
 
@@ -61,19 +61,23 @@ public class CatalogueUnlockSlotButton : MonoBehaviour
 
     private void OnClickSlot()
     {
-        if (!TryResolveContext(out CatalogueBuildingUnlockState buildingState, out int resolvedSlotIndex))
+        if (!TryResolveRuntimeSlotContext(
+                out CatalogueBuildingUnlockState buildingState,
+                out _,
+                out CatalogueBuildingId buildingId,
+                out int resolvedSlotIndex))
         {
             return;
         }
 
-        if (RuntimeProgressState.EnsureInstance().IsSlotUnlocked(buildingState.BuildingId, resolvedSlotIndex))
+        if (RuntimeProgressState.EnsureInstance().IsSlotUnlocked(buildingId, resolvedSlotIndex))
         {
-            ShowDescription();
+            ShowDescription(buildingId, resolvedSlotIndex);
             return;
         }
 
         bool success = RuntimeProgressState.EnsureInstance().TryUnlockSlot(
-            buildingState.BuildingId,
+            buildingId,
             resolvedSlotIndex,
             out BuildingRewardDefinition slotReward,
             out BuildingRewardDefinition completionReward);
@@ -86,10 +90,10 @@ public class CatalogueUnlockSlotButton : MonoBehaviour
 
         RefreshVisual();
         ShowRewardDialog(slotReward, completionReward);
-        buildingState.RefreshState();
+        buildingState?.RefreshState();
     }
 
-    private void ShowDescription()
+    private void ShowDescription(CatalogueBuildingId buildingId, int resolvedSlotIndex)
     {
         if (!ResolveDialogReference())
         {
@@ -97,33 +101,7 @@ public class CatalogueUnlockSlotButton : MonoBehaviour
             return;
         }
 
-        string content = "暂无介绍";
-
-        if (descriptionData != null)
-        {
-            if (!string.IsNullOrEmpty(descriptionData.description))
-            {
-                content = descriptionData.description;
-            }
-            else if (!string.IsNullOrEmpty(descriptionData.slotName))
-            {
-                content = descriptionData.slotName;
-            }
-        }
-        else if (TryResolveContext(out CatalogueBuildingUnlockState buildingState, out int resolvedSlotIndex))
-        {
-            BuildingDefinition definition = BuildingDefinitionLibrary.Get(buildingState.BuildingId);
-            if (definition.slotDefinitions != null &&
-                resolvedSlotIndex >= 0 &&
-                resolvedSlotIndex < definition.slotDefinitions.Length)
-            {
-                BuildingSlotDefinition slotDefinition = definition.slotDefinitions[resolvedSlotIndex];
-                content = !string.IsNullOrEmpty(slotDefinition.description)
-                    ? slotDefinition.description
-                    : slotDefinition.slotName;
-            }
-        }
-
+        string content = BuildDescriptionContent(buildingId, resolvedSlotIndex);
         dialogUI.ShowClickCloseDialog(content);
     }
 
@@ -149,15 +127,23 @@ public class CatalogueUnlockSlotButton : MonoBehaviour
         }
     }
 
-    private bool TryResolveContext(out CatalogueBuildingUnlockState buildingState, out int resolvedSlotIndex)
+    private bool TryResolveRuntimeSlotContext(
+        out CatalogueBuildingUnlockState buildingState,
+        out CatalogueBuildingUnlockState parentBuildingState,
+        out CatalogueBuildingId buildingId,
+        out int resolvedSlotIndex)
     {
         buildingState = GetComponentInParent<CatalogueBuildingUnlockState>();
+        parentBuildingState = buildingState;
+        buildingId = CatalogueBuildingId.Building1;
         resolvedSlotIndex = slotIndex;
 
         if (buildingState == null)
         {
-            return false;
+            return TryResolveBySlotId(out buildingId, out resolvedSlotIndex);
         }
+
+        buildingId = buildingState.BuildingId;
 
         if (resolvedSlotIndex < 0 && buildingState.slotButtons != null)
         {
@@ -172,7 +158,115 @@ public class CatalogueUnlockSlotButton : MonoBehaviour
             }
         }
 
-        return resolvedSlotIndex >= 0;
+        if (IsResolvedSlotConsistent(buildingId, resolvedSlotIndex))
+        {
+            return true;
+        }
+
+        bool resolvedBySlotId = TryResolveBySlotId(out buildingId, out resolvedSlotIndex);
+        if (resolvedBySlotId)
+        {
+            slotIndex = resolvedSlotIndex;
+        }
+
+        return resolvedBySlotId;
+    }
+
+    private bool IsResolvedSlotConsistent(CatalogueBuildingId buildingId, int resolvedSlotIndex)
+    {
+        if (resolvedSlotIndex < 0)
+        {
+            return false;
+        }
+
+        BuildingDefinition definition = BuildingDefinitionLibrary.Get(buildingId);
+        if (definition.slotDefinitions == null || resolvedSlotIndex >= definition.slotDefinitions.Length)
+        {
+            return false;
+        }
+
+        if (string.IsNullOrEmpty(slotId))
+        {
+            return true;
+        }
+
+        return definition.slotDefinitions[resolvedSlotIndex] != null &&
+               definition.slotDefinitions[resolvedSlotIndex].slotId == slotId;
+    }
+
+    private bool TryResolveBySlotId(out CatalogueBuildingId buildingId, out int resolvedSlotIndex)
+    {
+        buildingId = CatalogueBuildingId.Building1;
+        resolvedSlotIndex = -1;
+
+        if (string.IsNullOrEmpty(slotId))
+        {
+            return false;
+        }
+
+        foreach (BuildingDefinition definition in BuildingDefinitionLibrary.GetAll())
+        {
+            if (definition.slotDefinitions == null)
+            {
+                continue;
+            }
+
+            for (int i = 0; i < definition.slotDefinitions.Length; i++)
+            {
+                BuildingSlotDefinition slotDefinition = definition.slotDefinitions[i];
+                if (slotDefinition == null || slotDefinition.slotId != slotId)
+                {
+                    continue;
+                }
+
+                buildingId = definition.buildingId;
+                resolvedSlotIndex = i;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private string BuildDescriptionContent(CatalogueBuildingId buildingId, int resolvedSlotIndex)
+    {
+        string content = "暂无介绍";
+
+        if (descriptionData != null)
+        {
+            if (!string.IsNullOrEmpty(descriptionData.description))
+            {
+                content = descriptionData.description;
+            }
+            else if (!string.IsNullOrEmpty(descriptionData.slotName))
+            {
+                content = descriptionData.slotName;
+            }
+        }
+
+        BuildingDefinition definition = BuildingDefinitionLibrary.Get(buildingId);
+        if (definition.slotDefinitions != null &&
+            resolvedSlotIndex >= 0 &&
+            resolvedSlotIndex < definition.slotDefinitions.Length)
+        {
+            BuildingSlotDefinition slotDefinition = definition.slotDefinitions[resolvedSlotIndex];
+            if (slotDefinition != null)
+            {
+                if (string.IsNullOrEmpty(content) || content == "暂无介绍")
+                {
+                    content = !string.IsNullOrEmpty(slotDefinition.description)
+                        ? slotDefinition.description
+                        : slotDefinition.slotName;
+                }
+
+                if (slotDefinition.reward != null && !string.IsNullOrEmpty(slotDefinition.reward.description))
+                {
+                    content += $"\n\n永久效果：{slotDefinition.reward.description}";
+                }
+            }
+        }
+
+        return content;
     }
 
     private void ShowRewardDialog(BuildingRewardDefinition slotReward, BuildingRewardDefinition completionReward)

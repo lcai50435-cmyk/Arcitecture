@@ -597,7 +597,7 @@ public class GameDebugPageBootstrapper : MonoBehaviour
         switch (type)
         {
             case ArchitecturalType.Brackets:
-                return "斗拱：增加墨水弹数量。";
+                return "斗拱：首个触发二连击，继续叠加转为扇形齐射。";
             case ArchitecturalType.MortiseAndTenonJoint:
                 return "榫卯：提升单发命中次数，让墨迹继续向前穿透。";
             case ArchitecturalType.Tile:

@@ -570,6 +570,7 @@ public class RunStageDirector : MonoBehaviour
         handler.resourceCategory = crystal.resourceCategory;
         handler.inkRestoreValue = crystal.inkRestoreValue;
         handler.textDescription = crystal.textDescription;
+        handler.persistCollectedAcrossSceneLoads = false;
     }
 
     private Sprite GetDropSprite(ArchitecturalCrystal crystal)

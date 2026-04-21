@@ -25,6 +25,18 @@ public class InkBall : MonoBehaviour
     private float impactPulseScale = 0.9f;
     private float impactPulseDuration = 0.16f;
     private InkDebuffRuntimeConfig debuffConfig;
+    private bool enableTrailAfterImage;
+    private float trailSpawnInterval = 0.05f;
+    private float trailLifetime = 0.18f;
+    private float trailScaleMultiplier = 0.82f;
+    private float trailAlpha = 0.28f;
+    private bool enableHeavyShockwave;
+    private float heavyShockwaveScale = 1.45f;
+    private float heavyShockwaveDurationMultiplier = 1.25f;
+    private bool enableSlowResidue;
+    private float slowResidueScale = 1.1f;
+    private float slowResidueDuration = 0.55f;
+    private float nextTrailSpawnTime;
     private readonly HashSet<CharacterCore> hitTargets = new HashSet<CharacterCore>();
 
     private void Awake()
@@ -57,6 +69,18 @@ public class InkBall : MonoBehaviour
         explosionDamageMultiplier = Mathf.Max(0f, config.explosionDamageMultiplier);
         impactPulseScale = Mathf.Max(0.2f, config.impactPulseScale);
         impactPulseDuration = Mathf.Max(0.05f, config.impactPulseDuration);
+        enableTrailAfterImage = config.enableTrailAfterImage;
+        trailSpawnInterval = Mathf.Max(0.016f, config.trailSpawnInterval);
+        trailLifetime = Mathf.Max(0.05f, config.trailLifetime);
+        trailScaleMultiplier = Mathf.Max(0.2f, config.trailScaleMultiplier);
+        trailAlpha = Mathf.Clamp01(config.trailAlpha);
+        enableHeavyShockwave = config.enableHeavyShockwave;
+        heavyShockwaveScale = Mathf.Max(1f, config.heavyShockwaveScale);
+        heavyShockwaveDurationMultiplier = Mathf.Max(1f, config.heavyShockwaveDurationMultiplier);
+        enableSlowResidue = config.enableSlowResidue;
+        slowResidueScale = Mathf.Max(0.2f, config.slowResidueScale);
+        slowResidueDuration = Mathf.Max(0.05f, config.slowResidueDuration);
+        nextTrailSpawnTime = Time.time;
         speed = Mathf.Max(0.01f, config.baseProjectileSpeed * config.speedMultiplier);
         autoDestroyTime = Mathf.Max(0.05f, config.baseProjectileLifetime * config.lifetimeMultiplier);
         Vector3 nextScale = transform.localScale;
@@ -79,6 +103,7 @@ public class InkBall : MonoBehaviour
             return;
         }
 
+        TrySpawnTrailAfterImage();
         rb.velocity = transform.right * speed;
     }
 
@@ -89,6 +114,7 @@ public class InkBall : MonoBehaviour
             return;
         }
 
+        bool hitEnemy = false;
         CharacterCore enemyCore = other.GetComponent<CharacterCore>();
         if (enemyCore != null && enemyCore != character && character != null)
         {
@@ -99,6 +125,8 @@ public class InkBall : MonoBehaviour
 
             ApplyHit(enemyCore, damage, true);
             SpawnImpactPulse(enemyCore.transform.position, Mathf.Min(impactPulseScale, 0.95f));
+            SpawnModifierHitEffects(enemyCore.transform.position);
+            hitEnemy = true;
 
             if (explodeOnHit)
             {
@@ -111,7 +139,7 @@ public class InkBall : MonoBehaviour
             }
         }
 
-        FinishHit();
+        FinishHit(hitEnemy);
     }
 
     private void ApplyExplosion()
@@ -162,13 +190,18 @@ public class InkBall : MonoBehaviour
         receiver.Apply(debuffConfig, transform.right, baseDamage);
     }
 
-    private void FinishHit()
+    private void FinishHit(bool hitEnemy)
     {
         isHit = true;
 
         if (!explodeOnHit)
         {
             SpawnImpactPulse(transform.position, impactPulseScale * 0.75f);
+        }
+
+        if (!hitEnemy)
+        {
+            SpawnModifierHitEffects(transform.position);
         }
 
         if (rb != null)
@@ -238,17 +271,83 @@ public class InkBall : MonoBehaviour
 
     private void SpawnImpactPulse(Vector3 position, float pulseScale)
     {
+        SpawnImpactPulse(position, pulseScale, displayColor, impactPulseDuration, 0.8f);
+    }
+
+    private void SpawnImpactPulse(Vector3 position, float pulseScale, Color pulseColor, float pulseDuration, float expansionMultiplier)
+    {
         GameObject pulseObject = new GameObject("InkImpactPulse");
         pulseObject.transform.position = position;
         pulseObject.transform.localScale = Vector3.one * Mathf.Max(0.2f, pulseScale);
 
         SpriteRenderer renderer = pulseObject.AddComponent<SpriteRenderer>();
         renderer.sprite = GetRuntimeSprite();
-        renderer.color = displayColor;
+        renderer.color = pulseColor;
         renderer.sortingOrder = 12;
 
         InkImpactPulse pulse = pulseObject.AddComponent<InkImpactPulse>();
-        pulse.Initialize(displayColor, impactPulseDuration);
+        pulse.Initialize(pulseColor, pulseDuration, expansionMultiplier);
+    }
+
+    private void SpawnModifierHitEffects(Vector3 position)
+    {
+        if (enableHeavyShockwave)
+        {
+            Color shockwaveColor = Color.Lerp(displayColor, new Color(0.98f, 0.82f, 0.45f, 1f), 0.4f);
+            SpawnImpactPulse(
+                position,
+                impactPulseScale * heavyShockwaveScale,
+                shockwaveColor,
+                impactPulseDuration * heavyShockwaveDurationMultiplier,
+                1.18f);
+        }
+
+        if (enableSlowResidue)
+        {
+            SpawnSlowResidue(position);
+        }
+    }
+
+    private void TrySpawnTrailAfterImage()
+    {
+        if (!enableTrailAfterImage || spriteRenderer == null || Time.time < nextTrailSpawnTime)
+        {
+            return;
+        }
+
+        nextTrailSpawnTime = Time.time + trailSpawnInterval;
+
+        GameObject trailObject = new GameObject("InkTrailAfterImage");
+        trailObject.transform.position = transform.position - transform.right * 0.08f;
+        trailObject.transform.rotation = transform.rotation;
+        trailObject.transform.localScale = transform.localScale * trailScaleMultiplier;
+
+        SpriteRenderer renderer = trailObject.AddComponent<SpriteRenderer>();
+        renderer.sprite = spriteRenderer.sprite != null ? spriteRenderer.sprite : GetRuntimeSprite();
+        Color trailColor = Color.Lerp(displayColor, Color.white, 0.12f);
+        trailColor.a = trailAlpha;
+        renderer.color = trailColor;
+        renderer.sortingOrder = Mathf.Max(1, spriteRenderer.sortingOrder - 1);
+
+        InkTransientSprite transientSprite = trailObject.AddComponent<InkTransientSprite>();
+        transientSprite.Initialize(trailColor, trailLifetime, 1.03f, 0.75f);
+    }
+
+    private void SpawnSlowResidue(Vector3 position)
+    {
+        GameObject residueObject = new GameObject("InkSlowResidue");
+        residueObject.transform.position = position;
+        residueObject.transform.localScale = new Vector3(slowResidueScale, slowResidueScale * 0.62f, 1f);
+
+        SpriteRenderer renderer = residueObject.AddComponent<SpriteRenderer>();
+        renderer.sprite = GetRuntimeSprite();
+        Color residueColor = Color.Lerp(displayColor, new Color(0.56f, 0.74f, 0.42f, 1f), 0.45f);
+        residueColor.a = 0.26f;
+        renderer.color = residueColor;
+        renderer.sortingOrder = 6;
+
+        InkTransientSprite transientSprite = residueObject.AddComponent<InkTransientSprite>();
+        transientSprite.Initialize(residueColor, slowResidueDuration, 1.08f, 0.88f);
     }
 
     private static Sprite GetRuntimeSprite()
@@ -284,13 +383,59 @@ public class InkImpactPulse : MonoBehaviour
     private float remaining;
     private Vector3 initialScale;
     private SpriteRenderer spriteRenderer;
+    private float expansionMultiplier = 0.8f;
 
-    public void Initialize(Color color, float pulseDuration)
+    public void Initialize(Color color, float pulseDuration, float pulseExpansionMultiplier)
     {
         pulseColor = color;
         duration = Mathf.Max(0.05f, pulseDuration);
         remaining = duration;
         initialScale = transform.localScale;
+        spriteRenderer = GetComponent<SpriteRenderer>();
+        expansionMultiplier = Mathf.Max(0.2f, pulseExpansionMultiplier);
+    }
+
+    private void Update()
+    {
+        if (spriteRenderer == null)
+        {
+            Destroy(gameObject);
+            return;
+        }
+
+        remaining -= Time.deltaTime;
+        float progress = 1f - Mathf.Clamp01(remaining / duration);
+        transform.localScale = initialScale * (1f + progress * expansionMultiplier);
+
+        Color color = pulseColor;
+        color.a = 0.55f * (1f - progress);
+        spriteRenderer.color = color;
+
+        if (remaining <= 0f)
+        {
+            Destroy(gameObject);
+        }
+    }
+}
+
+public class InkTransientSprite : MonoBehaviour
+{
+    private Color spriteColor = Color.white;
+    private float duration = 0.18f;
+    private float remaining;
+    private Vector3 initialScale;
+    private float growMultiplier = 1f;
+    private float endScaleMultiplier = 0.8f;
+    private SpriteRenderer spriteRenderer;
+
+    public void Initialize(Color color, float spriteDuration, float scaleUpMultiplier, float scaleDownMultiplier)
+    {
+        spriteColor = color;
+        duration = Mathf.Max(0.05f, spriteDuration);
+        remaining = duration;
+        initialScale = transform.localScale;
+        growMultiplier = Mathf.Max(0f, scaleUpMultiplier);
+        endScaleMultiplier = Mathf.Max(0.01f, scaleDownMultiplier);
         spriteRenderer = GetComponent<SpriteRenderer>();
     }
 
@@ -304,10 +449,11 @@ public class InkImpactPulse : MonoBehaviour
 
         remaining -= Time.deltaTime;
         float progress = 1f - Mathf.Clamp01(remaining / duration);
-        transform.localScale = initialScale * (1f + progress * 0.8f);
+        float scaleMultiplier = Mathf.Lerp(growMultiplier, endScaleMultiplier, progress);
+        transform.localScale = initialScale * scaleMultiplier;
 
-        Color color = pulseColor;
-        color.a = 0.55f * (1f - progress);
+        Color color = spriteColor;
+        color.a = spriteColor.a * (1f - progress);
         spriteRenderer.color = color;
 
         if (remaining <= 0f)
