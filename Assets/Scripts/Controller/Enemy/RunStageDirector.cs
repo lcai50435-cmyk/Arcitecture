@@ -86,11 +86,13 @@ public class RunStageDirector : MonoBehaviour
 
     private void Awake()
     {
-        BuildDefaultStageConfigs();
+        EnsureStageConfigs();
     }
 
     private void Start()
     {
+        EnsureStageConfigs();
+        RuntimeMiniMapHud.EnsureInstance();
         BindCountdownManager();
         CaptureExistingEnemiesAsTemplates();
         ApplyStage(GetStageForElapsed(GetElapsedTime()));
@@ -118,6 +120,7 @@ public class RunStageDirector : MonoBehaviour
             return;
         }
 
+        EnsureStageConfigs();
         RunStageConfig nextStage = GetStageForElapsed(GetElapsedTime());
         if (nextStage != currentStage)
         {
@@ -149,7 +152,7 @@ public class RunStageDirector : MonoBehaviour
         SpawnDrop(position);
     }
 
-    private void BuildDefaultStageConfigs()
+    private void EnsureStageConfigs()
     {
         if (stageConfigs.Count > 0)
         {
@@ -420,6 +423,12 @@ public class RunStageDirector : MonoBehaviour
 
     private RunStageConfig GetStageForElapsed(float elapsedTime)
     {
+        EnsureStageConfigs();
+        if (stageConfigs.Count == 0)
+        {
+            return null;
+        }
+
         RunStageConfig selected = stageConfigs[0];
         for (int i = 0; i < stageConfigs.Count; i++)
         {

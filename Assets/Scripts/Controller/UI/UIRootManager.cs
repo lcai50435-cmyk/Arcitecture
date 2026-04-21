@@ -4,25 +4,25 @@ public class UIRootManager : MonoBehaviour
 {
     public static UIRootManager Instance;
 
-    [Header("Í¼¼øÖ÷Ò³")]
+    [Header("å›¾é‰´ä¸»é¡µ")]
     public CanvasGroup handbookUI;
 
-    [Header("ÏêÏ¸ĞÅÏ¢Ò³")]
+    [Header("è¯¦ç»†ä¿¡æ¯é¡µ")]
     public CanvasGroup detailUIPage1;
     public CanvasGroup detailUIPage2;
 
-    [Header("Ìá½»´°¿Ú - Èı¸ö½¨Öş·Ö±ğÒ»¸ö")]
+    [Header("æäº¤çª—å£ - ä¸‰ä¸ªå»ºç­‘åˆ†åˆ«ä¸€ä¸ª")]
     public CanvasGroup submitSelectionUI1;
     public CanvasGroup submitSelectionUI2;
     public CanvasGroup submitSelectionUI3;
 
-    [Header("Dialogµ¯´°")]
+    [Header("Dialogå¼¹çª—")]
     public CanvasGroup dialogUI;
 
-    [Header("³¡¾°½»»¥ÌáÊ¾UI")]
+    [Header("åœºæ™¯äº¤äº’æç¤ºUI")]
     public CanvasGroup interactTipUI;
 
-    [Header("±³°üUI£¨¿ÉÑ¡£©")]
+    [Header("èƒŒåŒ…UIï¼ˆå¯é€‰ï¼‰")]
     public CanvasGroup backpackUI;
 
     private void Awake()
@@ -50,11 +50,11 @@ public class UIRootManager : MonoBehaviour
     {
         if (cg == null)
         {
-            Debug.LogWarning($"{name} Ã»°ó¶¨ CanvasGroup");
+            Debug.LogWarning($"{name} æ²¡ç»‘å®š CanvasGroup");
             return;
         }
 
-        // ¹Ø¼ü£ºÏÔÊ¾Ê±Ç¿ÖÆÈ·±£ÎïÌå±¾Éí¼¤»î
+        // å…³é”®ï¼šæ˜¾ç¤ºæ—¶å¼ºåˆ¶ç¡®ä¿ç‰©ä½“æœ¬èº«æ¿€æ´»
         if (active && !cg.gameObject.activeSelf)
         {
             cg.gameObject.SetActive(true);
@@ -64,14 +64,13 @@ public class UIRootManager : MonoBehaviour
         cg.interactable = active;
         cg.blocksRaycasts = active;
 
-        Debug.Log($"{name} -> active={active}, gameObjectActive={cg.gameObject.activeSelf}, alpha={cg.alpha}, blocksRaycasts={cg.blocksRaycasts}");
     }
 
-    // ========= Í¼¼øÖ÷Ò³ =========
+    // ========= å›¾é‰´ä¸»é¡µ =========
     public void ShowHandbook() => SetUI(handbookUI, true, "HandbookUI");
     public void HideHandbook() => SetUI(handbookUI, false, "HandbookUI");
 
-    // ========= ÏêÏ¸Ò³ =========
+    // ========= è¯¦ç»†é¡µ =========
     public void ShowDetailPage1()
     {
         SetUI(detailUIPage1, true, "DetailUIPage1");
@@ -90,7 +89,7 @@ public class UIRootManager : MonoBehaviour
         SetUI(detailUIPage2, false, "DetailUIPage2");
     }
 
-    // ========= Ìá½»´°¿Ú =========
+    // ========= æäº¤çª—å£ =========
     public void ShowSubmitSelection(int buildingIndex)
     {
         HideAllSubmitSelection();
@@ -107,7 +106,7 @@ public class UIRootManager : MonoBehaviour
                 SetUI(submitSelectionUI3, true, "SubmitSelectionUI3");
                 break;
             default:
-                Debug.LogWarning($"Î´ÖªµÄÌá½»´°¿ÚË÷Òı: {buildingIndex}");
+                Debug.LogWarning($"æœªçŸ¥çš„æäº¤çª—å£ç´¢å¼•: {buildingIndex}");
                 break;
         }
     }
@@ -126,7 +125,7 @@ public class UIRootManager : MonoBehaviour
                 SetUI(submitSelectionUI3, false, "SubmitSelectionUI3");
                 break;
             default:
-                Debug.LogWarning($"Î´ÖªµÄÌá½»´°¿ÚË÷Òı: {buildingIndex}");
+                Debug.LogWarning($"æœªçŸ¥çš„æäº¤çª—å£ç´¢å¼•: {buildingIndex}");
                 break;
         }
     }
@@ -142,15 +141,15 @@ public class UIRootManager : MonoBehaviour
     public void ShowDialog() => SetUI(dialogUI, true, "DialogUI");
     public void HideDialog() => SetUI(dialogUI, false, "DialogUI");
 
-    // ========= ½»»¥ÌáÊ¾ =========
+    // ========= äº¤äº’æç¤º =========
     public void ShowInteractTip() => SetUI(interactTipUI, true, "InteractTipUI");
     public void HideInteractTip() => SetUI(interactTipUI, false, "InteractTipUI");
 
-    // ========= ±³°ü =========
+    // ========= èƒŒåŒ… =========
     public void ShowBackpack() => SetUI(backpackUI, true, "BackpackUI");
     public void HideBackpack() => SetUI(backpackUI, false, "BackpackUI");
 
-    // ========= ³£ÓÃ×éºÏ =========
+    // ========= å¸¸ç”¨ç»„åˆ =========
     public void OpenHandbookView()
     {
         ShowHandbook();

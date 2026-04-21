@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// ÈËÎïÒÆ¶¯
+/// äººç‰©ç§»åŠ¨
 /// </summary>
 public class PlayerMove : MonoBehaviour
 {
@@ -13,15 +13,15 @@ public class PlayerMove : MonoBehaviour
     
     protected CharacterCore core;
 
-    // ¼Ç×¡×îºóÒ»´ÎµÄ·½Ïò
+    // è®°ä½æœ€åä¸€æ¬¡çš„æ–¹å‘
     private float lastInputX;
     private float lastInputY;
 
-    private float moveSpeed; // ËÙ¶È
+    private float moveSpeed; // é€Ÿåº¦
 
     [HideInInspector] public bool canMove = true;
 
-    // ¹ÒÔØ³¯Ïò¸ú×Ù×é¼ş
+    // æŒ‚è½½æœå‘è·Ÿè¸ªç»„ä»¶
     private DirectionTracker directionTracker;
 
     private void Awake()
@@ -32,13 +32,13 @@ public class PlayerMove : MonoBehaviour
             rb = GetComponent<Rigidbody2D>();
         }
 
-        // »ñÈ¡³¯Ïò¸ú×Ù×é¼ş
+        // è·å–æœå‘è·Ÿè¸ªç»„ä»¶
         directionTracker = GetComponent<DirectionTracker>();
     }
 
     void Update()
     {
-        // Èô½Å±¾½ûÓÃÔòÖ±½Ó²»´¦Àí
+        // è‹¥è„šæœ¬ç¦ç”¨åˆ™ç›´æ¥ä¸å¤„ç†
         // if (!enabled) return;
 
         if (core == null || core.stats == null) return;
@@ -50,33 +50,33 @@ public class PlayerMove : MonoBehaviour
         float inputX = Input.GetAxisRaw("Horizontal"); 
         float inputY = Input.GetAxisRaw("Vertical");
 
-        // ÈËÎïÇ¿ÖÆËÄ·½ÏòĞĞ×ß
+        // äººç‰©å¼ºåˆ¶å››æ–¹å‘è¡Œèµ°
         if (Mathf.Abs(inputX) > 0.1f && Mathf.Abs(inputY) > 0.1f)
         {
-            // Í¬Ê±°´ÁËÁ½¸ö¼ü Ôò Çå¿ÕÒ»¸öÖá£¬Ç¿ÖÆËÄ·½Ïò
+            // åŒæ—¶æŒ‰äº†ä¸¤ä¸ªé”® åˆ™ æ¸…ç©ºä¸€ä¸ªè½´ï¼Œå¼ºåˆ¶å››æ–¹å‘
             inputX = 0;
         }
 
         Vector2 currentMoveDir = new Vector2(inputX, inputY);
-        // ÅĞ¶ÏÊÇ·ñÒÆ¶¯
+        // åˆ¤æ–­æ˜¯å¦ç§»åŠ¨
         bool isMoving = Mathf.Abs(inputX) > 0.1f || Mathf.Abs(inputY) > 0.1f;
 
-        // ¹Ø¼ü£º¸üĞÂ³¯Ïòµ½¹¤¾ßÀà
+        // å…³é”®ï¼šæ›´æ–°æœå‘åˆ°å·¥å…·ç±»
         if (isMoving)
         {
             directionTracker?.UpdateMoveDirection(currentMoveDir);
         }
 
-        // ´Ó¹¤¾ßÀà»ñÈ¡×îºó³¯Ïò£¬¸üĞÂ¶¯»­
+        // ä»å·¥å…·ç±»è·å–æœ€åæœå‘ï¼Œæ›´æ–°åŠ¨ç”»
         Vector2 lastDir = directionTracker != null ? directionTracker.LastDirection : Vector2.down;
-        if (animator != null)
+        if (AnimatorParameterUtility.CanDrive(animator))
         {
-            animator.SetFloat("InputX", lastDir.x);
-            animator.SetFloat("InputY", lastDir.y);
-            animator.SetBool("IsMoving", isMoving);
+            AnimatorParameterUtility.SetFloatIfPresent(animator, "InputX", lastDir.x);
+            AnimatorParameterUtility.SetFloatIfPresent(animator, "InputY", lastDir.y);
+            AnimatorParameterUtility.SetBoolIfPresent(animator, "IsMoving", isMoving);
         }
 
-        // ÒÆ¶¯
+        // ç§»åŠ¨
         if (rb != null)
         {
             rb.velocity = new Vector2(inputX, inputY) * moveSpeed;

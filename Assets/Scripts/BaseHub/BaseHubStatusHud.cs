@@ -33,6 +33,7 @@ public class BaseHubStatusHud : MonoBehaviour
 
     private void Update()
     {
+        RuntimeMiniMapHud.EnsureInstance();
         RefreshImmediate();
     }
 

@@ -90,8 +90,6 @@ public class CatalogueBuildingUnlockState : MonoBehaviour
             }
         }
 
-        Debug.Log(
-            $"{gameObject.name} 建筑状态：Slider完成={isSliderComplete}，槽位完成={areAllSlotsUnlocked}，最终完成={isBuildingUnlocked}");
     }
 
     private void ResolveBuildingIdIfNeeded()

@@ -5,7 +5,7 @@ using UnityEngine.UI;
 /// 图鉴总进度 UI。
 /// 三个进度条按顺序增长：先满第一条，再加第二条，再加第三条。
 /// </summary>
-public class HandbookTotalProgressUI : MonoBehaviour
+public class UniversalCollectionProgress : MonoBehaviour
 {
     [Header("三个总进度条（按顺序拖入）")]
     public Slider progressSlider1;
@@ -66,6 +66,5 @@ public class HandbookTotalProgressUI : MonoBehaviour
             progressSlider3.value = bar3;
         }
 
-        Debug.Log($"总进度：{totalProgress} | 第一条:{bar1}/100 第二条:{bar2}/100 第三条:{bar3}/100");
     }
 }

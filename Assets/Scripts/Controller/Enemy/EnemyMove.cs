@@ -222,11 +222,11 @@ public class EnemyMove : MonoBehaviour
             lastInputY = direction.y;
         }
 
-        if (animator != null)
+        if (AnimatorParameterUtility.CanDrive(animator))
         {
-            animator.SetFloat("InputX", lastInputX);
-            animator.SetFloat("InputY", lastInputY);
-            animator.SetBool("IsMoving", isMoving);
+            AnimatorParameterUtility.SetFloatIfPresent(animator, "InputX", lastInputX);
+            AnimatorParameterUtility.SetFloatIfPresent(animator, "InputY", lastInputY);
+            AnimatorParameterUtility.SetBoolIfPresent(animator, "IsMoving", isMoving);
         }
 
         if (rb == null)

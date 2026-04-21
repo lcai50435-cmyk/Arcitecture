@@ -67,7 +67,6 @@ public class SubmitSelectionPanelUI : MonoBehaviour
 
         selectedIndex = -1;
         RefreshPanel();
-        Debug.Log($"Open submit panel for {currentTargetBuilding}");
     }
 
     public void ClosePanel()
@@ -126,14 +125,12 @@ public class SubmitSelectionPanelUI : MonoBehaviour
         ArchitecturalCrystal? nullableItem = backpack.GetItem(slotIndex);
         if (!nullableItem.HasValue)
         {
-            Debug.Log($"Slot {slotIndex} is empty");
             return;
         }
 
         if (selectedIndex != slotIndex)
         {
             selectedIndex = slotIndex;
-            Debug.Log($"Selected backpack slot {slotIndex}");
             return;
         }
 
@@ -191,7 +188,6 @@ public class SubmitSelectionPanelUI : MonoBehaviour
         {
             GameObject manager = new GameObject("RuntimeBackpackManager");
             backpack = manager.AddComponent<BackpackMananger>();
-            Debug.Log("Created runtime BackpackMananger for submit selection");
         }
 
         if (playerGetArchitectural == null)

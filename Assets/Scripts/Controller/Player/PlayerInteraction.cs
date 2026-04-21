@@ -87,7 +87,6 @@ public class PlayerInteraction : MonoBehaviour
             return;
         }
 
-        Debug.Log("开始交互");
         currentInteractable.OnInteract();
     }
 

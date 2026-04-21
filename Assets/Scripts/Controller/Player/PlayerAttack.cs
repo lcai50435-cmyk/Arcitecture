@@ -21,6 +21,7 @@ public class PlayerAttack : CharacterAttack
 
     protected override void Awake()
     {
+        RuntimeMiniMapHud.EnsureInstance();
         directionTracker = GetComponent<DirectionTracker>();
         animator = GetComponent<Animator>();
         weaponTrans = GameplayStatusHudRuntime.EnsureWeaponGauge(weaponTrans);

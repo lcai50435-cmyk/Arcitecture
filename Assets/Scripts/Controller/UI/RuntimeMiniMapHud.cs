@@ -1,598 +1,567 @@
-using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
-using UnityEngine.UI;
 
 public class RuntimeMiniMapHud : MonoBehaviour
 {
     private const string BaseSceneName = "BaseScene";
     private const string GameSceneName = "GameScene";
+    private const string CameraName = "RuntimeMiniMapCamera";
     private const float SmallMapSize = 220f;
-    private const float LargeMapSize = 620f;
-    private const float MarkerRefreshInterval = 0.35f;
-    private const float BoundsRefreshInterval = 1f;
+    private const float SmallPanelWidth = 256f;
+    private const float SmallPanelHeight = 286f;
+    private const float LargeMapWidth = 720f;
+    private const float LargeMapHeight = 720f;
+    private const float LargePanelWidth = 796f;
+    private const float LargePanelHeight = 820f;
+    private const float Margin = 22f;
+    private const int TextureSize = 1024;
 
-    private static Sprite runtimeSprite;
-    private static Font runtimeFont;
+    private static readonly Color PanelColor = new Color(0.07f, 0.10f, 0.14f, 0.86f);
+    private static readonly Color ExpandedPanelColor = new Color(0.07f, 0.10f, 0.14f, 0.96f);
+    private static readonly Color BorderColor = new Color(0.29f, 0.43f, 0.52f, 1f);
+    private static readonly Color OverlayColor = new Color(0.03f, 0.05f, 0.08f, 0.84f);
+    private static readonly Color MapBackdropColor = new Color(0.02f, 0.03f, 0.05f, 1f);
+    private static readonly Color TitleColor = new Color(0.94f, 0.97f, 1f, 1f);
+    private static readonly Color HintColor = new Color(0.76f, 0.84f, 0.90f, 1f);
+    private static readonly Color MarkerOutlineColor = new Color(0.07f, 0.12f, 0.19f, 0.98f);
+    private static readonly Color MarkerGlowColor = new Color(0.58f, 0.83f, 1f, 0.62f);
+    private static readonly Color MarkerFillColor = new Color(0.98f, 0.99f, 1f, 1f);
+    private static readonly Color MarkerAccentColor = new Color(0.52f, 0.74f, 1f, 0.95f);
 
-    private readonly List<MiniMapMarkerData> trackedMarkers = new List<MiniMapMarkerData>();
-    private readonly List<MiniMapMarkerView> markerViews = new List<MiniMapMarkerView>();
+    public static RuntimeMiniMapHud Instance { get; private set; }
 
-    private Canvas canvas;
-    private RectTransform rootRect;
-    private RectTransform mapRect;
-    private Image overlayImage;
-    private Text titleText;
-    private Text hintText;
+    private Camera miniMapCamera;
+    private RenderTexture renderTexture;
+    private Camera cachedMainCamera;
+    private Transform cachedPlayer;
+    private GUIStyle titleStyle;
+    private GUIStyle hintStyle;
+    private Texture2D markerGlowTexture;
+    private Texture2D markerFigureTexture;
     private bool expanded;
-    private float markerRefreshTimer;
-    private float boundsRefreshTimer;
-    private Bounds worldBounds;
-    private bool hasWorldBounds;
+    private bool visible = true;
+    private bool pinnedExpanded;
+    private float mKeyPressedAt = -1f;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void Bootstrap()
     {
         SceneManager.sceneLoaded -= HandleSceneLoaded;
         SceneManager.sceneLoaded += HandleSceneLoaded;
-        TryCreate(SceneManager.GetActiveScene());
+        EnsureInstance();
     }
 
     private static void HandleSceneLoaded(Scene scene, LoadSceneMode mode)
     {
-        TryCreate(scene);
+        EnsureInstance();
     }
 
-    private static void TryCreate(Scene scene)
+    public static RuntimeMiniMapHud EnsureInstance()
     {
-        if (scene.name != BaseSceneName && scene.name != GameSceneName)
+        Scene activeScene = SceneManager.GetActiveScene();
+        bool supportedScene = IsSupportedScene(activeScene.name);
+
+        if (!supportedScene)
         {
-            return;
+            if (Instance != null)
+            {
+                Instance.SetVisible(false);
+            }
+
+            return Instance;
         }
 
-        if (FindObjectOfType<RuntimeMiniMapHud>() != null)
+        if (Instance != null)
         {
-            return;
+            Instance.SetVisible(true);
+            Instance.RefreshSceneBindings();
+            return Instance;
+        }
+
+        RuntimeMiniMapHud existing = FindObjectOfType<RuntimeMiniMapHud>(true);
+        if (existing != null)
+        {
+            Instance = existing;
+            Instance.SetVisible(true);
+            Instance.RefreshSceneBindings();
+            return existing;
         }
 
         GameObject hudObject = new GameObject("RuntimeMiniMapHud");
-        hudObject.AddComponent<RuntimeMiniMapHud>();
+        Instance = hudObject.AddComponent<RuntimeMiniMapHud>();
+        return Instance;
     }
 
     private void Awake()
     {
-        BuildUi();
-        RebuildWorldBounds();
-        RefreshTrackedTargets();
-        ApplyLayout(false);
-    }
-
-    private void Update()
-    {
-        bool shouldExpand = Input.GetKey(KeyCode.M);
-        if (shouldExpand != expanded)
+        if (Instance != null && Instance != this)
         {
-            ApplyLayout(shouldExpand);
+            Destroy(gameObject);
+            return;
         }
 
-        markerRefreshTimer -= Time.unscaledDeltaTime;
-        if (markerRefreshTimer <= 0f)
-        {
-            markerRefreshTimer = MarkerRefreshInterval;
-            RefreshTrackedTargets();
-        }
-
-        boundsRefreshTimer -= Time.unscaledDeltaTime;
-        if (boundsRefreshTimer <= 0f)
-        {
-            boundsRefreshTimer = BoundsRefreshInterval;
-            RebuildWorldBounds();
-        }
-
-        UpdateMarkerPositions();
+        Instance = this;
+        DontDestroyOnLoad(gameObject);
+        EnsureInfrastructure();
+        RefreshSceneBindings();
     }
 
-    private void BuildUi()
+    private void Start()
     {
-        GameObject canvasObject = new GameObject(
-            "MiniMapCanvas",
-            typeof(RectTransform),
-            typeof(Canvas),
-            typeof(CanvasScaler),
-            typeof(GraphicRaycaster));
-        canvasObject.transform.SetParent(transform, false);
-
-        canvas = canvasObject.GetComponent<Canvas>();
-        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-        canvas.overrideSorting = true;
-        canvas.sortingOrder = 260;
-
-        CanvasScaler scaler = canvasObject.GetComponent<CanvasScaler>();
-        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-        scaler.referenceResolution = new Vector2(1920f, 1080f);
-        scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
-        scaler.matchWidthOrHeight = 0.5f;
-
-        GameObject overlayObject = CreateUiObject("Overlay", canvasObject.transform);
-        RectTransform overlayRect = overlayObject.GetComponent<RectTransform>();
-        StretchRect(overlayRect);
-        overlayImage = overlayObject.AddComponent<Image>();
-        overlayImage.color = new Color(0.03f, 0.04f, 0.05f, 0f);
-        overlayImage.raycastTarget = false;
-
-        GameObject rootObject = CreateUiObject("Panel", canvasObject.transform);
-        rootRect = rootObject.GetComponent<RectTransform>();
-        Image rootImage = rootObject.AddComponent<Image>();
-        rootImage.color = new Color(0.07f, 0.09f, 0.11f, 0.82f);
-
-        CreateOutline(rootObject, new Color(0.19f, 0.28f, 0.33f, 0.95f));
-
-        titleText = CreateText(rootObject.transform, "Title", 20, TextAnchor.MiddleLeft);
-        SetRect(titleText.rectTransform, new Vector2(14f, -12f), new Vector2(240f, 24f), new Vector2(0f, 1f));
-
-        hintText = CreateText(rootObject.transform, "Hint", 16, TextAnchor.MiddleRight);
-        SetRect(hintText.rectTransform, new Vector2(-14f, -12f), new Vector2(260f, 22f), new Vector2(1f, 1f));
-        hintText.color = new Color(0.75f, 0.82f, 0.86f, 0.95f);
-
-        GameObject mapObject = CreateUiObject("MapArea", rootObject.transform);
-        mapRect = mapObject.GetComponent<RectTransform>();
-        Image mapImage = mapObject.AddComponent<Image>();
-        mapImage.color = new Color(0.10f, 0.13f, 0.16f, 0.92f);
-        CreateOutline(mapObject, new Color(0.24f, 0.38f, 0.42f, 1f));
-
-        GameObject horizontalAxis = CreateUiObject("HorizontalAxis", mapObject.transform);
-        RectTransform horizontalRect = horizontalAxis.GetComponent<RectTransform>();
-        horizontalRect.anchorMin = new Vector2(0f, 0.5f);
-        horizontalRect.anchorMax = new Vector2(1f, 0.5f);
-        horizontalRect.sizeDelta = new Vector2(0f, 2f);
-        horizontalAxis.AddComponent<Image>().color = new Color(0.20f, 0.28f, 0.32f, 0.75f);
-
-        GameObject verticalAxis = CreateUiObject("VerticalAxis", mapObject.transform);
-        RectTransform verticalRect = verticalAxis.GetComponent<RectTransform>();
-        verticalRect.anchorMin = new Vector2(0.5f, 0f);
-        verticalRect.anchorMax = new Vector2(0.5f, 1f);
-        verticalRect.sizeDelta = new Vector2(2f, 0f);
-        verticalAxis.AddComponent<Image>().color = new Color(0.20f, 0.28f, 0.32f, 0.75f);
+        EnsureInfrastructure();
+        RefreshSceneBindings();
     }
 
-    private void ApplyLayout(bool shouldExpand)
+    private void LateUpdate()
     {
-        expanded = shouldExpand;
-
-        if (rootRect == null || mapRect == null)
+        bool supportedScene = IsSupportedScene(SceneManager.GetActiveScene().name);
+        SetVisible(supportedScene);
+        if (!supportedScene)
         {
             return;
         }
+
+        EnsureInfrastructure();
+
+        if (cachedMainCamera == null || cachedPlayer == null)
+        {
+            RefreshSceneBindings();
+        }
+
+        if (Input.GetKeyDown(KeyCode.M))
+        {
+            mKeyPressedAt = Time.unscaledTime;
+        }
+
+        if (Input.GetKeyUp(KeyCode.M))
+        {
+            float pressedDuration = mKeyPressedAt < 0f ? 0f : Time.unscaledTime - mKeyPressedAt;
+            if (pressedDuration <= 0.22f)
+            {
+                pinnedExpanded = !pinnedExpanded;
+            }
+
+            mKeyPressedAt = -1f;
+        }
+
+        if (Input.GetKeyDown(KeyCode.Escape))
+        {
+            pinnedExpanded = false;
+        }
+
+        expanded = Input.GetKey(KeyCode.M) || pinnedExpanded;
+        UpdateCameraPose();
+
+        if (miniMapCamera != null && renderTexture != null)
+        {
+            miniMapCamera.targetTexture = renderTexture;
+            miniMapCamera.Render();
+        }
+    }
+
+    private void OnGUI()
+    {
+        if (!visible || renderTexture == null || !IsSupportedScene(SceneManager.GetActiveScene().name))
+        {
+            return;
+        }
+
+        EnsureStyles();
+
+        Rect mapRect;
+        Rect panelRect;
+        string title = $"{GetSceneDisplayName()} {(expanded ? "大地图" : "小地图")}";
+        string hint = expanded ? "松开 M 预览 / Esc 收起" : "按住或轻点 M 查看大地图";
 
         if (expanded)
         {
-            rootRect.anchorMin = new Vector2(0.5f, 0.5f);
-            rootRect.anchorMax = new Vector2(0.5f, 0.5f);
-            rootRect.pivot = new Vector2(0.5f, 0.5f);
-            rootRect.anchoredPosition = Vector2.zero;
-            rootRect.sizeDelta = new Vector2(720f, 760f);
+            GUI.color = OverlayColor;
+            GUI.DrawTexture(new Rect(0f, 0f, Screen.width, Screen.height), Texture2D.whiteTexture);
+            GUI.color = Color.white;
 
-            mapRect.anchorMin = new Vector2(0.5f, 0f);
-            mapRect.anchorMax = new Vector2(0.5f, 0f);
-            mapRect.pivot = new Vector2(0.5f, 0f);
-            mapRect.anchoredPosition = new Vector2(0f, 24f);
-            mapRect.sizeDelta = new Vector2(LargeMapSize, LargeMapSize);
-
-            if (overlayImage != null)
-            {
-                overlayImage.color = new Color(0.03f, 0.04f, 0.05f, 0.62f);
-            }
+            panelRect = new Rect(
+                (Screen.width - LargePanelWidth) * 0.5f,
+                (Screen.height - LargePanelHeight) * 0.5f,
+                LargePanelWidth,
+                LargePanelHeight);
+            mapRect = new Rect(
+                panelRect.x + (panelRect.width - LargeMapWidth) * 0.5f,
+                panelRect.y + 64f,
+                LargeMapWidth,
+                LargeMapHeight);
         }
         else
         {
-            rootRect.anchorMin = new Vector2(1f, 1f);
-            rootRect.anchorMax = new Vector2(1f, 1f);
-            rootRect.pivot = new Vector2(1f, 1f);
-            rootRect.anchoredPosition = new Vector2(-22f, -22f);
-            rootRect.sizeDelta = new Vector2(272f, 308f);
-
-            mapRect.anchorMin = new Vector2(0.5f, 0f);
-            mapRect.anchorMax = new Vector2(0.5f, 0f);
-            mapRect.pivot = new Vector2(0.5f, 0f);
-            mapRect.anchoredPosition = new Vector2(0f, 18f);
-            mapRect.sizeDelta = new Vector2(SmallMapSize, SmallMapSize);
-
-            if (overlayImage != null)
-            {
-                overlayImage.color = new Color(0.03f, 0.04f, 0.05f, 0f);
-            }
+            panelRect = new Rect(
+                Screen.width - SmallPanelWidth - Margin,
+                Margin,
+                SmallPanelWidth,
+                SmallPanelHeight);
+            mapRect = new Rect(
+                panelRect.x + (panelRect.width - SmallMapSize) * 0.5f,
+                panelRect.y + 48f,
+                SmallMapSize,
+                SmallMapSize);
         }
 
-        if (titleText != null)
+        DrawPanel(panelRect, expanded ? ExpandedPanelColor : PanelColor);
+        GUI.Label(new Rect(panelRect.x + 16f, panelRect.y + 12f, panelRect.width * 0.55f, 26f), title, titleStyle);
+        GUI.Label(new Rect(panelRect.x + panelRect.width - 236f, panelRect.y + 14f, 220f, 22f), hint, hintStyle);
+        DrawFilledRect(mapRect, MapBackdropColor);
+        GUI.DrawTexture(mapRect, renderTexture, ScaleMode.StretchToFill, false);
+        DrawBorder(mapRect, 2f);
+        DrawPlayerMarker(mapRect);
+
+        GUI.color = Color.white;
+    }
+
+    private void OnDestroy()
+    {
+        if (Instance == this)
         {
-            titleText.text = expanded ? $"{GetSceneDisplayName()} 大地图" : $"{GetSceneDisplayName()} 小地图";
+            Instance = null;
         }
 
-        if (hintText != null)
+        if (renderTexture != null)
         {
-            hintText.text = expanded ? "松开 M 返回小地图" : "按住 M 查看大地图";
+            renderTexture.Release();
+            Destroy(renderTexture);
+            renderTexture = null;
+        }
+
+        if (markerGlowTexture != null)
+        {
+            Destroy(markerGlowTexture);
+            markerGlowTexture = null;
+        }
+
+        if (markerFigureTexture != null)
+        {
+            Destroy(markerFigureTexture);
+            markerFigureTexture = null;
         }
     }
 
-    private void RefreshTrackedTargets()
+    private void EnsureInfrastructure()
     {
-        trackedMarkers.Clear();
-
-        AddPlayerMarker();
-        AddEnemyMarkers();
-        AddCrystalMarkers();
-        AddSceneMarkers();
-
-        EnsureMarkerPool(trackedMarkers.Count);
-        for (int i = 0; i < markerViews.Count; i++)
-        {
-            bool active = i < trackedMarkers.Count;
-            markerViews[i].SetActive(active);
-            if (active)
-            {
-                markerViews[i].Bind(trackedMarkers[i]);
-            }
-        }
+        EnsureRenderTexture();
+        EnsureMiniMapCamera();
     }
 
-    private void UpdateMarkerPositions()
+    private void EnsureMiniMapCamera()
     {
-        if (mapRect == null || !hasWorldBounds)
+        if (miniMapCamera == null)
+        {
+            Transform cameraTransform = transform.Find(CameraName);
+            GameObject cameraObject = cameraTransform != null ? cameraTransform.gameObject : new GameObject(CameraName);
+            cameraObject.transform.SetParent(transform, false);
+
+            miniMapCamera = cameraObject.GetComponent<Camera>();
+            if (miniMapCamera == null)
+            {
+                miniMapCamera = cameraObject.AddComponent<Camera>();
+            }
+        }
+
+        miniMapCamera.enabled = false;
+        miniMapCamera.orthographic = true;
+        miniMapCamera.clearFlags = CameraClearFlags.SolidColor;
+        miniMapCamera.backgroundColor = new Color(0.05f, 0.08f, 0.10f, 1f);
+        miniMapCamera.useOcclusionCulling = false;
+        miniMapCamera.allowHDR = false;
+        miniMapCamera.allowMSAA = false;
+        miniMapCamera.depth = -100f;
+        miniMapCamera.targetTexture = renderTexture;
+    }
+
+    private void EnsureRenderTexture()
+    {
+        if (renderTexture != null)
         {
             return;
         }
 
-        Rect mapArea = mapRect.rect;
-        for (int i = 0; i < markerViews.Count; i++)
-        {
-            MiniMapMarkerView view = markerViews[i];
-            if (!view.IsActive)
-            {
-                continue;
-            }
-
-            Transform target = view.Target;
-            if (target == null)
-            {
-                view.SetActive(false);
-                continue;
-            }
-
-            bool visible = expanded || !view.ExpandedOnly;
-            view.SetVisible(visible);
-            if (!visible)
-            {
-                continue;
-            }
-
-            Vector3 position = target.position;
-            float x = Mathf.InverseLerp(worldBounds.min.x, worldBounds.max.x, position.x);
-            float y = Mathf.InverseLerp(worldBounds.min.y, worldBounds.max.y, position.y);
-            view.SetPosition(new Vector2(
-                (x - 0.5f) * mapArea.width,
-                (y - 0.5f) * mapArea.height));
-        }
+        renderTexture = new RenderTexture(TextureSize, TextureSize, 16, RenderTextureFormat.ARGB32);
+        renderTexture.name = "RuntimeMiniMapTexture";
+        renderTexture.filterMode = FilterMode.Bilinear;
+        renderTexture.useMipMap = false;
+        renderTexture.autoGenerateMips = false;
+        renderTexture.Create();
     }
 
-    private void RebuildWorldBounds()
+    private void RefreshSceneBindings()
     {
-        hasWorldBounds = false;
-        Bounds bounds = new Bounds(Vector3.zero, new Vector3(10f, 10f, 1f));
+        cachedMainCamera = Camera.main;
+        cachedPlayer = null;
 
-        GameObject player = GameObject.FindGameObjectWithTag("Player");
-        if (player != null)
+        GameObject playerObject = GameObject.FindGameObjectWithTag("Player");
+        if (playerObject != null)
         {
-            bounds = new Bounds(player.transform.position, new Vector3(8f, 8f, 1f));
-            hasWorldBounds = true;
+            cachedPlayer = playerObject.transform;
         }
 
-        Renderer[] renderers = FindObjectsOfType<Renderer>();
-        for (int i = 0; i < renderers.Length; i++)
+        if (miniMapCamera == null)
         {
-            Renderer renderer = renderers[i];
-            if (renderer == null || !renderer.gameObject.activeInHierarchy)
-            {
-                continue;
-            }
-
-            if (renderer.GetComponentInParent<Canvas>() != null)
-            {
-                continue;
-            }
-
-            if (!hasWorldBounds)
-            {
-                bounds = renderer.bounds;
-                hasWorldBounds = true;
-            }
-            else
-            {
-                bounds.Encapsulate(renderer.bounds);
-            }
+            EnsureMiniMapCamera();
         }
 
-        Collider2D[] colliders = FindObjectsOfType<Collider2D>();
-        for (int i = 0; i < colliders.Length; i++)
-        {
-            Collider2D collider = colliders[i];
-            if (collider == null || !collider.gameObject.activeInHierarchy || collider.isTrigger)
-            {
-                continue;
-            }
-
-            if (!hasWorldBounds)
-            {
-                bounds = collider.bounds;
-                hasWorldBounds = true;
-            }
-            else
-            {
-                bounds.Encapsulate(collider.bounds);
-            }
-        }
-
-        if (!hasWorldBounds)
-        {
-            bounds = new Bounds(Vector3.zero, new Vector3(20f, 20f, 1f));
-            hasWorldBounds = true;
-        }
-
-        Vector3 size = bounds.size;
-        size.x = Mathf.Max(size.x, 12f);
-        size.y = Mathf.Max(size.y, 12f);
-        size.z = 1f;
-        bounds.size = size;
-
-        worldBounds = bounds;
-    }
-
-    private void AddPlayerMarker()
-    {
-        GameObject player = GameObject.FindGameObjectWithTag("Player");
-        if (player == null)
+        if (miniMapCamera == null)
         {
             return;
         }
 
-        trackedMarkers.Add(new MiniMapMarkerData(player.transform, new Color(0.24f, 0.78f, 0.96f, 1f), 16f, false));
+        if (cachedMainCamera != null)
+        {
+            miniMapCamera.cullingMask = cachedMainCamera.cullingMask;
+            miniMapCamera.backgroundColor = cachedMainCamera.backgroundColor;
+            miniMapCamera.nearClipPlane = cachedMainCamera.nearClipPlane;
+            miniMapCamera.farClipPlane = cachedMainCamera.farClipPlane;
+        }
+        else
+        {
+            miniMapCamera.cullingMask = ~0;
+            miniMapCamera.nearClipPlane = -50f;
+            miniMapCamera.farClipPlane = 50f;
+        }
+
+        UpdateCameraPose();
     }
 
-    private void AddEnemyMarkers()
+    private void UpdateCameraPose()
     {
-        EnemyStatsManager[] enemies = FindObjectsOfType<EnemyStatsManager>();
-        for (int i = 0; i < enemies.Length; i++)
+        if (miniMapCamera == null)
         {
-            if (enemies[i] == null)
+            return;
+        }
+
+        Camera referenceCamera = cachedMainCamera != null ? cachedMainCamera : Camera.main;
+        if (referenceCamera == null)
+        {
+            return;
+        }
+
+        Vector3 position = referenceCamera.transform.position;
+        if (cachedPlayer != null)
+        {
+            position.x = cachedPlayer.position.x;
+            position.y = cachedPlayer.position.y;
+        }
+
+        position.z = referenceCamera.transform.position.z;
+        miniMapCamera.transform.position = position;
+        miniMapCamera.transform.rotation = referenceCamera.transform.rotation;
+        miniMapCamera.orthographic = true;
+
+        float baseSize = referenceCamera.orthographic
+            ? Mathf.Max(referenceCamera.orthographicSize, 4f)
+            : 8f;
+        miniMapCamera.orthographicSize = expanded ? baseSize * 2.6f : baseSize * 1.65f;
+    }
+
+    private void DrawPlayerMarker(Rect mapRect)
+    {
+        float markerHeight = expanded ? 40f : 26f;
+        float markerWidth = expanded ? 30f : 20f;
+        Rect markerRect = new Rect(
+            mapRect.center.x - markerWidth * 0.5f,
+            mapRect.center.y - markerHeight * 0.5f,
+            markerWidth,
+            markerHeight);
+
+        float glowPadding = expanded ? 16f : 10f;
+        Rect glowRect = ExpandRect(markerRect, glowPadding);
+        DrawTintedTexture(glowRect, GetMarkerGlowTexture(), MarkerGlowColor);
+
+        DrawMarkerWithOutline(markerRect);
+    }
+
+    private void DrawMarkerWithOutline(Rect rect)
+    {
+        float outlineOffset = expanded ? 2.2f : 1.4f;
+        Vector2[] offsets =
+        {
+            new Vector2(-outlineOffset, 0f),
+            new Vector2(outlineOffset, 0f),
+            new Vector2(0f, -outlineOffset),
+            new Vector2(0f, outlineOffset),
+            new Vector2(-outlineOffset, -outlineOffset),
+            new Vector2(-outlineOffset, outlineOffset),
+            new Vector2(outlineOffset, -outlineOffset),
+            new Vector2(outlineOffset, outlineOffset)
+        };
+
+        for (int i = 0; i < offsets.Length; i++)
+        {
+            Rect outlineRect = new Rect(rect.x + offsets[i].x, rect.y + offsets[i].y, rect.width, rect.height);
+            DrawTintedTexture(outlineRect, GetMarkerFigureTexture(), MarkerOutlineColor);
+        }
+
+        DrawTintedTexture(rect, GetMarkerFigureTexture(), MarkerFillColor);
+
+        float accentWidth = rect.width * 0.34f;
+        float accentHeight = rect.height * 0.18f;
+        Rect accentRect = new Rect(
+            rect.center.x - accentWidth * 0.5f,
+            rect.y + rect.height * 0.48f,
+            accentWidth,
+            accentHeight);
+        DrawTintedTexture(accentRect, Texture2D.whiteTexture, MarkerAccentColor);
+    }
+
+    private Texture2D GetMarkerGlowTexture()
+    {
+        if (markerGlowTexture != null)
+        {
+            return markerGlowTexture;
+        }
+
+        markerGlowTexture = new Texture2D(32, 32, TextureFormat.RGBA32, false);
+        markerGlowTexture.filterMode = FilterMode.Bilinear;
+        Vector2 center = new Vector2(15.5f, 15.5f);
+
+        for (int y = 0; y < 32; y++)
+        {
+            for (int x = 0; x < 32; x++)
             {
-                continue;
-            }
-
-            trackedMarkers.Add(new MiniMapMarkerData(enemies[i].transform, new Color(0.96f, 0.28f, 0.22f, 1f), 12f, false));
-        }
-    }
-
-    private void AddCrystalMarkers()
-    {
-        CrystalInteractHandler[] crystals = FindObjectsOfType<CrystalInteractHandler>();
-        for (int i = 0; i < crystals.Length; i++)
-        {
-            CrystalInteractHandler crystal = crystals[i];
-            if (crystal == null)
-            {
-                continue;
-            }
-
-            Color color = crystal.resourceCategory == ArchitecturalResourceCategory.SpecialStructure
-                ? new Color(0.98f, 0.82f, 0.26f, 1f)
-                : crystal.resourceCategory == ArchitecturalResourceCategory.InkSupply
-                    ? new Color(0.24f, 0.78f, 0.56f, 1f)
-                    : new Color(0.92f, 0.92f, 0.92f, 1f);
-
-            trackedMarkers.Add(new MiniMapMarkerData(crystal.transform, color, 8f, true));
-        }
-    }
-
-    private void AddSceneMarkers()
-    {
-        AddMarkerByType<BaseHubGameSceneInteract>(new Color(0.98f, 0.71f, 0.24f, 1f), 14f);
-        AddMarkerByType<BaseHubBookInteract>(new Color(0.75f, 0.88f, 0.42f, 1f), 14f);
-        AddMarkerByType<SpiritInteract>(new Color(0.64f, 0.86f, 1f, 1f), 14f);
-        AddMarkerByType<BookInteract>(new Color(0.75f, 0.88f, 0.42f, 1f), 14f);
-        AddMarkerByType<CatagloueInteractHandler>(new Color(0.98f, 0.71f, 0.24f, 1f), 14f);
-        AddMarkerByType<CatalogueSubmitBridgeInteractHandler>(new Color(0.98f, 0.71f, 0.24f, 1f), 14f);
-    }
-
-    private void AddMarkerByType<T>(Color color, float size) where T : MonoBehaviour
-    {
-        T[] markers = FindObjectsOfType<T>();
-        for (int i = 0; i < markers.Length; i++)
-        {
-            if (markers[i] != null)
-            {
-                trackedMarkers.Add(new MiniMapMarkerData(markers[i].transform, color, size, false));
-            }
-        }
-    }
-
-    private void EnsureMarkerPool(int count)
-    {
-        while (markerViews.Count < count)
-        {
-            GameObject markerObject = CreateUiObject("Marker", mapRect);
-            RectTransform markerRect = markerObject.GetComponent<RectTransform>();
-            markerRect.anchorMin = new Vector2(0.5f, 0.5f);
-            markerRect.anchorMax = new Vector2(0.5f, 0.5f);
-            markerRect.pivot = new Vector2(0.5f, 0.5f);
-
-            Image image = markerObject.AddComponent<Image>();
-            image.sprite = GetRuntimeSprite();
-            image.raycastTarget = false;
-
-            markerViews.Add(new MiniMapMarkerView(markerRect, image));
-        }
-    }
-
-    private static GameObject CreateUiObject(string name, Transform parent)
-    {
-        GameObject gameObject = new GameObject(name, typeof(RectTransform));
-        gameObject.transform.SetParent(parent, false);
-        return gameObject;
-    }
-
-    private static void SetRect(RectTransform rect, Vector2 anchoredPosition, Vector2 sizeDelta, Vector2 anchor)
-    {
-        rect.anchorMin = anchor;
-        rect.anchorMax = anchor;
-        rect.pivot = anchor;
-        rect.anchoredPosition = anchoredPosition;
-        rect.sizeDelta = sizeDelta;
-    }
-
-    private static void StretchRect(RectTransform rect)
-    {
-        rect.anchorMin = Vector2.zero;
-        rect.anchorMax = Vector2.one;
-        rect.offsetMin = Vector2.zero;
-        rect.offsetMax = Vector2.zero;
-    }
-
-    private static Text CreateText(Transform parent, string name, int fontSize, TextAnchor anchor)
-    {
-        GameObject textObject = CreateUiObject(name, parent);
-        Text text = textObject.AddComponent<Text>();
-        text.font = GetRuntimeFont();
-        text.fontSize = fontSize;
-        text.alignment = anchor;
-        text.color = Color.white;
-        text.raycastTarget = false;
-        return text;
-    }
-
-    private static void CreateOutline(GameObject target, Color color)
-    {
-        Outline outline = target.AddComponent<Outline>();
-        outline.effectColor = color;
-        outline.effectDistance = new Vector2(1f, -1f);
-    }
-
-    private static Sprite GetRuntimeSprite()
-    {
-        if (runtimeSprite != null)
-        {
-            return runtimeSprite;
-        }
-
-        Texture2D texture = new Texture2D(4, 4, TextureFormat.RGBA32, false);
-        texture.filterMode = FilterMode.Point;
-        for (int y = 0; y < 4; y++)
-        {
-            for (int x = 0; x < 4; x++)
-            {
-                texture.SetPixel(x, y, Color.white);
+                float distance = Vector2.Distance(new Vector2(x, y), center) / 15.5f;
+                float alpha = Mathf.Clamp01(1f - distance);
+                alpha *= alpha;
+                markerGlowTexture.SetPixel(x, y, new Color(1f, 1f, 1f, alpha));
             }
         }
 
-        texture.Apply();
-        runtimeSprite = Sprite.Create(texture, new Rect(0f, 0f, 4f, 4f), new Vector2(0.5f, 0.5f), 4f);
-        return runtimeSprite;
+        markerGlowTexture.Apply();
+        return markerGlowTexture;
     }
 
-    private static Font GetRuntimeFont()
+    private Texture2D GetMarkerFigureTexture()
     {
-        if (runtimeFont != null)
+        if (markerFigureTexture != null)
         {
-            return runtimeFont;
+            return markerFigureTexture;
         }
 
-        runtimeFont = Resources.GetBuiltinResource<Font>("Arial.ttf");
-        return runtimeFont;
+        const int size = 32;
+        markerFigureTexture = new Texture2D(size, size, TextureFormat.RGBA32, false);
+        markerFigureTexture.filterMode = FilterMode.Bilinear;
+
+        Vector2 headCenter = new Vector2(15.5f, 7.5f);
+
+        for (int y = 0; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                Vector2 point = new Vector2(x, y);
+                bool isHead = Vector2.Distance(point, headCenter) <= 4.8f;
+                bool isTorso = x >= 11 && x <= 20 && y >= 12 && y <= 22;
+                bool isShoulders = x >= 8 && x <= 23 && y >= 14 && y <= 17;
+                bool isLeftLeg = x >= 11 && x <= 14 && y >= 22 && y <= 29;
+                bool isRightLeg = x >= 17 && x <= 20 && y >= 22 && y <= 29;
+                bool isFeet = x >= 9 && x <= 22 && y >= 28 && y <= 30;
+
+                bool filled = isHead || isTorso || isShoulders || isLeftLeg || isRightLeg || isFeet;
+                markerFigureTexture.SetPixel(x, y, filled ? Color.white : Color.clear);
+            }
+        }
+
+        markerFigureTexture.Apply();
+        return markerFigureTexture;
+    }
+
+    private void EnsureStyles()
+    {
+        if (titleStyle == null)
+        {
+            titleStyle = new GUIStyle(GUI.skin.label);
+            titleStyle.fontSize = 20;
+            titleStyle.fontStyle = FontStyle.Bold;
+            titleStyle.normal.textColor = TitleColor;
+        }
+
+        if (hintStyle == null)
+        {
+            hintStyle = new GUIStyle(GUI.skin.label);
+            hintStyle.fontSize = 14;
+            hintStyle.alignment = TextAnchor.MiddleRight;
+            hintStyle.normal.textColor = HintColor;
+        }
+    }
+
+    private void SetVisible(bool shouldShow)
+    {
+        visible = shouldShow;
+
+        if (miniMapCamera != null)
+        {
+            miniMapCamera.gameObject.SetActive(shouldShow);
+        }
+    }
+
+    private static void DrawPanel(Rect panelRect, Color fillColor)
+    {
+        DrawFilledRect(panelRect, fillColor);
+        DrawBorder(panelRect, 2f);
+    }
+
+    private static void DrawFilledRect(Rect rect, Color color)
+    {
+        Color previousColor = GUI.color;
+        GUI.color = color;
+        GUI.DrawTexture(rect, Texture2D.whiteTexture);
+        GUI.color = previousColor;
+    }
+
+    private static void DrawTintedTexture(Rect rect, Texture texture, Color color)
+    {
+        Color previousColor = GUI.color;
+        GUI.color = color;
+        GUI.DrawTexture(rect, texture, ScaleMode.StretchToFill, true);
+        GUI.color = previousColor;
+    }
+
+    private static void DrawTintedTexture(Rect rect, Texture texture, Color color, Rect uv)
+    {
+        Color previousColor = GUI.color;
+        GUI.color = color;
+        GUI.DrawTextureWithTexCoords(rect, texture, uv, true);
+        GUI.color = previousColor;
+    }
+
+    private static void DrawBorder(Rect rect, float thickness)
+    {
+        DrawFilledRect(new Rect(rect.x, rect.y, rect.width, thickness), BorderColor);
+        DrawFilledRect(new Rect(rect.x, rect.yMax - thickness, rect.width, thickness), BorderColor);
+        DrawFilledRect(new Rect(rect.x, rect.y, thickness, rect.height), BorderColor);
+        DrawFilledRect(new Rect(rect.xMax - thickness, rect.y, thickness, rect.height), BorderColor);
+    }
+
+    private static Rect ExpandRect(Rect rect, float padding)
+    {
+        return new Rect(
+            rect.x - padding,
+            rect.y - padding,
+            rect.width + padding * 2f,
+            rect.height + padding * 2f);
+    }
+
+    private static bool IsSupportedScene(string sceneName)
+    {
+        return sceneName == BaseSceneName || sceneName == GameSceneName;
     }
 
     private static string GetSceneDisplayName()
     {
-        Scene scene = SceneManager.GetActiveScene();
-        if (scene.name == BaseSceneName)
+        string sceneName = SceneManager.GetActiveScene().name;
+        if (sceneName == BaseSceneName)
         {
             return "基地";
         }
 
-        if (scene.name == GameSceneName)
+        if (sceneName == GameSceneName)
         {
             return "关卡";
         }
 
-        return scene.name;
-    }
-}
-
-public readonly struct MiniMapMarkerData
-{
-    public readonly Transform target;
-    public readonly Color color;
-    public readonly float size;
-    public readonly bool expandedOnly;
-
-    public MiniMapMarkerData(Transform target, Color color, float size, bool expandedOnly)
-    {
-        this.target = target;
-        this.color = color;
-        this.size = size;
-        this.expandedOnly = expandedOnly;
-    }
-}
-
-public sealed class MiniMapMarkerView
-{
-    private readonly RectTransform rectTransform;
-    private readonly Image image;
-
-    public Transform Target { get; private set; }
-    public bool ExpandedOnly { get; private set; }
-    public bool IsActive => image != null && image.gameObject.activeSelf;
-
-    public MiniMapMarkerView(RectTransform rectTransform, Image image)
-    {
-        this.rectTransform = rectTransform;
-        this.image = image;
-    }
-
-    public void Bind(MiniMapMarkerData data)
-    {
-        Target = data.target;
-        ExpandedOnly = data.expandedOnly;
-
-        if (image != null)
-        {
-            image.color = data.color;
-        }
-
-        if (rectTransform != null)
-        {
-            rectTransform.sizeDelta = new Vector2(data.size, data.size);
-        }
-    }
-
-    public void SetPosition(Vector2 anchoredPosition)
-    {
-        if (rectTransform != null)
-        {
-            rectTransform.anchoredPosition = anchoredPosition;
-        }
-    }
-
-    public void SetActive(bool active)
-    {
-        if (image != null)
-        {
-            image.gameObject.SetActive(active);
-        }
-    }
-
-    public void SetVisible(bool visible)
-    {
-        if (image != null)
-        {
-            image.enabled = visible;
-        }
+        return sceneName;
     }
 }

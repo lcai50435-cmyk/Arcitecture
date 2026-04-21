@@ -58,6 +58,7 @@ public class BaseHubBootstrapper : MonoBehaviour
 
     private void Start()
     {
+        RuntimeMiniMapHud.EnsureInstance();
         if (!buildOnStart) return;
         if (FindObjectOfType<BaseHubUIController>() != null) return;
 

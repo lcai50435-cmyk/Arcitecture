@@ -56,6 +56,8 @@ public static class GameplayStatusHudRuntime
 
     private static void EnsureRoot()
     {
+        RuntimeMiniMapHud.EnsureInstance();
+
         if (rootRect != null && healthGauge != null && weaponGauge != null)
         {
             ReattachToHudCanvas();
