@@ -12,8 +12,14 @@ public class PlayerProfileData : MonoBehaviour
     [Header("当前武器")]
     public WeaponType currentWeaponType = WeaponType.Ranged;
 
+    private void Awake()
+    {
+        currentWeaponType = PlayerLoadoutRuntime.CurrentWeaponType;
+    }
+
     public void SelectWeapon(WeaponType weaponType)
     {
         currentWeaponType = weaponType;
+        PlayerLoadoutRuntime.CurrentWeaponType = weaponType;
     }
 }

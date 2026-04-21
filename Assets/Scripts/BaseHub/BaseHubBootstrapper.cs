@@ -1,10 +1,36 @@
+using System;
+using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.SceneManagement;
+using UnityEngine.TextCore.LowLevel;
 using UnityEngine.UI;
 
 public class BaseHubBootstrapper : MonoBehaviour
 {
+    private const string BaseHubMapResourcePath = "BaseHub/base_hub_map";
+    private const string RequiredRuntimeCharacters = "图鉴精灵关卡入口打开查看属性武器攻击基地允许生命上限耐久攻击力移动速度防御调试面板按住显示关闭点击装备";
+    private static readonly string[] RuntimeFontNames =
+    {
+        "Arial Unicode MS",
+        "Arial Unicode",
+        "Hiragino Sans GB",
+        "PingFang SC",
+        "Noto Sans CJK SC",
+        "Helvetica",
+        "Arial"
+    };
+
+    private static readonly Vector3 DetailedPlayerSpawnPosition = new Vector3(0f, -1.75f, 0f);
+    private static readonly Vector3 DetailedBookPosition = new Vector3(-4.2f, 0.4f, 0f);
+    private static readonly Vector3 DetailedSpiritPosition = new Vector3(4.2f, 0.4f, 0f);
+    private static readonly Vector3 DetailedGatePosition = new Vector3(0f, 2.85f, 0f);
+    private static readonly Vector3 DetailedLeftDummyPosition = new Vector3(-4.1f, -3.3f, 0f);
+    private static readonly Vector3 DetailedRightDummyPosition = new Vector3(4.1f, -3.3f, 0f);
+
+    private static TMP_FontAsset runtimeFontAsset;
+
     [Header("运行时生成")]
     [SerializeField] private bool buildOnStart = true;
 
@@ -13,12 +39,20 @@ public class BaseHubBootstrapper : MonoBehaviour
     [SerializeField] private Sprite avatarSprite;
     [SerializeField] private Sprite bookSprite;
     [SerializeField] private Sprite spiritSprite;
+    [SerializeField] private Sprite hubMapSprite;
 
+    [Header("复用现有 UI")]
+    [SerializeField] private GameObject handbookUIPrefab;
+    [SerializeField] private GameObject healthHudPrefab;
+    [SerializeField] private GameObject weaponHudPrefab;
+
+    private bool useDetailedHubMap;
     private Sprite generatedPlayerSprite;
     private Sprite generatedBookSprite;
     private Sprite generatedSpiritSprite;
     private Sprite generatedGateSprite;
     private Sprite generatedFloorSprite;
+    private Sprite generatedHubMapSprite;
 
     private void Start()
     {
@@ -33,41 +67,49 @@ public class BaseHubBootstrapper : MonoBehaviour
         EnsureCamera();
         EnsureEventSystem();
 
-        CreateFloor();
+        useDetailedHubMap = CreateBaseMap();
+        if (!useDetailedHubMap)
+        {
+            CreateFloor();
+            CreateBaseDecorations();
+        }
 
         Canvas canvas = CreateCanvas();
         InteractPrompt prompt = CreateInteractPrompt(canvas.transform);
-        Button bookCloseButton;
-        GameObject handbookPanel = CreateHandbookPanel(canvas.transform, out bookCloseButton);
         SpiritPanelUI spiritPanel = CreateSpiritPanel(canvas.transform);
 
         BaseHubUIController uiController = new GameObject("BaseHubUIController").AddComponent<BaseHubUIController>();
         GameObject player = CreatePlayer(prompt);
         CharacterCore characterCore = player.GetComponent<CharacterCore>();
         PlayerProfileData profileData = player.GetComponent<PlayerProfileData>();
+        CreateStatusHud(canvas.transform, characterCore, profileData);
+        GameObject handbookPanel = CreateBaseHandbookUI(player, prompt.Root);
 
         spiritPanel.Bind(characterCore, profileData);
         uiController.Configure(player, handbookPanel, spiritPanel, prompt.Root);
         spiritPanel.SetCloseAction(uiController.CloseAll);
-        bookCloseButton.onClick.AddListener(uiController.CloseAll);
 
         CreateBookInteractable(uiController);
         CreateSpiritInteractable(uiController);
         CreateGameSceneInteractable();
+        CreateTrainingDummies();
     }
 
     private void EnsureCamera()
     {
-        if (Camera.main != null) return;
+        Camera camera = Camera.main;
+        if (camera == null)
+        {
+            GameObject cameraObject = new GameObject("Main Camera");
+            camera = cameraObject.AddComponent<Camera>();
+            cameraObject.tag = "MainCamera";
+            cameraObject.AddComponent<AudioListener>();
+        }
 
-        GameObject cameraObject = new GameObject("Main Camera");
-        Camera camera = cameraObject.AddComponent<Camera>();
-        cameraObject.tag = "MainCamera";
         camera.orthographic = true;
-        camera.orthographicSize = 5.5f;
-        camera.backgroundColor = new Color(0.12f, 0.16f, 0.14f, 1f);
-        camera.transform.position = new Vector3(0f, 0f, -10f);
-        cameraObject.AddComponent<AudioListener>();
+        camera.orthographicSize = 5.8f;
+        camera.backgroundColor = new Color(0.03f, 0.04f, 0.05f, 1f);
+        camera.transform.position = new Vector3(0f, -0.1f, -10f);
     }
 
     private void EnsureEventSystem()
@@ -79,6 +121,203 @@ public class BaseHubBootstrapper : MonoBehaviour
         eventSystem.AddComponent<StandaloneInputModule>();
     }
 
+    private void CreateStatusHud(Transform parent, CharacterCore characterCore, PlayerProfileData profileData)
+    {
+        GameObject root = CreateUIObject("BaseHubStatusHudRoot", parent);
+        RectTransform rootRect = root.GetComponent<RectTransform>();
+        rootRect.anchorMin = new Vector2(0f, 0f);
+        rootRect.anchorMax = new Vector2(0f, 0f);
+        rootRect.pivot = new Vector2(0f, 0f);
+        rootRect.anchoredPosition = new Vector2(26f, 26f);
+        rootRect.sizeDelta = new Vector2(420f, 108f);
+
+        Image background = root.AddComponent<Image>();
+        background.color = new Color(0.04f, 0.03f, 0.03f, 0.78f);
+
+        StatusHudWidgets healthWidgets = CreateStatusHudRow(
+            root.transform,
+            "Health",
+            "生命",
+            new Vector2(18f, 62f),
+            new Color(0.86f, 0.22f, 0.22f, 1f));
+        StatusHudWidgets weaponWidgets = CreateStatusHudRow(
+            root.transform,
+            "Weapon",
+            "武器",
+            new Vector2(18f, 20f),
+            new Color(0.26f, 0.72f, 0.90f, 1f));
+
+        BaseHubStatusHud hud = root.AddComponent<BaseHubStatusHud>();
+        hud.Configure(
+            characterCore,
+            profileData,
+            healthWidgets.valueTrans,
+            weaponWidgets.valueTrans,
+            weaponWidgets.fillImage,
+            healthWidgets.valueText,
+            weaponWidgets.valueText);
+    }
+
+    private StatusHudWidgets CreateStatusHudRow(Transform parent, string name, string title, Vector2 anchoredPosition, Color fillColor)
+    {
+        GameObject row = CreateUIObject($"{name}Row", parent);
+        RectTransform rowRect = row.GetComponent<RectTransform>();
+        rowRect.anchorMin = new Vector2(0f, 0f);
+        rowRect.anchorMax = new Vector2(0f, 0f);
+        rowRect.pivot = new Vector2(0f, 0f);
+        rowRect.anchoredPosition = anchoredPosition;
+        rowRect.sizeDelta = new Vector2(384f, 28f);
+
+        TextMeshProUGUI titleText = CreateText(
+            $"{name}Title",
+            row.transform,
+            title,
+            22,
+            new Color(0.96f, 0.91f, 0.80f, 1f),
+            TextAlignmentOptions.MidlineLeft);
+        RectTransform titleRect = titleText.rectTransform;
+        titleRect.anchorMin = new Vector2(0f, 0.5f);
+        titleRect.anchorMax = new Vector2(0f, 0.5f);
+        titleRect.pivot = new Vector2(0f, 0.5f);
+        titleRect.anchoredPosition = new Vector2(0f, 0f);
+        titleRect.sizeDelta = new Vector2(58f, 26f);
+
+        GameObject barObject = CreateUIObject($"{name}Bar", row.transform);
+        RectTransform barRect = barObject.GetComponent<RectTransform>();
+        barRect.anchorMin = new Vector2(0f, 0.5f);
+        barRect.anchorMax = new Vector2(0f, 0.5f);
+        barRect.pivot = new Vector2(0f, 0.5f);
+        barRect.anchoredPosition = new Vector2(70f, 0f);
+        barRect.sizeDelta = new Vector2(220f, 18f);
+
+        Image background = barObject.AddComponent<Image>();
+        background.color = new Color(0.19f, 0.16f, 0.15f, 1f);
+
+        Slider slider = barObject.AddComponent<Slider>();
+        slider.direction = Slider.Direction.LeftToRight;
+        slider.minValue = 0f;
+        slider.maxValue = 100f;
+        slider.value = 100f;
+        slider.targetGraphic = background;
+
+        GameObject fillArea = CreateUIObject($"{name}FillArea", barObject.transform);
+        SetStretch(fillArea.GetComponent<RectTransform>(), 2f, 2f, 2f, 2f);
+
+        GameObject fillObject = CreateUIObject($"{name}Fill", fillArea.transform);
+        RectTransform fillRect = fillObject.GetComponent<RectTransform>();
+        fillRect.anchorMin = Vector2.zero;
+        fillRect.anchorMax = Vector2.one;
+        fillRect.offsetMin = Vector2.zero;
+        fillRect.offsetMax = Vector2.zero;
+        Image fillImage = fillObject.AddComponent<Image>();
+        fillImage.color = fillColor;
+        slider.fillRect = fillRect;
+
+        ValueTrans valueTrans = barObject.AddComponent<ValueTrans>();
+        valueTrans.slider = slider;
+
+        TextMeshProUGUI valueText = CreateText(
+            $"{name}Value",
+            row.transform,
+            string.Empty,
+            20,
+            Color.white,
+            TextAlignmentOptions.MidlineRight);
+        RectTransform valueRect = valueText.rectTransform;
+        valueRect.anchorMin = new Vector2(1f, 0.5f);
+        valueRect.anchorMax = new Vector2(1f, 0.5f);
+        valueRect.pivot = new Vector2(1f, 0.5f);
+        valueRect.anchoredPosition = new Vector2(0f, 0f);
+        valueRect.sizeDelta = new Vector2(92f, 24f);
+
+        return new StatusHudWidgets(valueTrans, fillImage, valueText);
+    }
+
+    private GameObject ResolveHudPrefab(GameObject prefab, string exactName)
+    {
+        if (IsHudPrefab(prefab, exactName))
+        {
+            return prefab;
+        }
+
+        GameObject[] candidates = Resources.FindObjectsOfTypeAll<GameObject>();
+        for (int i = 0; i < candidates.Length; i++)
+        {
+            GameObject candidate = candidates[i];
+            if (!IsHudPrefab(candidate, exactName)) continue;
+
+            return candidate;
+        }
+
+        return null;
+    }
+
+    private static bool IsHudPrefab(GameObject candidate, string exactName)
+    {
+        try
+        {
+            if (candidate == null) return false;
+            if (candidate.scene.IsValid()) return false;
+            if (!string.Equals(candidate.name, exactName, StringComparison.Ordinal)) return false;
+            if (candidate.GetComponent<Canvas>() == null) return false;
+            if (candidate.GetComponentInChildren<ValueTrans>(true) == null) return false;
+
+            return true;
+        }
+        catch (MissingReferenceException)
+        {
+            return false;
+        }
+    }
+
+    private static ValueTrans ConfigureStatusHudRoot(GameObject hudRoot, string name, int sortingOrder)
+    {
+        if (hudRoot == null)
+        {
+            return null;
+        }
+
+        hudRoot.name = name;
+        RectTransform rectTransform = hudRoot.GetComponent<RectTransform>();
+        if (rectTransform != null)
+        {
+            rectTransform.localScale = Vector3.one;
+        }
+
+        Canvas canvas = hudRoot.GetComponent<Canvas>();
+        if (canvas != null)
+        {
+            canvas.overrideSorting = true;
+            canvas.sortingOrder = sortingOrder;
+        }
+
+        GraphicRaycaster raycaster = hudRoot.GetComponent<GraphicRaycaster>();
+        if (raycaster != null)
+        {
+            raycaster.enabled = false;
+        }
+
+        CanvasGroup canvasGroup = hudRoot.GetComponent<CanvasGroup>();
+        if (canvasGroup == null)
+        {
+            canvasGroup = hudRoot.AddComponent<CanvasGroup>();
+        }
+
+        canvasGroup.interactable = false;
+        canvasGroup.blocksRaycasts = false;
+        return hudRoot.GetComponentInChildren<ValueTrans>(true);
+    }
+
+    private static Image FindSliderFillImage(ValueTrans valueTrans)
+    {
+        if (valueTrans == null || valueTrans.slider == null || valueTrans.slider.fillRect == null)
+        {
+            return null;
+        }
+
+        return valueTrans.slider.fillRect.GetComponent<Image>();
+    }
+
     private void CreateFloor()
     {
         GameObject floor = new GameObject("BaseGround");
@@ -88,6 +327,40 @@ public class BaseHubBootstrapper : MonoBehaviour
         renderer.drawMode = SpriteDrawMode.Tiled;
         renderer.sortingOrder = -10;
         floor.transform.localScale = Vector3.one;
+    }
+
+    private bool CreateBaseMap()
+    {
+        Sprite sprite = ResolveHubMapSprite();
+        if (sprite == null)
+        {
+            return false;
+        }
+
+        GameObject map = new GameObject("BaseHubMap");
+        SpriteRenderer renderer = map.AddComponent<SpriteRenderer>();
+        renderer.sprite = sprite;
+        renderer.sortingOrder = -12;
+        map.transform.position = new Vector3(0f, -0.18f, 0f);
+        map.transform.localScale = Vector3.one;
+        return true;
+    }
+
+    private void CreateBaseDecorations()
+    {
+        Sprite pathSprite = CreateSolidSprite(new Color(0.30f, 0.25f, 0.17f, 1f));
+        Sprite mossSprite = CreateSolidSprite(new Color(0.15f, 0.30f, 0.18f, 1f));
+        Sprite stoneSprite = CreateSolidSprite(new Color(0.42f, 0.43f, 0.38f, 1f));
+        Sprite glowSprite = CreateSolidSprite(new Color(0.65f, 0.84f, 0.80f, 1f));
+
+        CreateWorldObject("BaseMainPath", new Vector3(0f, 0.8f, 0f), pathSprite, new Vector3(1.7f, 5.2f, 1f), -8);
+        CreateWorldObject("BaseCrossPath", new Vector3(0f, 1.2f, 0f), pathSprite, new Vector3(6.4f, 1.1f, 1f), -8);
+        CreateWorldObject("BookReadingMat", new Vector3(-2.2f, 0.95f, 0f), mossSprite, new Vector3(1.8f, 1.2f, 1f), -7);
+        CreateWorldObject("SpiritGarden", new Vector3(2.2f, 0.95f, 0f), glowSprite, new Vector3(1.8f, 1.2f, 1f), -7);
+
+        CreateWorldObject("LeftPillar", new Vector3(-1.25f, 2.55f, 0f), stoneSprite, new Vector3(0.34f, 0.85f, 1f), 1);
+        CreateWorldObject("RightPillar", new Vector3(1.25f, 2.55f, 0f), stoneSprite, new Vector3(0.34f, 0.85f, 1f), 1);
+
     }
 
     private Canvas CreateCanvas()
@@ -169,6 +442,135 @@ public class BaseHubBootstrapper : MonoBehaviour
 
         root.SetActive(false);
         return root;
+    }
+
+    private GameObject CreateBaseHandbookUI(GameObject playerObject, GameObject interactPrompt)
+    {
+        GameObject handbookRoot = TryInstantiatePrefabObject(handbookUIPrefab);
+        if (handbookRoot == null)
+        {
+            GameObject prefab = ResolveHandbookPrefab();
+            handbookRoot = TryInstantiatePrefabObject(prefab);
+        }
+
+        if (handbookRoot == null)
+        {
+            Debug.LogError("基地图鉴预制体未绑定，且未找到可用的图鉴 UI 预制体。");
+            return null;
+        }
+
+        handbookRoot.name = "BaseHandbookUI";
+
+        GameObject illustratedHandbook = FindChildByName(handbookRoot.transform, "IllustratedHandbookCanvas");
+        GameObject detailedInformation = FindChildByName(handbookRoot.transform, "DetailedInformationCanvas");
+        GameObject dialogCanvas = FindChildByName(handbookRoot.transform, "DialogCanvas");
+        GameObject packBagCanvas = FindChildByName(handbookRoot.transform, "PackBagCanvas");
+        GameObject interactionCanvas = FindChildByName(handbookRoot.transform, "InteractionCanvas");
+
+        if (dialogCanvas != null) dialogCanvas.SetActive(false);
+        if (packBagCanvas != null) packBagCanvas.SetActive(false);
+        if (interactionCanvas != null) interactionCanvas.SetActive(false);
+        if (illustratedHandbook != null) illustratedHandbook.SetActive(false);
+        if (detailedInformation != null) detailedInformation.SetActive(false);
+
+        if (ExperienceManager.Instance == null)
+        {
+            GameObject manager = new GameObject("BaseExperienceManager");
+            manager.AddComponent<ExperienceManager>();
+        }
+
+        if (FindObjectOfType<CatalogueAddExp>() == null)
+        {
+            GameObject manager = new GameObject("BaseCatalogueAddExp");
+            manager.AddComponent<CatalogueAddExp>();
+        }
+
+        if (CatalogueUnlockSelectionManager.Instance == null)
+        {
+            GameObject manager = new GameObject("BaseCatalogueUnlockSelectionManager");
+            manager.AddComponent<CatalogueUnlockSelectionManager>();
+        }
+
+        UIManager uiManager = UIManager.Instance;
+        if (uiManager == null)
+        {
+            uiManager = handbookRoot.GetComponentInChildren<UIManager>(true);
+        }
+
+        uiManager?.ConfigureForRuntime(
+            illustratedHandbook,
+            detailedInformation,
+            new[] { interactPrompt },
+            interactPrompt,
+            playerObject);
+
+        return illustratedHandbook;
+    }
+
+    private GameObject ResolveHandbookPrefab()
+    {
+        if (IsHandbookPrefab(handbookUIPrefab))
+        {
+            return handbookUIPrefab;
+        }
+
+        GameObject[] candidates = Resources.FindObjectsOfTypeAll<GameObject>();
+        for (int i = 0; i < candidates.Length; i++)
+        {
+            GameObject candidate = candidates[i];
+            if (!IsHandbookPrefab(candidate)) continue;
+
+            handbookUIPrefab = candidate;
+            return handbookUIPrefab;
+        }
+
+        return null;
+    }
+
+    private static GameObject TryInstantiatePrefabObject(GameObject prefab)
+    {
+        if (prefab == null)
+        {
+            return null;
+        }
+
+        try
+        {
+            UnityEngine.Object handbookInstance = Instantiate((UnityEngine.Object)prefab);
+            if (handbookInstance is GameObject handbookRoot)
+            {
+                return handbookRoot;
+            }
+
+            if (handbookInstance is Component handbookComponent)
+            {
+                return handbookComponent.gameObject;
+            }
+        }
+        catch (MissingReferenceException)
+        {
+            return null;
+        }
+
+        return null;
+    }
+
+    private bool IsHandbookPrefab(GameObject candidate)
+    {
+        try
+        {
+            if (candidate == null) return false;
+            if (candidate.scene.IsValid()) return false;
+            if (!string.Equals(candidate.name, "UI", System.StringComparison.Ordinal)) return false;
+            if (FindChildByName(candidate.transform, "IllustratedHandbookCanvas") == null) return false;
+            if (FindChildByName(candidate.transform, "DetailedInformationCanvas") == null) return false;
+
+            return true;
+        }
+        catch (MissingReferenceException)
+        {
+            return false;
+        }
     }
 
     private SpiritPanelUI CreateSpiritPanel(Transform parent)
@@ -302,11 +704,13 @@ public class BaseHubBootstrapper : MonoBehaviour
     {
         GameObject playerObject = new GameObject("Player");
         playerObject.tag = "Player";
-        playerObject.transform.position = new Vector3(0f, -1.2f, 0f);
+        playerObject.transform.position = useDetailedHubMap
+            ? DetailedPlayerSpawnPosition
+            : new Vector3(0f, -1.2f, 0f);
 
         Sprite playerVisual = playerSprite != null
             ? playerSprite
-            : GetOrCreateGeneratedSprite(ref generatedPlayerSprite, new Color(0.92f, 0.75f, 0.45f, 1f));
+            : GetOrCreateGeneratedPlayerSprite();
         SpriteRenderer renderer = playerObject.AddComponent<SpriteRenderer>();
         renderer.sprite = playerVisual;
         renderer.sortingOrder = 5;
@@ -335,7 +739,7 @@ public class BaseHubBootstrapper : MonoBehaviour
         profile.avatar = avatarSprite ?? playerVisual;
         profile.currentDurability = 100f;
         profile.maxDurability = 100f;
-        profile.currentWeaponType = WeaponType.Ranged;
+        profile.currentWeaponType = PlayerLoadoutRuntime.CurrentWeaponType;
 
         PlayerMove move = playerObject.AddComponent<PlayerMove>();
         move.rb = body;
@@ -345,22 +749,26 @@ public class BaseHubBootstrapper : MonoBehaviour
         interaction.boxPanel = prompt.Root;
         interaction.boxText = prompt.Text;
 
+        playerObject.AddComponent<BaseHubInkAttack>();
+
         return playerObject;
     }
 
     private void CreateBookInteractable(BaseHubUIController uiController)
     {
-        GameObject book = CreateWorldObject(
-            "BookInteractable",
-            new Vector3(-2.2f, 1.2f, 0f),
-            bookSprite != null
-                ? bookSprite
-                : GetOrCreateGeneratedSprite(ref generatedBookSprite, new Color(0.56f, 0.30f, 0.14f, 1f)),
-            new Vector3(0.9f, 0.7f, 1f));
+        GameObject book = useDetailedHubMap
+            ? CreateInteractionAnchor("BookInteractable", DetailedBookPosition)
+            : CreateWorldObject(
+                "BookInteractable",
+                new Vector3(-2.2f, 1.2f, 0f),
+                bookSprite != null
+                    ? bookSprite
+                    : GetOrCreateGeneratedBookSprite(),
+                new Vector3(1.05f, 0.82f, 1f));
 
         CircleCollider2D trigger = book.AddComponent<CircleCollider2D>();
         trigger.isTrigger = true;
-        trigger.radius = 1.05f;
+        trigger.radius = useDetailedHubMap ? 1.2f : 1.05f;
 
         BaseHubBookInteract interact = book.AddComponent<BaseHubBookInteract>();
         interact.Configure(uiController);
@@ -368,17 +776,19 @@ public class BaseHubBootstrapper : MonoBehaviour
 
     private void CreateSpiritInteractable(BaseHubUIController uiController)
     {
-        GameObject spirit = CreateWorldObject(
-            "SpiritInteractable",
-            new Vector3(2.2f, 1.2f, 0f),
-            spiritSprite != null
-                ? spiritSprite
-                : GetOrCreateGeneratedSprite(ref generatedSpiritSprite, new Color(0.42f, 0.78f, 0.95f, 1f)),
-            new Vector3(0.8f, 0.8f, 1f));
+        GameObject spirit = useDetailedHubMap
+            ? CreateInteractionAnchor("SpiritInteractable", DetailedSpiritPosition)
+            : CreateWorldObject(
+                "SpiritInteractable",
+                new Vector3(2.2f, 1.2f, 0f),
+                spiritSprite != null
+                    ? spiritSprite
+                    : GetOrCreateGeneratedSpiritSprite(),
+                new Vector3(0.95f, 1.05f, 1f));
 
         CircleCollider2D trigger = spirit.AddComponent<CircleCollider2D>();
         trigger.isTrigger = true;
-        trigger.radius = 1.05f;
+        trigger.radius = useDetailedHubMap ? 1.2f : 1.05f;
 
         SpiritInteract interact = spirit.AddComponent<SpiritInteract>();
         interact.Configure(uiController);
@@ -386,27 +796,79 @@ public class BaseHubBootstrapper : MonoBehaviour
 
     private void CreateGameSceneInteractable()
     {
-        GameObject gate = CreateWorldObject(
-            "GameSceneGateInteractable",
-            new Vector3(0f, 2.9f, 0f),
-            GetOrCreateGeneratedSprite(ref generatedGateSprite, new Color(0.78f, 0.58f, 0.28f, 1f)),
-            new Vector3(1.8f, 0.55f, 1f));
+        GameObject gate = useDetailedHubMap
+            ? CreateInteractionAnchor("GameSceneGateInteractable", DetailedGatePosition)
+            : CreateWorldObject(
+                "GameSceneGateInteractable",
+                new Vector3(0f, 2.9f, 0f),
+                GetOrCreateGeneratedGateSprite(),
+                new Vector3(1.55f, 1.05f, 1f));
 
         BoxCollider2D trigger = gate.AddComponent<BoxCollider2D>();
         trigger.isTrigger = true;
-        trigger.size = new Vector2(1.4f, 1.2f);
+        trigger.size = useDetailedHubMap
+            ? new Vector2(2.2f, 1.6f)
+            : new Vector2(1.4f, 1.2f);
 
         gate.AddComponent<BaseHubGameSceneInteract>();
     }
 
-    private GameObject CreateWorldObject(string name, Vector3 position, Sprite sprite, Vector3 scale)
+    private void CreateTrainingDummies()
+    {
+        CreateTrainingDummy(
+            "TrainingDummy_Left",
+            useDetailedHubMap ? DetailedLeftDummyPosition : new Vector3(-4.3f, -1.4f, 0f),
+            useDetailedHubMap ? new Vector3(0.78f, 1.08f, 1f) : new Vector3(0.9f, 1.25f, 1f));
+        CreateTrainingDummy(
+            "TrainingDummy_Right",
+            useDetailedHubMap ? DetailedRightDummyPosition : new Vector3(4.3f, -1.4f, 0f),
+            useDetailedHubMap ? new Vector3(0.78f, 1.08f, 1f) : new Vector3(0.9f, 1.25f, 1f));
+    }
+
+    private void CreateTrainingDummy(string name, Vector3 position, Vector3 scale)
+    {
+        GameObject dummy = CreateWorldObject(
+            name,
+            position,
+            CreateTrainingDummySprite(),
+            scale,
+            2);
+
+        BoxCollider2D collider = dummy.AddComponent<BoxCollider2D>();
+        collider.size = new Vector2(0.9f, 1.2f);
+
+        Rigidbody2D body = dummy.AddComponent<Rigidbody2D>();
+        body.gravityScale = 0f;
+        body.bodyType = RigidbodyType2D.Kinematic;
+
+        CharacterCore core = dummy.AddComponent<CharacterCore>();
+        core.stats = new CharacterStats
+        {
+            maxHp = 80f,
+            attackDamage = 0f,
+            moveSpeed = 0f,
+            defense = 0f
+        };
+        core.currentHp = core.stats.maxHp;
+
+        dummy.AddComponent<BaseHubTrainingDummy>();
+    }
+
+    private GameObject CreateInteractionAnchor(string name, Vector3 position)
+    {
+        GameObject anchor = new GameObject(name);
+        anchor.transform.position = position;
+        return anchor;
+    }
+
+    private GameObject CreateWorldObject(string name, Vector3 position, Sprite sprite, Vector3 scale, int sortingOrder = 3)
     {
         GameObject obj = new GameObject(name);
         obj.transform.position = position;
         obj.transform.localScale = scale;
         SpriteRenderer renderer = obj.AddComponent<SpriteRenderer>();
         renderer.sprite = sprite;
-        renderer.sortingOrder = 3;
+        renderer.sortingOrder = sortingOrder;
         return obj;
     }
 
@@ -472,7 +934,7 @@ public class BaseHubBootstrapper : MonoBehaviour
         GameObject textObject = CreateUIObject(name, parent);
         TextMeshProUGUI text = textObject.AddComponent<TextMeshProUGUI>();
         text.text = value;
-        text.font = TMP_Settings.defaultFontAsset;
+        text.font = GetRuntimeFont();
         text.fontSize = fontSize;
         text.color = color;
         text.alignment = alignment;
@@ -481,11 +943,161 @@ public class BaseHubBootstrapper : MonoBehaviour
         return text;
     }
 
+    private Sprite ResolveHubMapSprite()
+    {
+        if (hubMapSprite != null)
+        {
+            ApplyHubMapTextureSettings(hubMapSprite);
+            return hubMapSprite;
+        }
+
+        if (generatedHubMapSprite != null)
+        {
+            ApplyHubMapTextureSettings(generatedHubMapSprite);
+            return generatedHubMapSprite;
+        }
+
+        generatedHubMapSprite = Resources.Load<Sprite>(BaseHubMapResourcePath);
+        if (generatedHubMapSprite != null)
+        {
+            ApplyHubMapTextureSettings(generatedHubMapSprite);
+            return generatedHubMapSprite;
+        }
+
+        Texture2D hubMapTexture = Resources.Load<Texture2D>(BaseHubMapResourcePath);
+        if (hubMapTexture == null)
+        {
+            return null;
+        }
+
+        hubMapTexture.filterMode = FilterMode.Bilinear;
+        generatedHubMapSprite = Sprite.Create(
+            hubMapTexture,
+            new Rect(0f, 0f, hubMapTexture.width, hubMapTexture.height),
+            new Vector2(0.5f, 0.5f),
+            100f);
+        return generatedHubMapSprite;
+    }
+
+    private static void ApplyHubMapTextureSettings(Sprite sprite)
+    {
+        if (sprite == null || sprite.texture == null)
+        {
+            return;
+        }
+
+        sprite.texture.filterMode = FilterMode.Bilinear;
+    }
+
+    private static TMP_FontAsset GetRuntimeFont()
+    {
+        if (runtimeFontAsset != null)
+        {
+            return runtimeFontAsset;
+        }
+
+        Font[] loadedFonts = Resources.FindObjectsOfTypeAll<Font>();
+        for (int i = 0; i < loadedFonts.Length; i++)
+        {
+            Font font = loadedFonts[i];
+            if (font == null)
+            {
+                continue;
+            }
+
+            string fontName = font.name ?? string.Empty;
+            if (!fontName.Contains("NotoSansSC") && !fontName.Contains("Noto Sans SC"))
+            {
+                continue;
+            }
+
+            TMP_FontAsset fontAsset = TMP_FontAsset.CreateFontAsset(font, 90, 9, GlyphRenderMode.SDFAA, 1024, 1024, AtlasPopulationMode.Dynamic, true);
+            if (fontAsset == null)
+            {
+                continue;
+            }
+
+            fontAsset.fallbackFontAssetTable = new List<TMP_FontAsset>();
+            fontAsset.TryAddCharacters(RequiredRuntimeCharacters);
+            runtimeFontAsset = fontAsset;
+            return runtimeFontAsset;
+        }
+
+        TMP_FontAsset[] loadedFontAssets = Resources.FindObjectsOfTypeAll<TMP_FontAsset>();
+        for (int i = 0; i < loadedFontAssets.Length; i++)
+        {
+            TMP_FontAsset fontAsset = loadedFontAssets[i];
+            if (fontAsset == null) continue;
+            if (!fontAsset.name.Contains("NotoSansSC")) continue;
+            if (!fontAsset.HasCharacters(RequiredRuntimeCharacters))
+            {
+                continue;
+            }
+
+            runtimeFontAsset = fontAsset;
+            return runtimeFontAsset;
+        }
+
+        for (int i = 0; i < RuntimeFontNames.Length; i++)
+        {
+            Font font;
+            try
+            {
+                font = Font.CreateDynamicFontFromOSFont(RuntimeFontNames[i], 90);
+            }
+            catch (Exception)
+            {
+                continue;
+            }
+
+            if (font == null)
+            {
+                continue;
+            }
+
+            TMP_FontAsset fontAsset = TMP_FontAsset.CreateFontAsset(font, 90, 9, GlyphRenderMode.SDFAA, 1024, 1024, AtlasPopulationMode.Dynamic, true);
+            if (fontAsset == null)
+            {
+                continue;
+            }
+
+            fontAsset.fallbackFontAssetTable = new List<TMP_FontAsset>();
+            fontAsset.TryAddCharacters(RequiredRuntimeCharacters);
+            runtimeFontAsset = fontAsset;
+            return runtimeFontAsset;
+        }
+
+        runtimeFontAsset = TMP_Settings.defaultFontAsset;
+        return runtimeFontAsset;
+    }
+
     private static GameObject CreateUIObject(string name, Transform parent)
     {
         GameObject obj = new GameObject(name, typeof(RectTransform));
         obj.transform.SetParent(parent, false);
         return obj;
+    }
+
+    private static GameObject FindChildByName(Transform root, string targetName)
+    {
+        if (root == null) return null;
+
+        for (int i = 0; i < root.childCount; i++)
+        {
+            Transform child = root.GetChild(i);
+            if (child.name == targetName)
+            {
+                return child.gameObject;
+            }
+
+            GameObject nested = FindChildByName(child, targetName);
+            if (nested != null)
+            {
+                return nested;
+            }
+        }
+
+        return null;
     }
 
     private static void SetStretch(RectTransform rect, float left, float top, float right, float bottom)
@@ -524,6 +1136,175 @@ public class BaseHubBootstrapper : MonoBehaviour
         return sprite;
     }
 
+    private Sprite GetOrCreateGeneratedPlayerSprite()
+    {
+        if (generatedPlayerSprite == null)
+        {
+            generatedPlayerSprite = CreatePlayerSprite();
+        }
+
+        return generatedPlayerSprite;
+    }
+
+    private Sprite GetOrCreateGeneratedBookSprite()
+    {
+        if (generatedBookSprite == null)
+        {
+            generatedBookSprite = CreateBookSprite();
+        }
+
+        return generatedBookSprite;
+    }
+
+    private Sprite GetOrCreateGeneratedSpiritSprite()
+    {
+        if (generatedSpiritSprite == null)
+        {
+            generatedSpiritSprite = CreateSpiritSprite();
+        }
+
+        return generatedSpiritSprite;
+    }
+
+    private Sprite GetOrCreateGeneratedGateSprite()
+    {
+        if (generatedGateSprite == null)
+        {
+            generatedGateSprite = CreateGateSprite();
+        }
+
+        return generatedGateSprite;
+    }
+
+    private static Sprite CreatePlayerSprite()
+    {
+        Texture2D texture = CreateTransparentTexture(24, 32);
+        Color skin = new Color(0.84f, 0.62f, 0.38f, 1f);
+        Color coat = new Color(0.45f, 0.25f, 0.16f, 1f);
+        Color scarf = new Color(0.86f, 0.66f, 0.30f, 1f);
+
+        FillRect(texture, 8, 20, 8, 8, skin);
+        FillRect(texture, 6, 10, 12, 11, coat);
+        FillRect(texture, 7, 17, 10, 3, scarf);
+        FillRect(texture, 7, 4, 4, 7, new Color(0.24f, 0.16f, 0.12f, 1f));
+        FillRect(texture, 13, 4, 4, 7, new Color(0.24f, 0.16f, 0.12f, 1f));
+        FillRect(texture, 9, 24, 2, 2, Color.black);
+        FillRect(texture, 14, 24, 2, 2, Color.black);
+        texture.Apply();
+        return CreateSpriteFromTexture(texture, 16f);
+    }
+
+    private static Sprite CreateBookSprite()
+    {
+        Texture2D texture = CreateTransparentTexture(36, 24);
+        Color cover = new Color(0.42f, 0.17f, 0.10f, 1f);
+        Color page = new Color(0.90f, 0.78f, 0.55f, 1f);
+        Color line = new Color(0.47f, 0.30f, 0.16f, 1f);
+
+        FillRect(texture, 2, 3, 32, 18, cover);
+        FillRect(texture, 5, 6, 12, 12, page);
+        FillRect(texture, 19, 6, 12, 12, page);
+        FillRect(texture, 17, 4, 2, 16, new Color(0.20f, 0.10f, 0.07f, 1f));
+        FillRect(texture, 8, 10, 7, 1, line);
+        FillRect(texture, 8, 14, 6, 1, line);
+        FillRect(texture, 21, 10, 7, 1, line);
+        FillRect(texture, 22, 14, 6, 1, line);
+        texture.Apply();
+        return CreateSpriteFromTexture(texture, 18f);
+    }
+
+    private static Sprite CreateSpiritSprite()
+    {
+        Texture2D texture = CreateTransparentTexture(28, 32);
+        Color body = new Color(0.42f, 0.78f, 0.95f, 1f);
+        Color light = new Color(0.78f, 0.94f, 1f, 1f);
+        Color shadow = new Color(0.18f, 0.43f, 0.55f, 1f);
+
+        FillRect(texture, 9, 9, 10, 14, body);
+        FillRect(texture, 7, 12, 14, 8, body);
+        FillRect(texture, 11, 21, 6, 5, light);
+        FillRect(texture, 8, 7, 4, 4, shadow);
+        FillRect(texture, 16, 7, 4, 4, shadow);
+        FillRect(texture, 11, 16, 2, 2, Color.black);
+        FillRect(texture, 16, 16, 2, 2, Color.black);
+        FillRect(texture, 12, 3, 4, 3, new Color(0.68f, 0.90f, 0.96f, 1f));
+        texture.Apply();
+        return CreateSpriteFromTexture(texture, 16f);
+    }
+
+    private static Sprite CreateGateSprite()
+    {
+        Texture2D texture = CreateTransparentTexture(48, 32);
+        Color wood = new Color(0.55f, 0.33f, 0.16f, 1f);
+        Color roof = new Color(0.78f, 0.58f, 0.28f, 1f);
+        Color dark = new Color(0.22f, 0.13f, 0.08f, 1f);
+
+        FillRect(texture, 7, 4, 6, 19, wood);
+        FillRect(texture, 35, 4, 6, 19, wood);
+        FillRect(texture, 12, 19, 24, 5, wood);
+        FillRect(texture, 8, 24, 32, 4, roof);
+        FillRect(texture, 14, 12, 20, 3, dark);
+        FillRect(texture, 20, 4, 8, 8, dark);
+        texture.Apply();
+        return CreateSpriteFromTexture(texture, 16f);
+    }
+
+    private static Sprite CreateTrainingDummySprite()
+    {
+        Texture2D texture = CreateTransparentTexture(24, 32);
+        Color wood = new Color(0.52f, 0.34f, 0.18f, 1f);
+        Color rope = new Color(0.82f, 0.66f, 0.38f, 1f);
+        Color dark = new Color(0.22f, 0.14f, 0.08f, 1f);
+
+        FillRect(texture, 10, 3, 4, 26, wood);
+        FillRect(texture, 6, 18, 12, 8, wood);
+        FillRect(texture, 5, 16, 14, 3, rope);
+        FillRect(texture, 7, 8, 10, 4, rope);
+        FillRect(texture, 8, 22, 2, 2, dark);
+        FillRect(texture, 14, 22, 2, 2, dark);
+        texture.Apply();
+        return CreateSpriteFromTexture(texture, 16f);
+    }
+
+    private static Texture2D CreateTransparentTexture(int width, int height)
+    {
+        Texture2D texture = new Texture2D(width, height, TextureFormat.RGBA32, false);
+        texture.filterMode = FilterMode.Point;
+
+        for (int y = 0; y < height; y++)
+        {
+            for (int x = 0; x < width; x++)
+            {
+                texture.SetPixel(x, y, Color.clear);
+            }
+        }
+
+        return texture;
+    }
+
+    private static Sprite CreateSpriteFromTexture(Texture2D texture, float pixelsPerUnit)
+    {
+        return Sprite.Create(
+            texture,
+            new Rect(0f, 0f, texture.width, texture.height),
+            new Vector2(0.5f, 0.5f),
+            pixelsPerUnit);
+    }
+
+    private static void FillRect(Texture2D texture, int x, int y, int width, int height, Color color)
+    {
+        int maxX = Mathf.Min(texture.width, x + width);
+        int maxY = Mathf.Min(texture.height, y + height);
+
+        for (int py = Mathf.Max(0, y); py < maxY; py++)
+        {
+            for (int px = Mathf.Max(0, x); px < maxX; px++)
+            {
+                texture.SetPixel(px, py, color);
+            }
+        }
+    }
+
     private struct InteractPrompt
     {
         public readonly GameObject Root;
@@ -535,6 +1316,20 @@ public class BaseHubBootstrapper : MonoBehaviour
             Root = root;
             KeyObject = keyObject;
             Text = text;
+        }
+    }
+
+    private readonly struct StatusHudWidgets
+    {
+        public readonly ValueTrans valueTrans;
+        public readonly Image fillImage;
+        public readonly TextMeshProUGUI valueText;
+
+        public StatusHudWidgets(ValueTrans trans, Image fill, TextMeshProUGUI text)
+        {
+            valueTrans = trans;
+            fillImage = fill;
+            valueText = text;
         }
     }
 }

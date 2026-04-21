@@ -1,33 +1,32 @@
 using UnityEngine;
 
 /// <summary>
-/// UI¹ÜÀíÆ÷ - ¿ØÖÆÍ¼¼ø¿ª¹Ø¡¢ÆäËûUIÒş²Ø¡¢Íæ¼ÒÒÆ¶¯¿ØÖÆ
+/// UI ç®¡ç†å™¨ï¼Œè´Ÿè´£å›¾é‰´å¼€å…³ã€å…¶ä»– UI æ˜¾éšä¸ç©å®¶ç§»åŠ¨é”å®šã€‚
 /// </summary>
 public class UIManager : MonoBehaviour
 {
     public static UIManager Instance;
 
-    [Header("½çÃæ")]
+    [Header("å›¾é‰´")]
     public GameObject illustratedHandbook;
     public GameObject detailedInformation;
 
-    [Header("ĞèÒªÒş²ØµÄÆäËûUI")]
+    [Header("æ‰“å¼€å›¾é‰´æ—¶éœ€è¦éšè—çš„ UI")]
     public GameObject[] uiToHide;
 
-    [Header("½»»¥ÌáÊ¾UI")]
+    [Header("äº¤äº’æç¤º UI")]
     public GameObject interactTipUI;
 
-    [Header("Íæ¼Ò¿ØÖÆ")]
+    [Header("ç©å®¶æ§åˆ¶")]
     public GameObject player;
     public string playerMovementScriptName = "PlayerController";
 
-    private bool isHandbookOpen = false;
+    private bool isHandbookOpen;
     private MonoBehaviour playerMovementScript;
     private bool wasPlayerEnabled = true;
-
     private Dialog dialogUI;
 
-    void Awake()
+    private void Awake()
     {
         if (Instance == null)
         {
@@ -40,50 +39,54 @@ public class UIManager : MonoBehaviour
         }
     }
 
-    void Start()
+    private void Start()
     {
-        dialogUI = FindObjectOfType<Dialog>();
+        if (illustratedHandbook != null)
+            illustratedHandbook.SetActive(false);
 
-        if (player != null)
-        {
-            playerMovementScript = player.GetComponent(playerMovementScriptName) as MonoBehaviour;
-            if (playerMovementScript == null)
-            {
-                playerMovementScript = player.GetComponent<PlayerMove>();
-                if (playerMovementScript == null)
-                {
-                    Debug.LogWarning("Î´ÕÒµ½Íæ¼ÒÒÆ¶¯½Å±¾£¬Çë¼ì²é½Å±¾Ãû³ÆÊÇ·ñÕıÈ·");
-                }
-            }
-        }
-        else
-        {
-            Debug.LogWarning("UIManager: Î´ÍÏÈëÍæ¼ÒÎïÌå£¬ÎŞ·¨¿ØÖÆÍæ¼ÒÒÆ¶¯");
-        }
+        if (detailedInformation != null)
+            detailedInformation.SetActive(false);
 
-        // ¿ª¾ÖÇ¿ÖÆÊÕÆğÈ«²¿Í¼¼øÏà¹ØUI
         if (UIRootManager.Instance != null)
         {
             UIRootManager.Instance.CloseAllBookUI();
         }
 
         isHandbookOpen = false;
+        RefreshRuntimeBindings();
     }
 
-    /// <summary>
-    /// ´ò¿ªÍ¼¼ø
-    /// </summary>
+    public void ConfigureForRuntime(
+        GameObject handbook,
+        GameObject detail,
+        GameObject[] hideTargets,
+        GameObject interactTip,
+        GameObject playerObject)
+    {
+        illustratedHandbook = handbook;
+        detailedInformation = detail;
+        uiToHide = hideTargets;
+        interactTipUI = interactTip;
+        player = playerObject;
+
+        if (illustratedHandbook != null)
+            illustratedHandbook.SetActive(false);
+
+        if (detailedInformation != null)
+            detailedInformation.SetActive(false);
+
+        RefreshRuntimeBindings();
+    }
+
     public void OpenIllustratedHandbook()
     {
-        // Èç¹ûÍ¼¼øÒÑ¾­¿ª×Å£¬¾Í²»ÒªÖØ¸´´ò¿ª
         if (isHandbookOpen)
         {
-            Debug.Log("Í¼¼øÒÑ´ò¿ª£¬ºöÂÔÖØ¸´´ò¿ª");
+            Debug.Log("å›¾é‰´å·²æ‰“å¼€ï¼Œå¿½ç•¥é‡å¤æ‰“å¼€");
             return;
         }
 
         isHandbookOpen = true;
-
         DisablePlayerMovement();
         HideOtherUI(true);
 
@@ -105,6 +108,12 @@ public class UIManager : MonoBehaviour
             dialogUI.canShow = false;
         }
 
+        if (illustratedHandbook != null)
+            illustratedHandbook.SetActive(true);
+
+        if (detailedInformation != null)
+            detailedInformation.SetActive(false);
+
         if (UIRootManager.Instance != null)
         {
             UIRootManager.Instance.HideAllDetail();
@@ -114,20 +123,26 @@ public class UIManager : MonoBehaviour
             UIRootManager.Instance.HideInteractTip();
         }
 
-        Debug.Log("´ò¿ªÍ¼¼ø£¬Íæ¼ÒÒÆ¶¯ÒÑ½ûÓÃ");
+        if (interactTipUI != null)
+        {
+            interactTipUI.SetActive(false);
+        }
     }
 
-    /// <summary>
-    /// ¹Ø±ÕÍ¼¼ø
-    /// </summary>
     public void CloseIllustratedHandbook()
     {
         if (!isHandbookOpen)
         {
-            Debug.Log("Í¼¼ø±¾À´¾ÍÊÇ¹Ø±Õ×´Ì¬");
+            Debug.Log("å›¾é‰´å½“å‰å·²å¤„äºå…³é—­çŠ¶æ€");
             return;
         }
 
+        if (illustratedHandbook != null)
+            illustratedHandbook.SetActive(false);
+
+        if (detailedInformation != null)
+            detailedInformation.SetActive(false);
+
         if (UIRootManager.Instance != null)
         {
             UIRootManager.Instance.CloseAllBookUI();
@@ -143,18 +158,24 @@ public class UIManager : MonoBehaviour
         {
             dialogUI.canShow = true;
             dialogUI.ForceHideImmediately();
+        }
+
+        if (interactTipUI != null)
+        {
+            interactTipUI.SetActive(true);
         }
 
         isHandbookOpen = false;
-
-        Debug.Log("¹Ø±ÕÍ¼¼ø£¬Íæ¼ÒÒÆ¶¯ÒÑ»Ö¸´");
     }
 
-    /// <summary>
-    /// »Ö¸´ËùÓĞUIºÍÍæ¼Ò¿ØÖÆ
-    /// </summary>
     public void RestoreUI()
     {
+        if (illustratedHandbook != null)
+            illustratedHandbook.SetActive(false);
+
+        if (detailedInformation != null)
+            detailedInformation.SetActive(false);
+
         HideOtherUI(false);
         EnablePlayerMovement();
 
@@ -170,6 +191,11 @@ public class UIManager : MonoBehaviour
         if (UIRootManager.Instance != null)
         {
             UIRootManager.Instance.CloseAllBookUI();
+        }
+
+        if (interactTipUI != null)
+        {
+            interactTipUI.SetActive(true);
         }
 
         isHandbookOpen = false;
@@ -213,12 +239,37 @@ public class UIManager : MonoBehaviour
 
     private void HideOtherUI(bool hide)
     {
+        if (uiToHide == null) return;
+
         foreach (GameObject ui in uiToHide)
         {
             if (ui != null)
             {
                 ui.SetActive(!hide);
             }
+        }
+    }
+
+    private void RefreshRuntimeBindings()
+    {
+        dialogUI = FindObjectOfType<Dialog>();
+
+        if (player != null)
+        {
+            playerMovementScript = player.GetComponent(playerMovementScriptName) as MonoBehaviour;
+            if (playerMovementScript == null)
+            {
+                playerMovementScript = player.GetComponent<PlayerMove>();
+                if (playerMovementScript == null)
+                {
+                    Debug.LogWarning("æœªæ‰¾åˆ°ç©å®¶ç§»åŠ¨è„šæœ¬ï¼Œè¯·æ£€æŸ¥ playerMovementScriptName æˆ– PlayerMove ç»„ä»¶ã€‚");
+                }
+            }
+        }
+        else
+        {
+            playerMovementScript = null;
+            Debug.LogWarning("UIManager æœªç»‘å®šç©å®¶å¯¹è±¡ï¼Œæ— æ³•é”å®šç§»åŠ¨ã€‚");
         }
     }
 }

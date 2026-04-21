@@ -4,25 +4,27 @@ using UnityEngine.UI;
 
 public class Dialog : MonoBehaviour
 {
-    [Header("UI×é¼ş")]
+    [Header("UI ç»„ä»¶")]
     public GameObject dialogPanel;
     public Text descriptionText;
 
-    [Header("µã»÷ÈÎÒâ´¦¹Ø±ÕÓÃ°´Å¥")]
+    [Header("ç‚¹å‡»å…³é—­æŒ‰é’®")]
     public Button clickCloseButton;
 
-    [Header("ĞèÒªÒş²ØµÄÆäËûUI")]
+    [Header("éœ€è¦éšè—çš„å…¶ä»– UI")]
     public GameObject[] uiToHide;
 
-    [Header("×Ô¶¯¹Ø±ÕÊ±¼ä")]
+    [Header("è‡ªåŠ¨å…³é—­æ—¶é—´")]
     public float displayDuration = 4f;
 
-    [Header("ÊÇ·ñÔÊĞíÆÕÍ¨µ¯´°ÏÔÊ¾")]
+    [Header("æ˜¯å¦å…è®¸æ™®é€šå¼¹çª—æ˜¾ç¤º")]
     public bool canShow = true;
 
     private BackpackMananger backpackManager;
     private Coroutine currentCoroutine;
-    private bool waitingForClickClose = false;
+    private bool waitingForClickClose;
+    private bool pausedByFirstPickDialog;
+    private float timeScaleBeforeDialog = 1f;
 
     private void Start()
     {
@@ -54,59 +56,58 @@ public class Dialog : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Ê×´ÎÊ°È¡ÎïÆ·Ê±ÏÔÊ¾µ¯´°
-    /// </summary>
     private void ShowDialogByCrystal(ArchitecturalCrystal crystal)
     {
-        // ĞŞ¸´µã£ºÓÃÎ¨Ò»±êÊ¶ÅĞ¶ÏÊÇ·ñÎª¡°¿Õ¡±£¨Ê¾Àı£º¼ÙÉè type ÊÇÃ¶¾Ù£¬Ä¬ÈÏÖµÎª 0/None£©
-        if (crystal.type == default) return;
+        if (crystal.isUnlockMaterial) return;
 
-        string desc = string.IsNullOrEmpty(crystal.textDescription)
-            ? $"»ñµÃ {crystal.type}£¡\n¾­ÑéÖµ +{crystal.expValue}"
-            : crystal.textDescription;
-
-        ShowAutoDialog(desc);
+        string desc = BuildSpiritIntro(crystal);
+        if (InternalShow(desc, false))
+        {
+            PauseGameForFirstPickDialog();
+        }
     }
 
-
-    /// <summary>
-    /// ×Ô¶¯¹Ø±Õµ¯´°£¨Ê°È¡ÌáÊ¾ÓÃ£©
-    /// </summary>
     public void ShowAutoDialog(string desc)
     {
         if (!canShow) return;
         InternalShow(desc, true);
     }
 
-    /// <summary>
-    /// µã»÷¹Ø±Õµ¯´°£¨Ğ¡Í¼±ê½éÉÜÓÃ£©
-    /// </summary>
+    public void ShowAutoDialogForce(string desc)
+    {
+        InternalShow(desc, true);
+    }
+
     public void ShowClickCloseDialog(string desc)
     {
         InternalShow(desc, false);
     }
 
-    /// <summary>
-    /// ÄÚ²¿Í³Ò»ÏÔÊ¾Âß¼­
-    /// </summary>
-    private void InternalShow(string desc, bool autoClose)
+    private bool InternalShow(string desc, bool autoClose)
     {
+        if (!gameObject.activeInHierarchy)
+        {
+            Debug.LogWarning("Dialog æ‰€åœ¨å¯¹è±¡æœªæ¿€æ´»ï¼Œæ— æ³•æ˜¾ç¤ºå¼¹çª—");
+            return false;
+        }
+
         if (descriptionText != null)
         {
             descriptionText.text = desc;
         }
 
-        // Òş²ØÆäËûUI
         HideOtherUI(true);
 
-        // ´ò¿ªDialogÃæ°å
+        if (dialogPanel != null)
+        {
+            dialogPanel.SetActive(true);
+        }
+
         if (UIRootManager.Instance != null)
         {
             UIRootManager.Instance.ShowDialog();
         }
 
-        // Çåµô¾ÉĞ­³Ì
         if (currentCoroutine != null)
         {
             StopCoroutine(currentCoroutine);
@@ -120,34 +121,26 @@ public class Dialog : MonoBehaviour
             clickCloseButton.gameObject.SetActive(waitingForClickClose);
         }
 
-        // ×Ô¶¯¹Ø±ÕÄ£Ê½
         if (autoClose)
         {
             currentCoroutine = StartCoroutine(HideAfterDelay());
         }
+
+        return true;
     }
 
-    /// <summary>
-    /// ×Ô¶¯µÈ´ıºó¹Ø±Õ
-    /// </summary>
     private IEnumerator HideAfterDelay()
     {
         yield return new WaitForSeconds(displayDuration);
         ForceHideImmediately();
     }
 
-    /// <summary>
-    /// µã»÷¹Ø±Õ°´Å¥
-    /// </summary>
     private void OnClickCloseDialog()
     {
         if (!waitingForClickClose) return;
         ForceHideImmediately();
     }
 
-    /// <summary>
-    /// Ç¿ÖÆÁ¢¼´¹Ø±Õµ¯´°
-    /// </summary>
     public void ForceHideImmediately()
     {
         if (currentCoroutine != null)
@@ -163,19 +156,50 @@ public class Dialog : MonoBehaviour
             clickCloseButton.gameObject.SetActive(false);
         }
 
+        if (dialogPanel != null)
+        {
+            dialogPanel.SetActive(false);
+        }
+
         if (UIRootManager.Instance != null)
         {
             UIRootManager.Instance.HideDialog();
         }
 
         HideOtherUI(false);
+        ResumeGameAfterFirstPickDialog();
     }
 
-    /// <summary>
-    /// ´ò¿ªµ¯´°Ê±Òş²ØÆäËûUI£¬¹Ø±Õµ¯´°Ê±»Ö¸´
-    /// </summary>
+    private void PauseGameForFirstPickDialog()
+    {
+        if (pausedByFirstPickDialog) return;
+
+        timeScaleBeforeDialog = Time.timeScale;
+        Time.timeScale = 0f;
+        pausedByFirstPickDialog = true;
+    }
+
+    private void ResumeGameAfterFirstPickDialog()
+    {
+        if (!pausedByFirstPickDialog) return;
+
+        Time.timeScale = timeScaleBeforeDialog <= 0f ? 1f : timeScaleBeforeDialog;
+        pausedByFirstPickDialog = false;
+    }
+
+    private string BuildSpiritIntro(ArchitecturalCrystal crystal)
+    {
+        string desc = string.IsNullOrEmpty(crystal.textDescription)
+            ? $"å‘ç°äº† {crystal.type}ã€‚å®ƒä¼šå¸¦æ¥ {crystal.expValue} ç‚¹ç»“æ„ç»éªŒã€‚"
+            : crystal.textDescription;
+
+        return $"ç²¾çµï¼š\n{desc}\n\nç‚¹å‡»æŒ‰é’®åç»§ç»­æ¢ç´¢ã€‚";
+    }
+
     private void HideOtherUI(bool hide)
     {
+        if (uiToHide == null) return;
+
         foreach (GameObject ui in uiToHide)
         {
             if (ui != null)

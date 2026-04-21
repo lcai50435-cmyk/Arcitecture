@@ -13,6 +13,12 @@ public class BaseHubBookInteract : MonoBehaviour, IInteractable
 
     public void OnInteract()
     {
+        if (UIManager.Instance != null)
+        {
+            UIManager.Instance.OpenIllustratedHandbook();
+            return;
+        }
+
         if (uiController == null)
             uiController = FindObjectOfType<BaseHubUIController>();
 

@@ -1,42 +1,41 @@
 using UnityEngine;
 
-/// <summary>
-/// Í¼¼øÉÏ½»ÇÅ½ÓÆ÷
-/// ²»¸ÄÔ­ÓĞÉÏ½»Á÷³Ì£¬Ö»ÔÚÉÏ½»Ç°°Ñ±³°üÊıÁ¿×ª»»³É¡°¿ÉµãÁÁ´ÎÊı¡±
-/// </summary>
 public class CatalogueSubmitBridgeInteractHandler : MonoBehaviour, IInteractable
 {
-    public string InteractionTip => "´ò¿ªÍ¼¼ø²¢ÉÏ½»";
+    public string InteractionTip => GameSceneBaseReturnBootstrapper.IsGameSceneActive()
+        ? "è¿”å›åŸºåœ°"
+        : "æ‰“å¼€å›¾é‰´å¹¶ä¸Šäº¤";
 
     public void OnInteract()
     {
+        if (GameSceneBaseReturnBootstrapper.IsGameSceneActive())
+        {
+            GameSceneBaseReturnBootstrapper.SubmitCatalogueAndReturnToBase();
+            return;
+        }
+
         BackpackMananger backpack = BackpackMananger.Instance;
         PlayerGetArchitectural player = FindObjectOfType<PlayerGetArchitectural>();
 
         if (backpack == null)
         {
-            Debug.LogError("Î´ÕÒµ½ BackpackMananger");
+            Debug.LogError("æœªæ‰¾åˆ° BackpackMananger");
             return;
         }
 
         if (player == null)
         {
-            Debug.LogError("Î´ÕÒµ½ PlayerGetArchitectural");
+            Debug.LogError("æœªæ‰¾åˆ° PlayerGetArchitectural");
             return;
         }
 
-        int itemCount = backpack.backpackItems.Count;
-
-        // ÏÈ°ÑÕâ´ÎÉÏ½»µÄÎïÆ·ÊıÁ¿×ª³É¡°¿ÉµãÁÁ´ÎÊı¡±
+        int itemCount = backpack.GetOccupiedCount();
         if (CatalogueUnlockSelectionManager.Instance != null && itemCount > 0)
         {
             CatalogueUnlockSelectionManager.Instance.AddUnlockCount(itemCount);
         }
 
-        // ¼ÌĞø×ßÄãÔ­À´µÄ¾­ÑéÉÏ½»Á÷³Ì
         player.SubmitAllCachedExp();
-
-        // ´ò¿ªÍ¼¼ø
         UIManager.Instance?.OpenIllustratedHandbook();
     }
 }

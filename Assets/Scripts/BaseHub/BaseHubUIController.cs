@@ -10,11 +10,13 @@ public class BaseHubUIController : MonoBehaviour
     private PlayerMove playerMove;
     private Rigidbody2D playerBody;
     private PlayerInteraction playerInteraction;
+    private BaseHubInkAttack playerInkAttack;
     private bool isModalOpen;
     private bool hasSavedPlayerState;
     private bool wasMoveEnabled;
     private bool wasCanMove;
     private bool wasBodySimulated = true;
+    private bool wasInkAttackEnabled;
 
     public void Configure(
         GameObject playerObject,
@@ -30,6 +32,7 @@ public class BaseHubUIController : MonoBehaviour
         playerMove = player != null ? player.GetComponent<PlayerMove>() : null;
         playerBody = player != null ? player.GetComponent<Rigidbody2D>() : null;
         playerInteraction = player != null ? player.GetComponent<PlayerInteraction>() : null;
+        playerInkAttack = player != null ? player.GetComponent<BaseHubInkAttack>() : null;
 
         ClosePanelsOnly();
     }
@@ -88,6 +91,7 @@ public class BaseHubUIController : MonoBehaviour
             wasMoveEnabled = playerMove == null || playerMove.enabled;
             wasCanMove = playerMove == null || playerMove.canMove;
             wasBodySimulated = playerBody == null || playerBody.simulated;
+            wasInkAttackEnabled = playerInkAttack == null || playerInkAttack.enabled;
             hasSavedPlayerState = true;
         }
 
@@ -99,6 +103,9 @@ public class BaseHubUIController : MonoBehaviour
             playerMove.canMove = false;
             playerMove.enabled = false;
         }
+
+        if (playerInkAttack != null)
+            playerInkAttack.enabled = false;
 
         if (playerBody != null)
         {
@@ -119,6 +126,9 @@ public class BaseHubUIController : MonoBehaviour
             playerMove.enabled = wasMoveEnabled;
             playerMove.canMove = wasCanMove;
         }
+
+        if (playerInkAttack != null)
+            playerInkAttack.enabled = wasInkAttackEnabled;
 
         hasSavedPlayerState = false;
     }

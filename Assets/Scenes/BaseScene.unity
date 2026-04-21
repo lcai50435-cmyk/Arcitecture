@@ -171,6 +171,10 @@ MonoBehaviour:
   avatarSprite: {fileID: 0}
   bookSprite: {fileID: 0}
   spiritSprite: {fileID: 0}
+  hubMapSprite: {fileID: 0}
+  handbookUIPrefab: {fileID: 100100000, guid: 22b88ab0514320d448b19bb7f925f60d, type: 3}
+  healthHudPrefab: {fileID: 100100000, guid: e913fcbbfae233b49a4d97c95b252361, type: 3}
+  weaponHudPrefab: {fileID: 100100000, guid: e228bafa456fad54dad3ef726a3ab6d4, type: 3}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

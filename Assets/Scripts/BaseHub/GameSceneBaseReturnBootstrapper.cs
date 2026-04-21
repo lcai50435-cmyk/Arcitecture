@@ -1,8 +1,6 @@
-using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.SceneManagement;
-using UnityEngine.UI;
 
 public class GameSceneBaseReturnBootstrapper : MonoBehaviour
 {
@@ -34,23 +32,6 @@ public class GameSceneBaseReturnBootstrapper : MonoBehaviour
     private void Build()
     {
         EnsureEventSystem();
-
-        GameObject canvasObject = new GameObject("GameSceneBaseReturnCanvas");
-        canvasObject.transform.SetParent(transform, false);
-
-        Canvas canvas = canvasObject.AddComponent<Canvas>();
-        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-        canvas.sortingOrder = 50;
-
-        CanvasScaler scaler = canvasObject.AddComponent<CanvasScaler>();
-        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-        scaler.referenceResolution = new Vector2(1920f, 1080f);
-        scaler.matchWidthOrHeight = 0.5f;
-
-        canvasObject.AddComponent<GraphicRaycaster>();
-
-        Button returnButton = CreateReturnButton(canvasObject.transform);
-        returnButton.onClick.AddListener(ReturnToBaseScene);
     }
 
     private static void EnsureEventSystem()
@@ -62,43 +43,18 @@ public class GameSceneBaseReturnBootstrapper : MonoBehaviour
         eventSystem.AddComponent<StandaloneInputModule>();
     }
 
-    private static Button CreateReturnButton(Transform parent)
+    public static bool IsGameSceneActive()
     {
-        GameObject buttonObject = new GameObject("ReturnBaseButton", typeof(RectTransform));
-        buttonObject.transform.SetParent(parent, false);
-
-        RectTransform rect = buttonObject.GetComponent<RectTransform>();
-        rect.anchorMin = new Vector2(1f, 1f);
-        rect.anchorMax = new Vector2(1f, 1f);
-        rect.pivot = new Vector2(1f, 1f);
-        rect.anchoredPosition = new Vector2(-36f, -36f);
-        rect.sizeDelta = new Vector2(160f, 54f);
-
-        Image image = buttonObject.AddComponent<Image>();
-        image.color = new Color(0.12f, 0.08f, 0.05f, 0.88f);
-
-        Button button = buttonObject.AddComponent<Button>();
-        button.targetGraphic = image;
-
-        GameObject labelObject = new GameObject("Label", typeof(RectTransform));
-        labelObject.transform.SetParent(buttonObject.transform, false);
-        RectTransform labelRect = labelObject.GetComponent<RectTransform>();
-        labelRect.anchorMin = Vector2.zero;
-        labelRect.anchorMax = Vector2.one;
-        labelRect.offsetMin = Vector2.zero;
-        labelRect.offsetMax = Vector2.zero;
-
-        TextMeshProUGUI label = labelObject.AddComponent<TextMeshProUGUI>();
-        label.text = "返回基地";
-        label.font = TMP_Settings.defaultFontAsset;
-        label.fontSize = 24;
-        label.alignment = TextAlignmentOptions.Center;
-        label.color = new Color(0.96f, 0.86f, 0.62f, 1f);
-
-        return button;
+        return SceneManager.GetActiveScene().name == GameSceneName;
     }
 
-    private static void ReturnToBaseScene()
+    public static void SubmitCatalogueAndReturnToBase()
+    {
+        SubmitBackpackToCatalogue();
+        ReturnToBaseScene();
+    }
+
+    public static void ReturnToBaseScene()
     {
         Time.timeScale = 1f;
 
@@ -109,5 +65,29 @@ public class GameSceneBaseReturnBootstrapper : MonoBehaviour
         }
 
         SceneManager.LoadScene(BaseSceneName);
+    }
+
+    private static void SubmitBackpackToCatalogue()
+    {
+        BackpackMananger backpack = BackpackMananger.Instance;
+        PlayerGetArchitectural player = FindObjectOfType<PlayerGetArchitectural>();
+
+        if (backpack == null || player == null)
+        {
+            return;
+        }
+
+        int itemCount = backpack.GetOccupiedCount();
+        if (itemCount <= 0)
+        {
+            return;
+        }
+
+        if (CatalogueUnlockSelectionManager.Instance != null)
+        {
+            CatalogueUnlockSelectionManager.Instance.AddUnlockCount(itemCount);
+        }
+
+        player.SubmitAllCachedExp();
     }
 }
