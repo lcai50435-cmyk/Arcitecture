@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 
 public class CharacterDeathBase : MonoBehaviour
@@ -7,6 +8,9 @@ public class CharacterDeathBase : MonoBehaviour
     protected Animator anim;
     protected CharacterCore core;
     private bool deathTriggered;
+    private bool deathCompleted;
+
+    public event Action OnDeathSequenceCompleted;
 
     protected virtual void Awake()
     {
@@ -24,6 +28,7 @@ public class CharacterDeathBase : MonoBehaviour
         }
 
         deathTriggered = true;
+        DisableAliveOnlyComponents();
         DisablePhysicsComponents();
         OnCharacterDie();
         StartCoroutine(DestroyAfterDelayRoutine());
@@ -55,6 +60,34 @@ public class CharacterDeathBase : MonoBehaviour
         }
     }
 
+    protected virtual void DisableAliveOnlyComponents()
+    {
+        CharacterAttack attackBehaviour = GetComponent<CharacterAttack>();
+        if (attackBehaviour != null)
+        {
+            attackBehaviour.HandleOwnerDeathImmediate();
+        }
+
+        EnemyChase enemyChase = GetComponent<EnemyChase>();
+        if (enemyChase != null)
+        {
+            enemyChase.enabled = false;
+        }
+
+        EnemyMove enemyMove = GetComponent<EnemyMove>();
+        if (enemyMove != null)
+        {
+            enemyMove.StopMovement();
+            enemyMove.enabled = false;
+        }
+
+        EnemyStatsManager enemyStats = GetComponent<EnemyStatsManager>();
+        if (enemyStats != null)
+        {
+            enemyStats.enabled = false;
+        }
+    }
+
     protected virtual void OnCharacterDie()
     {
         // 交由子类播放死亡表现
@@ -67,6 +100,13 @@ public class CharacterDeathBase : MonoBehaviour
 
     protected void CompleteDeathDestroy()
     {
+        if (deathCompleted)
+        {
+            return;
+        }
+
+        deathCompleted = true;
+        OnDeathSequenceCompleted?.Invoke();
         Destroy(gameObject);
     }
 

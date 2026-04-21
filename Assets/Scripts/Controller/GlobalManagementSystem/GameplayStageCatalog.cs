@@ -5,6 +5,8 @@ using System.Collections.Generic;
 public class GameplayStageDefinition
 {
     public string stageId;
+    public string stageLabel;
+    public string mapTitle;
     public string displayName;
     public string sceneName;
     public CatalogueBuildingId gatingBuildingId;
@@ -18,6 +20,8 @@ public static class GameplayStageCatalog
         new GameplayStageDefinition
         {
             stageId = "stage_01",
+            stageLabel = "第一关",
+            mapTitle = "福建土楼",
             displayName = "第一关 · 福建土楼",
             sceneName = "GameScene",
             gatingBuildingId = CatalogueBuildingId.Building1,
@@ -26,6 +30,8 @@ public static class GameplayStageCatalog
         new GameplayStageDefinition
         {
             stageId = "stage_02",
+            stageLabel = "第二关",
+            mapTitle = "赵州桥",
             displayName = "第二关 · 赵州桥",
             sceneName = "GameScene_02",
             gatingBuildingId = CatalogueBuildingId.Building1,
@@ -34,6 +40,8 @@ public static class GameplayStageCatalog
         new GameplayStageDefinition
         {
             stageId = "stage_03",
+            stageLabel = "第三关",
+            mapTitle = "安徽水乡民居",
             displayName = "第三关 · 安徽水乡民居",
             sceneName = "GameScene_03",
             gatingBuildingId = CatalogueBuildingId.Building2,

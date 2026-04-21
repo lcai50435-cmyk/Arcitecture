@@ -34,6 +34,19 @@ public static class GameProgressPersistence
 
     public static string SavePath => Path.Combine(Application.persistentDataPath, SaveFileName);
 
+    public static bool HasSaveData()
+    {
+        try
+        {
+            return File.Exists(SavePath) && new FileInfo(SavePath).Length > 0L;
+        }
+        catch (Exception exception)
+        {
+            Debug.LogWarning($"检查游戏进度失败：{exception.Message}");
+            return File.Exists(SavePath);
+        }
+    }
+
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
     private static void Bootstrap()
     {
@@ -84,6 +97,23 @@ public static class GameProgressPersistence
         }
     }
 
+    public static void ResetSaveData()
+    {
+        bool previousSuppressState = suppressSave;
+        suppressSave = true;
+
+        try
+        {
+            DeleteSaveFileIfExists();
+            ApplyLoadedData(null);
+        }
+        finally
+        {
+            suppressSave = previousSuppressState;
+            isReady = true;
+        }
+    }
+
     public static void RunWithoutSaving(Action action)
     {
         bool previousSuppressState = suppressSave;
@@ -120,6 +150,23 @@ public static class GameProgressPersistence
         {
             Debug.LogWarning($"读取游戏进度失败：{exception.Message}");
             return null;
+        }
+    }
+
+    private static void DeleteSaveFileIfExists()
+    {
+        try
+        {
+            if (!File.Exists(SavePath))
+            {
+                return;
+            }
+
+            File.Delete(SavePath);
+        }
+        catch (Exception exception)
+        {
+            Debug.LogWarning($"删除游戏进度失败：{exception.Message}");
         }
     }
 
@@ -163,5 +210,21 @@ public static class GameProgressPersistence
             availableSpecialStructureInventory = runtimeState.AvailableSpecialStructureInventory,
             buildingStates = runtimeState.ExportSaveData()
         };
+    }
+}
+
+public static class GameSaveResetService
+{
+    public static bool HasAnySaveData()
+    {
+        return GameProgressPersistence.HasSaveData() || PhotoAlbumRepository.HasEntries();
+    }
+
+    public static void ResetAllSaveData()
+    {
+        GameProgressPersistence.ResetSaveData();
+        PhotoAlbumRepository.ClearAll();
+        RuntimeCollectedCrystalRegistry.Instance?.Clear();
+        BackpackMananger.Instance?.ClearAllItems();
     }
 }

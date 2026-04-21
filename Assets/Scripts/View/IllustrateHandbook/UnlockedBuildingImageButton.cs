@@ -2,21 +2,21 @@ using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
-/// ½¨ÖşÍ¼Æ¬½âËøºó¿Éµã»÷£¬µã»÷Ìø×ªµ½ÏêÏ¸ĞÅÏ¢½çÃæ
+/// å»ºç­‘å›¾ç‰‡è§£é”åå¯ç‚¹å‡»ï¼Œç‚¹å‡»è·³è½¬åˆ°è¯¦ç»†ä¿¡æ¯ç•Œé¢
 /// </summary>
 [RequireComponent(typeof(Button))]
 public class UnlockedBuildingImageButton : MonoBehaviour
 {
-    [Header("µ±Ç°½¨Öş×´Ì¬½Å±¾")]
+    [Header("å½“å‰å»ºç­‘çŠ¶æ€è„šæœ¬")]
     public CatalogueBuildingUnlockState buildingUnlockState;
 
-    [Header("Í¼¼øÖ÷½çÃæ")]
+    [Header("å›¾é‰´ä¸»ç•Œé¢")]
     public GameObject illustratedHandbookPanel;
 
-    [Header("ÏêÏ¸ĞÅÏ¢½çÃæ")]
+    [Header("è¯¦ç»†ä¿¡æ¯ç•Œé¢")]
     public GameObject detailedInformationPanel;
 
-    [Header("ÊÇ·ñ½âËøºó²ÅÔÊĞíµã»÷")]
+    [Header("æ˜¯å¦è§£é”åæ‰å…è®¸ç‚¹å‡»")]
     public bool onlyClickableWhenUnlocked = true;
 
     private Button button;
@@ -81,7 +81,7 @@ public class UnlockedBuildingImageButton : MonoBehaviour
             }
         }
 
-        Debug.Log("µã»÷ÒÑ½âËø½¨ÖşÍ¼Æ¬£¬Ìø×ªµ½ÏêÏ¸ĞÅÏ¢½çÃæ");
+        Debug.Log("ç‚¹å‡»å·²è§£é”å»ºç­‘å›¾ç‰‡ï¼Œè·³è½¬åˆ°è¯¦ç»†ä¿¡æ¯ç•Œé¢");
 
         if (illustratedHandbookPanel != null)
         {

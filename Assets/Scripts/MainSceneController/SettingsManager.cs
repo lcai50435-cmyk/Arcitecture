@@ -20,6 +20,7 @@ public sealed class SettingsManager : MonoBehaviour
     {
         InitializeVolume();
         InitializeResolution();
+        ApplyRuntimeFonts();
 
         if (closeButton != null)
         {
@@ -131,5 +132,18 @@ public sealed class SettingsManager : MonoBehaviour
         }
 
         currentDraft.resolutionIndex = Mathf.Clamp(index, 0, GameSettingsStore.ResolutionOptionCount - 1);
+    }
+
+    private void ApplyRuntimeFonts()
+    {
+        RuntimeTextFontRepair.RepairLegacyText(volumeText);
+
+        if (resolutionDropdown == null)
+        {
+            return;
+        }
+
+        RuntimeTextFontRepair.RepairLegacyText(resolutionDropdown.captionText);
+        RuntimeTextFontRepair.RepairLegacyText(resolutionDropdown.itemText);
     }
 }

@@ -126,11 +126,11 @@ public class EnemyPatrol : MonoBehaviour
 
     private void PickNextTarget(Vector2 currentPosition)
     {
-        // ¸ü¸ÄµÄ´úÂë
+        // æ›´æ”¹çš„ä»£ç 
         Vector2 currentAlignedPos = GetAlignedPosition(currentPosition);
 
         float minimumDistance = Mathf.Max(patrolPointSnap * 0.5f, minPatrolPointDistance);
-        Vector2 bestCandidate = currentAlignedPos; // Ô­À´ÊÇÕâ¸öcurrentPosition
+        Vector2 bestCandidate = currentAlignedPos; // åŸæ¥æ˜¯è¿™ä¸ªcurrentPosition
         float bestDistance = 0f;
         bool hasFallbackCandidate = false;
 
@@ -141,7 +141,7 @@ public class EnemyPatrol : MonoBehaviour
                 Random.Range(-patrolRange.y, patrolRange.y));
 
             Vector2 candidate = GetReachableAlignedPosition(
-                SnapPatrolPoint(currentAlignedPos + randomOffset), currentAlignedPos); // Ô­À´ÊÇÕâ¸öspawnPoint
+                SnapPatrolPoint(currentAlignedPos + randomOffset), currentAlignedPos); // åŸæ¥æ˜¯è¿™ä¸ªspawnPoint
 
             if (avoidObstacle != null && avoidObstacle.IsPointBlocked(candidate))
             {
@@ -256,7 +256,7 @@ public class EnemyPatrol : MonoBehaviour
             return spawnPoint;
         }
 
-        return GetAlignedPosition(transform.position); // Ô­À´ÊÇÕâ¸ötransform.position
+        return GetAlignedPosition(transform.position); // åŸæ¥æ˜¯è¿™ä¸ªtransform.position
     }
 
     private void OnDrawGizmos()

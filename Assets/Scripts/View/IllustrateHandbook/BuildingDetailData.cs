@@ -2,24 +2,24 @@ using UnityEngine;
 
 public class BuildingDetailData : MonoBehaviour
 {
-    [Header("½¨ÖşÃû³Æ")]
+    [Header("å»ºç­‘åç§°")]
     public string buildingName;
 
-    [Header("µÚÒ»Ò³Í¼Æ¬")]
+    [Header("ç¬¬ä¸€é¡µå›¾ç‰‡")]
     public Sprite detailSprite1;
 
-    [Header("µÚ¶şÒ³Í¼Æ¬")]
+    [Header("ç¬¬äºŒé¡µå›¾ç‰‡")]
     public Sprite detailSprite2;
 
-    [Header("µÚÒ»Ò³½éÉÜ")]
+    [Header("ç¬¬ä¸€é¡µä»‹ç»")]
     [TextArea(2, 6)]
     public string introduction1;
 
-    [Header("µÚ¶şÒ³½éÉÜ")]
+    [Header("ç¬¬äºŒé¡µä»‹ç»")]
     [TextArea(2, 6)]
     public string introduction2;
 
-    [Header("µÚ¶şÒ³×îÖÕ½éÉÜ")]
+    [Header("ç¬¬äºŒé¡µæœ€ç»ˆä»‹ç»")]
     [TextArea(2, 8)]
     public string finalIntroduction;
 }

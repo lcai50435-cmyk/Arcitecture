@@ -2,16 +2,16 @@ using UnityEngine;
 
 public class CrackDamage : MonoBehaviour
 {
-    private float damage = 20; // 攻击伤害
+    private float damage = 20; // 鏀诲嚮浼ゅ
 
 
-    // 因为碰撞矩阵已经过滤，这里进来的一定是玩家
+    // 鍥犱负纰版挒鐭╅樀宸茬粡杩囨护锛岃繖閲岃繘鏉ョ殑涓�瀹氭槸鐜╁
     private void OnTriggerEnter2D(Collider2D other)
     {
-        // 只认玩家标签！敌人永远不会触发！
+        // 鍙鐜╁鏍囩锛佹晫浜烘案杩滀笉浼氳Е鍙戯紒
         if (!other.CompareTag("Player")) return;
 
-        // 直接拿玩家脚本造成伤害
+        // 鐩存帴鎷跨帺瀹惰剼鏈�犳垚浼ゅ
         CharacterCore player = other.GetComponent<CharacterCore>();
 
         if (other.CompareTag("Player")) 

@@ -38,7 +38,6 @@ public class CrystalInteractHandler : MonoBehaviour, IInteractable
 
     private string runtimeCollectionId;
     private bool collectionIdResolved;
-    private bool lootBagOpened;
 
     private void Awake()
     {
@@ -62,12 +61,6 @@ public class CrystalInteractHandler : MonoBehaviour, IInteractable
             return;
         }
 
-        if (startClosedAsLootBag && !lootBagOpened)
-        {
-            OpenLootBag();
-            return;
-        }
-
         if (ShouldTriggerPickupAmbush())
         {
             RegisterCollectedState();
@@ -76,6 +69,17 @@ public class CrystalInteractHandler : MonoBehaviour, IInteractable
         }
 
         ArchitecturalCrystal data = BuildRuntimeCrystalData();
+
+        if (startClosedAsLootBag &&
+            RuntimeBackpackPickupAnimator.TryAnimateLootBagPickup(
+                data,
+                transform.position,
+                closedLootBagSprite != null ? closedLootBagSprite : icon))
+        {
+            RegisterCollectedState();
+            Destroy(gameObject);
+            return;
+        }
 
         bool pickSuccess = player.PickCrystal(data);
 
@@ -94,9 +98,9 @@ public class CrystalInteractHandler : MonoBehaviour, IInteractable
     {
         get
         {
-            if (startClosedAsLootBag && !lootBagOpened)
+            if (startClosedAsLootBag)
             {
-                return "打开锦囊";
+                return "收取锦囊";
             }
 
             ArchitecturalResourceCategory category = resourceCategory;
@@ -117,24 +121,6 @@ public class CrystalInteractHandler : MonoBehaviour, IInteractable
 
             return "拾取晶体";
         }
-    }
-
-    private void OpenLootBag()
-    {
-        lootBagOpened = true;
-        startClosedAsLootBag = false;
-
-        SpriteRenderer spriteRenderer = GetComponent<SpriteRenderer>();
-        if (spriteRenderer != null)
-        {
-            Sprite revealedSprite = revealedLootSprite != null
-                ? revealedLootSprite
-                : (icon != null ? icon : spriteRenderer.sprite);
-            spriteRenderer.sprite = revealedSprite;
-        }
-
-        transform.localScale *= 1.08f;
-        Debug.Log($"打开锦囊，露出了 {BuildRuntimeCrystalData().DisplayName}");
     }
 
     private ArchitecturalCrystal BuildRuntimeCrystalData()

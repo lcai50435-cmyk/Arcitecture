@@ -16,6 +16,6 @@ public class SpiritInteract : MonoBehaviour, IInteractable
         if (uiController == null)
             uiController = FindObjectOfType<BaseHubUIController>();
 
-        uiController?.OpenSpiritPanel();
+        uiController?.OpenSpiritPanel(RuntimeModalOpenSource.Interact);
     }
 }

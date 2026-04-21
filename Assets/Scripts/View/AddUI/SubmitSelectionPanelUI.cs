@@ -55,7 +55,7 @@ public class SubmitSelectionPanelUI : MonoBehaviour
 
         if (UIRootManager.Instance != null)
         {
-            UIRootManager.Instance.ShowSubmitSelection((int)currentTargetBuilding);
+            UIRootManager.Instance.OpenModal(ResolveModalType(), RuntimeModalOpenSource.None, true);
         }
         else
         {
@@ -79,7 +79,7 @@ public class SubmitSelectionPanelUI : MonoBehaviour
 
         if (UIRootManager.Instance != null)
         {
-            UIRootManager.Instance.HideSubmitSelection((int)currentTargetBuilding);
+            UIRootManager.Instance.OpenModal(RuntimeModalType.Handbook, RuntimeModalOpenSource.None, true);
         }
         else
         {
@@ -103,7 +103,11 @@ public class SubmitSelectionPanelUI : MonoBehaviour
 
         if (UIRootManager.Instance != null)
         {
-            UIRootManager.Instance.HideAllSubmitSelection();
+            GameObject root = panelRoot != null ? panelRoot : gameObject;
+            if (root != null)
+            {
+                root.SetActive(false);
+            }
         }
         else
         {
@@ -293,5 +297,20 @@ public class SubmitSelectionPanelUI : MonoBehaviour
         }
 
         return false;
+    }
+
+    private RuntimeModalType ResolveModalType()
+    {
+        switch (currentTargetBuilding)
+        {
+            case CatalogueBuildingId.Building1:
+                return RuntimeModalType.SubmitSelection1;
+            case CatalogueBuildingId.Building2:
+                return RuntimeModalType.SubmitSelection2;
+            case CatalogueBuildingId.Building3:
+                return RuntimeModalType.SubmitSelection3;
+            default:
+                return RuntimeModalType.SubmitSelection1;
+        }
     }
 }

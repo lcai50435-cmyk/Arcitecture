@@ -4,13 +4,13 @@ using UnityEngine.UI;
 [RequireComponent(typeof(Button))]
 public class BuildingDetailOpenButton : MonoBehaviour
 {
-    [Header("µ±Ç°½¨ÖşÊÇ·ñ½âËø")]
+    [Header("å½“å‰å»ºç­‘æ˜¯å¦è§£é”")]
     public CatalogueBuildingUnlockState buildingUnlockState;
 
-    [Header("µ±Ç°½¨ÖşµÄÊı¾İ")]
+    [Header("å½“å‰å»ºç­‘çš„æ•°æ®")]
     public BuildingDetailData buildingDetailData;
 
-    [Header("ÏêÏ¸ĞÅÏ¢½çÃæ¿ØÖÆÆ÷")]
+    [Header("è¯¦ç»†ä¿¡æ¯ç•Œé¢æ§åˆ¶å™¨")]
     public DetailedInformationUI detailedInformationUI;
 
     private Button button;
@@ -59,7 +59,7 @@ public class BuildingDetailOpenButton : MonoBehaviour
 
         if (detailedInformationUI == null)
         {
-            Debug.LogError("DetailedInformationUI Î´°ó¶¨");
+            Debug.LogError("DetailedInformationUI æœªç»‘å®š");
             return;
         }
 

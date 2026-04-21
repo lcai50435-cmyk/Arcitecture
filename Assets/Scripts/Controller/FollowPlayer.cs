@@ -4,12 +4,12 @@ using UnityEngine;
 
 public class FollowPlayer : MonoBehaviour
 {
-    public Transform player; // ÍÏÈëÄãµÄ Player
+    public Transform player; // æ‹–å…¥ä½ çš„ Player
 
     // Update is called once per frame
     void Update()
     {        
-        // ÔÚÍæ¼ÒÍ·¶¥ 1 Ã×µÄÎ»ÖÃ¸úËæ
+        // åœ¨ç©å®¶å¤´é¡¶ 1 ç±³çš„ä½ç½®è·Ÿéš
         transform.position = player.position + new Vector3(4, -2, 0);
         transform.rotation = player.rotation;
     }

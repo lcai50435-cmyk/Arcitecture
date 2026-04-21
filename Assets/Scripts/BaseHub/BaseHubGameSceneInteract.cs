@@ -21,7 +21,7 @@ public class BaseHubGameSceneInteract : MonoBehaviour, IInteractable
 
         if (uiController != null)
         {
-            uiController.OpenStageSelectionPanel();
+            uiController.OpenStageSelectionPanel(RuntimeModalOpenSource.Interact);
             return;
         }
 

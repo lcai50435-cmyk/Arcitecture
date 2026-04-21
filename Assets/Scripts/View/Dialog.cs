@@ -1,9 +1,12 @@
 using System.Collections;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 public class Dialog : MonoBehaviour
 {
+    private const string GameplayPauseReason = "RuntimeDialog";
+
     [Header("UI 组件")]
     public GameObject dialogPanel;
     public Text descriptionText;
@@ -23,12 +26,13 @@ public class Dialog : MonoBehaviour
     private BackpackMananger backpackManager;
     private Coroutine currentCoroutine;
     private bool waitingForClickClose;
-    private bool pausedByFirstPickDialog;
-    private float timeScaleBeforeDialog = 1f;
+    private bool isClosingDialog;
+    private bool requestedGameplayPause;
 
     private void Start()
     {
         backpackManager = BackpackMananger.Instance;
+        RuntimeTextFontRepair.RepairLegacyText(descriptionText);
 
         if (backpackManager != null)
         {
@@ -61,10 +65,7 @@ public class Dialog : MonoBehaviour
         if (crystal.isUnlockMaterial) return;
 
         string desc = BuildSpiritIntro(crystal);
-        if (InternalShow(desc, false))
-        {
-            PauseGameForFirstPickDialog();
-        }
+        InternalShow(desc, false);
     }
 
     public void ShowAutoDialog(string desc)
@@ -97,15 +98,21 @@ public class Dialog : MonoBehaviour
         }
 
         HideOtherUI(true);
-
-        if (dialogPanel != null)
-        {
-            dialogPanel.SetActive(true);
-        }
+        isClosingDialog = false;
+        PauseGameForFirstPickDialog();
 
         if (UIRootManager.Instance != null)
         {
-            UIRootManager.Instance.ShowDialog();
+            if (dialogPanel != null)
+            {
+                dialogPanel.SetActive(true);
+            }
+
+            UIRootManager.Instance.OpenModal(RuntimeModalType.Dialog, RuntimeModalOpenSource.None);
+        }
+        else if (dialogPanel != null)
+        {
+            dialogPanel.SetActive(true);
         }
 
         if (currentCoroutine != null)
@@ -132,13 +139,38 @@ public class Dialog : MonoBehaviour
     private IEnumerator HideAfterDelay()
     {
         yield return new WaitForSeconds(displayDuration);
-        ForceHideImmediately();
+        CloseDialog();
     }
 
     private void OnClickCloseDialog()
     {
         if (!waitingForClickClose) return;
-        ForceHideImmediately();
+        CloseDialog();
+    }
+
+    public void CloseDialog()
+    {
+        if (isClosingDialog)
+        {
+            return;
+        }
+
+        if (currentCoroutine != null)
+        {
+            StopCoroutine(currentCoroutine);
+            currentCoroutine = null;
+        }
+
+        waitingForClickClose = false;
+        isClosingDialog = true;
+
+        if (UIRootManager.Instance != null && UIRootManager.Instance.ActiveModalType == RuntimeModalType.Dialog)
+        {
+            UIRootManager.Instance.CloseModalFlow(CompleteCloseDialog);
+            return;
+        }
+
+        CompleteCloseDialog();
     }
 
     public void ForceHideImmediately()
@@ -150,6 +182,7 @@ public class Dialog : MonoBehaviour
         }
 
         waitingForClickClose = false;
+        isClosingDialog = false;
 
         if (clickCloseButton != null)
         {
@@ -170,21 +203,43 @@ public class Dialog : MonoBehaviour
         ResumeGameAfterFirstPickDialog();
     }
 
+    private void CompleteCloseDialog()
+    {
+        if (clickCloseButton != null)
+        {
+            clickCloseButton.gameObject.SetActive(false);
+        }
+
+        if (dialogPanel != null)
+        {
+            dialogPanel.SetActive(false);
+        }
+
+        HideOtherUI(false);
+        ResumeGameAfterFirstPickDialog();
+        isClosingDialog = false;
+    }
+
     private void PauseGameForFirstPickDialog()
     {
-        if (pausedByFirstPickDialog) return;
+        if (requestedGameplayPause || !GameplayStageCatalog.IsGameplayScene(SceneManager.GetActiveScene().name))
+        {
+            return;
+        }
 
-        timeScaleBeforeDialog = Time.timeScale;
-        Time.timeScale = 0f;
-        pausedByFirstPickDialog = true;
+        RuntimeGameplayPauseController.RequestPause(GameplayPauseReason);
+        requestedGameplayPause = true;
     }
 
     private void ResumeGameAfterFirstPickDialog()
     {
-        if (!pausedByFirstPickDialog) return;
+        if (!requestedGameplayPause)
+        {
+            return;
+        }
 
-        Time.timeScale = timeScaleBeforeDialog <= 0f ? 1f : timeScaleBeforeDialog;
-        pausedByFirstPickDialog = false;
+        RuntimeGameplayPauseController.ReleasePause(GameplayPauseReason);
+        requestedGameplayPause = false;
     }
 
     private string BuildSpiritIntro(ArchitecturalCrystal crystal)

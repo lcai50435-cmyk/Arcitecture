@@ -15,13 +15,13 @@ public class BaseHubBookInteract : MonoBehaviour, IInteractable
     {
         if (UIManager.Instance != null)
         {
-            UIManager.Instance.OpenIllustratedHandbook();
+            UIManager.Instance.OpenIllustratedHandbook(RuntimeModalOpenSource.Interact);
             return;
         }
 
         if (uiController == null)
             uiController = FindObjectOfType<BaseHubUIController>();
 
-        uiController?.OpenIllustratedHandbook();
+        uiController?.OpenIllustratedHandbook(RuntimeModalOpenSource.Interact);
     }
 }

@@ -30,6 +30,6 @@ public class CatalogueSubmitBridgeInteractHandler : MonoBehaviour, IInteractable
         }
 
         player.SubmitAllCachedExp();
-        UIManager.Instance?.OpenIllustratedHandbook();
+        UIManager.Instance?.OpenIllustratedHandbook(RuntimeModalOpenSource.Interact);
     }
 }

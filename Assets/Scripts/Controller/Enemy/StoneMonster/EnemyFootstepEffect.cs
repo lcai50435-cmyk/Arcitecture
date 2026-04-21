@@ -2,37 +2,37 @@ using UnityEngine;
 
 public class EnemyFootstepEffect : MonoBehaviour
 {
-    [Header("²ÈµØÁÑÎÆÔ¤Éè")]
+    [Header("è¸©åœ°è£‚çº¹é¢„è®¾")]
     public GameObject crackEffectPrefab;
 
-    [Header("ÁÑÎÆÏÔÊ¾Ê±³¤£¨Ãë£©")]
+    [Header("è£‚çº¹æ˜¾ç¤ºæ—¶é•¿ï¼ˆç§’ï¼‰")]
     public float effectDuration = 0.5f;
 
-    [Header("µĞÈËÎ»ÖÃ")]
+    [Header("æ•Œäººä½ç½®")]
     public Transform enemyTransform;
 
-    [Header("ÁÑÎÆÉú³É¼ä¸ô£¨Ãë£©")]
-    public float spawnInterval = 2f; // Ã¿2ÃëÉú³ÉÒ»´Î
+    [Header("è£‚çº¹ç”Ÿæˆé—´éš”ï¼ˆç§’ï¼‰")]
+    public float spawnInterval = 2f; // æ¯2ç§’ç”Ÿæˆä¸€æ¬¡
 
-    // ÀäÈ´Ê±¼ä¼ÇÂ¼
-    private float lastSpawnTime = -2f; // Ò»¿ªÊ¼¾ÍÄÜÉú³É
+    // å†·å´æ—¶é—´è®°å½•
+    private float lastSpawnTime = -2f; // ä¸€å¼€å§‹å°±èƒ½ç”Ÿæˆ
 
     /// <summary>
-    /// ÁÑÎÆÉú³É½Å±¾
+    /// è£‚çº¹ç”Ÿæˆè„šæœ¬
     /// </summary>
     public void SpawnFootstepCrack()
     {
-        // ¾àÀëÉÏ´ÎÉú³É²»×ã2Ãë£¬Ö±½ÓÌø¹ı£¬²»Éú³É
+        // è·ç¦»ä¸Šæ¬¡ç”Ÿæˆä¸è¶³2ç§’ï¼Œç›´æ¥è·³è¿‡ï¼Œä¸ç”Ÿæˆ
         if (Time.time < lastSpawnTime + spawnInterval)
             return;
 
         if (crackEffectPrefab == null || enemyTransform == null)
             return;
 
-        // ¸üĞÂ×îºóÉú³ÉÊ±¼ä
+        // æ›´æ–°æœ€åç”Ÿæˆæ—¶é—´
         lastSpawnTime = Time.time;
 
-        // Éú³ÉÁÑÎÆ
+        // ç”Ÿæˆè£‚çº¹
         GameObject crack = Instantiate(
             crackEffectPrefab,
             enemyTransform.position,
@@ -45,7 +45,7 @@ public class EnemyFootstepEffect : MonoBehaviour
             crackRenderer.sortingOrder = 0;
         }
 
-        // ×Ô¶¯Ïú»Ù
+        // è‡ªåŠ¨é”€æ¯
         Destroy(crack, effectDuration);
     }
 }

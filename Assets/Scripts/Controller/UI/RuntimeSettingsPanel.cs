@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Text;
 using TMPro;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using UnityEngine.TextCore.LowLevel;
 using UnityEngine.UI;
 
@@ -13,7 +14,8 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
     {
         Audio,
         Display,
-        Controls
+        Controls,
+        Data
     }
 
     private const string CanvasName = "RuntimeSettingsPanelCanvas";
@@ -23,14 +25,11 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
     private const float CardWidth = 1220f;
     private const float FooterButtonWidth = 172f;
     private const float FooterButtonHeight = 56f;
-    private const float ShowAnimationDuration = 0.24f;
-    private const float PanelStartScale = 0.965f;
-    private const float PanelStartYOffset = -18f;
-    private const float BlurStartScale = 1.035f;
+    private const float ShowAnimationDuration = RuntimeModalStyle.TransitionDuration;
     private const int DisplayRefreshFrameBudget = 12;
 
     private const string RequiredCharacters =
-        "设置游戏已暂停当前没有未应用更改存在未应用更改继续游戏会自动应用声音画面按键恢复默认取消应用总音量音乐音量控制全部游戏声音背景音乐实时预览屏幕大小显示模式视野缩放影响游戏相机可见范围待应用窗口尺寸窗口模式与全屏切换当前生效信息以下内容来自当前运行中的实际状态攻击交互地图暂停点击右侧按钮后按任意键或鼠标键进行绑定移动固定使用方向键和WASD等待输入正在为当前暂停键待应用值实际分辨率实际模式实际比例当前视野鼠标左键右键中键空格回车全屏窗口应用并继续“”0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-+/():.% ";
+        "设置游戏已暂停当前没有未应用更改存在未应用更改继续游戏会自动应用声音画面按键存档恢复默认取消应用总音量音乐音量控制全部游戏声音背景音乐实时预览屏幕大小显示模式视野缩放影响游戏相机可见范围待应用窗口尺寸窗口模式与全屏切换当前生效信息以下内容来自当前运行中的实际状态攻击交互地图暂停拍照留念纪念截图点击右侧按钮后按任意键或鼠标键进行绑定等待输入正在为当前暂停键重置存档清空本地建筑进度关卡选择武器状态和留念相册设置项会保留没有可重置的数据再次点击将立即清空本地进度与相册截图并返回主菜单此操作不可恢复完成后重置结束后会返回主菜单便于从干净状态重新开始返回主菜单图形音量键位等设置不会被重置保留设置确认重置，。“”0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-+/():.% ";
 
     private static readonly string[] RuntimeFontNames =
     {
@@ -48,8 +47,6 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
         KeyCode.Mouse2
     };
 
-    private static readonly Color BlurTintColor = new Color(0.04f, 0.05f, 0.08f, 0.46f);
-    private static readonly Color OverlayColor = new Color(0.02f, 0.03f, 0.05f, 0.22f);
     private static readonly Color PanelColor = new Color(0.09f, 0.11f, 0.16f, 0.82f);
     private static readonly Color BorderColor = new Color(0.31f, 0.45f, 0.57f, 0.88f);
     private static readonly Color SectionColor = new Color(0.14f, 0.17f, 0.24f, 0.56f);
@@ -65,6 +62,9 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
     private static readonly Color DisabledButtonTextColor = new Color(0.58f, 0.64f, 0.72f, 0.92f);
     private static readonly Color DisabledPrimaryButtonColor = new Color(0.44f, 0.37f, 0.28f, 0.72f);
     private static readonly Color DisabledPrimaryButtonTextColor = new Color(0.95f, 0.90f, 0.80f, 0.82f);
+    private static readonly Color DangerButtonColor = new Color(0.55f, 0.25f, 0.22f, 0.88f);
+    private static readonly Color DangerButtonArmedColor = new Color(0.84f, 0.30f, 0.26f, 0.96f);
+    private static readonly Color DangerButtonTextColor = new Color(0.99f, 0.95f, 0.92f, 1f);
     private static readonly Color TitleColor = new Color(0.96f, 0.98f, 1f, 1f);
     private static readonly Color DescriptionColor = new Color(0.70f, 0.78f, 0.88f, 1f);
     private static readonly Color ValueChipColor = new Color(0.16f, 0.20f, 0.28f, 0.78f);
@@ -80,6 +80,7 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
     public event Action ContinueRequested;
 
     public bool IsCapturingBinding => pendingBindingAction.HasValue;
+    public bool IsShown => IsPanelShown();
 
     private readonly Dictionary<SettingsTab, RectTransform> pageRoots = new Dictionary<SettingsTab, RectTransform>();
     private readonly Dictionary<SettingsTab, Image> tabImages = new Dictionary<SettingsTab, Image>();
@@ -95,14 +96,18 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
     private RectTransform panelRectTransform;
     private CanvasGroup panelCanvasGroup;
     private Coroutine showAnimationCoroutine;
+    private Coroutine hideAnimationCoroutine;
     private Coroutine showSequenceCoroutine;
     private Coroutine backdropRefreshCoroutine;
     private Vector2 panelVisibleAnchoredPosition;
     private SettingsTab currentTab = SettingsTab.Audio;
     private GameInputAction? pendingBindingAction;
     private float captureReadyAt;
+    private bool resetSaveArmed;
     private Texture2D capturedBackdropTexture;
     private RenderTexture blurredBackdropTexture;
+    private float animationProgress;
+    private Action pendingHideCallback;
 
     private GameSettingsDraft savedSettings;
     private GameSettingsDraft draftSettings;
@@ -115,12 +120,16 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
     private TextMeshProUGUI displayModeValueText;
     private TextMeshProUGUI viewZoomValueText;
     private TextMeshProUGUI runtimeInfoValueText;
+    private TextMeshProUGUI saveResetSummaryText;
     private Button applyButton;
     private TextMeshProUGUI applyButtonLabel;
     private Image applyButtonImage;
     private Button continueButton;
     private TextMeshProUGUI continueButtonLabel;
     private Image continueButtonImage;
+    private Button resetSaveButton;
+    private TextMeshProUGUI resetSaveButtonLabel;
+    private Image resetSaveButtonImage;
 
     public static RuntimeSettingsPanel EnsureInstance()
     {
@@ -177,6 +186,7 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
     {
         StopShowSequence();
         StopShowAnimation();
+        StopHideAnimation();
         StopBackdropRefresh();
         ReleaseBlurBackdrop();
     }
@@ -212,10 +222,24 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
 
     public void HideImmediate()
     {
+        CompleteHideState(true, true);
+    }
+
+    private void CompleteHideState(bool stopHideAnimation, bool clearPendingHideCallback)
+    {
         StopShowSequence();
         StopShowAnimation();
+        if (stopHideAnimation)
+        {
+            StopHideAnimation();
+        }
+
         StopBackdropRefresh();
         pendingBindingAction = null;
+        if (clearPendingHideCallback)
+        {
+            pendingHideCallback = null;
+        }
 
         if (savedSettings != null)
         {
@@ -224,9 +248,27 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
 
         savedSettings = null;
         draftSettings = null;
+        resetSaveArmed = false;
         ReleaseBlurBackdrop();
         ApplyAnimationState(0f);
         SetPanelVisibility(false);
+    }
+
+    public void Hide(Action onHidden)
+    {
+        if (!IsPanelShown())
+        {
+            HideImmediate();
+            onHidden?.Invoke();
+            return;
+        }
+
+        pendingHideCallback = onHidden;
+        StopShowSequence();
+        StopShowAnimation();
+        StopBackdropRefresh();
+        StopHideAnimation();
+        hideAnimationCoroutine = StartCoroutine(AnimateHideRoutine());
     }
 
     public void RequestContinueGame()
@@ -239,6 +281,7 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
         savedSettings = GameSettingsStore.LoadSavedSettings();
         draftSettings = GameSettingsStore.CreateDraftFromSaved();
         pendingBindingAction = null;
+        resetSaveArmed = false;
     }
 
     private void EnsureUi()
@@ -280,11 +323,11 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
         blurBackdropImage.raycastTarget = false;
         StretchRect(blurBackdropImage.rectTransform);
 
-        blurTintImage = CreateImage("BlurTint", canvasObject.transform, BlurTintColor, 0, 0);
+        blurTintImage = CreateImage("BlurTint", canvasObject.transform, RuntimeModalStyle.BlurTintColor, 0, 0);
         StretchRect(blurTintImage.rectTransform);
         blurTintImage.raycastTarget = false;
 
-        overlayImage = CreateImage("Overlay", canvasObject.transform, OverlayColor, 0, 0);
+        overlayImage = CreateImage("Overlay", canvasObject.transform, RuntimeModalStyle.OverlayColor, 0, 0);
         StretchRect(overlayImage.rectTransform);
         overlayImage.raycastTarget = true;
 
@@ -341,6 +384,7 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
         CreateTabButton(tabRoot, SettingsTab.Audio, "声音", 0f);
         CreateTabButton(tabRoot, SettingsTab.Display, "画面", 188f);
         CreateTabButton(tabRoot, SettingsTab.Controls, "按键", 376f);
+        CreateTabButton(tabRoot, SettingsTab.Data, "存档", 564f);
     }
 
     private void BuildPages(Transform parent)
@@ -352,6 +396,7 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
         CreateAudioPage(contentRoot);
         CreateDisplayPage(contentRoot);
         CreateControlsPage(contentRoot);
+        CreateDataPage(contentRoot);
     }
 
     private void BuildFooter(Transform parent)
@@ -489,7 +534,69 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
         CreateBindingCard(pageRoot, GameInputAction.Interact, "交互", "靠近对象时触发交互", 164f);
         CreateBindingCard(pageRoot, GameInputAction.OpenMap, "地图", "查看和展开地图", 284f);
         CreateBindingCard(pageRoot, GameInputAction.Pause, "暂停", "打开或关闭设置菜单", 404f);
-        CreateStaticInfoCard(pageRoot, "移动", "固定使用方向键和 WASD", 524f, "WASD / 方向键");
+        CreateBindingCard(pageRoot, GameInputAction.PhotoCapture, "拍照", "定格当前战斗画面并保存留念", 524f);
+    }
+
+    private void CreateDataPage(Transform parent)
+    {
+        RectTransform pageRoot = CreatePageRoot("DataPage", parent, SettingsTab.Data);
+
+        Image card = CreateImage("SaveResetCard", pageRoot, SectionColor, 20, 16);
+        RectTransform cardRect = card.rectTransform;
+        cardRect.anchorMin = new Vector2(0.5f, 1f);
+        cardRect.anchorMax = new Vector2(0.5f, 1f);
+        cardRect.pivot = new Vector2(0.5f, 1f);
+        cardRect.sizeDelta = new Vector2(CardWidth, 184f);
+        cardRect.anchoredPosition = new Vector2(0f, -28f);
+
+        TextMeshProUGUI titleText = CreateText("Title", cardRect, "重置存档", 28f, TitleColor, TextAlignmentOptions.Left);
+        RectTransform titleRect = titleText.rectTransform;
+        titleRect.anchorMin = new Vector2(0f, 1f);
+        titleRect.anchorMax = new Vector2(0f, 1f);
+        titleRect.pivot = new Vector2(0f, 1f);
+        titleRect.sizeDelta = new Vector2(360f, 34f);
+        titleRect.anchoredPosition = new Vector2(30f, -18f);
+
+        TextMeshProUGUI descriptionText = CreateText(
+            "Description",
+            cardRect,
+            "清空本地建筑进度、关卡选择、武器状态和留念相册，设置项会保留。",
+            20f,
+            DescriptionColor,
+            TextAlignmentOptions.Left);
+        RectTransform descriptionRect = descriptionText.rectTransform;
+        descriptionRect.anchorMin = new Vector2(0f, 1f);
+        descriptionRect.anchorMax = new Vector2(0f, 1f);
+        descriptionRect.pivot = new Vector2(0f, 1f);
+        descriptionRect.sizeDelta = new Vector2(680f, 48f);
+        descriptionRect.anchoredPosition = new Vector2(30f, -56f);
+
+        saveResetSummaryText = CreateText("Summary", cardRect, string.Empty, 18f, EmphasisColor, TextAlignmentOptions.Left);
+        RectTransform summaryRect = saveResetSummaryText.rectTransform;
+        summaryRect.anchorMin = new Vector2(0f, 0f);
+        summaryRect.anchorMax = new Vector2(0f, 0f);
+        summaryRect.pivot = new Vector2(0f, 0f);
+        summaryRect.sizeDelta = new Vector2(700f, 58f);
+        summaryRect.anchoredPosition = new Vector2(30f, 24f);
+
+        resetSaveButton = CreateButton(
+            "ResetSaveButton",
+            cardRect,
+            "重置存档",
+            DangerButtonColor,
+            DangerButtonTextColor,
+            new Vector2(236f, 56f));
+        RectTransform buttonRect = resetSaveButton.GetComponent<RectTransform>();
+        buttonRect.anchorMin = new Vector2(1f, 0.5f);
+        buttonRect.anchorMax = new Vector2(1f, 0.5f);
+        buttonRect.pivot = new Vector2(1f, 0.5f);
+        buttonRect.anchoredPosition = new Vector2(-30f, -6f);
+        resetSaveButton.onClick.AddListener(HandleResetSaveRequested);
+        resetSaveButtonImage = resetSaveButton.GetComponent<Image>();
+        resetSaveButtonLabel = resetSaveButton.GetComponentInChildren<TextMeshProUGUI>();
+
+        CreateStaticInfoCard(pageRoot, "完成后", "重置结束后会返回主菜单，便于从干净状态重新开始", 236f, "返回主菜单");
+        CreateStaticInfoCard(pageRoot, "保留项", "图形、音量、键位等设置不会被重置", 360f, "保留设置");
     }
 
     private RectTransform CreatePageRoot(string name, Transform parent, SettingsTab tab)
@@ -675,6 +782,12 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
 
     private void SelectTab(SettingsTab tab)
     {
+        if (tab != SettingsTab.Data && resetSaveArmed)
+        {
+            resetSaveArmed = false;
+            RefreshDataPage();
+        }
+
         currentTab = tab;
         RefreshTabState();
     }
@@ -695,29 +808,32 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
     private void HandleContinueRequested()
     {
         pendingBindingAction = null;
+        resetSaveArmed = false;
         if (draftSettings != null && GameSettingsStore.IsDirty(savedSettings, draftSettings))
         {
             ApplyDraftAndRefreshState();
         }
 
-        ContinueRequested?.Invoke();
+        Hide(() => ContinueRequested?.Invoke());
     }
 
     private void HandleCancelRequested()
     {
         pendingBindingAction = null;
+        resetSaveArmed = false;
         if (savedSettings != null)
         {
             GameSettingsStore.PreviewDraftAudio(savedSettings);
             draftSettings = GameSettingsStore.DiscardDraft(savedSettings);
         }
 
-        ContinueRequested?.Invoke();
+        Hide(() => ContinueRequested?.Invoke());
     }
 
     private void HandleApplyRequested()
     {
         pendingBindingAction = null;
+        resetSaveArmed = false;
         if (draftSettings == null || !GameSettingsStore.IsDirty(savedSettings, draftSettings))
         {
             return;
@@ -736,9 +852,43 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
     private void HandleResetAll()
     {
         pendingBindingAction = null;
+        resetSaveArmed = false;
         draftSettings = GameSettingsStore.CreateDefaultDraft();
         GameSettingsStore.PreviewDraftAudio(draftSettings);
         RefreshAll();
+    }
+
+    private void HandleResetSaveRequested()
+    {
+        pendingBindingAction = null;
+
+        if (!GameSaveResetService.HasAnySaveData())
+        {
+            resetSaveArmed = false;
+            RefreshDataPage();
+            return;
+        }
+
+        if (!resetSaveArmed)
+        {
+            resetSaveArmed = true;
+            RefreshDataPage();
+            return;
+        }
+
+        resetSaveArmed = false;
+        GameSaveResetService.ResetAllSaveData();
+        HideImmediate();
+        ContinueRequested?.Invoke();
+
+        SceneLoader loader = SceneLoader.EnsureInstance();
+        if (loader != null)
+        {
+            loader.ToMenu();
+            return;
+        }
+
+        SceneManager.LoadScene("MainScene");
     }
 
     private void ApplyDraftAndRefreshState()
@@ -827,6 +977,7 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
         RefreshAudioPage();
         RefreshDisplayPage();
         RefreshControlsPage();
+        RefreshDataPage();
         RefreshTabState();
         RefreshFooterState();
     }
@@ -938,6 +1089,51 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
             captureHintText.text = pendingBindingAction.HasValue
                 ? $"正在为“{GameSettingsStore.GetActionDisplayName(pendingBindingAction.Value)}”等待输入..."
                 : "点击右侧按钮后，按任意键或鼠标键进行绑定";
+        }
+    }
+
+    private void RefreshDataPage()
+    {
+        bool hasSaveData = GameSaveResetService.HasAnySaveData();
+
+        if (saveResetSummaryText != null)
+        {
+            if (!hasSaveData)
+            {
+                saveResetSummaryText.text = "当前没有可重置的数据。";
+            }
+            else if (resetSaveArmed)
+            {
+                saveResetSummaryText.text = "再次点击将立即清空本地进度与相册截图，并返回主菜单。此操作不可恢复。";
+            }
+            else
+            {
+                saveResetSummaryText.text = "会清空本地进度和相册截图，设置项会保留。";
+            }
+        }
+
+        if (resetSaveButtonLabel != null)
+        {
+            resetSaveButtonLabel.text = !hasSaveData
+                ? "没有存档"
+                : resetSaveArmed
+                    ? "确认重置"
+                    : "重置存档";
+        }
+
+        if (resetSaveButton != null)
+        {
+            SetButtonState(
+                resetSaveButton,
+                resetSaveButtonImage,
+                resetSaveButtonLabel,
+                hasSaveData,
+                !hasSaveData
+                    ? DisabledButtonColor
+                    : resetSaveArmed
+                        ? DangerButtonArmedColor
+                        : DangerButtonColor,
+                hasSaveData ? DangerButtonTextColor : DisabledButtonTextColor);
         }
     }
 
@@ -1073,6 +1269,8 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
     {
         StopShowSequence();
         StopShowAnimation();
+        StopHideAnimation();
+        pendingHideCallback = null;
         showSequenceCoroutine = StartCoroutine(ShowSequenceRoutine());
     }
 
@@ -1149,6 +1347,7 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
     private void PlayShowAnimation()
     {
         StopShowAnimation();
+        StopHideAnimation();
         ApplyAnimationState(0f);
         showAnimationCoroutine = StartCoroutine(AnimateShowRoutine());
     }
@@ -1162,6 +1361,17 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
 
         StopCoroutine(showAnimationCoroutine);
         showAnimationCoroutine = null;
+    }
+
+    private void StopHideAnimation()
+    {
+        if (hideAnimationCoroutine == null)
+        {
+            return;
+        }
+
+        StopCoroutine(hideAnimationCoroutine);
+        hideAnimationCoroutine = null;
     }
 
     private IEnumerator AnimateShowRoutine()
@@ -1179,41 +1389,41 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
         showAnimationCoroutine = null;
     }
 
+    private IEnumerator AnimateHideRoutine()
+    {
+        float elapsed = 0f;
+        float startProgress = animationProgress;
+        while (elapsed < ShowAnimationDuration)
+        {
+            elapsed += Time.unscaledDeltaTime;
+            float t = Mathf.Clamp01(elapsed / ShowAnimationDuration);
+            float progress = Mathf.Lerp(startProgress, 0f, t);
+            ApplyAnimationState(progress);
+            yield return null;
+        }
+
+        Action callback = pendingHideCallback;
+        pendingHideCallback = null;
+        hideAnimationCoroutine = null;
+        CompleteHideState(false, false);
+        callback?.Invoke();
+    }
+
     private void ApplyAnimationState(float progress)
     {
-        float easedProgress = EaseOutCubic(progress);
-        float blurProgress = Mathf.SmoothStep(0f, 1f, progress);
-
-        if (blurBackdropImage != null)
-        {
-            blurBackdropImage.color = WithAlpha(Color.white, blurProgress);
-            blurBackdropImage.rectTransform.localScale = Vector3.one;
-        }
-
-        if (blurTintImage != null)
-        {
-            blurTintImage.color = WithAlpha(BlurTintColor, BlurTintColor.a * blurProgress);
-        }
-
-        if (overlayImage != null)
-        {
-            overlayImage.color = WithAlpha(OverlayColor, OverlayColor.a * blurProgress);
-        }
-
-        if (panelCanvasGroup != null)
-        {
-            panelCanvasGroup.alpha = easedProgress;
-        }
-
-        if (panelRectTransform != null)
-        {
-            panelRectTransform.localScale = Vector3.one * Mathf.Lerp(PanelStartScale, 1f, easedProgress);
-            panelRectTransform.anchoredPosition = panelVisibleAnchoredPosition + new Vector2(0f, Mathf.Lerp(PanelStartYOffset, 0f, easedProgress));
-        }
+        animationProgress = Mathf.Clamp01(progress);
+        RuntimeModalStyle.ApplyBackdropState(blurBackdropImage, blurTintImage, overlayImage, animationProgress);
+        RuntimeModalStyle.ApplyPanelState(
+            panelCanvasGroup,
+            panelRectTransform,
+            panelVisibleAnchoredPosition,
+            Vector3.one,
+            animationProgress);
 
         if (panelOutline != null)
         {
-            panelOutline.effectColor = WithAlpha(BorderColor, BorderColor.a * easedProgress);
+            float easedProgress = RuntimeModalStyle.EaseOutCubic(animationProgress);
+            panelOutline.effectColor = RuntimeModalStyle.WithAlpha(BorderColor, BorderColor.a * easedProgress);
         }
     }
 
@@ -1236,39 +1446,7 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
         screenshot.filterMode = FilterMode.Bilinear;
         screenshot.wrapMode = TextureWrapMode.Clamp;
         capturedBackdropTexture = screenshot;
-
-        int halfWidth = Mathf.Max(640, Screen.width / 2);
-        int halfHeight = Mathf.Max(360, Screen.height / 2);
-        int quarterWidth = Mathf.Max(480, Screen.width / 4);
-        int quarterHeight = Mathf.Max(270, Screen.height / 4);
-        int finalWidth = Mathf.Max(320, Screen.width / 8);
-        int finalHeight = Mathf.Max(180, Screen.height / 8);
-
-        RenderTexture halfTexture = RenderTexture.GetTemporary(halfWidth, halfHeight, 0, RenderTextureFormat.ARGB32);
-        RenderTexture quarterTexture = RenderTexture.GetTemporary(quarterWidth, quarterHeight, 0, RenderTextureFormat.ARGB32);
-        RenderTexture tempTexture = RenderTexture.GetTemporary(finalWidth, finalHeight, 0, RenderTextureFormat.ARGB32);
-        halfTexture.filterMode = FilterMode.Bilinear;
-        quarterTexture.filterMode = FilterMode.Bilinear;
-        tempTexture.filterMode = FilterMode.Bilinear;
-
-        blurredBackdropTexture = new RenderTexture(finalWidth, finalHeight, 0, RenderTextureFormat.ARGB32)
-        {
-            name = "RuntimeSettingsBlurBackdrop",
-            filterMode = FilterMode.Bilinear,
-            wrapMode = TextureWrapMode.Clamp
-        };
-        blurredBackdropTexture.Create();
-
-        Graphics.Blit(capturedBackdropTexture, halfTexture);
-        Graphics.Blit(halfTexture, quarterTexture);
-        Graphics.Blit(quarterTexture, tempTexture);
-        Graphics.Blit(tempTexture, quarterTexture);
-        Graphics.Blit(quarterTexture, blurredBackdropTexture);
-
-        RenderTexture.ReleaseTemporary(halfTexture);
-        RenderTexture.ReleaseTemporary(quarterTexture);
-        RenderTexture.ReleaseTemporary(tempTexture);
-
+        blurredBackdropTexture = RuntimeModalStyle.BuildBlurBackdrop(capturedBackdropTexture);
         blurBackdropImage.texture = blurredBackdropTexture;
     }
 
@@ -1342,27 +1520,7 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
 
     private void ReleaseBlurBackdrop()
     {
-        if (blurBackdropImage != null)
-        {
-            blurBackdropImage.texture = null;
-        }
-
-        if (blurredBackdropTexture != null)
-        {
-            if (blurredBackdropTexture.IsCreated())
-            {
-                blurredBackdropTexture.Release();
-            }
-
-            Destroy(blurredBackdropTexture);
-            blurredBackdropTexture = null;
-        }
-
-        if (capturedBackdropTexture != null)
-        {
-            Destroy(capturedBackdropTexture);
-            capturedBackdropTexture = null;
-        }
+        RuntimeModalStyle.ReleaseBlurBackdrop(blurBackdropImage, ref capturedBackdropTexture, ref blurredBackdropTexture);
     }
 
     private static float EaseOutCubic(float t)

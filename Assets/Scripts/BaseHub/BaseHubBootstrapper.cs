@@ -11,7 +11,7 @@ public class BaseHubBootstrapper : MonoBehaviour
 {
     private const string BaseHubMapResourcePath = "BaseHub/base_hub_map";
     private const string DefaultHandbookPrefabPath = "Assets/Scripts/View/Prefab/CatagloueUI.prefab";
-    private const string RequiredRuntimeCharacters = "图鉴精灵关卡入口打开查看属性武器攻击基地允许生命上限耐久攻击力移动速度防御调试面板按住显示关闭点击装备";
+    private const string RequiredRuntimeCharacters = "图鉴精灵关卡入口打开查看属性武器攻击基地允许生命上限耐久攻击力移动速度防御调试面板按住显示关闭点击装备相册留念拍照本地保存时间场景分辨率暂无上一页下一页";
     private static readonly string[] RuntimeFontNames =
     {
         "Arial Unicode MS",
@@ -27,6 +27,7 @@ public class BaseHubBootstrapper : MonoBehaviour
     private static readonly Vector3 DetailedBookPosition = new Vector3(-4.2f, 0.4f, 0f);
     private static readonly Vector3 DetailedSpiritPosition = new Vector3(4.2f, 0.4f, 0f);
     private static readonly Vector3 DetailedGatePosition = new Vector3(0f, 2.85f, 0f);
+    private static readonly Vector3 DetailedAlbumPosition = new Vector3(0f, -4.05f, 0f);
     private static readonly Vector3 DetailedLeftDummyPosition = new Vector3(-4.1f, -3.3f, 0f);
     private static readonly Vector3 DetailedRightDummyPosition = new Vector3(4.1f, -3.3f, 0f);
 
@@ -41,6 +42,7 @@ public class BaseHubBootstrapper : MonoBehaviour
     [SerializeField] private Sprite avatarSprite;
     [SerializeField] private Sprite bookSprite;
     [SerializeField] private Sprite spiritSprite;
+    [SerializeField] private Sprite albumSprite;
     [SerializeField] private Sprite hubMapSprite;
 
     [Header("复用现有 UI")]
@@ -52,6 +54,7 @@ public class BaseHubBootstrapper : MonoBehaviour
     private Sprite generatedPlayerSprite;
     private Sprite generatedBookSprite;
     private Sprite generatedSpiritSprite;
+    private Sprite generatedAlbumSprite;
     private Sprite generatedGateSprite;
     private Sprite generatedFloorSprite;
     private Sprite generatedHubMapSprite;
@@ -82,6 +85,7 @@ public class BaseHubBootstrapper : MonoBehaviour
         InteractPrompt prompt = CreateInteractPrompt(canvas.transform);
         StageSelectionPanelUI stageSelectionPanel = CreateStageSelectionPanel(canvas.transform, uiController);
         SpiritPanelUI spiritPanel = CreateSpiritPanel(canvas.transform);
+        BaseHubAlbumPanel albumPanel = CreateAlbumPanel(canvas.transform, uiController);
 
         GameObject player = CreatePlayer(prompt);
         CharacterCore characterCore = player.GetComponent<CharacterCore>();
@@ -89,11 +93,12 @@ public class BaseHubBootstrapper : MonoBehaviour
         GameObject handbookPanel = CreateBaseHandbookUI(player, prompt.Root);
 
         spiritPanel.Bind(characterCore, profileData);
-        uiController.Configure(player, handbookPanel, spiritPanel, stageSelectionPanel, prompt.Root);
+        uiController.Configure(player, handbookPanel, spiritPanel, stageSelectionPanel, albumPanel, prompt.Root);
         spiritPanel.SetCloseAction(uiController.CloseAll);
 
         CreateBookInteractable(uiController);
         CreateSpiritInteractable(uiController);
+        CreateAlbumInteractable(uiController);
         CreateGameSceneInteractable(uiController);
         CreateTrainingDummies();
     }
@@ -535,16 +540,22 @@ public class BaseHubBootstrapper : MonoBehaviour
             rootManager = handbookRoot.AddComponent<UIRootManager>();
         }
 
+        BackpackUI backpackView = handbookRoot.GetComponentInChildren<BackpackUI>(true);
+
         rootManager.handbookUI = EnsureCanvasGroup(illustratedHandbook);
         rootManager.dialogUI = EnsureCanvasGroup(dialogCanvas);
-        rootManager.backpackUI = EnsureCanvasGroup(packBagCanvas);
+        rootManager.backpackUI = EnsureCanvasGroup(backpackView != null ? backpackView.gameObject : packBagCanvas);
         rootManager.interactTipUI = EnsureCanvasGroup(interactPrompt);
 
         DetailedInformationUI detailUi = handbookRoot.GetComponentInChildren<DetailedInformationUI>(true);
         if (detailUi != null)
         {
-            rootManager.detailUIPage1 = EnsureCanvasGroup(detailUi.backGround1);
-            rootManager.detailUIPage2 = EnsureCanvasGroup(detailUi.backGround2);
+            CanvasGroup detailRoot = EnsureCanvasGroup(
+                detailUi.detailedInformationPanel != null
+                    ? detailUi.detailedInformationPanel
+                    : detailedInformation);
+            rootManager.detailUIPage1 = detailRoot;
+            rootManager.detailUIPage2 = detailRoot;
         }
         else
         {
@@ -562,7 +573,8 @@ public class BaseHubBootstrapper : MonoBehaviour
         rootManager.HideAllSubmitSelection();
         rootManager.HideDialog();
         rootManager.ShowInteractTip();
-        rootManager.ShowBackpack();
+        rootManager.ShowBackpack(true);
+        rootManager.RefreshRuntimeBindings();
     }
 
     private static CanvasGroup EnsureCanvasGroup(GameObject target)
@@ -922,6 +934,286 @@ public class BaseHubBootstrapper : MonoBehaviour
         return stagePanel;
     }
 
+    private BaseHubAlbumPanel CreateAlbumPanel(Transform parent, BaseHubUIController uiController)
+    {
+        GameObject root = CreateModalRoot("AlbumPanel", parent);
+        GameObject panel = CreateCenteredPanel("AlbumContent", root.transform, new Vector2(1320f, 780f));
+        Image panelBackground = panel.GetComponent<Image>();
+        RuntimeUiSpriteFactory.ApplyRoundedSprite(
+            panelBackground,
+            new Color(0.10f, 0.08f, 0.06f, 0.97f),
+            18,
+            18,
+            1.2f);
+
+        TextMeshProUGUI title = CreateText(
+            "Title",
+            panel.transform,
+            "留念相册",
+            42,
+            new Color(0.96f, 0.83f, 0.52f, 1f),
+            TextAlignmentOptions.Center);
+        SetCenteredRect(title.rectTransform, new Vector2(0f, 304f), new Vector2(620f, 64f));
+
+        TextMeshProUGUI subtitle = CreateText(
+            "Subtitle",
+            panel.transform,
+            "这里会展示战斗中拍下的本地留念，最新照片会排在最前面。",
+            20,
+            new Color(0.82f, 0.78f, 0.70f, 1f),
+            TextAlignmentOptions.Center);
+        SetCenteredRect(subtitle.rectTransform, new Vector2(0f, 264f), new Vector2(760f, 30f));
+
+        Button closeButton = CreateButton(
+            "CloseButton",
+            panel.transform,
+            "×",
+            new Color(0.19f, 0.24f, 0.17f, 0.92f),
+            new Vector2(58f, 42f));
+        RuntimeUiSpriteFactory.ApplyRoundedSprite(
+            closeButton.GetComponent<Image>(),
+            new Color(0.19f, 0.24f, 0.17f, 0.92f),
+            12,
+            12,
+            1.2f);
+        closeButton.GetComponent<RectTransform>().anchoredPosition = new Vector2(590f, 322f);
+
+        GameObject leftPanel = CreateUIObject("ThumbnailPanel", panel.transform);
+        SetCenteredRect(leftPanel.GetComponent<RectTransform>(), new Vector2(-350f, -12f), new Vector2(430f, 560f));
+        Image leftPanelImage = leftPanel.AddComponent<Image>();
+        RuntimeUiSpriteFactory.ApplyRoundedSprite(
+            leftPanelImage,
+            new Color(0.16f, 0.14f, 0.11f, 0.94f),
+            18,
+            16,
+            1.2f);
+
+        TextMeshProUGUI leftTitle = CreateText(
+            "LeftTitle",
+            leftPanel.transform,
+            "本地相册",
+            28,
+            new Color(0.95f, 0.91f, 0.82f, 1f),
+            TextAlignmentOptions.Left);
+        RectTransform leftTitleRect = leftTitle.rectTransform;
+        leftTitleRect.anchorMin = new Vector2(0f, 1f);
+        leftTitleRect.anchorMax = new Vector2(0f, 1f);
+        leftTitleRect.pivot = new Vector2(0f, 1f);
+        leftTitleRect.sizeDelta = new Vector2(220f, 36f);
+        leftTitleRect.anchoredPosition = new Vector2(24f, -20f);
+
+        TextMeshProUGUI emptyState = CreateText(
+            "EmptyState",
+            leftPanel.transform,
+            "还没有留念。\n进入关卡后按下拍照键，就会自动保存到这里。",
+            22,
+            new Color(0.82f, 0.78f, 0.70f, 1f),
+            TextAlignmentOptions.Center);
+        SetCenteredRect(emptyState.rectTransform, new Vector2(0f, -10f), new Vector2(330f, 120f));
+
+        GameObject gridRoot = CreateUIObject("ThumbnailGrid", leftPanel.transform);
+        RectTransform gridRect = gridRoot.GetComponent<RectTransform>();
+        gridRect.anchorMin = new Vector2(0.5f, 0.5f);
+        gridRect.anchorMax = new Vector2(0.5f, 0.5f);
+        gridRect.pivot = new Vector2(0.5f, 0.5f);
+        gridRect.anchoredPosition = new Vector2(0f, -18f);
+        gridRect.sizeDelta = new Vector2(372f, 430f);
+
+        GameObject rightPanel = CreateUIObject("PreviewPanel", panel.transform);
+        SetCenteredRect(rightPanel.GetComponent<RectTransform>(), new Vector2(240f, -12f), new Vector2(610f, 560f));
+        Image rightPanelImage = rightPanel.AddComponent<Image>();
+        RuntimeUiSpriteFactory.ApplyRoundedSprite(
+            rightPanelImage,
+            new Color(0.16f, 0.14f, 0.11f, 0.94f),
+            18,
+            16,
+            1.2f);
+
+        TextMeshProUGUI previewTitle = CreateText(
+            "PreviewTitle",
+            rightPanel.transform,
+            "暂无留念",
+            28,
+            new Color(0.95f, 0.91f, 0.82f, 1f),
+            TextAlignmentOptions.Left);
+        RectTransform previewTitleRect = previewTitle.rectTransform;
+        previewTitleRect.anchorMin = new Vector2(0f, 1f);
+        previewTitleRect.anchorMax = new Vector2(0f, 1f);
+        previewTitleRect.pivot = new Vector2(0f, 1f);
+        previewTitleRect.sizeDelta = new Vector2(420f, 36f);
+        previewTitleRect.anchoredPosition = new Vector2(24f, -20f);
+
+        GameObject previewFrame = CreateUIObject("PreviewFrame", rightPanel.transform);
+        SetCenteredRect(previewFrame.GetComponent<RectTransform>(), new Vector2(0f, 72f), new Vector2(548f, 328f));
+        Image previewFrameImage = previewFrame.AddComponent<Image>();
+        RuntimeUiSpriteFactory.ApplyRoundedSprite(
+            previewFrameImage,
+            new Color(0.12f, 0.11f, 0.09f, 1f),
+            20,
+            18,
+            1.2f);
+
+        GameObject previewViewport = CreateUIObject("PreviewViewport", previewFrame.transform);
+        SetStretch(previewViewport.GetComponent<RectTransform>(), 18f, 18f, 18f, 18f);
+        previewViewport.AddComponent<RectMask2D>();
+
+        GameObject previewImageObject = CreateUIObject("PreviewImage", previewViewport.transform);
+        RawImage previewImage = previewImageObject.AddComponent<RawImage>();
+        previewImage.color = new Color(1f, 1f, 1f, 0f);
+        AspectRatioFitter previewFitter = previewImageObject.AddComponent<AspectRatioFitter>();
+        previewFitter.aspectMode = AspectRatioFitter.AspectMode.FitInParent;
+        previewFitter.aspectRatio = 1.6f;
+        SetStretch(previewImage.rectTransform, 0f, 0f, 0f, 0f);
+
+        TextMeshProUGUI previewMeta = CreateText(
+            "PreviewMeta",
+            rightPanel.transform,
+            string.Empty,
+            21,
+            new Color(0.82f, 0.78f, 0.70f, 1f),
+            TextAlignmentOptions.TopLeft);
+        RectTransform previewMetaRect = previewMeta.rectTransform;
+        previewMetaRect.anchorMin = new Vector2(0f, 0f);
+        previewMetaRect.anchorMax = new Vector2(1f, 0f);
+        previewMetaRect.pivot = new Vector2(0f, 0f);
+        previewMetaRect.offsetMin = new Vector2(24f, 24f);
+        previewMetaRect.offsetMax = new Vector2(-24f, 166f);
+
+        Button previousPageButton = CreateButton(
+            "PreviousPageButton",
+            panel.transform,
+            "上一页",
+            new Color(0.28f, 0.24f, 0.18f, 0.96f),
+            new Vector2(150f, 48f));
+        previousPageButton.GetComponent<RectTransform>().anchoredPosition = new Vector2(-108f, -326f);
+
+        TextMeshProUGUI pageIndicator = CreateText(
+            "PageIndicator",
+            panel.transform,
+            "0 / 0",
+            22,
+            new Color(0.96f, 0.91f, 0.80f, 1f),
+            TextAlignmentOptions.Center);
+        SetCenteredRect(pageIndicator.rectTransform, new Vector2(0f, -326f), new Vector2(120f, 30f));
+
+        Button nextPageButton = CreateButton(
+            "NextPageButton",
+            panel.transform,
+            "下一页",
+            new Color(0.28f, 0.24f, 0.18f, 0.96f),
+            new Vector2(150f, 48f));
+        nextPageButton.GetComponent<RectTransform>().anchoredPosition = new Vector2(108f, -326f);
+
+        BaseHubAlbumPanel albumPanel = root.AddComponent<BaseHubAlbumPanel>();
+        albumPanel.Configure(
+            uiController,
+            closeButton,
+            previousPageButton,
+            nextPageButton,
+            pageIndicator,
+            previewTitle,
+            previewMeta,
+            emptyState,
+            previewImage,
+            previewFitter);
+
+        const float startX = -96f;
+        const float startY = 148f;
+        const float offsetX = 192f;
+        const float offsetY = 102f;
+        for (int row = 0; row < 4; row++)
+        {
+            for (int column = 0; column < 2; column++)
+            {
+                int slotIndex = row * 2 + column;
+                Vector2 anchoredPosition = new Vector2(
+                    startX + column * offsetX,
+                    startY - row * offsetY);
+                CreateAlbumSlot(gridRoot.transform, albumPanel, slotIndex, anchoredPosition);
+            }
+        }
+
+        root.SetActive(false);
+        return albumPanel;
+    }
+
+    private void CreateAlbumSlot(
+        Transform parent,
+        BaseHubAlbumPanel albumPanel,
+        int slotIndex,
+        Vector2 anchoredPosition)
+    {
+        GameObject slotObject = CreateUIObject($"AlbumSlot_{slotIndex + 1}", parent);
+        RectTransform slotRect = slotObject.GetComponent<RectTransform>();
+        slotRect.anchorMin = new Vector2(0.5f, 0.5f);
+        slotRect.anchorMax = new Vector2(0.5f, 0.5f);
+        slotRect.pivot = new Vector2(0.5f, 0.5f);
+        slotRect.anchoredPosition = anchoredPosition;
+        slotRect.sizeDelta = new Vector2(172f, 92f);
+
+        Image slotBackground = slotObject.AddComponent<Image>();
+        RuntimeUiSpriteFactory.ApplyRoundedSprite(
+            slotBackground,
+            new Color(0.20f, 0.18f, 0.14f, 0.92f),
+            14,
+            14,
+            1.2f);
+
+        Button slotButton = slotObject.AddComponent<Button>();
+        slotButton.targetGraphic = slotBackground;
+
+        GameObject thumbnailFrame = CreateUIObject("ThumbnailFrame", slotObject.transform);
+        RectTransform thumbnailFrameRect = thumbnailFrame.GetComponent<RectTransform>();
+        thumbnailFrameRect.anchorMin = new Vector2(0.5f, 1f);
+        thumbnailFrameRect.anchorMax = new Vector2(0.5f, 1f);
+        thumbnailFrameRect.pivot = new Vector2(0.5f, 1f);
+        thumbnailFrameRect.anchoredPosition = new Vector2(0f, -10f);
+        thumbnailFrameRect.sizeDelta = new Vector2(152f, 58f);
+        Image thumbnailFrameImage = thumbnailFrame.AddComponent<Image>();
+        RuntimeUiSpriteFactory.ApplyRoundedSprite(
+            thumbnailFrameImage,
+            new Color(0.11f, 0.10f, 0.08f, 1f),
+            12,
+            12,
+            1.2f);
+
+        GameObject thumbnailViewport = CreateUIObject("ThumbnailViewport", thumbnailFrame.transform);
+        SetStretch(thumbnailViewport.GetComponent<RectTransform>(), 6f, 6f, 6f, 6f);
+        thumbnailViewport.AddComponent<RectMask2D>();
+
+        GameObject thumbnailImageObject = CreateUIObject("ThumbnailImage", thumbnailViewport.transform);
+        RawImage thumbnailImage = thumbnailImageObject.AddComponent<RawImage>();
+        thumbnailImage.color = new Color(1f, 1f, 1f, 0f);
+        AspectRatioFitter thumbnailFitter = thumbnailImageObject.AddComponent<AspectRatioFitter>();
+        thumbnailFitter.aspectMode = AspectRatioFitter.AspectMode.FitInParent;
+        thumbnailFitter.aspectRatio = 1.6f;
+        SetStretch(thumbnailImage.rectTransform, 0f, 0f, 0f, 0f);
+
+        TextMeshProUGUI labelText = CreateText(
+            "Label",
+            slotObject.transform,
+            string.Empty,
+            17,
+            new Color(0.95f, 0.91f, 0.82f, 1f),
+            TextAlignmentOptions.Center);
+        RectTransform labelRect = labelText.rectTransform;
+        labelRect.anchorMin = new Vector2(0f, 0f);
+        labelRect.anchorMax = new Vector2(1f, 0f);
+        labelRect.pivot = new Vector2(0.5f, 0f);
+        labelRect.offsetMin = new Vector2(10f, 8f);
+        labelRect.offsetMax = new Vector2(-10f, 30f);
+        labelText.enableWordWrapping = false;
+
+        albumPanel.RegisterSlot(new BaseHubAlbumSlotView
+        {
+            button = slotButton,
+            background = slotBackground,
+            thumbnailImage = thumbnailImage,
+            thumbnailFitter = thumbnailFitter,
+            labelText = labelText
+        });
+    }
+
     private void CreateStageCard(
         Transform parent,
         StageSelectionPanelUI stagePanel,
@@ -1220,6 +1512,24 @@ public class BaseHubBootstrapper : MonoBehaviour
         trigger.radius = useDetailedHubMap ? 1.2f : 1.05f;
 
         SpiritInteract interact = spirit.AddComponent<SpiritInteract>();
+        interact.Configure(uiController);
+    }
+
+    private void CreateAlbumInteractable(BaseHubUIController uiController)
+    {
+        GameObject album = CreateWorldObject(
+            "AlbumInteractable",
+            useDetailedHubMap ? DetailedAlbumPosition : new Vector3(0f, -2.55f, 0f),
+            albumSprite != null ? albumSprite : GetOrCreateGeneratedAlbumSprite(),
+            useDetailedHubMap ? new Vector3(1.12f, 1.02f, 1f) : new Vector3(1.18f, 1.08f, 1f));
+
+        BoxCollider2D trigger = album.AddComponent<BoxCollider2D>();
+        trigger.isTrigger = true;
+        trigger.size = useDetailedHubMap
+            ? new Vector2(1.8f, 1.35f)
+            : new Vector2(1.25f, 1.05f);
+
+        BaseHubAlbumInteract interact = album.AddComponent<BaseHubAlbumInteract>();
         interact.Configure(uiController);
     }
 
@@ -1597,6 +1907,16 @@ public class BaseHubBootstrapper : MonoBehaviour
         return generatedSpiritSprite;
     }
 
+    private Sprite GetOrCreateGeneratedAlbumSprite()
+    {
+        if (generatedAlbumSprite == null)
+        {
+            generatedAlbumSprite = CreateAlbumSprite();
+        }
+
+        return generatedAlbumSprite;
+    }
+
     private Sprite GetOrCreateGeneratedGateSprite()
     {
         if (generatedGateSprite == null)
@@ -1659,6 +1979,23 @@ public class BaseHubBootstrapper : MonoBehaviour
         FillRect(texture, 11, 16, 2, 2, Color.black);
         FillRect(texture, 16, 16, 2, 2, Color.black);
         FillRect(texture, 12, 3, 4, 3, new Color(0.68f, 0.90f, 0.96f, 1f));
+        texture.Apply();
+        return CreateSpriteFromTexture(texture, 16f);
+    }
+
+    private static Sprite CreateAlbumSprite()
+    {
+        Texture2D texture = CreateTransparentTexture(36, 32);
+        Color frame = new Color(0.94f, 0.92f, 0.86f, 1f);
+        Color photo = new Color(0.53f, 0.71f, 0.84f, 1f);
+        Color accent = new Color(0.42f, 0.23f, 0.16f, 1f);
+
+        FillRect(texture, 4, 6, 28, 22, frame);
+        FillRect(texture, 7, 11, 22, 12, photo);
+        FillRect(texture, 10, 25, 8, 1, accent);
+        FillRect(texture, 20, 25, 6, 1, accent);
+        FillRect(texture, 12, 14, 6, 3, new Color(0.79f, 0.89f, 0.92f, 1f));
+        FillRect(texture, 19, 13, 7, 5, new Color(0.33f, 0.57f, 0.42f, 1f));
         texture.Apply();
         return CreateSpriteFromTexture(texture, 16f);
     }

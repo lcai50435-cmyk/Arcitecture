@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using UnityEngine.UI;
 
 public enum GameplayFailureReason
 {
@@ -18,10 +19,27 @@ public class GameplayFailureController : MonoBehaviour
     private const float DropScatterMaxDistance = 1.45f;
     private const float DropScatterArcHeight = 0.55f;
     private const float SceneTransitionDelay = 0.16f;
+    private const string FailureOverlayCanvasName = "FailureSpotlightCanvas";
+    private const string FailureOverlayGraphicName = "FailureSpotlightOverlay";
+    private const int FailureOverlaySortingOrder = 12000;
+    private const float SpotlightFadeInDuration = 0.18f;
+    private const float SpotlightFocusDuration = 1.1f;
+    private const float SpotlightHoldDuration = 0.3f;
+    private const float SpotlightStartAlpha = 0.9f;
+    private const float SpotlightEndAlpha = 1f;
+    private static readonly Vector2 SpotlightStartClearRadii = new Vector2(260f, 180f);
+    private static readonly Vector2 SpotlightEndClearRadii = new Vector2(44f, 64f);
+    private static readonly Vector2 SpotlightStartFeatherRadii = new Vector2(96f, 84f);
+    private static readonly Vector2 SpotlightEndFeatherRadii = new Vector2(28f, 24f);
+    private static readonly Color FailureOverlayColor = Color.black;
 
     public static GameplayFailureController Instance { get; private set; }
+    public static bool IsFailureActive => Instance != null && Instance.isFailureActive;
 
     private bool isFailureActive;
+    private Canvas failureOverlayCanvas;
+    private RectTransform failureOverlayRect;
+    private StageIntroRevealGraphic failureRevealGraphic;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void Bootstrap()
@@ -70,6 +88,14 @@ public class GameplayFailureController : MonoBehaviour
 
     private void OnDestroy()
     {
+        if (failureOverlayCanvas != null)
+        {
+            Destroy(failureOverlayCanvas.gameObject);
+            failureOverlayCanvas = null;
+            failureOverlayRect = null;
+            failureRevealGraphic = null;
+        }
+
         if (Instance == this)
         {
             Instance = null;
@@ -105,11 +131,14 @@ public class GameplayFailureController : MonoBehaviour
         BackpackMananger backpack = BackpackMananger.Instance;
         List<ArchitecturalCrystal> droppedItems = SnapshotBackpackItems(backpack);
         Vector3 dropOrigin = ResolveDropOrigin();
+        Vector3 failureFocusOrigin = ResolveFailureFocusOrigin(dropOrigin);
+        float spotlightDuration = PlayDeathSpotlightTransition(failureFocusOrigin);
         float waitDuration = PlayDropScatterAnimation(droppedItems, dropOrigin);
 
-        if (waitDuration > 0f)
+        float combinedWaitDuration = Mathf.Max(waitDuration, spotlightDuration);
+        if (combinedWaitDuration > 0f)
         {
-            yield return new WaitForSecondsRealtime(waitDuration);
+            yield return new WaitForSecondsRealtime(combinedWaitDuration);
         }
 
         if (backpack != null)
@@ -143,7 +172,7 @@ public class GameplayFailureController : MonoBehaviour
         UIRootManager.Instance.HideAllSubmitSelection();
         UIRootManager.Instance.HideDialog();
         UIRootManager.Instance.HideInteractTip();
-        UIRootManager.Instance.HideBackpack();
+        UIRootManager.Instance.HideBackpack(true);
     }
 
     private static void DisablePlayerControls()
@@ -209,6 +238,167 @@ public class GameplayFailureController : MonoBehaviour
         }
 
         return Vector3.zero;
+    }
+
+    private static Vector3 ResolveFailureFocusOrigin(Vector3 fallbackOrigin)
+    {
+        GameObject playerObject = GameObject.FindGameObjectWithTag("Player");
+        if (playerObject == null)
+        {
+            return fallbackOrigin;
+        }
+
+        Renderer playerRenderer = playerObject.GetComponentInChildren<Renderer>();
+        if (playerRenderer != null)
+        {
+            Vector3 center = playerRenderer.bounds.center;
+            center.z = 0f;
+            return center;
+        }
+
+        Vector3 position = playerObject.transform.position;
+        position.z = 0f;
+        return position;
+    }
+
+    private float PlayDeathSpotlightTransition(Vector3 focusWorldPosition)
+    {
+        EnsureFailureOverlay();
+        if (failureRevealGraphic == null)
+        {
+            return 0f;
+        }
+
+        StartCoroutine(AnimateFailureSpotlight(focusWorldPosition));
+        return SpotlightFadeInDuration + SpotlightFocusDuration + SpotlightHoldDuration;
+    }
+
+    private void EnsureFailureOverlay()
+    {
+        if (failureOverlayCanvas != null && failureRevealGraphic != null)
+        {
+            return;
+        }
+
+        GameObject canvasObject = new GameObject(
+            FailureOverlayCanvasName,
+            typeof(RectTransform),
+            typeof(Canvas),
+            typeof(CanvasScaler),
+            typeof(GraphicRaycaster));
+        canvasObject.transform.SetParent(transform, false);
+
+        failureOverlayCanvas = canvasObject.GetComponent<Canvas>();
+        failureOverlayCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        failureOverlayCanvas.overrideSorting = true;
+        failureOverlayCanvas.sortingOrder = FailureOverlaySortingOrder;
+
+        CanvasScaler scaler = canvasObject.GetComponent<CanvasScaler>();
+        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+        scaler.referenceResolution = new Vector2(1920f, 1080f);
+        scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
+        scaler.matchWidthOrHeight = 0.5f;
+
+        GraphicRaycaster raycaster = canvasObject.GetComponent<GraphicRaycaster>();
+        raycaster.enabled = false;
+
+        failureOverlayRect = canvasObject.GetComponent<RectTransform>();
+        failureOverlayRect.anchorMin = Vector2.zero;
+        failureOverlayRect.anchorMax = Vector2.one;
+        failureOverlayRect.offsetMin = Vector2.zero;
+        failureOverlayRect.offsetMax = Vector2.zero;
+        failureOverlayRect.localScale = Vector3.one;
+
+        GameObject revealObject = new GameObject(
+            FailureOverlayGraphicName,
+            typeof(RectTransform),
+            typeof(StageIntroRevealGraphic));
+        revealObject.transform.SetParent(failureOverlayRect, false);
+
+        RectTransform revealRect = revealObject.GetComponent<RectTransform>();
+        revealRect.anchorMin = Vector2.zero;
+        revealRect.anchorMax = Vector2.one;
+        revealRect.offsetMin = Vector2.zero;
+        revealRect.offsetMax = Vector2.zero;
+        revealRect.localScale = Vector3.one;
+
+        failureRevealGraphic = revealObject.GetComponent<StageIntroRevealGraphic>();
+        failureRevealGraphic.raycastTarget = false;
+        failureRevealGraphic.SetBaseColor(FailureOverlayColor);
+        failureRevealGraphic.SetReveal(SpotlightStartClearRadii, SpotlightStartFeatherRadii, 0f);
+    }
+
+    private IEnumerator AnimateFailureSpotlight(Vector3 focusWorldPosition)
+    {
+        if (failureRevealGraphic == null)
+        {
+            yield break;
+        }
+
+        Vector2 focusViewport = ResolveFocusViewport(focusWorldPosition);
+
+        float elapsed = 0f;
+        while (elapsed < SpotlightFadeInDuration)
+        {
+            elapsed += Time.unscaledDeltaTime;
+            float t = Mathf.Clamp01(elapsed / Mathf.Max(0.01f, SpotlightFadeInDuration));
+            float easedT = Mathf.SmoothStep(0f, 1f, t);
+            float alpha = Mathf.Lerp(0f, SpotlightStartAlpha, easedT);
+            failureRevealGraphic.SetReveal(
+                SpotlightStartClearRadii,
+                SpotlightStartFeatherRadii,
+                alpha,
+                focusViewport);
+            yield return null;
+        }
+
+        elapsed = 0f;
+        while (elapsed < SpotlightFocusDuration)
+        {
+            elapsed += Time.unscaledDeltaTime;
+            float t = Mathf.Clamp01(elapsed / Mathf.Max(0.01f, SpotlightFocusDuration));
+            float easedT = Mathf.SmoothStep(0f, 1f, t);
+            Vector2 clearRadii = Vector2.Lerp(SpotlightStartClearRadii, SpotlightEndClearRadii, easedT);
+            Vector2 featherRadii = Vector2.Lerp(SpotlightStartFeatherRadii, SpotlightEndFeatherRadii, easedT);
+            float alpha = Mathf.Lerp(SpotlightStartAlpha, SpotlightEndAlpha, easedT);
+            failureRevealGraphic.SetReveal(clearRadii, featherRadii, alpha, focusViewport);
+            yield return null;
+        }
+
+        failureRevealGraphic.SetReveal(
+            SpotlightEndClearRadii,
+            SpotlightEndFeatherRadii,
+            SpotlightEndAlpha,
+            focusViewport);
+
+        if (SpotlightHoldDuration > 0f)
+        {
+            yield return new WaitForSecondsRealtime(SpotlightHoldDuration);
+        }
+    }
+
+    private static Vector2 ResolveFocusViewport(Vector3 focusWorldPosition)
+    {
+        Camera targetCamera = Camera.main;
+        if (targetCamera == null)
+        {
+            targetCamera = FindObjectOfType<Camera>();
+        }
+
+        if (targetCamera == null)
+        {
+            return new Vector2(0.5f, 0.5f);
+        }
+
+        Vector3 viewportPoint = targetCamera.WorldToViewportPoint(focusWorldPosition);
+        if (viewportPoint.z < 0f)
+        {
+            return new Vector2(0.5f, 0.5f);
+        }
+
+        return new Vector2(
+            Mathf.Clamp01(viewportPoint.x),
+            Mathf.Clamp01(viewportPoint.y));
     }
 
     private float PlayDropScatterAnimation(List<ArchitecturalCrystal> droppedItems, Vector3 origin)

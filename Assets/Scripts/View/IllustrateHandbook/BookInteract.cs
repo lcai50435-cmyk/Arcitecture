@@ -19,7 +19,7 @@ public class BookInteract : MonoBehaviour, IInteractable
 
         if (illustratedHandbook != null)
         {
-            UIManager.Instance?.OpenIllustratedHandbook();
+            UIManager.Instance?.OpenIllustratedHandbook(RuntimeModalOpenSource.Interact);
         }
         else
         {

@@ -2,22 +2,22 @@ using UnityEngine;
 using System;
 
 /// <summary>
-/// µĞÈË¹¥»÷·¶Î§´¥·¢Æ÷
+/// æ•Œäººæ”»å‡»èŒƒå›´è§¦å‘å™¨
 /// </summary>
 [RequireComponent(typeof(Collider2D))] 
 public class EnemyAttackRangeTrigger2D : MonoBehaviour
 {
-    // Íæ¼Ò½øÈë¹¥»÷·¶Î§ÊÂ¼ş
+    // ç©å®¶è¿›å…¥æ”»å‡»èŒƒå›´äº‹ä»¶
     public event Action OnPlayerEnterRange;
-    // Íæ¼ÒÀë¿ª¹¥»÷·¶Î§ÊÂ¼ş
+    // ç©å®¶ç¦»å¼€æ”»å‡»èŒƒå›´äº‹ä»¶
     public event Action OnPlayerExitRange;
 
-    // ±êÇ©¼ì²â
+    // æ ‡ç­¾æ£€æµ‹
     [SerializeField] private string playerTag = "Player";
 
     private void Awake()
     {
-        // È·±£´¥·¢Æ÷ÊÇ¿ªÆô×´Ì¬ÇÒ·ÇÅö×²Ìå
+        // ç¡®ä¿è§¦å‘å™¨æ˜¯å¼€å¯çŠ¶æ€ä¸”éç¢°æ’ä½“
         Collider2D col = GetComponent<Collider2D>();
         if (col != null)
         {
@@ -29,7 +29,7 @@ public class EnemyAttackRangeTrigger2D : MonoBehaviour
     {
         if (other.CompareTag(playerTag))
         {
-            Debug.Log("Íæ¼Ò½øÈë¹¥»÷·¶Î§");
+            Debug.Log("ç©å®¶è¿›å…¥æ”»å‡»èŒƒå›´");
             OnPlayerEnterRange?.Invoke();
         }
     }

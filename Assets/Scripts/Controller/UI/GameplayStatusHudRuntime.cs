@@ -17,6 +17,7 @@ public static class GameplayStatusHudRuntime
     private static TextMeshProUGUI healthValueText;
     private static TextMeshProUGUI weaponValueText;
     private static TextMeshProUGUI countdownText;
+    private static bool externallyHidden;
 
     public static ValueTrans EnsureHealthGauge(ValueTrans currentGauge)
     {
@@ -113,8 +114,29 @@ public static class GameplayStatusHudRuntime
         countdownText.alignment = TextAlignmentOptions.Center;
         countdownText.enableWordWrapping = false;
         countdownText.raycastTarget = false;
+        countdownText.gameObject.SetActive(!externallyHidden);
 
         return countdownText;
+    }
+
+    public static void SetVisible(bool shouldShow)
+    {
+        externallyHidden = !shouldShow;
+
+        if (hudCanvas != null)
+        {
+            hudCanvas.gameObject.SetActive(shouldShow);
+        }
+
+        if (rootRect != null)
+        {
+            rootRect.gameObject.SetActive(shouldShow);
+        }
+
+        if (countdownText != null)
+        {
+            countdownText.gameObject.SetActive(shouldShow);
+        }
     }
 
     private static void EnsureRoot()
@@ -154,7 +176,7 @@ public static class GameplayStatusHudRuntime
             10,
             12);
         ReattachToHudCanvas();
-        rootRect.gameObject.SetActive(true);
+        rootRect.gameObject.SetActive(!externallyHidden);
 
         if (healthGauge == null || weaponGauge == null)
         {
@@ -395,6 +417,7 @@ public static class GameplayStatusHudRuntime
 
         canvasGroup.interactable = false;
         canvasGroup.blocksRaycasts = false;
+        canvasObject.SetActive(!externallyHidden);
     }
 
     private static void ReattachToHudCanvas()

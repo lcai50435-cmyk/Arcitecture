@@ -8,7 +8,7 @@ public class MusicManager : MonoBehaviour
 
     void Awake()
     {
-        // 防止重复创建
+        // 闃叉閲嶅鍒涘缓
         if (Instance != null)
         {
             Destroy(gameObject);
@@ -18,10 +18,10 @@ public class MusicManager : MonoBehaviour
         Instance = this;
         DontDestroyOnLoad(gameObject);
 
-        // 自动获取 Audio Source
+        // 鑷姩鑾峰彇 Audio Source
         bgmSource = GetComponent<AudioSource>();
 
-        // 确保音乐播放
+        // 纭繚闊充箰鎾斁
         if (!bgmSource.isPlaying)
             bgmSource.Play();
     }

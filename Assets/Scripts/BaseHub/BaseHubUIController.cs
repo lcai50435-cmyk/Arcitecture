@@ -5,6 +5,7 @@ public class BaseHubUIController : MonoBehaviour
     [SerializeField] private GameObject illustratedHandbookPanel;
     [SerializeField] private SpiritPanelUI spiritPanel;
     [SerializeField] private StageSelectionPanelUI stageSelectionPanel;
+    [SerializeField] private BaseHubAlbumPanel albumPanel;
     [SerializeField] private GameObject interactTipUI;
     [SerializeField] private GameObject player;
 
@@ -12,7 +13,7 @@ public class BaseHubUIController : MonoBehaviour
     private Rigidbody2D playerBody;
     private PlayerInteraction playerInteraction;
     private BaseHubInkAttack playerInkAttack;
-    private bool isModalOpen;
+    private bool isClosingModal;
     private bool hasSavedPlayerState;
     private bool wasMoveEnabled;
     private bool wasCanMove;
@@ -24,12 +25,14 @@ public class BaseHubUIController : MonoBehaviour
         GameObject handbookPanel,
         SpiritPanelUI spirit,
         StageSelectionPanelUI stagePanel,
+        BaseHubAlbumPanel photoAlbumPanel,
         GameObject interactTip)
     {
         player = playerObject;
         illustratedHandbookPanel = handbookPanel;
         spiritPanel = spirit;
         stageSelectionPanel = stagePanel;
+        albumPanel = photoAlbumPanel;
         interactTipUI = interactTip;
 
         playerMove = player != null ? player.GetComponent<PlayerMove>() : null;
@@ -37,43 +40,57 @@ public class BaseHubUIController : MonoBehaviour
         playerInteraction = player != null ? player.GetComponent<PlayerInteraction>() : null;
         playerInkAttack = player != null ? player.GetComponent<BaseHubInkAttack>() : null;
 
+        isClosingModal = false;
         ClosePanelsOnly();
     }
 
-    private void Update()
+    public void OpenIllustratedHandbook(RuntimeModalOpenSource source = RuntimeModalOpenSource.None)
     {
-        if (isModalOpen && Input.GetKeyDown(GameSettingsStore.GetKeyBinding(GameInputAction.Pause)))
+        if (UIManager.Instance != null)
         {
-            CloseAll();
+            UIManager.Instance.OpenIllustratedHandbook(source);
+            return;
         }
+
+        OpenModal(illustratedHandbookPanel, RuntimeModalType.Handbook, source);
     }
 
-    public void OpenIllustratedHandbook()
+    public void OpenSpiritPanel(RuntimeModalOpenSource source = RuntimeModalOpenSource.None)
     {
-        OpenModal(illustratedHandbookPanel);
-    }
-
-    public void OpenSpiritPanel()
-    {
-        OpenModal(spiritPanel != null ? spiritPanel.gameObject : null);
+        OpenModal(spiritPanel != null ? spiritPanel.gameObject : null, RuntimeModalType.Spirit, source);
         spiritPanel?.Open();
     }
 
-    public void OpenStageSelectionPanel()
+    public void OpenStageSelectionPanel(RuntimeModalOpenSource source = RuntimeModalOpenSource.None)
     {
-        OpenModal(stageSelectionPanel != null ? stageSelectionPanel.gameObject : null);
+        OpenModal(stageSelectionPanel != null ? stageSelectionPanel.gameObject : null, RuntimeModalType.Stage, source);
         stageSelectionPanel?.Open();
+    }
+
+    public void OpenAlbumPanel(RuntimeModalOpenSource source = RuntimeModalOpenSource.None)
+    {
+        OpenModal(albumPanel != null ? albumPanel.gameObject : null, RuntimeModalType.Album, source);
+        albumPanel?.Open();
     }
 
     public void CloseAll()
     {
-        ClosePanelsOnly();
-        SetInteractTipVisible(false);
-        UnlockPlayer();
-        isModalOpen = false;
+        if (isClosingModal)
+        {
+            return;
+        }
+
+        if (UIRootManager.Instance != null && UIRootManager.Instance.IsModalFlowOpen)
+        {
+            isClosingModal = true;
+            UIRootManager.Instance.CloseModalFlow(CompleteCloseAll);
+            return;
+        }
+
+        CompleteCloseAll();
     }
 
-    private void OpenModal(GameObject panel)
+    private void OpenModal(GameObject panel, RuntimeModalType modalType, RuntimeModalOpenSource source)
     {
         if (panel == null) return;
 
@@ -81,7 +98,12 @@ public class BaseHubUIController : MonoBehaviour
         LockPlayer();
         SetInteractTipVisible(false);
         panel.SetActive(true);
-        isModalOpen = true;
+        isClosingModal = false;
+
+        if (UIRootManager.Instance != null)
+        {
+            UIRootManager.Instance.OpenModal(modalType, source);
+        }
     }
 
     private void ClosePanelsOnly()
@@ -94,6 +116,9 @@ public class BaseHubUIController : MonoBehaviour
 
         if (stageSelectionPanel != null)
             stageSelectionPanel.gameObject.SetActive(false);
+
+        if (albumPanel != null)
+            albumPanel.gameObject.SetActive(false);
     }
 
     private void LockPlayer()
@@ -149,5 +174,13 @@ public class BaseHubUIController : MonoBehaviour
     {
         if (interactTipUI != null)
             interactTipUI.SetActive(visible);
+    }
+
+    private void CompleteCloseAll()
+    {
+        ClosePanelsOnly();
+        SetInteractTipVisible(false);
+        UnlockPlayer();
+        isClosingModal = false;
     }
 }

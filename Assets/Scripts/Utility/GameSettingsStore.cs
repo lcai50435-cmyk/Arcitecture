@@ -6,7 +6,8 @@ public enum GameInputAction
     Attack = 0,
     Interact = 1,
     OpenMap = 2,
-    Pause = 3
+    Pause = 3,
+    PhotoCapture = 4
 }
 
 public enum GameDisplayMode
@@ -26,6 +27,7 @@ public sealed class GameSettingsDraft
     public KeyCode interactKey;
     public KeyCode openMapKey;
     public KeyCode pauseKey;
+    public KeyCode photoCaptureKey;
 
     public GameSettingsDraft Clone()
     {
@@ -39,7 +41,8 @@ public sealed class GameSettingsDraft
             attackKey = attackKey,
             interactKey = interactKey,
             openMapKey = openMapKey,
-            pauseKey = pauseKey
+            pauseKey = pauseKey,
+            photoCaptureKey = photoCaptureKey
         };
     }
 
@@ -55,6 +58,8 @@ public sealed class GameSettingsDraft
                 return openMapKey;
             case GameInputAction.Pause:
                 return pauseKey;
+            case GameInputAction.PhotoCapture:
+                return photoCaptureKey;
             default:
                 return KeyCode.None;
         }
@@ -75,6 +80,9 @@ public sealed class GameSettingsDraft
                 break;
             case GameInputAction.Pause:
                 pauseKey = keyCode;
+                break;
+            case GameInputAction.PhotoCapture:
+                photoCaptureKey = keyCode;
                 break;
         }
     }
@@ -128,7 +136,8 @@ public static class GameSettingsStore
             attackKey = LoadSavedKeyBinding(GameInputAction.Attack),
             interactKey = LoadSavedKeyBinding(GameInputAction.Interact),
             openMapKey = LoadSavedKeyBinding(GameInputAction.OpenMap),
-            pauseKey = LoadSavedKeyBinding(GameInputAction.Pause)
+            pauseKey = LoadSavedKeyBinding(GameInputAction.Pause),
+            photoCaptureKey = LoadSavedKeyBinding(GameInputAction.PhotoCapture)
         };
     }
 
@@ -149,7 +158,8 @@ public static class GameSettingsStore
             attackKey = GetDefaultKey(GameInputAction.Attack),
             interactKey = GetDefaultKey(GameInputAction.Interact),
             openMapKey = GetDefaultKey(GameInputAction.OpenMap),
-            pauseKey = GetDefaultKey(GameInputAction.Pause)
+            pauseKey = GetDefaultKey(GameInputAction.Pause),
+            photoCaptureKey = GetDefaultKey(GameInputAction.PhotoCapture)
         };
     }
 
@@ -185,6 +195,7 @@ public static class GameSettingsStore
         PlayerPrefs.SetInt(GetInputActionPrefKey(GameInputAction.Interact), (int)source.interactKey);
         PlayerPrefs.SetInt(GetInputActionPrefKey(GameInputAction.OpenMap), (int)source.openMapKey);
         PlayerPrefs.SetInt(GetInputActionPrefKey(GameInputAction.Pause), (int)source.pauseKey);
+        PlayerPrefs.SetInt(GetInputActionPrefKey(GameInputAction.PhotoCapture), (int)source.photoCaptureKey);
         PlayerPrefs.Save();
 
         ApplyAudioSettings();
@@ -206,7 +217,8 @@ public static class GameSettingsStore
                savedSettings.attackKey != draftSettings.attackKey ||
                savedSettings.interactKey != draftSettings.interactKey ||
                savedSettings.openMapKey != draftSettings.openMapKey ||
-               savedSettings.pauseKey != draftSettings.pauseKey;
+               savedSettings.pauseKey != draftSettings.pauseKey ||
+               savedSettings.photoCaptureKey != draftSettings.photoCaptureKey;
     }
 
     public static Vector2Int GetResolutionOption(int index)
@@ -320,6 +332,8 @@ public static class GameSettingsStore
                 return KeyCode.M;
             case GameInputAction.Pause:
                 return KeyCode.Escape;
+            case GameInputAction.PhotoCapture:
+                return KeyCode.P;
             default:
                 return KeyCode.None;
         }
@@ -337,6 +351,8 @@ public static class GameSettingsStore
                 return "地图";
             case GameInputAction.Pause:
                 return "暂停";
+            case GameInputAction.PhotoCapture:
+                return "拍照";
             default:
                 return action.ToString();
         }
@@ -451,6 +467,7 @@ public static class GameSettingsStore
         PlayerPrefs.SetInt(GetInputActionPrefKey(GameInputAction.Interact), (int)draft.interactKey);
         PlayerPrefs.SetInt(GetInputActionPrefKey(GameInputAction.OpenMap), (int)draft.openMapKey);
         PlayerPrefs.SetInt(GetInputActionPrefKey(GameInputAction.Pause), (int)draft.pauseKey);
+        PlayerPrefs.SetInt(GetInputActionPrefKey(GameInputAction.PhotoCapture), (int)draft.photoCaptureKey);
         PlayerPrefs.Save();
     }
 

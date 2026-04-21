@@ -3,11 +3,11 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// 交互接口
+/// 浜や簰鎺ュ彛
 /// </summary>
 public interface IInteractable 
 {
-    string InteractionTip { get; }  // 物品交互信息提示
+    string InteractionTip { get; }  // 鐗╁搧浜や簰淇℃伅鎻愮ず
 
-    void OnInteract(); // 物品被交互时执行
+    void OnInteract(); // 鐗╁搧琚氦浜掓椂鎵ц
 }

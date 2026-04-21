@@ -9,6 +9,8 @@ public class BackpackUI : MonoBehaviour
     private const float ToggleHotspotHeight = 44f;
     private const float CollapseSlideDistance = 150f;
     private const float SlideSmoothTime = 0.08f;
+    private const float ModalHideSlideDistance = 92f;
+    private const float VisibilitySmoothTime = 0.12f;
     private const float CollapsedHintScalePulse = 0.04f;
     private const float CollapsedHintPulseSpeed = 4.4f;
     private static readonly Color ToggleButtonColor = new Color(0.17f, 0.12f, 0.07f, 0.88f);
@@ -22,15 +24,19 @@ public class BackpackUI : MonoBehaviour
     private RectTransform toggleHotspotRect;
     private Image toggleHotspotImage;
     private TextMeshProUGUI toggleHintText;
+    private CanvasGroup canvasGroup;
     private Vector2 expandedAnchoredPosition;
     private Vector2 currentTargetPosition;
     private Vector2 slideVelocity;
+    private float alphaVelocity;
     private bool slideInitialized;
     private bool isCollapsed;
+    private bool isRuntimeVisible = true;
 
     private void Start()
     {
         ResolveBackpackManager();
+        EnsureCanvasGroup();
         EnsureSlideToggle();
         RefreshUI();
     }
@@ -39,6 +45,7 @@ public class BackpackUI : MonoBehaviour
     {
         ResolveBackpackManager();
         SubscribeRuntimeEvents();
+        EnsureCanvasGroup();
         EnsureSlideToggle();
         RefreshUI();
     }
@@ -93,25 +100,48 @@ public class BackpackUI : MonoBehaviour
             return;
         }
 
-        if ((rectTransform.anchoredPosition - currentTargetPosition).sqrMagnitude < 0.01f)
+        Vector2 targetPosition = GetAnimatedTargetPosition();
+        if ((rectTransform.anchoredPosition - targetPosition).sqrMagnitude < 0.01f)
         {
-            rectTransform.anchoredPosition = currentTargetPosition;
-            return;
+            rectTransform.anchoredPosition = targetPosition;
+        }
+        else
+        {
+            rectTransform.anchoredPosition = Vector2.SmoothDamp(
+                rectTransform.anchoredPosition,
+                targetPosition,
+                ref slideVelocity,
+                SlideSmoothTime,
+                Mathf.Infinity,
+                Time.unscaledDeltaTime);
         }
 
-        rectTransform.anchoredPosition = Vector2.SmoothDamp(
-            rectTransform.anchoredPosition,
-            currentTargetPosition,
-            ref slideVelocity,
-            SlideSmoothTime,
-            Mathf.Infinity,
-            Time.unscaledDeltaTime);
+        if (canvasGroup != null)
+        {
+            float targetAlpha = isRuntimeVisible ? 1f : 0f;
+            canvasGroup.alpha = Mathf.SmoothDamp(
+                canvasGroup.alpha,
+                targetAlpha,
+                ref alphaVelocity,
+                VisibilitySmoothTime,
+                Mathf.Infinity,
+                Time.unscaledDeltaTime);
+
+            bool canInteract = isRuntimeVisible && canvasGroup.alpha > 0.98f;
+            canvasGroup.interactable = canInteract;
+            canvasGroup.blocksRaycasts = canInteract;
+        }
 
         RefreshToggleHintVisual();
     }
 
     private void HandleToggleShortcut()
     {
+        if (!isRuntimeVisible)
+        {
+            return;
+        }
+
         if (!Input.GetKeyDown(KeyCode.B))
         {
             return;
@@ -133,6 +163,60 @@ public class BackpackUI : MonoBehaviour
         }
 
         ToggleCollapsedState();
+    }
+
+    public void SetRuntimeVisible(bool visible, bool immediate = false)
+    {
+        EnsureCanvasGroup();
+        EnsureSlideToggle();
+        isRuntimeVisible = visible;
+
+        if (immediate)
+        {
+            ApplyRuntimeVisibilityInstant();
+        }
+    }
+
+    public void EnsureVisibleForIncomingPickup()
+    {
+        EnsureCanvasGroup();
+        EnsureSlideToggle();
+
+        isRuntimeVisible = true;
+        isCollapsed = false;
+
+        ApplySlidePositionInstant();
+        ApplyRuntimeVisibilityInstant();
+        RefreshToggleHintVisual();
+    }
+
+    public bool TryGetSlotScreenPosition(int slotIndex, out Vector2 screenPosition, out Vector2 slotSize)
+    {
+        screenPosition = default;
+        slotSize = default;
+
+        if (backPackGrid == null || slotIndex < 0 || slotIndex >= backPackGrid.Length)
+        {
+            return false;
+        }
+
+        Image slotImage = backPackGrid[slotIndex];
+        if (slotImage == null)
+        {
+            return false;
+        }
+
+        RectTransform slotRect = slotImage.rectTransform;
+        Canvas parentCanvas = GetComponentInParent<Canvas>();
+        Camera canvasCamera = parentCanvas != null && parentCanvas.renderMode != RenderMode.ScreenSpaceOverlay
+            ? parentCanvas.worldCamera
+            : null;
+
+        screenPosition = RectTransformUtility.WorldToScreenPoint(
+            canvasCamera,
+            slotRect.TransformPoint(slotRect.rect.center));
+        slotSize = Vector2.Scale(slotRect.rect.size, slotRect.lossyScale);
+        return true;
     }
 
     private void ResolveBackpackManager()
@@ -204,6 +288,7 @@ public class BackpackUI : MonoBehaviour
         EnsureToggleHintText();
 
         ApplySlidePositionInstant();
+        ApplyRuntimeVisibilityInstant();
         RefreshToggleHintVisual();
     }
 
@@ -226,7 +311,7 @@ public class BackpackUI : MonoBehaviour
             ? expandedAnchoredPosition + new Vector2(0f, -CollapseSlideDistance)
             : expandedAnchoredPosition;
         slideVelocity = Vector2.zero;
-        rectTransform.anchoredPosition = currentTargetPosition;
+        rectTransform.anchoredPosition = GetAnimatedTargetPosition();
     }
 
     private void EnsureToggleHintText()
@@ -309,6 +394,44 @@ public class BackpackUI : MonoBehaviour
                 toggleHintText.text = "收起 [B]";
             }
         }
+    }
+
+    private void EnsureCanvasGroup()
+    {
+        if (canvasGroup != null)
+        {
+            return;
+        }
+
+        canvasGroup = GetComponent<CanvasGroup>();
+        if (canvasGroup == null)
+        {
+            canvasGroup = gameObject.AddComponent<CanvasGroup>();
+        }
+    }
+
+    private Vector2 GetAnimatedTargetPosition()
+    {
+        return currentTargetPosition + (isRuntimeVisible ? Vector2.zero : new Vector2(0f, -ModalHideSlideDistance));
+    }
+
+    private void ApplyRuntimeVisibilityInstant()
+    {
+        if (rectTransform != null)
+        {
+            slideVelocity = Vector2.zero;
+            rectTransform.anchoredPosition = GetAnimatedTargetPosition();
+        }
+
+        if (canvasGroup == null)
+        {
+            return;
+        }
+
+        alphaVelocity = 0f;
+        canvasGroup.alpha = isRuntimeVisible ? 1f : 0f;
+        canvasGroup.interactable = isRuntimeVisible;
+        canvasGroup.blocksRaycasts = isRuntimeVisible;
     }
 
     private void SubscribeRuntimeEvents()

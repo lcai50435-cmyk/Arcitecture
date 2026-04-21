@@ -4,10 +4,10 @@ using UnityEngine;
 
 public class FireBall : MonoBehaviour
 {
-    [Header("»ù´¡ÉèÖÃ")]
+    [Header("åŸºç¡€è®¾ç½®")]
     public float speed = 6f;
-    public float autoDestroyTime = 10f; // Î´ÃüÖĞ10Ãë×Ô¶¯Ïú»Ù
-    public float hitDestroyDelay = 3f;  // ÃüÖĞºó¶µµ×Ïú»ÙÑÓ³Ù
+    public float autoDestroyTime = 10f; // æœªå‘½ä¸­10ç§’è‡ªåŠ¨é”€æ¯
+    public float hitDestroyDelay = 3f;  // å‘½ä¸­åå…œåº•é”€æ¯å»¶è¿Ÿ
 
     private float damage = 10;
     private Animator anim;
@@ -19,14 +19,14 @@ public class FireBall : MonoBehaviour
         anim = GetComponent<Animator>();
         rb = GetComponent<Rigidbody2D>();
 
-        // ÅĞ¿ÕĞ£Ñé£¬±ÜÃâ¿ÕÒıÓÃ
-        if (anim == null) Debug.LogError($"[{gameObject.name}] È±ÉÙAnimator×é¼ş£¡");
-        if (rb == null) Debug.LogError($"[{gameObject.name}] È±ÉÙRigidbody2D×é¼ş£¡");
+        // åˆ¤ç©ºæ ¡éªŒï¼Œé¿å…ç©ºå¼•ç”¨
+        if (anim == null) Debug.LogError($"[{gameObject.name}] ç¼ºå°‘Animatorç»„ä»¶ï¼");
+        if (rb == null) Debug.LogError($"[{gameObject.name}] ç¼ºå°‘Rigidbody2Dç»„ä»¶ï¼");
     }
 
     private void Start()
     {
-        // Î´ÃüÖĞ10Ãë×Ô¶¯Ïú»Ù
+        // æœªå‘½ä¸­10ç§’è‡ªåŠ¨é”€æ¯
         Destroy(gameObject, autoDestroyTime);
     }
 
@@ -43,34 +43,34 @@ public class FireBall : MonoBehaviour
 
         isHit = true;
 
-        // Í£Ö¹ÒÆ¶¯
+        // åœæ­¢ç§»åŠ¨
         rb.velocity = Vector2.zero;
 
-        // »ñµÃÍæ¼Ò½Å±¾CharacterCore
+        // è·å¾—ç©å®¶è„šæœ¬CharacterCore
         CharacterCore playerCore = other.GetComponent<CharacterCore>();
         if (playerCore != null)
         {
-            // ¶ÔÍæ¼ÒÔì³ÉÉËº¦
+            // å¯¹ç©å®¶é€ æˆä¼¤å®³
             playerCore.TakeDamage(damage);
         }
 
-        // ²¥·ÅÃüÖĞ¶¯»­£¨ÅĞ¿Õ±£»¤£©
+        // æ’­æ”¾å‘½ä¸­åŠ¨ç”»ï¼ˆåˆ¤ç©ºä¿æŠ¤ï¼‰
         if (anim != null)
             anim.SetTrigger("IsHit");
 
-        // ¹Ø±ÕÅö×²Æ÷£¬±ÜÃâÖØ¸´´¥·¢
+        // å…³é—­ç¢°æ’å™¨ï¼Œé¿å…é‡å¤è§¦å‘
         Collider2D col = GetComponent<Collider2D>();
         if (col != null)
             col.enabled = false;
 
-        // È¡ÏûÔ­±¾µÄ10Ãë×Ô¶¯Ïú»Ù£¬±ÜÃâºÍ¶¯»­ÊÂ¼ş³åÍ»
+        // å–æ¶ˆåŸæœ¬çš„10ç§’è‡ªåŠ¨é”€æ¯ï¼Œé¿å…å’ŒåŠ¨ç”»äº‹ä»¶å†²çª
         CancelInvoke(nameof(Destroy));
 
-        // ±ÜÃâ¿¨ËÀ
+        // é¿å…å¡æ­»
         Destroy(gameObject, hitDestroyDelay);
     }
 
-    // ÃüÖĞ¶¯»­²¥ÍêºóÏú»Ù
+    // å‘½ä¸­åŠ¨ç”»æ’­å®Œåé”€æ¯
     public void DestroyAfterHit()
     {
         Destroy(gameObject);

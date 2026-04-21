@@ -73,6 +73,7 @@ public class RuntimeMiniMapHud : MonoBehaviour
     private float expandProgress;
     private float expandVelocity;
     private bool sceneBindingsReady;
+    private bool externallyHidden;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void Bootstrap()
@@ -127,6 +128,27 @@ public class RuntimeMiniMapHud : MonoBehaviour
         return Instance;
     }
 
+    public static void SetExternallyHidden(bool hidden)
+    {
+        RuntimeMiniMapHud hud = EnsureInstance();
+        if (hud == null)
+        {
+            return;
+        }
+
+        hud.externallyHidden = hidden;
+        if (hidden)
+        {
+            hud.expanded = false;
+            hud.pinnedExpanded = false;
+            hud.suppressHoldExpandUntilMReleased = false;
+            hud.mKeyPressedAt = -1f;
+            hud.RestorePlayerMoveSpeed();
+            hud.SetVisible(false);
+            hud.UpdateSmallMapOverlay();
+        }
+    }
+
     private void Awake()
     {
         if (Instance != null && Instance != this)
@@ -172,6 +194,14 @@ public class RuntimeMiniMapHud : MonoBehaviour
             }
         }
 
+        if (externallyHidden)
+        {
+            RestorePlayerMoveSpeed();
+            SetVisible(false);
+            UpdateSmallMapOverlay();
+            return;
+        }
+
         SetVisible(true);
 
         KeyCode mapKey = GameSettingsStore.GetKeyBinding(GameInputAction.OpenMap);
@@ -210,8 +240,14 @@ public class RuntimeMiniMapHud : MonoBehaviour
             }
         }
 
+        bool shouldConsumePauseForMap = pinnedExpanded || IsExpandedViewVisible;
         if (Input.GetKeyDown(pauseKey))
         {
+            if (shouldConsumePauseForMap)
+            {
+                RuntimePauseMenu.ConsumeOpenHotkey();
+            }
+
             pinnedExpanded = false;
             suppressHoldExpandUntilMReleased = false;
         }

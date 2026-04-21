@@ -195,6 +195,11 @@ public class RunStageDirector : MonoBehaviour
         runtimeSuspended = true;
     }
 
+    public void ResumeRuntime()
+    {
+        runtimeSuspended = false;
+    }
+
     private void EnsureStageConfigs()
     {
         if (stageConfigs.Count > 0)
@@ -239,6 +244,8 @@ public class RunStageDirector : MonoBehaviour
 
     private void BindCountdownManager()
     {
+        bool shouldHoldForIntro = GameplayStageIntroDirector.IsIntroActive;
+
         countdownManager = GameCountDownManager.Instance != null
             ? GameCountDownManager.Instance
             : FindObjectOfType<GameCountDownManager>();
@@ -251,9 +258,11 @@ public class RunStageDirector : MonoBehaviour
 
         countdownManager.totalTime = 300f;
         countdownManager.DebugSetRemainTime(300f);
-        countdownManager.SetInBaseState(false);
+        countdownManager.SetInBaseState(shouldHoldForIntro);
         countdownManager.OnCountdownFinished -= HandleCountdownFinished;
         countdownManager.OnCountdownFinished += HandleCountdownFinished;
+
+        runtimeSuspended = shouldHoldForIntro;
     }
 
     private void CaptureExistingEnemiesAsTemplates()
@@ -733,22 +742,32 @@ public class RunStageEnemyBinding : MonoBehaviour
         deathBehaviour = GetComponent<CharacterDeathBase>();
         handledDeath = false;
 
-        if (characterCore != null)
+        if (deathBehaviour != null)
         {
-            characterCore.OnDeath -= HandleDeath;
-            characterCore.OnDeath += HandleDeath;
+            deathBehaviour.OnDeathSequenceCompleted -= HandleDeathSequenceCompleted;
+            deathBehaviour.OnDeathSequenceCompleted += HandleDeathSequenceCompleted;
+        }
+        else if (characterCore != null)
+        {
+            characterCore.OnDeath -= HandleImmediateDeath;
+            characterCore.OnDeath += HandleImmediateDeath;
         }
     }
 
     private void OnDisable()
     {
+        if (deathBehaviour != null)
+        {
+            deathBehaviour.OnDeathSequenceCompleted -= HandleDeathSequenceCompleted;
+        }
+
         if (characterCore != null)
         {
-            characterCore.OnDeath -= HandleDeath;
+            characterCore.OnDeath -= HandleImmediateDeath;
         }
     }
 
-    private void HandleDeath()
+    private void HandleDeathSequenceCompleted()
     {
         if (handledDeath)
         {
@@ -757,6 +776,11 @@ public class RunStageEnemyBinding : MonoBehaviour
 
         handledDeath = true;
         director?.HandleEnemyDeath(transform.position);
+    }
+
+    private void HandleImmediateDeath()
+    {
+        HandleDeathSequenceCompleted();
         if (deathBehaviour == null)
         {
             Destroy(gameObject, FallbackDestroyDelay);

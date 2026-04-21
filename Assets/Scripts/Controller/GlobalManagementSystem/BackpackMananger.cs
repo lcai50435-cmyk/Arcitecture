@@ -10,6 +10,7 @@ public class BackpackMananger : MonoBehaviour
 
     private const int MaxCapacity = 6;
     private readonly HashSet<ArchitecturalType> alreadyPickedCommonTypes = new HashSet<ArchitecturalType>();
+    private readonly HashSet<int> reservedSlots = new HashSet<int>();
     private int nextRuntimePickupOrder = 1;
 
     public delegate void FirstPickTipEvent(ArchitecturalCrystal crystal);
@@ -67,19 +68,9 @@ public class BackpackMananger : MonoBehaviour
     {
         EnsureCapacity();
 
-        if (crystal.IsInkSupply)
+        if (TryHandleImmediatePickup(crystal, out bool immediatePickupSucceeded))
         {
-            ApplyInkSupply(crystal);
-            Debug.Log($"拾取 {crystal.DisplayName}，恢复墨笔耐久 {crystal.inkRestoreValue}");
-            return true;
-        }
-
-        if (crystal.IsSpecialStructure)
-        {
-            RuntimeProgressState.EnsureInstance().AddSpecialStructureInventory(1);
-            OnInventoryChanged?.Invoke();
-            Debug.Log($"拾取 {crystal.DisplayName}，已加入专用材料库存");
-            return true;
+            return immediatePickupSucceeded;
         }
 
         int emptyIndex = FindEmptyIndex();
@@ -89,40 +80,54 @@ public class BackpackMananger : MonoBehaviour
             return false;
         }
 
-        bool shouldShowFirstPick = crystal.IsCommonStructure && !alreadyPickedCommonTypes.Contains(crystal.type);
-        if (shouldShowFirstPick)
+        return StoreBackpackItem(crystal, emptyIndex);
+    }
+
+    public bool TryReserveSlotForPickup(ArchitecturalCrystal crystal, out int slotIndex)
+    {
+        EnsureCapacity();
+        slotIndex = -1;
+
+        if (!crystal.IsCommonStructure)
         {
-            alreadyPickedCommonTypes.Add(crystal.type);
+            return false;
         }
 
-        ArchitecturalCrystal newItem = new ArchitecturalCrystal(
-            crystal.type,
-            crystal.expValue,
-            crystal.icon,
-            crystal.backIcon,
-            crystal.textDescription,
-            crystal.bonusType,
-            crystal.bonusValue,
-            crystal.subBonusType,
-            crystal.subBonusValue,
-            crystal.isUnlockMaterial,
-            crystal.resourceCategory,
-            crystal.inkRestoreValue);
-        newItem.runtimePickupOrder = nextRuntimePickupOrder++;
-
-        backpackItems[emptyIndex] = newItem;
-        RefreshPlayerTemporaryAttributes();
-
-        if (shouldShowFirstPick)
+        slotIndex = FindEmptyIndex();
+        if (slotIndex == -1)
         {
-            OnFirstTimePickItemType?.Invoke(newItem);
+            return false;
         }
 
-        OnItemPicked?.Invoke(newItem);
-        OnInventoryChanged?.Invoke();
-
-        Debug.Log($"拾取 {newItem.DisplayName}，放入背包格子 {emptyIndex}");
+        reservedSlots.Add(slotIndex);
         return true;
+    }
+
+    public void CancelReservedSlot(int slotIndex)
+    {
+        if (slotIndex < 0)
+        {
+            return;
+        }
+
+        reservedSlots.Remove(slotIndex);
+    }
+
+    public bool CommitReservedPickup(ArchitecturalCrystal crystal, int slotIndex)
+    {
+        EnsureCapacity();
+
+        if (!reservedSlots.Remove(slotIndex))
+        {
+            return false;
+        }
+
+        if (slotIndex < 0 || slotIndex >= backpackItems.Count || backpackItems[slotIndex].HasValue)
+        {
+            return false;
+        }
+
+        return StoreBackpackItem(crystal, slotIndex);
     }
 
     public void RemoveItem(int index)
@@ -166,6 +171,8 @@ public class BackpackMananger : MonoBehaviour
             OnInventoryChanged?.Invoke();
         }
 
+        reservedSlots.Clear();
+
         Debug.Log("背包已清空");
     }
 
@@ -181,13 +188,79 @@ public class BackpackMananger : MonoBehaviour
     {
         for (int i = 0; i < backpackItems.Count; i++)
         {
-            if (!backpackItems[i].HasValue)
+            if (!backpackItems[i].HasValue && !reservedSlots.Contains(i))
             {
                 return i;
             }
         }
 
         return -1;
+    }
+
+    private bool TryHandleImmediatePickup(ArchitecturalCrystal crystal, out bool success)
+    {
+        if (crystal.IsInkSupply)
+        {
+            ApplyInkSupply(crystal);
+            Debug.Log($"拾取 {crystal.DisplayName}，恢复墨笔耐久 {crystal.inkRestoreValue}");
+            success = true;
+            return true;
+        }
+
+        if (crystal.IsSpecialStructure)
+        {
+            RuntimeProgressState.EnsureInstance().AddSpecialStructureInventory(1);
+            OnInventoryChanged?.Invoke();
+            Debug.Log($"拾取 {crystal.DisplayName}，已加入专用材料库存");
+            success = true;
+            return true;
+        }
+
+        success = false;
+        return false;
+    }
+
+    private bool StoreBackpackItem(ArchitecturalCrystal crystal, int slotIndex)
+    {
+        bool shouldShowFirstPick = crystal.IsCommonStructure && !alreadyPickedCommonTypes.Contains(crystal.type);
+        if (shouldShowFirstPick)
+        {
+            alreadyPickedCommonTypes.Add(crystal.type);
+        }
+
+        ArchitecturalCrystal storedItem = CreateStoredBackpackItem(crystal);
+        backpackItems[slotIndex] = storedItem;
+        RefreshPlayerTemporaryAttributes();
+
+        if (shouldShowFirstPick)
+        {
+            OnFirstTimePickItemType?.Invoke(storedItem);
+        }
+
+        OnItemPicked?.Invoke(storedItem);
+        OnInventoryChanged?.Invoke();
+
+        Debug.Log($"拾取 {storedItem.DisplayName}，放入背包格子 {slotIndex}");
+        return true;
+    }
+
+    private ArchitecturalCrystal CreateStoredBackpackItem(ArchitecturalCrystal crystal)
+    {
+        ArchitecturalCrystal storedItem = new ArchitecturalCrystal(
+            crystal.type,
+            crystal.expValue,
+            crystal.icon,
+            crystal.backIcon,
+            crystal.textDescription,
+            crystal.bonusType,
+            crystal.bonusValue,
+            crystal.subBonusType,
+            crystal.subBonusValue,
+            crystal.isUnlockMaterial,
+            crystal.resourceCategory,
+            crystal.inkRestoreValue);
+        storedItem.runtimePickupOrder = nextRuntimePickupOrder++;
+        return storedItem;
     }
 
     private void ApplyInkSupply(ArchitecturalCrystal crystal)

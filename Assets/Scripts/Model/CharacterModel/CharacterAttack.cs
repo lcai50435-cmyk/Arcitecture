@@ -31,7 +31,10 @@ public abstract class CharacterAttack : MonoBehaviour
     protected virtual void Awake()
     {
         core = GetComponent<CharacterCore>();
-        playerMove = moveScript.GetComponent<PlayerMove>();
+        if (moveScript != null)
+        {
+            playerMove = moveScript.GetComponent<PlayerMove>();
+        }
 
         if (core == null)
         {
@@ -39,10 +42,21 @@ public abstract class CharacterAttack : MonoBehaviour
         }
     }
 
+    protected virtual void OnEnable()
+    {
+        if (core == null)
+        {
+            return;
+        }
+
+        core.OnDeath -= HandleOwnerDeath;
+        core.OnDeath += HandleOwnerDeath;
+    }
+
     #region 角色攻击（复用核心逻辑：面朝方向 + 移动禁用 + 动画触发）
     public virtual void TriggerAttack()
     {
-        if (isAttacking || core == null) return; // 攻击中或者无核心组件则拦截
+        if (isAttacking || core == null || core.IsDead) return; // 攻击中或者已死亡则拦截
 
         // 根据最后面朝方向更新攻击朝向
         UpdateAttackFacingDirection();  
@@ -105,6 +119,12 @@ public abstract class CharacterAttack : MonoBehaviour
     {
         isAttacking = false;
 
+        if (core != null && core.IsDead)
+        {
+            AnimatorParameterUtility.SetBoolIfPresent(anim, "IsAttacking", false);
+            return;
+        }
+
         // 恢复移动能力
         if (playerMove != null) playerMove.canMove = true;
         AnimatorParameterUtility.SetBoolIfPresent(anim, "IsAttacking", false);
@@ -117,8 +137,30 @@ public abstract class CharacterAttack : MonoBehaviour
     // 防止事件内存泄漏
     protected virtual void OnDisable()
     {
+        if (core != null)
+        {
+            core.OnDeath -= HandleOwnerDeath;
+        }
+
         OnAttackStarted = null;
         OnAttackFinished = null;
+    }
+
+    public void HandleOwnerDeathImmediate()
+    {
+        isAttacking = false;
+
+        if (playerMove != null)
+        {
+            playerMove.canMove = false;
+            if (playerMove.rb != null)
+            {
+                playerMove.rb.velocity = Vector2.zero;
+            }
+        }
+
+        AnimatorParameterUtility.SetBoolIfPresent(anim, "IsAttacking", false);
+        enabled = false;
     }
 
     /// <summary>
@@ -130,5 +172,10 @@ public abstract class CharacterAttack : MonoBehaviour
         if (core == null) return;
         float dmg = core.stats.attackDamage;
         OnAttackHit?.Invoke(gameObject, target, dmg);
+    }
+
+    private void HandleOwnerDeath()
+    {
+        HandleOwnerDeathImmediate();
     }
 }

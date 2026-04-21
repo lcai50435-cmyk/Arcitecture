@@ -13,6 +13,7 @@ public class PlayerInteraction : MonoBehaviour
 
     private IInteractable currentInteractable;
     private Collider2D currentInteractableCollider;
+    private bool suppressInteractUi;
 
     private void Awake()
     {
@@ -27,6 +28,12 @@ public class PlayerInteraction : MonoBehaviour
 
     void Update()
     {
+        if (suppressInteractUi)
+        {
+            HideInteractUI();
+            return;
+        }
+
         if (IsGameplayUiBlockingInteraction())
         {
             ClearCurrentInteractable();
@@ -37,6 +44,11 @@ public class PlayerInteraction : MonoBehaviour
 
         if (Input.GetKeyDown(GameSettingsStore.GetKeyBinding(GameInputAction.Interact)))
         {
+            if (UIRootManager.Instance != null && UIRootManager.Instance.ShouldSuppressInteractionInput())
+            {
+                return;
+            }
+
             TryInteract();
         }
     }
@@ -104,6 +116,11 @@ public class PlayerInteraction : MonoBehaviour
 
     private void ShowInteractUI(string tip)
     {
+        if (suppressInteractUi)
+        {
+            return;
+        }
+
         ResolveRuntimeReferences();
 
         if (fImage != null)
@@ -127,6 +144,15 @@ public class PlayerInteraction : MonoBehaviour
         currentInteractable = null;
         currentInteractableCollider = null;
         HideInteractUI();
+    }
+
+    public void SetInteractUiSuppressed(bool suppressed)
+    {
+        suppressInteractUi = suppressed;
+        if (suppressed)
+        {
+            HideInteractUI();
+        }
     }
 
     private static bool IsGameplayUiBlockingInteraction()

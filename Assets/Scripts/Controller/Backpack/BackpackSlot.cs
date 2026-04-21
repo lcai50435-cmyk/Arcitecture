@@ -251,6 +251,9 @@ public sealed class RuntimeBackpackHoverHud : MonoBehaviour
     private int capturedScreenHeight;
     private float nextBackdropRefreshAt;
     private BackpackSlot currentOwner;
+    private string cachedTitle;
+    private string cachedDescription;
+    private Sprite cachedIcon;
 
     public static RuntimeBackpackHoverHud EnsureInstance()
     {
@@ -440,13 +443,27 @@ public sealed class RuntimeBackpackHoverHud : MonoBehaviour
                 : crystal.textDescription;
         }
 
+        Sprite resolvedIcon = crystal.backIcon != null ? crystal.backIcon : crystal.icon;
+        bool contentChanged = cachedTitle != title
+            || cachedDescription != description
+            || cachedIcon != resolvedIcon;
+
+        if (!contentChanged)
+        {
+            return;
+        }
+
+        cachedTitle = title;
+        cachedDescription = description;
+        cachedIcon = resolvedIcon;
+
         TMP_FontAsset runtimeFont = TmpRuntimeFontFallback.WarmupCharacters($"{title}\n{description}")
             ?? TmpRuntimeFontFallback.EnsureChineseFallback()
             ?? TMP_Settings.defaultFontAsset;
 
         if (iconImage != null)
         {
-            iconImage.sprite = crystal.backIcon != null ? crystal.backIcon : crystal.icon;
+            iconImage.sprite = resolvedIcon;
             iconImage.enabled = iconImage.sprite != null;
         }
 
@@ -686,6 +703,9 @@ public sealed class RuntimeBackpackHoverHud : MonoBehaviour
     private void HideImmediate()
     {
         currentOwner = null;
+        cachedTitle = null;
+        cachedDescription = null;
+        cachedIcon = null;
         ReleaseBlurBackdrop();
         SetVisible(false);
     }

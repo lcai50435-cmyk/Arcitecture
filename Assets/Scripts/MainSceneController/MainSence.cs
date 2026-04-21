@@ -3,30 +3,30 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// ÓÎÏ·Ö÷Ò³Ãæ³¡¾°Ğ§¹û
+/// æ¸¸æˆä¸»é¡µé¢åœºæ™¯æ•ˆæœ
 /// </summary>
 public class MainSence : MonoBehaviour
 {
-    public float offsetMultipliter = 1f; // Æ«ÒÆ³ËÊı
-    public float smoothTime = 0.3f; // Æ½»¬Ê±¼ä
+    public float offsetMultipliter = 1f; // åç§»ä¹˜æ•°
+    public float smoothTime = 0.3f; // å¹³æ»‘æ—¶é—´
 
-    private Vector3 startPosition; // ¿ªÊ¼Î»ÖÃ
-    private Vector3 velocity; // ËÙ¶È
+    private Vector3 startPosition; // å¼€å§‹ä½ç½®
+    private Vector3 velocity; // é€Ÿåº¦
 
     void Start()
     {
-        startPosition = transform.position; //»ñÈ¡µ±Ç°½Å±¾¹ÒÔØ¶ÔÏóµÄ±ä»»µÄ×é¼şÎ»ÖÃ
+        startPosition = transform.position; //è·å–å½“å‰è„šæœ¬æŒ‚è½½å¯¹è±¡çš„å˜æ¢çš„ç»„ä»¶ä½ç½®
     }
 
     void Update()
     {
-        //Vector2 offset = Camera.main.ScreenToViewportPoint(Input.mousePosition);// ´ÓÆÁÄ»¿Õ¼ä×ª»¯³ÉÊÓ¿Ú¿Õ¼ä
+        //Vector2 offset = Camera.main.ScreenToViewportPoint(Input.mousePosition);// ä»å±å¹•ç©ºé—´è½¬åŒ–æˆè§†å£ç©ºé—´
         ////
         //transform.position = Vector3.SmoothDamp(transform.position, startPosition + (offset * offsetMultipliter) ,ref velocity , smoothTime);
        
         Vector2 offset = Camera.main.ScreenToViewportPoint(Input.mousePosition);
         Vector3 targetPosition = startPosition + (Vector3)(offset * offsetMultipliter);
-        targetPosition.z = transform.position.z;   // ±£³ÖÔ­À´µÄ Z Öµ
+        targetPosition.z = transform.position.z;   // ä¿æŒåŸæ¥çš„ Z å€¼
 
         transform.position = Vector3.SmoothDamp(transform.position, targetPosition, ref velocity, smoothTime);
 

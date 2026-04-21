@@ -22,6 +22,7 @@ public class UIManager : MonoBehaviour
     public string playerMovementScriptName = "PlayerController";
 
     private bool isHandbookOpen;
+    private bool isClosingHandbook;
     private MonoBehaviour playerMovementScript;
     private bool wasPlayerEnabled = true;
     private Dialog dialogUI;
@@ -62,6 +63,7 @@ public class UIManager : MonoBehaviour
         }
 
         isHandbookOpen = false;
+        isClosingHandbook = false;
         RefreshRuntimeBindings();
     }
 
@@ -84,12 +86,14 @@ public class UIManager : MonoBehaviour
         if (detailedInformation != null)
             detailedInformation.SetActive(false);
 
+        isHandbookOpen = false;
+        isClosingHandbook = false;
         RefreshRuntimeBindings();
     }
 
-    public void OpenIllustratedHandbook()
+    public void OpenIllustratedHandbook(RuntimeModalOpenSource source = RuntimeModalOpenSource.None)
     {
-        if (isHandbookOpen)
+        if (isHandbookOpen || isClosingHandbook)
         {
             Debug.Log("图鉴已打开，忽略重复打开");
             return;
@@ -117,19 +121,17 @@ public class UIManager : MonoBehaviour
             dialogUI.canShow = false;
         }
 
-        if (illustratedHandbook != null)
-            illustratedHandbook.SetActive(true);
-
-        if (detailedInformation != null)
-            detailedInformation.SetActive(false);
-
         if (UIRootManager.Instance != null)
         {
-            UIRootManager.Instance.HideAllDetail();
-            UIRootManager.Instance.HideAllSubmitSelection();
-            UIRootManager.Instance.HideDialog();
-            UIRootManager.Instance.ShowHandbook();
-            UIRootManager.Instance.HideInteractTip();
+            UIRootManager.Instance.OpenModal(RuntimeModalType.Handbook, source);
+        }
+        else
+        {
+            if (illustratedHandbook != null)
+                illustratedHandbook.SetActive(true);
+
+            if (detailedInformation != null)
+                detailedInformation.SetActive(false);
         }
 
         if (interactTipUI != null)
@@ -140,44 +142,40 @@ public class UIManager : MonoBehaviour
 
     public void CloseIllustratedHandbook()
     {
-        if (!isHandbookOpen)
+        if (!isHandbookOpen || isClosingHandbook)
         {
             Debug.Log("图鉴当前已处于关闭状态");
             return;
         }
 
-        if (illustratedHandbook != null)
-            illustratedHandbook.SetActive(false);
-
-        if (detailedInformation != null)
-            detailedInformation.SetActive(false);
-
         if (UIRootManager.Instance != null)
         {
-            UIRootManager.Instance.CloseAllBookUI();
+            isClosingHandbook = true;
+            UIRootManager.Instance.CloseModalFlow(CompleteCloseIllustratedHandbook);
+            return;
         }
 
-        HideOtherUI(false);
-        EnablePlayerMovement();
-
-        if (dialogUI == null)
-            dialogUI = FindObjectOfType<Dialog>();
-
-        if (dialogUI != null)
-        {
-            dialogUI.canShow = true;
-            dialogUI.ForceHideImmediately();
-        }
-
-        if (interactTipUI != null)
-        {
-            interactTipUI.SetActive(true);
-        }
-
-        isHandbookOpen = false;
+        CompleteCloseIllustratedHandbook();
     }
 
     public void RestoreUI()
+    {
+        if (isClosingHandbook)
+        {
+            return;
+        }
+
+        if (UIRootManager.Instance != null && UIRootManager.Instance.IsModalFlowOpen)
+        {
+            isClosingHandbook = true;
+            UIRootManager.Instance.CloseModalFlow(CompleteCloseIllustratedHandbook);
+            return;
+        }
+
+        CompleteCloseIllustratedHandbook();
+    }
+
+    private void CompleteCloseIllustratedHandbook()
     {
         if (illustratedHandbook != null)
             illustratedHandbook.SetActive(false);
@@ -208,6 +206,7 @@ public class UIManager : MonoBehaviour
         }
 
         isHandbookOpen = false;
+        isClosingHandbook = false;
     }
 
     private void DisablePlayerMovement()
