@@ -1,6 +1,6 @@
 using UnityEngine;
 
-// ½¨Öş½á¹¹ÎïÆ·ÀàĞÍ
+// å»ºç­‘ç»“æ„ç‰©å“ç±»å‹
 public enum ArchitecturalType
 {
     MortiseAndTenonJoint,
@@ -8,39 +8,39 @@ public enum ArchitecturalType
     BeamFrame,
     TampedEarth,
     Tile,
-    Brackets
+    Brackets,
+    Gold,
+    White,
+    Green
 }
 
 public enum AttributeBonusType
 {
-    CurrentHealth, // ÑªÁ¿
-    MoveSpeed, // ÒÆ¶¯ËÙ¶È
-    AttackPower, // ¹¥»÷Á¦
-    Defense, // ·ÀÓùÁ¦
-    Durability // ÎäÆ÷ÄÍ¾Ã
-
+    CurrentHealth,
+    MoveSpeed,
+    AttackPower,
+    Defense,
+    Durability,
+    MaxHealth
 }
 
 /// <summary>
-/// ½¨Öş½á¹¹ÎïÆ·Ïà¹ØĞÅÏ¢
+/// å»ºç­‘ç»“æ„ç‰©å“æ•°æ®ä¿¡æ¯ã€‚
 /// </summary>
 public struct ArchitecturalCrystal
 {
-    public ArchitecturalType type;   // ½¨ÖşÀàĞÍ
-    public int expValue;             // ½¨Öş¹¹½¨¶È
-    public Sprite icon;              // ³¡¾°Í¼±ê
-    public Sprite backIcon;          // ±³°üÍ¼±ê
-    public string textDescription;   // ÃèÊöÎÄ±¾
+    public ArchitecturalType type;
+    public int expValue;
+    public Sprite icon;
+    public Sprite backIcon;
+    public string textDescription;
 
-    // ÊôĞÔÏà¹Ø¼Ó³É
     public AttributeBonusType bonusType;
     public float bonusValue;
 
-    // ¸±ÊôĞÔÏà¹Ø¼Ó³É
     public AttributeBonusType subBonusType;
     public float subBonusValue;
 
-    // ÊÇ·ñÎª×¨ÓÃµãÁÁµÀ¾ß
     public bool isUnlockMaterial;
 
     public ArchitecturalCrystal(
@@ -48,7 +48,7 @@ public struct ArchitecturalCrystal
         int expValue,
         Sprite icon,
         Sprite backIcon,
-        string textDescription, 
+        string textDescription,
         AttributeBonusType bonusType,
         float bonusValue,
         AttributeBonusType subBonusType,

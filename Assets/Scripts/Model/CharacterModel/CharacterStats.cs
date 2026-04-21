@@ -9,14 +9,14 @@ using UnityEngine;
 public class CharacterStats
 {
     [Header("生命")]
-    public float maxHp;
+    public float maxHp = 100f;
 
     [Header("战斗")]
-    public float attackDamage;
+    public float attackDamage = 10f;
 
     [Header("速度")]
-    public float moveSpeed;
+    public float moveSpeed = 4f;
 
     [Header("防御")]
-    public float defense;
+    public float defense = 0f;
 }

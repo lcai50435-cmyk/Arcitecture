@@ -33,6 +33,8 @@
 
 # Visual Studio cache directory
 .vs/
+.vscode/
+.serena/
 
 # Gradle cache directory
 .gradle/

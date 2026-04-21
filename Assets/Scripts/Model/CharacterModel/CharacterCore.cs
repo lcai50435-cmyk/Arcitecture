@@ -22,6 +22,11 @@ public class CharacterCore : MonoBehaviour
 
     private void Awake()
     {
+        if (stats == null)
+        {
+            stats = new CharacterStats();
+        }
+
         currentHp = stats.maxHp; // 满血状态
         baseStats = stats; // // 保存原始基础属性
     }

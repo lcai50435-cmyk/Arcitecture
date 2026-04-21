@@ -2,18 +2,19 @@ using UnityEngine;
 
 public class PlayerAttack : CharacterAttack
 {
-    private KeyCode attackKey = KeyCode.Mouse0;
+    private readonly KeyCode attackKey = KeyCode.Mouse0;
+    private const float InkCostPerAttack = 5f;
     private DirectionTracker directionTracker;
     private Animator animator;
 
-    [Header("Ô¶³ÌÉèÖÃ")]
+    [Header("è¿œç¨‹æ”»å‡»")]
     public GameObject inkballPrefab;
     public Transform inkPoint;
 
-    [Header("ÑªÌõ½Å±¾")]
+    [Header("å¢¨æ°´æ¡")]
     public ValueTrans weaponTrans;
 
-    [Header("Ä«Ë®ÊıÁ¿")]
+    [Header("å¢¨æ°´å€¼")]
     public float ink;
     public float maxInk = 100f;
 
@@ -35,7 +36,6 @@ public class PlayerAttack : CharacterAttack
     {
         if (Input.GetKeyDown(attackKey))
         {
-            // Ö»ÒªÓĞ²Ù×÷ÀàUI¿ª×Å£¬¾Í½ûÖ¹¹¥»÷
             if (UIRootManager.Instance != null && UIRootManager.Instance.IsAnyGameplayBlockingUIOpen())
             {
                 return;
@@ -50,10 +50,9 @@ public class PlayerAttack : CharacterAttack
 
     public override void TriggerAttack()
     {
-        if (ink < 5f) return;
+        if (ink < InkCostPerAttack) return;
 
-        ink = Mathf.Max(0, ink - 5f);
-
+        ink = Mathf.Max(0f, ink - InkCostPerAttack);
         if (weaponTrans != null)
         {
             weaponTrans.SetValue(ink);
@@ -67,10 +66,33 @@ public class PlayerAttack : CharacterAttack
             lastDir = Vector2.right;
         }
 
-        if (inkballPrefab != null && inkPoint != null)
+        InkAttackRuntimeConfig inkConfig = InkModifierRuntimeConfig.BuildFromBackpack(BackpackMananger.Instance);
+        SpawnInkBalls(lastDir.normalized, inkConfig);
+    }
+
+    private void SpawnInkBalls(Vector2 direction, InkAttackRuntimeConfig inkConfig)
+    {
+        if (inkballPrefab == null || inkPoint == null)
         {
+            return;
+        }
+
+        int projectileCount = Mathf.Max(1, inkConfig.projectileCount);
+        float centerIndex = (projectileCount - 1) * 0.5f;
+
+        for (int i = 0; i < projectileCount; i++)
+        {
+            float angle = (i - centerIndex) * inkConfig.fanAngleStep;
+            Vector2 shotDirection = Quaternion.Euler(0f, 0f, angle) * direction;
+
             GameObject inkball = Instantiate(inkballPrefab, inkPoint.position, Quaternion.identity);
-            inkball.transform.right = lastDir;
+            inkball.transform.right = shotDirection;
+
+            InkBall inkBallComponent = inkball.GetComponent<InkBall>();
+            if (inkBallComponent != null)
+            {
+                inkBallComponent.Init(inkConfig);
+            }
         }
     }
 

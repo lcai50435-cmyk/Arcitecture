@@ -3530,7 +3530,8 @@ MonoBehaviour:
   animator: {fileID: 1216690262}
   fadeDuration: 1
   mainMenuIndex: 0
-  gameSceneIndex: 1
+  baseSceneIndex: 1
+  gameSceneIndex: 2
 --- !u!4 &1335621195
 Transform:
   m_ObjectHideFlags: 0
