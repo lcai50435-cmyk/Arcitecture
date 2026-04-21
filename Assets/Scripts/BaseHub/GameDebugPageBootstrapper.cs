@@ -13,7 +13,7 @@ public class GameDebugPageBootstrapper : MonoBehaviour
     private const string BaseSceneName = "BaseScene";
     private const string GameSceneName = "GameScene";
     private const float RefreshInterval = 0.2f;
-    private const string RequiredDebugCharacters = "调试面板按住显示当前场景基地允许攻击生命上限耐久攻击力移动速度防御建筑结构材料武器属性技能关闭开关";
+    private const string RequiredDebugCharacters = "调试面板按住显示当前场景基地允许攻击生命上限耐久攻击力移动速度防御建筑结构材料武器属性技能关闭开关预留版本暂不启用穿透效果命中TabEsc";
     private static readonly string[] DebugFontNames =
     {
         "Arial Unicode MS",
@@ -59,18 +59,17 @@ public class GameDebugPageBootstrapper : MonoBehaviour
     {
         if (panelRoot == null) return;
 
-        bool shouldShow = Input.GetKey(KeyCode.Tab);
-        if (panelRoot.activeSelf != shouldShow)
+        if (Input.GetKeyDown(KeyCode.Tab))
         {
-            panelRoot.SetActive(shouldShow);
-            refreshTimer = 0f;
-            if (shouldShow)
-            {
-                RefreshStatus();
-            }
+            SetPanelVisible(!panelRoot.activeSelf);
         }
 
-        if (!shouldShow) return;
+        if (panelRoot.activeSelf && Input.GetKeyDown(KeyCode.Escape))
+        {
+            SetPanelVisible(false);
+        }
+
+        if (!panelRoot.activeSelf) return;
 
         refreshTimer -= Time.unscaledDeltaTime;
         if (refreshTimer <= 0f)
@@ -83,6 +82,7 @@ public class GameDebugPageBootstrapper : MonoBehaviour
     private void Build()
     {
         EnsureEventSystem();
+        EnsureRuntimeSceneSystems();
 
         GameObject canvasObject = new GameObject("RuntimeDebugCanvas");
         canvasObject.transform.SetParent(transform, false);
@@ -109,7 +109,7 @@ public class GameDebugPageBootstrapper : MonoBehaviour
         Image panelImage = panelRoot.AddComponent<Image>();
         panelImage.color = new Color(0.08f, 0.08f, 0.07f, 0.90f);
 
-        TextMeshProUGUI title = CreateText("Title", panelRoot.transform, "调试面板（按住 Tab 显示）", 30, new Color(0.96f, 0.86f, 0.62f, 1f), TextAlignmentOptions.MidlineLeft);
+        TextMeshProUGUI title = CreateText("Title", panelRoot.transform, "调试面板（Tab 开关，Esc 关闭）", 30, new Color(0.96f, 0.86f, 0.62f, 1f), TextAlignmentOptions.MidlineLeft);
         RectTransform titleRect = title.rectTransform;
         titleRect.anchorMin = new Vector2(0f, 1f);
         titleRect.anchorMax = new Vector2(1f, 1f);
@@ -134,6 +134,18 @@ public class GameDebugPageBootstrapper : MonoBehaviour
         }
 
         panelRoot.SetActive(false);
+    }
+
+    private void SetPanelVisible(bool visible)
+    {
+        if (panelRoot == null) return;
+
+        panelRoot.SetActive(visible);
+        refreshTimer = 0f;
+        if (visible)
+        {
+            RefreshStatus();
+        }
     }
 
     private void BuildStatusSection(Transform parent)
@@ -178,7 +190,7 @@ public class GameDebugPageBootstrapper : MonoBehaviour
     {
         GameObject section = CreateSection(parent, "技能与结构");
         CreateActionRow(section.transform, "弹道数量", ("加斗拱", () => AddSkill(ArchitecturalType.Brackets)), ("经验+50", () => AddExperience(ArchitecturalType.Brackets, 50)), ("清空背包", ClearBackpack));
-        CreateActionRow(section.transform, "穿透次数", ("加榫卯", () => AddSkill(ArchitecturalType.MortiseAndTenonJoint)), ("经验+50", () => AddExperience(ArchitecturalType.MortiseAndTenonJoint, 50)));
+        CreateActionRow(section.transform, "榫卯预留", ("加榫卯", () => AddSkill(ArchitecturalType.MortiseAndTenonJoint)), ("经验+50", () => AddExperience(ArchitecturalType.MortiseAndTenonJoint, 50)));
         CreateActionRow(section.transform, "弹体尺寸", ("加瓦片", () => AddSkill(ArchitecturalType.Tile)), ("经验+50", () => AddExperience(ArchitecturalType.Tile, 50)));
         CreateActionRow(section.transform, "减速效果", ("加夯土", () => AddSkill(ArchitecturalType.TampedEarth)), ("经验+50", () => AddExperience(ArchitecturalType.TampedEarth, 50)));
         CreateActionRow(section.transform, "击退效果", ("加台基", () => AddSkill(ArchitecturalType.GroundMass)), ("经验+50", () => AddExperience(ArchitecturalType.GroundMass, 50)));
@@ -205,10 +217,12 @@ public class GameDebugPageBootstrapper : MonoBehaviour
     {
         if (statusText == null) return;
 
+        EnsureRuntimeSceneSystems();
+
         CharacterCore core = GetPlayerCore();
         PlayerAttack attack = GetPlayerAttack();
-        BackpackMananger backpack = BackpackMananger.Instance;
-        GameCountDownManager countdown = GameCountDownManager.Instance;
+        BackpackMananger backpack = EnsureBackpackManager();
+        GameCountDownManager countdown = IsBaseScene() ? null : EnsureCountdownManager();
         InkAttackRuntimeConfig inkConfig = InkModifierRuntimeConfig.BuildFromBackpack(backpack);
 
         StringBuilder builder = new StringBuilder();
@@ -221,7 +235,7 @@ public class GameDebugPageBootstrapper : MonoBehaviour
         if (!IsBaseScene())
         {
             builder.AppendLine(attack != null
-                ? $"墨水：{attack.ink:0}    弹道：{inkConfig.projectileCount}    穿透：{inkConfig.maxHitCount}    尺寸：{inkConfig.projectileScale:0.00}"
+                ? $"墨水：{attack.ink:0}    弹道：{inkConfig.projectileCount}    命中上限：{inkConfig.maxHitCount}    尺寸：{inkConfig.projectileScale:0.00}"
                 : "攻击组件：未找到 PlayerAttack");
             builder.AppendLine(backpack != null
                 ? $"背包：{backpack.GetOccupiedCount()}/{backpack.backpackItems.Count}    减速：{inkConfig.debuff.slowRatio:P0}    击退：{inkConfig.debuff.knockbackForce:0.0}"
@@ -381,7 +395,7 @@ public class GameDebugPageBootstrapper : MonoBehaviour
 
     private void AddSkill(ArchitecturalType type)
     {
-        BackpackMananger backpack = BackpackMananger.Instance;
+        BackpackMananger backpack = EnsureBackpackManager();
         if (backpack == null || backpack.backpackItems == null) return;
 
         for (int i = 0; i < backpack.backpackItems.Count; i++)
@@ -431,7 +445,17 @@ public class GameDebugPageBootstrapper : MonoBehaviour
                 break;
         }
 
-        return new ArchitecturalCrystal(type, 50, icon, icon, GetSkillDescription(type), bonusType, bonusValue, false);
+        return new ArchitecturalCrystal(
+            type,
+            50,
+            icon,
+            icon,
+            GetSkillDescription(type),
+            bonusType,
+            bonusValue,
+            AttributeBonusType.CurrentHealth,
+            0f,
+            false);
     }
 
     private void AddExperience(ArchitecturalType type, int value)
@@ -444,34 +468,38 @@ public class GameDebugPageBootstrapper : MonoBehaviour
 
     private void ClearBackpack()
     {
-        if (BackpackMananger.Instance == null) return;
+        BackpackMananger backpack = EnsureBackpackManager();
+        if (backpack == null) return;
 
-        BackpackMananger.Instance.ClearAllItems();
+        backpack.ClearAllItems();
         RefreshBackpackUI();
         RefreshStatus();
     }
 
     private void SetCountdownPaused(bool paused)
     {
-        if (GameCountDownManager.Instance == null) return;
+        GameCountDownManager countdown = EnsureCountdownManager();
+        if (countdown == null) return;
 
-        GameCountDownManager.Instance.SetInBaseState(paused);
+        countdown.SetInBaseState(paused);
         RefreshStatus();
     }
 
     private void AddRemainTime(float value)
     {
-        if (GameCountDownManager.Instance == null) return;
+        GameCountDownManager countdown = EnsureCountdownManager();
+        if (countdown == null) return;
 
-        GameCountDownManager.Instance.DebugAddRemainTime(value);
+        countdown.DebugAddRemainTime(value);
         RefreshStatus();
     }
 
     private void SetRemainTime(float value)
     {
-        if (GameCountDownManager.Instance == null) return;
+        GameCountDownManager countdown = EnsureCountdownManager();
+        if (countdown == null) return;
 
-        GameCountDownManager.Instance.DebugSetRemainTime(value);
+        countdown.DebugSetRemainTime(value);
         RefreshStatus();
     }
 
@@ -574,7 +602,7 @@ public class GameDebugPageBootstrapper : MonoBehaviour
             case ArchitecturalType.Brackets:
                 return "斗拱：增加墨水弹数量。";
             case ArchitecturalType.MortiseAndTenonJoint:
-                return "榫卯：增加墨水弹可命中次数。";
+                return "榫卯：当前版本暂不启用穿透效果。";
             case ArchitecturalType.Tile:
                 return "瓦片：放大墨水弹体积。";
             case ArchitecturalType.TampedEarth:
@@ -693,6 +721,101 @@ public class GameDebugPageBootstrapper : MonoBehaviour
     private static bool IsBaseScene()
     {
         return SceneManager.GetActiveScene().name == BaseSceneName;
+    }
+
+    private static void EnsureRuntimeSceneSystems()
+    {
+        EnsureBackpackManager();
+
+        if (!IsBaseScene())
+        {
+            EnsureCountdownManager();
+        }
+    }
+
+    private static BackpackMananger EnsureBackpackManager()
+    {
+        if (BackpackMananger.Instance != null)
+        {
+            EnsureBackpackCapacity(BackpackMananger.Instance);
+            return BackpackMananger.Instance;
+        }
+
+        BackpackMananger manager = FindObjectOfType<BackpackMananger>(true);
+        if (manager == null)
+        {
+            GameObject managerObject = new GameObject("RuntimeBackpackManager");
+            manager = managerObject.AddComponent<BackpackMananger>();
+        }
+        else
+        {
+            BackpackMananger.Instance = manager;
+            EnsureBackpackCapacity(manager);
+        }
+
+        return manager;
+    }
+
+    private static void EnsureBackpackCapacity(BackpackMananger manager)
+    {
+        if (manager == null || manager.backpackItems == null)
+        {
+            return;
+        }
+
+        while (manager.backpackItems.Count < 6)
+        {
+            manager.backpackItems.Add(null);
+        }
+    }
+
+    private static GameCountDownManager EnsureCountdownManager()
+    {
+        if (GameCountDownManager.Instance != null)
+        {
+            BindCountdownTextIfMissing(GameCountDownManager.Instance);
+            return GameCountDownManager.Instance;
+        }
+
+        GameCountDownManager manager = FindObjectOfType<GameCountDownManager>(true);
+        if (manager == null)
+        {
+            GameObject managerObject = new GameObject("RuntimeGameCountDownManager");
+            manager = managerObject.AddComponent<GameCountDownManager>();
+            manager.isInBase = IsBaseScene();
+        }
+        else
+        {
+            GameCountDownManager.Instance = manager;
+        }
+
+        BindCountdownTextIfMissing(manager);
+        return manager;
+    }
+
+    private static void BindCountdownTextIfMissing(GameCountDownManager manager)
+    {
+        if (manager == null || manager.timer != null)
+        {
+            return;
+        }
+
+        TextMeshProUGUI[] texts = FindObjectsOfType<TextMeshProUGUI>(true);
+        for (int i = 0; i < texts.Length; i++)
+        {
+            TextMeshProUGUI text = texts[i];
+            if (text == null)
+            {
+                continue;
+            }
+
+            if (string.Equals(text.gameObject.name, "Timer", StringComparison.Ordinal) ||
+                string.Equals(text.transform.parent != null ? text.transform.parent.gameObject.name : string.Empty, "CountDownTimer", StringComparison.Ordinal))
+            {
+                manager.timer = text;
+                return;
+            }
+        }
     }
 
     private static string GetSceneDisplayName(string sceneName)

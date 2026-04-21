@@ -167,7 +167,8 @@ MonoBehaviour:
   m_Name:
   m_EditorClassIdentifier:
   buildOnStart: 1
-  playerSprite: {fileID: 0}
+  playerSprite: {fileID: 1616465552, guid: ec919683f998c124c84bcc410270fa80, type: 3}
+  playerAnimatorController: {fileID: 9100000, guid: 596a1a4e453d52a40a2eda4c8716e686, type: 2}
   avatarSprite: {fileID: 0}
   bookSprite: {fileID: 0}
   spiritSprite: {fileID: 0}

@@ -631,8 +631,10 @@ MonoBehaviour:
     kerningPairs: []
   m_FontFeatureTable:
     m_GlyphPairAdjustmentRecords: []
-  fallbackFontAssets: []
-  m_FallbackFontAssetTable: []
+  fallbackFontAssets:
+  - {fileID: 11400000, guid: 45924697ad433e747a3367e44881f1ba, type: 2}
+  m_FallbackFontAssetTable:
+  - {fileID: 11400000, guid: 45924697ad433e747a3367e44881f1ba, type: 2}
   m_CreationSettings:
     sourceFontFileName: 
     sourceFontFileGUID: 145ace327e3f727459629a2e428ce356

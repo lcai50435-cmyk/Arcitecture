@@ -28,6 +28,24 @@ public class BackpackMananger : MonoBehaviour
         }
     }
 
+    private void OnEnable()
+    {
+        if (Instance == null)
+        {
+            Instance = this;
+        }
+
+        EnsureCapacity();
+    }
+
+    private void OnDestroy()
+    {
+        if (Instance == this)
+        {
+            Instance = null;
+        }
+    }
+
     public int GetOccupiedCount()
     {
         int count = 0;

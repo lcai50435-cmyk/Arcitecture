@@ -58,9 +58,10 @@ public class GameSceneBaseReturnBootstrapper : MonoBehaviour
     {
         Time.timeScale = 1f;
 
-        if (SceneLoader.Instance != null)
+        SceneLoader loader = SceneLoader.EnsureInstance();
+        if (loader != null)
         {
-            SceneLoader.Instance.ToBase();
+            loader.ToScene(BaseSceneName);
             return;
         }
 

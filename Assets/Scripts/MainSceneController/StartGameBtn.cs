@@ -10,7 +10,12 @@ public class StartGameBtn : MonoBehaviour
 
     void OnClick()
     {
-        Debug.Log("开始游戏按钮点击成功！");
-        SceneLoader.Instance.ToBase();
+        Debug.Log("寮�濮嬫父鎴忔寜閽偣鍑绘垚鍔燂紒");
+
+        SceneLoader loader = SceneLoader.EnsureInstance();
+        if (loader != null)
+        {
+            loader.ToBase();
+        }
     }
 }

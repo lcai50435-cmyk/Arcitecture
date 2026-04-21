@@ -9,7 +9,10 @@ public class CatagloueAreaTrigger2D : MonoBehaviour
     {
         if (other.CompareTag("Player"))
         {
-            GameCountDownManager.Instance.SetInBaseState(true);
+            if (GameCountDownManager.Instance != null)
+            {
+                GameCountDownManager.Instance.SetInBaseState(true);
+            }
             Debug.Log("进入基地 → 倒计时暂停");
         }
     }
@@ -18,7 +21,10 @@ public class CatagloueAreaTrigger2D : MonoBehaviour
     {
         if (other.CompareTag("Player"))
         {
-            GameCountDownManager.Instance.SetInBaseState(false);
+            if (GameCountDownManager.Instance != null)
+            {
+                GameCountDownManager.Instance.SetInBaseState(false);
+            }
             Debug.Log("离开基地 → 倒计时开始");
         }
     }

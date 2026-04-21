@@ -3,75 +3,60 @@ using UnityEngine.UI;
 
 public class SubmitSelectionPanelUI : MonoBehaviour
 {
-    [Header("窗口根物体")]
     public GameObject panelRoot;
-
-    [Header("图鉴主页关闭按钮")]
     public Button handbookCloseButton;
-
-    [Header("6个槽位")]
     public SubmitSelectionSlotUI[] slotUIs;
 
     private BackpackMananger backpack;
     private PlayerGetArchitectural playerGetArchitectural;
     private BackpackUI backpackUI;
-
     private int selectedIndex = -1;
-    private bool isOpen = false;
-
-    // 当前提交目标建筑
+    private bool isOpen;
     private CatalogueBuildingId currentTargetBuilding;
 
     private void Start()
     {
-        backpack = BackpackMananger.Instance;
-        playerGetArchitectural = FindObjectOfType<PlayerGetArchitectural>();
-        backpackUI = FindObjectOfType<BackpackUI>();
+        ResolveRuntimeDependencies();
 
-        for (int i = 0; i < slotUIs.Length; i++)
+        if (slotUIs != null)
         {
-            if (slotUIs[i] != null)
+            for (int i = 0; i < slotUIs.Length; i++)
             {
-                slotUIs[i].Init(this);
-            }
-            else
-            {
-                Debug.LogWarning($"slotUIs[{i}] 没有绑定");
+                if (slotUIs[i] != null)
+                {
+                    slotUIs[i].Init(this);
+                }
             }
         }
 
         ClosePanelImmediate();
     }
 
-    /// <summary>
-    /// 指定建筑打开/关闭窗口
-    /// </summary>
     public void TogglePanelForBuilding(int buildingIndex)
     {
         CatalogueBuildingId target = (CatalogueBuildingId)buildingIndex;
-
-        // 同一个建筑再次点击：关闭
         if (isOpen && currentTargetBuilding == target)
         {
             ClosePanel();
             return;
         }
 
-        // 切换到另一个建筑窗口
         currentTargetBuilding = target;
         OpenPanel();
     }
 
-    /// <summary>
-    /// 打开提交窗口
-    /// </summary>
     public void OpenPanel()
     {
+        ResolveRuntimeDependencies();
         isOpen = true;
 
         if (UIRootManager.Instance != null)
         {
             UIRootManager.Instance.ShowSubmitSelection((int)currentTargetBuilding);
+        }
+        else
+        {
+            SetFallbackPanelVisible(true);
         }
 
         if (handbookCloseButton != null)
@@ -82,13 +67,9 @@ public class SubmitSelectionPanelUI : MonoBehaviour
 
         selectedIndex = -1;
         RefreshPanel();
-
-        Debug.Log($"打开提交窗口，当前目标建筑：{currentTargetBuilding}");
+        Debug.Log($"Open submit panel for {currentTargetBuilding}");
     }
 
-    /// <summary>
-    /// 关闭提交窗口
-    /// </summary>
     public void ClosePanel()
     {
         isOpen = false;
@@ -97,6 +78,10 @@ public class SubmitSelectionPanelUI : MonoBehaviour
         {
             UIRootManager.Instance.HideSubmitSelection((int)currentTargetBuilding);
         }
+        else
+        {
+            SetFallbackPanelVisible(false);
+        }
 
         if (handbookCloseButton != null)
         {
@@ -108,9 +93,6 @@ public class SubmitSelectionPanelUI : MonoBehaviour
         RefreshPanel();
     }
 
-    /// <summary>
-    /// 初始化时直接关闭全部提交窗口
-    /// </summary>
     private void ClosePanelImmediate()
     {
         isOpen = false;
@@ -119,6 +101,10 @@ public class SubmitSelectionPanelUI : MonoBehaviour
         {
             UIRootManager.Instance.HideAllSubmitSelection();
         }
+        else
+        {
+            SetFallbackPanelVisible(false);
+        }
 
         if (handbookCloseButton != null)
         {
@@ -129,39 +115,34 @@ public class SubmitSelectionPanelUI : MonoBehaviour
         selectedIndex = -1;
     }
 
-    /// <summary>
-    /// 点击某个背包槽位
-    /// </summary>
     public void OnSlotClicked(int slotIndex)
     {
-        if (backpack == null) return;
-
-        // 修复点1：接收可空值类型，并判断HasValue
-        ArchitecturalCrystal? nullableItem = backpack.GetItem(slotIndex);
-        if (!nullableItem.HasValue) // 替代 item == null 判断
+        ResolveRuntimeDependencies();
+        if (backpack == null)
         {
-            Debug.Log($"背包的物品槽 {slotIndex} 是空的");
             return;
         }
-        // 提取非空值
-        ArchitecturalCrystal item = nullableItem.Value;
 
-        // 第一次点击选中
+        ArchitecturalCrystal? nullableItem = backpack.GetItem(slotIndex);
+        if (!nullableItem.HasValue)
+        {
+            Debug.Log($"Slot {slotIndex} is empty");
+            return;
+        }
+
         if (selectedIndex != slotIndex)
         {
             selectedIndex = slotIndex;
-            Debug.Log($"首次点击选中物品槽，索引：{slotIndex}");
+            Debug.Log($"Selected backpack slot {slotIndex}");
             return;
         }
 
-        // 第二次点击同一物品提交到当前建筑
         if (playerGetArchitectural != null)
         {
             playerGetArchitectural.SubmitSingleItemToBuilding(slotIndex, currentTargetBuilding);
         }
 
         selectedIndex = -1;
-
         if (backpackUI != null)
         {
             backpackUI.RefreshUI();
@@ -170,35 +151,128 @@ public class SubmitSelectionPanelUI : MonoBehaviour
         RefreshPanel();
     }
 
-    /// <summary>
-    /// 刷新窗口显示
-    /// </summary>
     public void RefreshPanel()
     {
+        ResolveRuntimeDependencies();
         if (backpack == null)
         {
-            Debug.LogError("backpack 为空");
+            Debug.LogError("SubmitSelectionPanelUI missing BackpackMananger");
             return;
         }
 
-        Debug.Log($"刷新提交面板，当前物品数{backpack.GetOccupiedCount()}");
+        if (slotUIs == null)
+        {
+            return;
+        }
 
         for (int i = 0; i < slotUIs.Length; i++)
         {
-            if (slotUIs[i] == null)
+            SubmitSelectionSlotUI slot = slotUIs[i];
+            if (slot == null)
             {
-                Debug.LogWarning($"slotUIs[{i}] 未赋值");
                 continue;
             }
 
-            int realIndex = slotUIs[i].slotIndex;
-            // 修复点2：RefreshPanel 中同样处理可空值类型
+            int realIndex = slot.slotIndex;
             ArchitecturalCrystal? nullableItem = backpack.GetItem(realIndex);
             ArchitecturalCrystal item = nullableItem.HasValue ? nullableItem.Value : default;
-            // 新增：传递「是否有有效物品」的标记（给 SlotUI 用）
-            slotUIs[i].Refresh(item, nullableItem.HasValue);
-
-            Debug.Log($"物品槽 {slotUIs[i].gameObject.name} -> 实际索引 {realIndex} -> {(nullableItem.HasValue ? item.type.ToString() : "空")}");
+            slot.Refresh(item, nullableItem.HasValue);
         }
+    }
+
+    private void ResolveRuntimeDependencies()
+    {
+        if (backpack == null)
+        {
+            backpack = BackpackMananger.Instance;
+        }
+
+        if (backpack == null)
+        {
+            GameObject manager = new GameObject("RuntimeBackpackManager");
+            backpack = manager.AddComponent<BackpackMananger>();
+            Debug.Log("Created runtime BackpackMananger for submit selection");
+        }
+
+        if (playerGetArchitectural == null)
+        {
+            playerGetArchitectural = FindObjectOfType<PlayerGetArchitectural>();
+        }
+
+        if (backpackUI == null)
+        {
+            backpackUI = FindObjectOfType<BackpackUI>(true);
+        }
+
+        if (panelRoot == null)
+        {
+            panelRoot = gameObject;
+        }
+    }
+
+    private void SetFallbackPanelVisible(bool visible)
+    {
+        if (panelRoot == null)
+        {
+            panelRoot = gameObject;
+        }
+
+        GameObject packBagCanvasRoot = FindPackBagCanvasRoot();
+        if (visible)
+        {
+            if (packBagCanvasRoot != null)
+            {
+                packBagCanvasRoot.SetActive(true);
+            }
+
+            SubmitSelectionPanelUI[] allPanels = FindObjectsOfType<SubmitSelectionPanelUI>(true);
+            for (int i = 0; i < allPanels.Length; i++)
+            {
+                if (allPanels[i] == null || allPanels[i].panelRoot == null)
+                {
+                    continue;
+                }
+
+                allPanels[i].panelRoot.SetActive(allPanels[i] == this);
+            }
+        }
+        else
+        {
+            panelRoot.SetActive(false);
+            if (packBagCanvasRoot != null && !HasAnyVisibleSubmitPanel(packBagCanvasRoot.transform))
+            {
+                packBagCanvasRoot.SetActive(false);
+            }
+        }
+    }
+
+    private GameObject FindPackBagCanvasRoot()
+    {
+        Transform current = panelRoot != null ? panelRoot.transform : transform;
+        while (current != null)
+        {
+            if (current.name == "PackBagCanvas")
+            {
+                return current.gameObject;
+            }
+
+            current = current.parent;
+        }
+
+        return null;
+    }
+
+    private static bool HasAnyVisibleSubmitPanel(Transform root)
+    {
+        SubmitSelectionPanelUI[] panels = root.GetComponentsInChildren<SubmitSelectionPanelUI>(true);
+        for (int i = 0; i < panels.Length; i++)
+        {
+            if (panels[i] != null && panels[i].panelRoot != null && panels[i].panelRoot.activeSelf)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

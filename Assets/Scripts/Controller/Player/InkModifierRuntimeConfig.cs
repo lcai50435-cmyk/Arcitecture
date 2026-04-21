@@ -62,7 +62,6 @@ public static class InkModifierRuntimeConfig
         }
 
         int bracketCount = 0;
-        int mortiseCount = 0;
         int tileCount = 0;
         int tampedEarthCount = 0;
         int groundMassCount = 0;
@@ -92,9 +91,6 @@ public static class InkModifierRuntimeConfig
                 case InkModifierType.ProjectileCount:
                     bracketCount++;
                     break;
-                case InkModifierType.HitCount:
-                    mortiseCount++;
-                    break;
                 case InkModifierType.ProjectileScale:
                     tileCount++;
                     break;
@@ -111,7 +107,6 @@ public static class InkModifierRuntimeConfig
         }
 
         config.projectileCount += bracketCount;
-        config.maxHitCount += mortiseCount;
         config.projectileScale += tileCount * TileScaleBonus;
         config.speedMultiplier += beamFrameCount * BeamSpeedAndRangeBonus;
         config.lifetimeMultiplier += beamFrameCount * BeamSpeedAndRangeBonus;

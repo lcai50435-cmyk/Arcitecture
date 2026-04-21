@@ -9,9 +9,10 @@ public class BaseHubGameSceneInteract : MonoBehaviour, IInteractable
 
     public void OnInteract()
     {
-        if (SceneLoader.Instance != null)
+        SceneLoader loader = SceneLoader.EnsureInstance();
+        if (loader != null)
         {
-            SceneLoader.Instance.ToGame();
+            loader.ToScene(gameSceneName);
             return;
         }
 

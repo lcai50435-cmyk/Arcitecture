@@ -1,14 +1,14 @@
 using UnityEngine;
 
 /// <summary>
-/// ½¨Öş½á¹¹ÎïÆ·½»»¥´¦ÀíÆ÷
+/// å»ºç­‘ç»“æ„ç‰©å“äº¤äº’å¤„ç†å™¨
 /// </summary>
 public class CrystalInteractHandler : MonoBehaviour, IInteractable
 {
-    [Header("ÊÇ·ñÎª×¨ÓÃµãÁÁµÀ¾ß")]
+    [Header("æ˜¯å¦ä¸ºä¸“ç”¨ææ–™")]
     public bool isUnlockMaterial = false;
 
-    [Header("ÎïÆ·ÅäÖÃ")]
+    [Header("æ™¶ä½“é…ç½®")]
     public ArchitecturalType type;
     public int expValue;
     public Sprite icon;
@@ -19,15 +19,15 @@ public class CrystalInteractHandler : MonoBehaviour, IInteractable
     public float subBonusValue;
     [TextArea] public string textDescription;
 
-    // private bool pickSuccess;
-
     public void OnInteract()
     {
-        var player = FindObjectOfType<PlayerGetArchitectural>();
-        if (player == null) return;
+        PlayerGetArchitectural player = FindObjectOfType<PlayerGetArchitectural>();
+        if (player == null)
+        {
+            return;
+        }
 
-        // ·â×°ÎïÆ·Êı¾İ
-        var data = new ArchitecturalCrystal(
+        ArchitecturalCrystal data = new ArchitecturalCrystal(
             type,
             expValue,
             icon,
@@ -38,22 +38,18 @@ public class CrystalInteractHandler : MonoBehaviour, IInteractable
             subBonusType,
             subBonusValue,
             isUnlockMaterial
-        );   
+        );
 
-        // ÏÈÅĞ¶ÏÊÇ·ñÊ°È¡³É¹¦
         bool pickSuccess = player.PickCrystal(data);
 
-        // Ö»ÓĞ³É¹¦¼ñÆğÀ´£¬²ÅÉ¾³ıÎïÆ·
         if (pickSuccess)
         {
             Destroy(gameObject);
         }
         else
         {
-            // ¿ÉÒÔ¼ÓÌáÊ¾£º±³°üÒÑÂú
-            Debug.Log("±³°üÂúÁË£¬ÎïÆ·±£ÁôÔÚµØÍ¼ÉÏ");
+            Debug.Log("èƒŒåŒ…å·²æ»¡ï¼Œæ™¶ä½“ä¿ç•™åœ¨åœ°å›¾ä¸Š");
         }
-
     }
 
     public string InteractionTip
@@ -62,10 +58,10 @@ public class CrystalInteractHandler : MonoBehaviour, IInteractable
         {
             if (isUnlockMaterial)
             {
-                return "×¨ÓÃµãÁÁµÀ¾ß";
+                return "æ‹¾å–ææ–™";
             }
 
-            return $"Ê°Æğ±¦²Ø";
+            return "æ‹¾å–æ™¶ä½“";
         }
     }
 }

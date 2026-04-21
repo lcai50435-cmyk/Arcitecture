@@ -8,11 +8,11 @@ public class ResolutionManager : MonoBehaviour
     // 分辨率列表
     private string[] resolutionOptions = new string[]
     {
-        "1280 × 720",    // 默认
-        "1280 × 1050",
-        "1920 × 1080",   // 全高清
-        "1600 × 900",    // 常用
-        "2560 × 1440"    // 2K
+        "1280 x 720",    // 默认
+        "1280 x 1050",
+        "1920 x 1080",   // 全高清
+        "1600 x 900",    // 常用
+        "2560 x 1440"    // 2K
     };
 
     void Awake()
@@ -41,11 +41,11 @@ public class ResolutionManager : MonoBehaviour
             return;
 
         // 解析分辨率字符串
-        string[] parts = resolutionOptions[index].Split('×');
+        string[] parts = resolutionOptions[index].Split('x');
         int w = int.Parse(parts[0].Trim());
         int h = int.Parse(parts[1].Trim());
 
-        Debug.Log($"[ResolutionManager] 设置分辨率: {w}×{h}");
+        Debug.Log($"[ResolutionManager] 设置分辨率: {w}x{h}");
 
         // 启动协程强制刷新
         StartCoroutine(ForceResolution(w, h));
@@ -62,7 +62,7 @@ public class ResolutionManager : MonoBehaviour
         Screen.SetResolution(w, h, false);
         yield return new WaitForSeconds(0.1f);
 
-        Debug.Log($"[ResolutionManager] 实际分辨率: {Screen.width}×{Screen.height}");
+        Debug.Log($"[ResolutionManager] 实际分辨率: {Screen.width}x{Screen.height}");
     }
 
     // 获取当前分辨率索引
@@ -78,7 +78,7 @@ public class ResolutionManager : MonoBehaviour
 
     bool IsCurrentResolution(string resString)
     {
-        string[] parts = resString.Split('×');
+        string[] parts = resString.Split('x');
         if (parts.Length == 2)
         {
             int w = int.Parse(parts[0].Trim());

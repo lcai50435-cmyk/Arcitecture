@@ -3,15 +3,15 @@ using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 /// <summary>
-/// Game Over ½çÃæ°´Å¥¿ØÖÆ
+/// Game Over ç•Œé¢æŒ‰é’®æ§åˆ¶
 /// </summary>
 public class GameOverUI : MonoBehaviour
 {
-    [Header("°´Å¥")]
+    [Header("æŒ‰é’®")]
     public Button restartButton;
     public Button mainMenuButton;
 
-    [Header("³¡¾°Ãû")]
+    [Header("åœºæ™¯å")]
     public string gameSceneName = "GameScene";
     public string mainMenuSceneName = "MainScene";
 
@@ -46,12 +46,28 @@ public class GameOverUI : MonoBehaviour
     public void RestartGame()
     {
         Time.timeScale = 1f;
+
+        SceneLoader loader = SceneLoader.EnsureInstance();
+        if (loader != null)
+        {
+            loader.ToScene(gameSceneName);
+            return;
+        }
+
         SceneManager.LoadScene(gameSceneName);
     }
 
     public void GoToMainMenu()
     {
         Time.timeScale = 1f;
+
+        SceneLoader loader = SceneLoader.EnsureInstance();
+        if (loader != null)
+        {
+            loader.ToScene(mainMenuSceneName);
+            return;
+        }
+
         SceneManager.LoadScene(mainMenuSceneName);
     }
 }

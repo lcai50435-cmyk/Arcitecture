@@ -10,6 +10,7 @@ using UnityEngine.UI;
 public class BaseHubBootstrapper : MonoBehaviour
 {
     private const string BaseHubMapResourcePath = "BaseHub/base_hub_map";
+    private const string DefaultHandbookPrefabPath = "Assets/Scripts/View/Prefab/CatagloueUI.prefab";
     private const string RequiredRuntimeCharacters = "图鉴精灵关卡入口打开查看属性武器攻击基地允许生命上限耐久攻击力移动速度防御调试面板按住显示关闭点击装备";
     private static readonly string[] RuntimeFontNames =
     {
@@ -36,6 +37,7 @@ public class BaseHubBootstrapper : MonoBehaviour
 
     [Header("可选美术资源")]
     [SerializeField] private Sprite playerSprite;
+    [SerializeField] private RuntimeAnimatorController playerAnimatorController;
     [SerializeField] private Sprite avatarSprite;
     [SerializeField] private Sprite bookSprite;
     [SerializeField] private Sprite spiritSprite;
@@ -446,6 +448,8 @@ public class BaseHubBootstrapper : MonoBehaviour
 
     private GameObject CreateBaseHandbookUI(GameObject playerObject, GameObject interactPrompt)
     {
+        EnsureBaseHandbookRuntimeSystems(playerObject);
+
         GameObject handbookRoot = TryInstantiatePrefabObject(handbookUIPrefab);
         if (handbookRoot == null)
         {
@@ -468,7 +472,7 @@ public class BaseHubBootstrapper : MonoBehaviour
         GameObject interactionCanvas = FindChildByName(handbookRoot.transform, "InteractionCanvas");
 
         if (dialogCanvas != null) dialogCanvas.SetActive(false);
-        if (packBagCanvas != null) packBagCanvas.SetActive(false);
+        if (packBagCanvas != null) ConfigureBaseBackpackCanvas(packBagCanvas);
         if (interactionCanvas != null) interactionCanvas.SetActive(false);
         if (illustratedHandbook != null) illustratedHandbook.SetActive(false);
         if (detailedInformation != null) detailedInformation.SetActive(false);
@@ -504,13 +508,61 @@ public class BaseHubBootstrapper : MonoBehaviour
             interactPrompt,
             playerObject);
 
+        BackpackUI backpackUI = handbookRoot.GetComponentInChildren<BackpackUI>(true);
+        backpackUI?.RefreshUI();
+
         return illustratedHandbook;
+    }
+
+    private static void EnsureBaseHandbookRuntimeSystems(GameObject playerObject)
+    {
+        if (BackpackMananger.Instance == null)
+        {
+            GameObject manager = new GameObject("BaseBackpackManager");
+            manager.AddComponent<BackpackMananger>();
+        }
+
+        if (playerObject != null && playerObject.GetComponent<PlayerGetArchitectural>() == null)
+        {
+            playerObject.AddComponent<PlayerGetArchitectural>();
+        }
+    }
+
+    private static void ConfigureBaseBackpackCanvas(GameObject packBagCanvas)
+    {
+        if (packBagCanvas == null)
+        {
+            return;
+        }
+
+        packBagCanvas.SetActive(true);
+
+        RectTransform rectTransform = packBagCanvas.GetComponent<RectTransform>();
+        if (rectTransform != null)
+        {
+            rectTransform.localScale = Vector3.one;
+        }
+
+        CanvasGroup canvasGroup = packBagCanvas.GetComponent<CanvasGroup>();
+        if (canvasGroup != null)
+        {
+            canvasGroup.alpha = 1f;
+            canvasGroup.interactable = true;
+            canvasGroup.blocksRaycasts = true;
+        }
     }
 
     private GameObject ResolveHandbookPrefab()
     {
         if (IsHandbookPrefab(handbookUIPrefab))
         {
+            return handbookUIPrefab;
+        }
+
+        GameObject knownPrefab = LoadHandbookPrefabFromKnownPath();
+        if (IsHandbookPrefab(knownPrefab))
+        {
+            handbookUIPrefab = knownPrefab;
             return handbookUIPrefab;
         }
 
@@ -561,9 +613,9 @@ public class BaseHubBootstrapper : MonoBehaviour
         {
             if (candidate == null) return false;
             if (candidate.scene.IsValid()) return false;
-            if (!string.Equals(candidate.name, "UI", System.StringComparison.Ordinal)) return false;
             if (FindChildByName(candidate.transform, "IllustratedHandbookCanvas") == null) return false;
             if (FindChildByName(candidate.transform, "DetailedInformationCanvas") == null) return false;
+            if (candidate.GetComponentInChildren<UIManager>(true) == null) return false;
 
             return true;
         }
@@ -571,6 +623,15 @@ public class BaseHubBootstrapper : MonoBehaviour
         {
             return false;
         }
+    }
+
+    private static GameObject LoadHandbookPrefabFromKnownPath()
+    {
+#if UNITY_EDITOR
+        return UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>(DefaultHandbookPrefabPath);
+#else
+        return null;
+#endif
     }
 
     private SpiritPanelUI CreateSpiritPanel(Transform parent)
@@ -708,20 +769,25 @@ public class BaseHubBootstrapper : MonoBehaviour
             ? DetailedPlayerSpawnPosition
             : new Vector3(0f, -1.2f, 0f);
 
-        Sprite playerVisual = playerSprite != null
+        bool useConfiguredPlayerVisual = playerSprite != null;
+        Sprite playerVisual = useConfiguredPlayerVisual
             ? playerSprite
             : GetOrCreateGeneratedPlayerSprite();
         SpriteRenderer renderer = playerObject.AddComponent<SpriteRenderer>();
         renderer.sprite = playerVisual;
         renderer.sortingOrder = 5;
-        playerObject.transform.localScale = new Vector3(0.8f, 1.1f, 1f);
+        playerObject.transform.localScale = useConfiguredPlayerVisual
+            ? new Vector3(4f, 4f, 1f)
+            : new Vector3(0.8f, 1.1f, 1f);
 
         Rigidbody2D body = playerObject.AddComponent<Rigidbody2D>();
         body.gravityScale = 0f;
         body.freezeRotation = true;
 
         BoxCollider2D collider = playerObject.AddComponent<BoxCollider2D>();
-        collider.size = new Vector2(0.8f, 0.9f);
+        collider.size = useConfiguredPlayerVisual
+            ? new Vector2(0.22f, 0.24f)
+            : new Vector2(0.8f, 0.9f);
 
         playerObject.AddComponent<DirectionTracker>();
 
@@ -741,8 +807,19 @@ public class BaseHubBootstrapper : MonoBehaviour
         profile.maxDurability = 100f;
         profile.currentWeaponType = PlayerLoadoutRuntime.CurrentWeaponType;
 
+        if (playerObject.GetComponent<PlayerGetArchitectural>() == null)
+        {
+            playerObject.AddComponent<PlayerGetArchitectural>();
+        }
+
         PlayerMove move = playerObject.AddComponent<PlayerMove>();
         move.rb = body;
+        if (playerAnimatorController != null)
+        {
+            Animator animator = playerObject.AddComponent<Animator>();
+            animator.runtimeAnimatorController = playerAnimatorController;
+            move.animator = animator;
+        }
 
         PlayerInteraction interaction = playerObject.AddComponent<PlayerInteraction>();
         interaction.fImage = prompt.KeyObject;

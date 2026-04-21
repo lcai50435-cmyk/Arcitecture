@@ -21,12 +21,25 @@ public class PlayerAttack : CharacterAttack
     {
         directionTracker = GetComponent<DirectionTracker>();
         animator = GetComponent<Animator>();
+        weaponTrans = GameplayStatusHudRuntime.EnsureWeaponGauge(weaponTrans);
         base.Awake();
 
         if (weaponTrans != null)
         {
             weaponTrans.SetMaxValue(maxInk);
             weaponTrans.SetValue(ink);
+            GameplayStatusHudRuntime.RefreshWeaponText(ink, maxInk);
+        }
+    }
+
+    private void Start()
+    {
+        weaponTrans = GameplayStatusHudRuntime.EnsureWeaponGauge(weaponTrans);
+        if (weaponTrans != null)
+        {
+            weaponTrans.SetMaxValue(maxInk);
+            weaponTrans.SetValue(ink);
+            GameplayStatusHudRuntime.RefreshWeaponText(ink, maxInk);
         }
     }
 
@@ -55,6 +68,7 @@ public class PlayerAttack : CharacterAttack
         if (weaponTrans != null)
         {
             weaponTrans.SetValue(ink);
+            GameplayStatusHudRuntime.RefreshWeaponText(ink, maxInk);
         }
 
         base.TriggerAttack();
@@ -132,6 +146,7 @@ public class PlayerAttack : CharacterAttack
         if (weaponTrans != null)
         {
             weaponTrans.SetValue(ink);
+            GameplayStatusHudRuntime.RefreshWeaponText(ink, maxInk);
         }
     }
 }

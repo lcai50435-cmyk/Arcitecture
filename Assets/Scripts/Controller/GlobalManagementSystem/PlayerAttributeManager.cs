@@ -94,12 +94,15 @@ public class PlayerAttributeManager : MonoBehaviour
             {
                 playerAttack.weaponTrans.SetMaxValue(playerAttack.maxInk);
                 playerAttack.weaponTrans.SetValue(playerAttack.ink);
+                GameplayStatusHudRuntime.RefreshWeaponText(playerAttack.ink, playerAttack.maxInk);
             }
         }
 
         if (playerTakeDamage != null && playerTakeDamage.healthTrans != null && characterCore != null)
         {
+            playerTakeDamage.healthTrans.SetMaxValue(characterCore.stats.maxHp);
             playerTakeDamage.healthTrans.SetValue(characterCore.currentHp);
+            GameplayStatusHudRuntime.RefreshHealthText(characterCore.currentHp, characterCore.stats.maxHp);
         }
 
         ClearAllBonus();
