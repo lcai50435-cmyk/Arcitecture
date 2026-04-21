@@ -22,9 +22,12 @@ public readonly struct WeaponAttackProfile
         InkAttackRuntimeConfig config = baseConfig;
         InkTypeDefinition definition = inkDefinition ?? InkTypeCatalog.Get(InkType.DirectInk);
 
+        config.inkType = definition.inkType;
+        config.displayColor = definition.displayColor;
         config.projectileCount = Mathf.Max(config.projectileCount, definition.baseProjectileCount);
         config.maxHitCount = Mathf.Max(config.maxHitCount, definition.baseHitCount);
         config.projectileScale *= Mathf.Max(0.01f, definition.projectileScale);
+        config.projectileStretch = Vector2.Scale(config.projectileStretch, definition.projectileStretch);
         config.fanAngleStep = definition.fanAngleStep;
         config.baseProjectileSpeed = definition.projectileSpeed;
         config.baseProjectileLifetime = definition.projectileSpeed > 0.01f
@@ -35,6 +38,8 @@ public readonly struct WeaponAttackProfile
         config.explodeOnHit = definition.explodeOnHit;
         config.explosionRadius = definition.explosionRadius;
         config.explosionDamageMultiplier = definition.explosionDamageMultiplier;
+        config.impactPulseScale = definition.impactPulseScale;
+        config.impactPulseDuration = definition.impactPulseDuration;
 
         if (definition.hasDamageOverTime)
         {

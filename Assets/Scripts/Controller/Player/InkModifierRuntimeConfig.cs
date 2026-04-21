@@ -26,9 +26,12 @@ public struct InkDebuffRuntimeConfig
 
 public struct InkAttackRuntimeConfig
 {
+    public InkType inkType;
+    public Color displayColor;
     public int projectileCount;
     public int maxHitCount;
     public float projectileScale;
+    public Vector2 projectileStretch;
     public float speedMultiplier;
     public float lifetimeMultiplier;
     public float fanAngleStep;
@@ -39,13 +42,18 @@ public struct InkAttackRuntimeConfig
     public bool explodeOnHit;
     public float explosionRadius;
     public float explosionDamageMultiplier;
+    public float impactPulseScale;
+    public float impactPulseDuration;
     public InkDebuffRuntimeConfig debuff;
 
     public static InkAttackRuntimeConfig Default => new InkAttackRuntimeConfig
     {
+        inkType = InkType.DirectInk,
+        displayColor = Color.white,
         projectileCount = 1,
         maxHitCount = 1,
         projectileScale = 1f,
+        projectileStretch = Vector2.one,
         speedMultiplier = 1f,
         lifetimeMultiplier = 1f,
         fanAngleStep = 12f,
@@ -56,6 +64,8 @@ public struct InkAttackRuntimeConfig
         explodeOnHit = false,
         explosionRadius = 1.35f,
         explosionDamageMultiplier = 1f,
+        impactPulseScale = 0.9f,
+        impactPulseDuration = 0.16f,
         debuff = new InkDebuffRuntimeConfig()
     };
 }

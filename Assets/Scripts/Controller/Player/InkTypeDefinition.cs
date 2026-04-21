@@ -32,6 +32,9 @@ public class InkTypeDefinition
     public float dotDuration = 3f;
     public float dotTickInterval = 1f;
     public float dotDamageMultiplier = 0.35f;
+    public Vector2 projectileStretch = Vector2.one;
+    public float impactPulseScale = 0.9f;
+    public float impactPulseDuration = 0.16f;
 }
 
 public static class InkTypeCatalog
@@ -45,7 +48,10 @@ public static class InkTypeCatalog
                 {
                     inkType = InkType.DirectInk,
                     displayName = "直墨",
-                    displayColor = new Color(0.26f, 0.72f, 0.90f, 1f)
+                    displayColor = new Color(0.26f, 0.72f, 0.90f, 1f),
+                    projectileStretch = new Vector2(1f, 1f),
+                    impactPulseScale = 0.85f,
+                    impactPulseDuration = 0.14f
                 }
             },
             {
@@ -55,9 +61,12 @@ public static class InkTypeCatalog
                     inkType = InkType.BurstInk,
                     displayName = "爆墨",
                     displayColor = new Color(0.90f, 0.38f, 0.24f, 1f),
+                    projectileStretch = new Vector2(1.15f, 1.15f),
                     explodeOnHit = true,
-                    explosionRadius = 1.4f,
-                    explosionDamageMultiplier = 1f
+                    explosionRadius = 1.85f,
+                    explosionDamageMultiplier = 1f,
+                    impactPulseScale = 2.35f,
+                    impactPulseDuration = 0.24f
                 }
             },
             {
@@ -67,7 +76,10 @@ public static class InkTypeCatalog
                     inkType = InkType.PierceInk,
                     displayName = "贯墨",
                     displayColor = new Color(0.94f, 0.78f, 0.28f, 1f),
-                    baseHitCount = 3
+                    baseHitCount = 3,
+                    projectileStretch = new Vector2(1.8f, 0.55f),
+                    impactPulseScale = 0.7f,
+                    impactPulseDuration = 0.1f
                 }
             },
             {
@@ -79,8 +91,11 @@ public static class InkTypeCatalog
                     displayColor = new Color(0.24f, 0.78f, 0.56f, 1f),
                     hasDamageOverTime = true,
                     dotDuration = 3f,
-                    dotTickInterval = 1f,
-                    dotDamageMultiplier = 0.35f
+                    dotTickInterval = 0.5f,
+                    dotDamageMultiplier = 0.25f,
+                    projectileStretch = new Vector2(1.25f, 0.82f),
+                    impactPulseScale = 1.05f,
+                    impactPulseDuration = 0.2f
                 }
             }
         };

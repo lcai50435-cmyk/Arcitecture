@@ -1254,50 +1254,6 @@ GameObject:
   m_CorrespondingSourceObject: {fileID: 3665778523354325147, guid: 22b88ab0514320d448b19bb7f925f60d, type: 3}
   m_PrefabInstance: {fileID: 216821525}
   m_PrefabAsset: {fileID: 0}
---- !u!1 &1008421296
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1008421298}
-  - component: {fileID: 1008421297}
-  m_Layer: 0
-  m_Name: ExperienceManager
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &1008421297
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1008421296}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 48c8f661798a5734f8f05be2ec7ed7f1, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
---- !u!4 &1008421298
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1008421296}
-  serializedVersion: 2
-  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0.8128072, y: -0.53656495, z: 0.042400472}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &1018657143
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -2548,7 +2504,6 @@ GameObject:
   - component: {fileID: 1608170897}
   - component: {fileID: 1608170898}
   - component: {fileID: 1608170888}
-  - component: {fileID: 1608170890}
   m_Layer: 0
   m_Name: Catalogue
   m_TagString: Catalogue
@@ -2568,19 +2523,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f9a188a5205227a4593571420a2c71e2, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
---- !u!114 &1608170890
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1608170887}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: ee9e09f12921c9647aef3845e13ab6e9, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  totalMaxProgress: 100
 --- !u!212 &1608170892
 SpriteRenderer:
   m_ObjectHideFlags: 0
@@ -3445,51 +3387,6 @@ Tilemap:
   m_CorrespondingSourceObject: {fileID: 3647097102641930409, guid: ff59e018c4b37d245b3e3092a233101d, type: 3}
   m_PrefabInstance: {fileID: 1300329662}
   m_PrefabAsset: {fileID: 0}
---- !u!114 &34568618129584715
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1750144493999928020}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: ee9e09f12921c9647aef3845e13ab6e9, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  totalMaxProgress: 100
---- !u!4 &81852490261685686
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1750144493999928020}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 525.0966, y: 481.7646, z: -5.103797}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &1750144493999928020
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 81852490261685686}
-  - component: {fileID: 34568618129584715}
-  m_Layer: 0
-  m_Name: CatalogueAddExpManager
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
 --- !u!1001 &2772256182914920460
 PrefabInstance:
   m_ObjectHideFlags: 0
