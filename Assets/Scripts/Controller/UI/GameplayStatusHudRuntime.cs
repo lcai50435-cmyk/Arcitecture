@@ -13,13 +13,15 @@ public static class GameplayStatusHudRuntime
     private static RectTransform rootRect;
     private static ValueTrans healthGauge;
     private static ValueTrans weaponGauge;
+    private static Graphic weaponFillGraphic;
     private static TextMeshProUGUI healthValueText;
     private static TextMeshProUGUI weaponValueText;
 
     public static ValueTrans EnsureHealthGauge(ValueTrans currentGauge)
     {
-        if (IsRuntimeGauge(currentGauge))
+        if (IsUsableGauge(currentGauge))
         {
+            RegisterExistingGauge(currentGauge, false);
             return currentGauge;
         }
 
@@ -29,8 +31,9 @@ public static class GameplayStatusHudRuntime
 
     public static ValueTrans EnsureWeaponGauge(ValueTrans currentGauge)
     {
-        if (IsRuntimeGauge(currentGauge))
+        if (IsUsableGauge(currentGauge))
         {
+            RegisterExistingGauge(currentGauge, true);
             return currentGauge;
         }
 
@@ -48,6 +51,11 @@ public static class GameplayStatusHudRuntime
 
     public static void RefreshWeaponText(float current, float max)
     {
+        if (weaponFillGraphic != null)
+        {
+            weaponFillGraphic.color = InkTypeCatalog.GetDisplayColor(PlayerLoadoutRuntime.CurrentInkType);
+        }
+
         if (weaponValueText != null)
         {
             weaponValueText.text = $"{current:0}/{max:0}";
@@ -61,6 +69,7 @@ public static class GameplayStatusHudRuntime
         if (rootRect != null && healthGauge != null && weaponGauge != null)
         {
             ReattachToHudCanvas();
+            rootRect.gameObject.SetActive(true);
             return;
         }
 
@@ -84,8 +93,13 @@ public static class GameplayStatusHudRuntime
             rootBackground = rootObject.AddComponent<Image>();
         }
 
-        rootBackground.color = new Color(0.08f, 0.06f, 0.04f, 0.74f);
+        RuntimeUiSpriteFactory.ApplyRoundedSprite(
+            rootBackground,
+            new Color(0.08f, 0.06f, 0.04f, 0.74f),
+            10,
+            12);
         ReattachToHudCanvas();
+        rootRect.gameObject.SetActive(true);
 
         if (healthGauge == null || weaponGauge == null)
         {
@@ -103,6 +117,9 @@ public static class GameplayStatusHudRuntime
 
         healthGauge = healthRow.gauge;
         weaponGauge = weaponRow.gauge;
+        weaponFillGraphic = weaponGauge != null && weaponGauge.slider != null && weaponGauge.slider.fillRect != null
+            ? weaponGauge.slider.fillRect.GetComponent<Graphic>()
+            : null;
         healthValueText = healthRow.valueText;
         weaponValueText = weaponRow.valueText;
     }
@@ -127,7 +144,11 @@ public static class GameplayStatusHudRuntime
         rowRect.sizeDelta = new Vector2(392f, 30f);
 
         Image background = rowObject.AddComponent<Image>();
-        background.color = new Color(0.14f, 0.11f, 0.08f, 0.82f);
+        RuntimeUiSpriteFactory.ApplyRoundedSprite(
+            background,
+            new Color(0.14f, 0.11f, 0.08f, 0.82f),
+            8,
+            10);
 
         TextMeshProUGUI titleText = CreateText("Label", rowObject.transform, title, 18f, new Vector2(12f, -4f), new Vector2(54f, 20f), TextAlignmentOptions.MidlineLeft);
         titleText.fontStyle = FontStyles.Bold;
@@ -141,7 +162,11 @@ public static class GameplayStatusHudRuntime
         barRect.sizeDelta = new Vector2(224f, 14f);
 
         Image barBackground = barObject.AddComponent<Image>();
-        barBackground.color = new Color(0.17f, 0.17f, 0.20f, 0.95f);
+        RuntimeUiSpriteFactory.ApplyRoundedSprite(
+            barBackground,
+            new Color(0.17f, 0.17f, 0.20f, 0.95f),
+            7,
+            10);
 
         Slider slider = barObject.AddComponent<Slider>();
         slider.direction = Slider.Direction.LeftToRight;
@@ -165,7 +190,7 @@ public static class GameplayStatusHudRuntime
         fillRect.offsetMax = Vector2.zero;
 
         Image fillImage = fillObject.AddComponent<Image>();
-        fillImage.color = fillColor;
+        RuntimeUiSpriteFactory.ApplyRoundedSprite(fillImage, fillColor, 7, 10);
         slider.fillRect = fillRect;
 
         ValueTrans gauge = barObject.AddComponent<ValueTrans>();
@@ -273,6 +298,21 @@ public static class GameplayStatusHudRuntime
         canvasRect.offsetMin = Vector2.zero;
         canvasRect.offsetMax = Vector2.zero;
         canvasRect.localScale = Vector3.one;
+
+        GraphicRaycaster raycaster = canvasObject.GetComponent<GraphicRaycaster>();
+        if (raycaster != null)
+        {
+            raycaster.enabled = false;
+        }
+
+        CanvasGroup canvasGroup = canvasObject.GetComponent<CanvasGroup>();
+        if (canvasGroup == null)
+        {
+            canvasGroup = canvasObject.AddComponent<CanvasGroup>();
+        }
+
+        canvasGroup.interactable = false;
+        canvasGroup.blocksRaycasts = false;
     }
 
     private static void ReattachToHudCanvas()
@@ -297,19 +337,73 @@ public static class GameplayStatusHudRuntime
         rootRect.SetAsLastSibling();
     }
 
-    private static bool IsRuntimeGauge(ValueTrans gauge)
+    private static bool IsUsableGauge(ValueTrans gauge)
     {
-        if (gauge == null || gauge.slider == null)
+        return gauge != null && gauge.slider != null;
+    }
+
+    private static bool IsSceneGauge(ValueTrans gauge)
+    {
+        return IsUsableGauge(gauge) && (hudCanvas == null || gauge.transform.root != hudCanvas.transform);
+    }
+
+    private static void RegisterExistingGauge(ValueTrans gauge, bool cacheWeaponFill)
+    {
+        if (!IsUsableGauge(gauge))
         {
-            return false;
+            return;
         }
 
-        if (rootRect != null && gauge.transform.IsChildOf(rootRect))
+        DisableRaycastTargets(gauge.gameObject);
+
+        if (cacheWeaponFill)
         {
-            return true;
+            weaponGauge = gauge;
+            weaponFillGraphic = gauge.slider.fillRect != null
+                ? gauge.slider.fillRect.GetComponent<Graphic>()
+                : null;
+        }
+        else
+        {
+            healthGauge = gauge;
         }
 
-        return gauge.transform.root != null && gauge.transform.root.name == CanvasName;
+        UpdatePresentationMode();
+    }
+
+    private static void UpdatePresentationMode()
+    {
+        bool useSceneGaugeSet = IsSceneGauge(healthGauge) && IsSceneGauge(weaponGauge);
+        if (rootRect != null)
+        {
+            rootRect.gameObject.SetActive(!useSceneGaugeSet);
+        }
+
+        if (useSceneGaugeSet)
+        {
+            healthValueText = null;
+            weaponValueText = null;
+        }
+    }
+
+    private static void DisableRaycastTargets(GameObject root)
+    {
+        if (root == null)
+        {
+            return;
+        }
+
+        Graphic[] graphics = root.GetComponentsInChildren<Graphic>(true);
+        for (int i = 0; i < graphics.Length; i++)
+        {
+            graphics[i].raycastTarget = false;
+        }
+
+        Selectable[] selectables = root.GetComponentsInChildren<Selectable>(true);
+        for (int i = 0; i < selectables.Length; i++)
+        {
+            selectables[i].interactable = false;
+        }
     }
 
     private readonly struct StatusRow

@@ -1,47 +1,73 @@
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using UnityEngine.Sprites;
+using UnityEngine.UI;
 
 public class RuntimeMiniMapHud : MonoBehaviour
 {
     private const string BaseSceneName = "BaseScene";
     private const string GameSceneName = "GameScene";
     private const string CameraName = "RuntimeMiniMapCamera";
-    private const float SmallMapSize = 220f;
-    private const float SmallPanelWidth = 256f;
-    private const float SmallPanelHeight = 286f;
+    private const string OverlayCanvasName = "RuntimeMiniMapOverlayCanvas";
+    private const string SmallMapRootName = "RuntimeMiniMapRoot";
+    private const int OverlayCanvasSortingOrder = 228;
+    private const float SmallMapSize = 172f;
+    private const float MapAspect = 4f / 3f;
     private const float LargeMapWidth = 720f;
     private const float LargeMapHeight = 720f;
     private const float LargePanelWidth = 796f;
     private const float LargePanelHeight = 820f;
     private const float Margin = 22f;
-    private const int TextureSize = 1024;
+    private const float SmallMarkerMaxWidth = 16f;
+    private const float SmallMarkerMaxHeight = 22f;
+    private const float ExpandedMarkerMaxWidth = 28f;
+    private const float ExpandedMarkerMaxHeight = 38f;
+    private const float MiniMapMarkerMaxWidth = 18f;
+    private const float MiniMapMarkerMaxHeight = 24f;
+    private const int TextureWidth = 1024;
+    private const int TextureHeight = 768;
+    private const float ExpandSmoothTime = 0.14f;
+    private const float SmallFramePaddingX = 12f;
+    private const float SmallFramePaddingY = 12f;
+    private const float LargeFramePaddingX = 20f;
+    private const float LargeFramePaddingY = 18f;
 
     private static readonly Color PanelColor = new Color(0.07f, 0.10f, 0.14f, 0.86f);
     private static readonly Color ExpandedPanelColor = new Color(0.07f, 0.10f, 0.14f, 0.96f);
     private static readonly Color BorderColor = new Color(0.29f, 0.43f, 0.52f, 1f);
     private static readonly Color OverlayColor = new Color(0.03f, 0.05f, 0.08f, 0.84f);
-    private static readonly Color MapBackdropColor = new Color(0.02f, 0.03f, 0.05f, 1f);
     private static readonly Color TitleColor = new Color(0.94f, 0.97f, 1f, 1f);
     private static readonly Color HintColor = new Color(0.76f, 0.84f, 0.90f, 1f);
     private static readonly Color MarkerOutlineColor = new Color(0.07f, 0.12f, 0.19f, 0.98f);
-    private static readonly Color MarkerGlowColor = new Color(0.58f, 0.83f, 1f, 0.62f);
-    private static readonly Color MarkerFillColor = new Color(0.98f, 0.99f, 1f, 1f);
-    private static readonly Color MarkerAccentColor = new Color(0.52f, 0.74f, 1f, 0.95f);
+    private static readonly Color MarkerGlowColor = new Color(0.58f, 0.83f, 1f, 0.38f);
 
     public static RuntimeMiniMapHud Instance { get; private set; }
+    public bool IsExpandedViewVisible => visible && expandProgress > 0.05f;
 
     private Camera miniMapCamera;
+    private Canvas overlayCanvas;
     private RenderTexture renderTexture;
     private Camera cachedMainCamera;
     private Transform cachedPlayer;
+    private SpriteRenderer cachedPlayerSpriteRenderer;
+    private RectTransform smallMapRoot;
+    private RectTransform smallMapViewportRect;
+    private RectTransform smallMapImageRect;
+    private RawImage smallMapImage;
+    private Image smallMapFrameImage;
+    private RectTransform smallMarkerRoot;
+    private RawImage smallMarkerGlowImage;
+    private RawImage[] smallMarkerOutlineImages;
+    private RawImage smallMarkerFigureImage;
     private GUIStyle titleStyle;
     private GUIStyle hintStyle;
-    private Texture2D markerGlowTexture;
     private Texture2D markerFigureTexture;
     private bool expanded;
     private bool visible = true;
     private bool pinnedExpanded;
     private float mKeyPressedAt = -1f;
+    private float expandProgress;
+    private float expandVelocity;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void Bootstrap()
@@ -110,6 +136,7 @@ public class RuntimeMiniMapHud : MonoBehaviour
     {
         EnsureInfrastructure();
         RefreshSceneBindings();
+        expandProgress = expanded ? 1f : 0f;
     }
 
     private void LateUpdate()
@@ -149,8 +176,15 @@ public class RuntimeMiniMapHud : MonoBehaviour
             pinnedExpanded = false;
         }
 
-        expanded = Input.GetKey(KeyCode.M) || pinnedExpanded;
+        if (ShouldHideForGameplayOverlay())
+        {
+            pinnedExpanded = false;
+        }
+
+        expanded = !ShouldHideForGameplayOverlay() && (Input.GetKey(KeyCode.M) || pinnedExpanded);
+        UpdateExpansionState();
         UpdateCameraPose();
+        UpdateSmallMapOverlay();
 
         if (miniMapCamera != null && renderTexture != null)
         {
@@ -161,55 +195,93 @@ public class RuntimeMiniMapHud : MonoBehaviour
 
     private void OnGUI()
     {
-        if (!visible || renderTexture == null || !IsSupportedScene(SceneManager.GetActiveScene().name))
+        if (!visible ||
+            renderTexture == null ||
+            !IsSupportedScene(SceneManager.GetActiveScene().name) ||
+            ShouldHideForGameplayOverlay())
         {
             return;
         }
 
         EnsureStyles();
 
-        Rect mapRect;
-        Rect panelRect;
-        string title = $"{GetSceneDisplayName()} {(expanded ? "大地图" : "小地图")}";
-        string hint = expanded ? "松开 M 预览 / Esc 收起" : "按住或轻点 M 查看大地图";
+        float easedExpandProgress = GetEasedExpandProgress();
+        bool showExpandedState = expanded || easedExpandProgress > 0.5f;
+        string title = $"{GetSceneDisplayName()} {(showExpandedState ? "大地图" : "小地图")}";
+        string hint = showExpandedState ? "松开 M 预览 / Esc 收起" : "按住或轻点 M 查看大地图";
+        float chromeAlpha = Mathf.Clamp01(Mathf.InverseLerp(0.04f, 0.22f, easedExpandProgress));
 
-        if (expanded)
+        Rect smallMapSlotRect = new Rect(
+            Screen.width - SmallMapSize - Margin,
+            Margin,
+            SmallMapSize,
+            SmallMapSize);
+        Rect smallMapRect = GetAspectFitRect(smallMapSlotRect, MapAspect);
+        Rect smallMapFrameRect = ExpandRect(smallMapRect, SmallFramePaddingX, SmallFramePaddingY);
+        Rect smallPanelRect = smallMapSlotRect;
+        Rect largePanelRect = new Rect(
+            (Screen.width - LargePanelWidth) * 0.5f,
+            (Screen.height - LargePanelHeight) * 0.5f,
+            LargePanelWidth,
+            LargePanelHeight);
+        Rect panelRect = LerpRect(smallPanelRect, largePanelRect, easedExpandProgress);
+
+        Rect largeMapSlotRect = new Rect(
+            largePanelRect.x + (largePanelRect.width - LargeMapWidth) * 0.5f,
+            largePanelRect.y + 64f,
+            LargeMapWidth,
+            LargeMapHeight);
+        Rect largeMapRect = GetAspectFitRect(largeMapSlotRect, MapAspect);
+        Rect largeMapFrameRect = ExpandRect(largeMapRect, LargeFramePaddingX, LargeFramePaddingY);
+        Rect mapRect = LerpRect(smallMapRect, largeMapRect, easedExpandProgress);
+        Rect mapFrameRect = LerpRect(smallMapFrameRect, largeMapFrameRect, easedExpandProgress);
+
+        if (easedExpandProgress <= 0.001f)
         {
-            GUI.color = OverlayColor;
+            DrawMapFrame(smallMapFrameRect, SmallFramePaddingX, SmallFramePaddingY, 1f);
+            return;
+        }
+
+        if (easedExpandProgress > 0.001f)
+        {
+            Color overlayColor = OverlayColor;
+            overlayColor.a *= easedExpandProgress;
+            GUI.color = overlayColor;
             GUI.DrawTexture(new Rect(0f, 0f, Screen.width, Screen.height), Texture2D.whiteTexture);
             GUI.color = Color.white;
-
-            panelRect = new Rect(
-                (Screen.width - LargePanelWidth) * 0.5f,
-                (Screen.height - LargePanelHeight) * 0.5f,
-                LargePanelWidth,
-                LargePanelHeight);
-            mapRect = new Rect(
-                panelRect.x + (panelRect.width - LargeMapWidth) * 0.5f,
-                panelRect.y + 64f,
-                LargeMapWidth,
-                LargeMapHeight);
         }
-        else
+
+        if (chromeAlpha > 0.001f)
         {
-            panelRect = new Rect(
-                Screen.width - SmallPanelWidth - Margin,
-                Margin,
-                SmallPanelWidth,
-                SmallPanelHeight);
-            mapRect = new Rect(
-                panelRect.x + (panelRect.width - SmallMapSize) * 0.5f,
-                panelRect.y + 48f,
-                SmallMapSize,
-                SmallMapSize);
+            Color panelFillColor = Color.Lerp(PanelColor, ExpandedPanelColor, easedExpandProgress);
+            panelFillColor.a *= chromeAlpha;
+
+            Color borderColor = BorderColor;
+            borderColor.a *= chromeAlpha;
+
+            DrawPanel(panelRect, panelFillColor, borderColor);
         }
 
-        DrawPanel(panelRect, expanded ? ExpandedPanelColor : PanelColor);
-        GUI.Label(new Rect(panelRect.x + 16f, panelRect.y + 12f, panelRect.width * 0.55f, 26f), title, titleStyle);
-        GUI.Label(new Rect(panelRect.x + panelRect.width - 236f, panelRect.y + 14f, 220f, 22f), hint, hintStyle);
-        DrawFilledRect(mapRect, MapBackdropColor);
+        if (chromeAlpha > 0.001f)
+        {
+            float currentFramePaddingX = Mathf.Lerp(SmallFramePaddingX, LargeFramePaddingX, easedExpandProgress);
+            float currentFramePaddingY = Mathf.Lerp(SmallFramePaddingY, LargeFramePaddingY, easedExpandProgress);
+            DrawMapFrame(mapFrameRect, currentFramePaddingX, currentFramePaddingY, chromeAlpha);
+        }
+
         GUI.DrawTexture(mapRect, renderTexture, ScaleMode.StretchToFill, false);
-        DrawBorder(mapRect, 2f);
+
+        if (chromeAlpha > 0.001f)
+        {
+            Color previousGuiColor = GUI.color;
+            Color labelTint = Color.white;
+            labelTint.a = chromeAlpha;
+            GUI.color = labelTint;
+            GUI.Label(new Rect(panelRect.x + 16f, panelRect.y + 12f, panelRect.width * 0.55f, 26f), title, titleStyle);
+            GUI.Label(new Rect(panelRect.x + panelRect.width - 236f, panelRect.y + 14f, 220f, 22f), hint, hintStyle);
+            GUI.color = previousGuiColor;
+        }
+
         DrawPlayerMarker(mapRect);
 
         GUI.color = Color.white;
@@ -229,16 +301,16 @@ public class RuntimeMiniMapHud : MonoBehaviour
             renderTexture = null;
         }
 
-        if (markerGlowTexture != null)
-        {
-            Destroy(markerGlowTexture);
-            markerGlowTexture = null;
-        }
-
         if (markerFigureTexture != null)
         {
             Destroy(markerFigureTexture);
             markerFigureTexture = null;
+        }
+
+        if (overlayCanvas != null)
+        {
+            Destroy(overlayCanvas.gameObject);
+            overlayCanvas = null;
         }
     }
 
@@ -246,6 +318,7 @@ public class RuntimeMiniMapHud : MonoBehaviour
     {
         EnsureRenderTexture();
         EnsureMiniMapCamera();
+        EnsureSmallMapOverlay();
     }
 
     private void EnsureMiniMapCamera()
@@ -281,7 +354,7 @@ public class RuntimeMiniMapHud : MonoBehaviour
             return;
         }
 
-        renderTexture = new RenderTexture(TextureSize, TextureSize, 16, RenderTextureFormat.ARGB32);
+        renderTexture = new RenderTexture(TextureWidth, TextureHeight, 16, RenderTextureFormat.ARGB32);
         renderTexture.name = "RuntimeMiniMapTexture";
         renderTexture.filterMode = FilterMode.Bilinear;
         renderTexture.useMipMap = false;
@@ -293,11 +366,13 @@ public class RuntimeMiniMapHud : MonoBehaviour
     {
         cachedMainCamera = Camera.main;
         cachedPlayer = null;
+        cachedPlayerSpriteRenderer = null;
 
         GameObject playerObject = GameObject.FindGameObjectWithTag("Player");
         if (playerObject != null)
         {
             cachedPlayer = playerObject.transform;
+            cachedPlayerSpriteRenderer = ResolvePlayerSpriteRenderer(playerObject.transform);
         }
 
         if (miniMapCamera == null)
@@ -327,6 +402,181 @@ public class RuntimeMiniMapHud : MonoBehaviour
         UpdateCameraPose();
     }
 
+    private void EnsureSmallMapOverlay()
+    {
+        if (overlayCanvas == null)
+        {
+            Transform canvasTransform = transform.Find(OverlayCanvasName);
+            GameObject canvasObject = canvasTransform != null
+                ? canvasTransform.gameObject
+                : new GameObject(
+                    OverlayCanvasName,
+                    typeof(RectTransform),
+                    typeof(Canvas),
+                    typeof(CanvasScaler),
+                    typeof(GraphicRaycaster),
+                    typeof(CanvasGroup));
+
+            canvasObject.transform.SetParent(transform, false);
+
+            overlayCanvas = canvasObject.GetComponent<Canvas>();
+            if (overlayCanvas == null)
+            {
+                overlayCanvas = canvasObject.AddComponent<Canvas>();
+            }
+
+            overlayCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            overlayCanvas.overrideSorting = true;
+            overlayCanvas.sortingOrder = OverlayCanvasSortingOrder;
+
+            CanvasScaler scaler = canvasObject.GetComponent<CanvasScaler>();
+            if (scaler == null)
+            {
+                scaler = canvasObject.AddComponent<CanvasScaler>();
+            }
+
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(1920f, 1080f);
+            scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
+            scaler.matchWidthOrHeight = 0.5f;
+
+            GraphicRaycaster raycaster = canvasObject.GetComponent<GraphicRaycaster>();
+            if (raycaster != null)
+            {
+                raycaster.enabled = false;
+            }
+
+            CanvasGroup canvasGroup = canvasObject.GetComponent<CanvasGroup>();
+            if (canvasGroup == null)
+            {
+                canvasGroup = canvasObject.AddComponent<CanvasGroup>();
+            }
+
+            canvasGroup.interactable = false;
+            canvasGroup.blocksRaycasts = false;
+        }
+
+        if (smallMapRoot != null)
+        {
+            if (smallMapImage != null)
+            {
+                smallMapImage.texture = renderTexture;
+            }
+
+            return;
+        }
+
+        GameObject rootObject = CreateOverlayUIObject(SmallMapRootName, overlayCanvas.transform);
+        smallMapRoot = rootObject.GetComponent<RectTransform>();
+
+        GameObject frameObject = CreateOverlayUIObject("Frame", smallMapRoot);
+        RectTransform frameRect = frameObject.GetComponent<RectTransform>();
+        StretchRect(frameRect);
+        smallMapFrameImage = frameObject.AddComponent<Image>();
+        RuntimeUiSpriteFactory.ApplyMapFrameSprite(smallMapFrameImage, Color.white);
+        smallMapFrameImage.enabled = false;
+        smallMapFrameImage.raycastTarget = false;
+
+        GameObject viewportObject = CreateOverlayUIObject("Viewport", smallMapRoot);
+        smallMapViewportRect = viewportObject.GetComponent<RectTransform>();
+        viewportObject.AddComponent<RectMask2D>();
+
+        GameObject mapObject = CreateOverlayUIObject("Map", smallMapViewportRect);
+        smallMapImageRect = mapObject.GetComponent<RectTransform>();
+        smallMapImage = mapObject.AddComponent<RawImage>();
+        smallMapImage.texture = renderTexture;
+        smallMapImage.raycastTarget = false;
+
+        GameObject markerObject = CreateOverlayUIObject("PlayerMarker", smallMapViewportRect);
+        smallMarkerRoot = markerObject.GetComponent<RectTransform>();
+        smallMarkerRoot.anchorMin = new Vector2(0.5f, 0.5f);
+        smallMarkerRoot.anchorMax = new Vector2(0.5f, 0.5f);
+        smallMarkerRoot.pivot = new Vector2(0.5f, 0.5f);
+
+        GameObject glowObject = CreateOverlayUIObject("Glow", smallMarkerRoot);
+        RectTransform glowRect = glowObject.GetComponent<RectTransform>();
+        StretchRect(glowRect);
+        smallMarkerGlowImage = glowObject.AddComponent<RawImage>();
+        smallMarkerGlowImage.color = MarkerGlowColor;
+        smallMarkerGlowImage.raycastTarget = false;
+
+        smallMarkerOutlineImages = new RawImage[8];
+        for (int i = 0; i < smallMarkerOutlineImages.Length; i++)
+        {
+            GameObject outlineObject = CreateOverlayUIObject($"Outline{i}", smallMarkerRoot);
+            smallMarkerOutlineImages[i] = outlineObject.AddComponent<RawImage>();
+            smallMarkerOutlineImages[i].color = MarkerOutlineColor;
+            smallMarkerOutlineImages[i].raycastTarget = false;
+        }
+
+        GameObject figureObject = CreateOverlayUIObject("Figure", smallMarkerRoot);
+        RectTransform figureRect = figureObject.GetComponent<RectTransform>();
+        figureRect.anchorMin = new Vector2(0.5f, 0.5f);
+        figureRect.anchorMax = new Vector2(0.5f, 0.5f);
+        figureRect.pivot = new Vector2(0.5f, 0.5f);
+        smallMarkerFigureImage = figureObject.AddComponent<RawImage>();
+        smallMarkerFigureImage.color = Color.white;
+        smallMarkerFigureImage.raycastTarget = false;
+    }
+
+    private void UpdateSmallMapOverlay()
+    {
+        if (smallMapRoot == null)
+        {
+            return;
+        }
+
+        bool shouldShow = visible && !ShouldHideForGameplayOverlay() && expandProgress <= 0.001f;
+        if (smallMapRoot.gameObject.activeSelf != shouldShow)
+        {
+            smallMapRoot.gameObject.SetActive(shouldShow);
+        }
+
+        if (!shouldShow)
+        {
+            return;
+        }
+
+        smallMapRoot.anchorMin = new Vector2(1f, 1f);
+        smallMapRoot.anchorMax = new Vector2(1f, 1f);
+        smallMapRoot.pivot = new Vector2(1f, 1f);
+        smallMapRoot.anchoredPosition = new Vector2(-Margin, -Margin);
+
+        Vector2 mapSize = BuildAspectFitSize(SmallMapSize, SmallMapSize, MapAspect);
+        smallMapRoot.sizeDelta = new Vector2(
+            mapSize.x + SmallFramePaddingX * 2f,
+            mapSize.y + SmallFramePaddingY * 2f);
+        smallMapRoot.SetAsLastSibling();
+
+        if (smallMapViewportRect != null)
+        {
+            ConfigureMarkerLayerRect(
+                smallMapViewportRect,
+                mapSize,
+                Vector2.zero);
+        }
+
+        if (smallMapImageRect != null)
+        {
+            ConfigureMarkerLayerRect(
+                smallMapImageRect,
+                mapSize,
+                Vector2.zero);
+        }
+
+        if (smallMapImage != null && smallMapImage.texture != renderTexture)
+        {
+            smallMapImage.texture = renderTexture;
+        }
+
+        if (smallMarkerRoot != null)
+        {
+            smallMarkerRoot.sizeDelta = Vector2.zero;
+            smallMarkerRoot.anchoredPosition = Vector2.zero;
+            UpdateSmallMarkerVisual();
+        }
+    }
+
     private void UpdateCameraPose()
     {
         if (miniMapCamera == null)
@@ -351,33 +601,31 @@ public class RuntimeMiniMapHud : MonoBehaviour
         miniMapCamera.transform.position = position;
         miniMapCamera.transform.rotation = referenceCamera.transform.rotation;
         miniMapCamera.orthographic = true;
+        miniMapCamera.aspect = MapAspect;
 
         float baseSize = referenceCamera.orthographic
             ? Mathf.Max(referenceCamera.orthographicSize, 4f)
             : 8f;
-        miniMapCamera.orthographicSize = expanded ? baseSize * 2.6f : baseSize * 1.65f;
+        miniMapCamera.orthographicSize = Mathf.Lerp(baseSize * 1.65f, baseSize * 2.6f, GetEasedExpandProgress());
     }
 
     private void DrawPlayerMarker(Rect mapRect)
     {
-        float markerHeight = expanded ? 40f : 26f;
-        float markerWidth = expanded ? 30f : 20f;
-        Rect markerRect = new Rect(
-            mapRect.center.x - markerWidth * 0.5f,
-            mapRect.center.y - markerHeight * 0.5f,
-            markerWidth,
-            markerHeight);
+        GetMarkerVisual(out Texture markerTexture, out Rect uvRect, out float aspect, out bool flipX, out bool flipY);
 
-        float glowPadding = expanded ? 16f : 10f;
-        Rect glowRect = ExpandRect(markerRect, glowPadding);
-        DrawTintedTexture(glowRect, GetMarkerGlowTexture(), MarkerGlowColor);
+        Rect markerRect = BuildAspectFitRect(
+            mapRect.center,
+            expanded ? ExpandedMarkerMaxWidth : SmallMarkerMaxWidth,
+            expanded ? ExpandedMarkerMaxHeight : SmallMarkerMaxHeight,
+            aspect);
 
-        DrawMarkerWithOutline(markerRect);
+        DrawPlayerSpriteMarker(markerRect, markerTexture, uvRect, flipX, flipY);
     }
 
-    private void DrawMarkerWithOutline(Rect rect)
+    private void DrawPlayerSpriteMarker(Rect rect, Texture markerTexture, Rect uvRect, bool flipX, bool flipY)
     {
-        float outlineOffset = expanded ? 2.2f : 1.4f;
+        float outlineOffset = expanded ? 1.8f : 1.1f;
+        float glowPadding = expanded ? 7f : 4f;
         Vector2[] offsets =
         {
             new Vector2(-outlineOffset, 0f),
@@ -390,48 +638,16 @@ public class RuntimeMiniMapHud : MonoBehaviour
             new Vector2(outlineOffset, outlineOffset)
         };
 
+        Rect glowRect = ExpandRect(rect, glowPadding);
+        DrawMarkerTexture(glowRect, markerTexture, uvRect, MarkerGlowColor, flipX, flipY);
+
         for (int i = 0; i < offsets.Length; i++)
         {
             Rect outlineRect = new Rect(rect.x + offsets[i].x, rect.y + offsets[i].y, rect.width, rect.height);
-            DrawTintedTexture(outlineRect, GetMarkerFigureTexture(), MarkerOutlineColor);
+            DrawMarkerTexture(outlineRect, markerTexture, uvRect, MarkerOutlineColor, flipX, flipY);
         }
 
-        DrawTintedTexture(rect, GetMarkerFigureTexture(), MarkerFillColor);
-
-        float accentWidth = rect.width * 0.34f;
-        float accentHeight = rect.height * 0.18f;
-        Rect accentRect = new Rect(
-            rect.center.x - accentWidth * 0.5f,
-            rect.y + rect.height * 0.48f,
-            accentWidth,
-            accentHeight);
-        DrawTintedTexture(accentRect, Texture2D.whiteTexture, MarkerAccentColor);
-    }
-
-    private Texture2D GetMarkerGlowTexture()
-    {
-        if (markerGlowTexture != null)
-        {
-            return markerGlowTexture;
-        }
-
-        markerGlowTexture = new Texture2D(32, 32, TextureFormat.RGBA32, false);
-        markerGlowTexture.filterMode = FilterMode.Bilinear;
-        Vector2 center = new Vector2(15.5f, 15.5f);
-
-        for (int y = 0; y < 32; y++)
-        {
-            for (int x = 0; x < 32; x++)
-            {
-                float distance = Vector2.Distance(new Vector2(x, y), center) / 15.5f;
-                float alpha = Mathf.Clamp01(1f - distance);
-                alpha *= alpha;
-                markerGlowTexture.SetPixel(x, y, new Color(1f, 1f, 1f, alpha));
-            }
-        }
-
-        markerGlowTexture.Apply();
-        return markerGlowTexture;
+        DrawMarkerTexture(rect, markerTexture, uvRect, Color.white, flipX, flipY);
     }
 
     private Texture2D GetMarkerFigureTexture()
@@ -487,6 +703,110 @@ public class RuntimeMiniMapHud : MonoBehaviour
         }
     }
 
+    private void UpdateSmallMarkerVisual()
+    {
+        if (smallMarkerRoot == null || smallMarkerFigureImage == null)
+        {
+            return;
+        }
+
+        GetMarkerVisual(out Texture markerTexture, out Rect uvRect, out float aspect, out bool flipX, out bool flipY);
+        Vector2 markerSize = BuildAspectFitSize(MiniMapMarkerMaxWidth, MiniMapMarkerMaxHeight, aspect);
+
+        smallMarkerRoot.localScale = new Vector3(flipX ? -1f : 1f, flipY ? -1f : 1f, 1f);
+
+        ConfigureMarkerLayerRect(smallMarkerGlowImage.rectTransform, markerSize + new Vector2(8f, 8f), Vector2.zero);
+        ApplyMarkerToRawImage(smallMarkerGlowImage, markerTexture, uvRect, MarkerGlowColor);
+
+        Vector2[] offsets =
+        {
+            new Vector2(-1f, 0f),
+            new Vector2(1f, 0f),
+            new Vector2(0f, -1f),
+            new Vector2(0f, 1f),
+            new Vector2(-0.85f, -0.85f),
+            new Vector2(-0.85f, 0.85f),
+            new Vector2(0.85f, -0.85f),
+            new Vector2(0.85f, 0.85f)
+        };
+
+        for (int i = 0; i < smallMarkerOutlineImages.Length; i++)
+        {
+            ConfigureMarkerLayerRect(smallMarkerOutlineImages[i].rectTransform, markerSize, offsets[i]);
+            ApplyMarkerToRawImage(smallMarkerOutlineImages[i], markerTexture, uvRect, MarkerOutlineColor);
+        }
+
+        ConfigureMarkerLayerRect(smallMarkerFigureImage.rectTransform, markerSize, Vector2.zero);
+        ApplyMarkerToRawImage(smallMarkerFigureImage, markerTexture, uvRect, Color.white);
+    }
+
+    private void GetMarkerVisual(out Texture markerTexture, out Rect uvRect, out float aspect, out bool flipX, out bool flipY)
+    {
+        SpriteRenderer spriteRenderer = ResolvePlayerSpriteRenderer();
+        if (spriteRenderer != null && spriteRenderer.sprite != null && spriteRenderer.sprite.texture != null)
+        {
+            Sprite sprite = spriteRenderer.sprite;
+            Vector4 outerUv = DataUtility.GetOuterUV(sprite);
+
+            markerTexture = sprite.texture;
+            uvRect = new Rect(outerUv.x, outerUv.y, outerUv.z - outerUv.x, outerUv.w - outerUv.y);
+            aspect = sprite.rect.width / Mathf.Max(1f, sprite.rect.height);
+            flipX = spriteRenderer.flipX;
+            flipY = spriteRenderer.flipY;
+            return;
+        }
+
+        markerTexture = GetMarkerFigureTexture();
+        uvRect = new Rect(0f, 0f, 1f, 1f);
+        aspect = 20f / 26f;
+        flipX = false;
+        flipY = false;
+    }
+
+    private SpriteRenderer ResolvePlayerSpriteRenderer()
+    {
+        if (cachedPlayerSpriteRenderer != null)
+        {
+            return cachedPlayerSpriteRenderer;
+        }
+
+        if (cachedPlayer != null)
+        {
+            cachedPlayerSpriteRenderer = ResolvePlayerSpriteRenderer(cachedPlayer);
+            if (cachedPlayerSpriteRenderer != null)
+            {
+                return cachedPlayerSpriteRenderer;
+            }
+        }
+
+        GameObject playerObject = GameObject.FindGameObjectWithTag("Player");
+        if (playerObject == null)
+        {
+            return null;
+        }
+
+        cachedPlayer = playerObject.transform;
+        cachedPlayerSpriteRenderer = ResolvePlayerSpriteRenderer(playerObject.transform);
+        return cachedPlayerSpriteRenderer;
+    }
+
+    private static SpriteRenderer ResolvePlayerSpriteRenderer(Transform playerTransform)
+    {
+        if (playerTransform == null)
+        {
+            return null;
+        }
+
+        SpriteRenderer directRenderer = playerTransform.GetComponent<SpriteRenderer>();
+        if (directRenderer != null)
+        {
+            return directRenderer;
+        }
+
+        SpriteRenderer[] childRenderers = playerTransform.GetComponentsInChildren<SpriteRenderer>(true);
+        return childRenderers.Length > 0 ? childRenderers[0] : null;
+    }
+
     private void SetVisible(bool shouldShow)
     {
         visible = shouldShow;
@@ -495,12 +815,124 @@ public class RuntimeMiniMapHud : MonoBehaviour
         {
             miniMapCamera.gameObject.SetActive(shouldShow);
         }
+
+        if (overlayCanvas != null)
+        {
+            overlayCanvas.gameObject.SetActive(shouldShow);
+        }
     }
 
-    private static void DrawPanel(Rect panelRect, Color fillColor)
+    private void UpdateExpansionState()
+    {
+        float target = expanded ? 1f : 0f;
+        expandProgress = Mathf.SmoothDamp(
+            expandProgress,
+            target,
+            ref expandVelocity,
+            ExpandSmoothTime,
+            Mathf.Infinity,
+            Time.unscaledDeltaTime);
+
+        if (Mathf.Abs(expandProgress - target) <= 0.001f)
+        {
+            expandProgress = target;
+            expandVelocity = 0f;
+        }
+    }
+
+    private float GetEasedExpandProgress()
+    {
+        float progress = Mathf.Clamp01(expandProgress);
+        return progress * progress * (3f - 2f * progress);
+    }
+
+    private static void DrawPanel(Rect panelRect, Color fillColor, Color borderColor)
     {
         DrawFilledRect(panelRect, fillColor);
-        DrawBorder(panelRect, 2f);
+        DrawBorder(panelRect, 2f, borderColor);
+    }
+
+    private static void DrawMapFrame(Rect rect, float borderWidth, float borderHeight, float alpha)
+    {
+        Texture2D frameTexture = RuntimeUiSpriteFactory.GetMapFrameTexture();
+        if (frameTexture == null)
+        {
+            Color fallbackFill = Color.Lerp(PanelColor, ExpandedPanelColor, alpha);
+            fallbackFill.a = alpha;
+            Color fallbackBorder = BorderColor;
+            fallbackBorder.a = alpha;
+            DrawPanel(rect, fallbackFill, fallbackBorder);
+            return;
+        }
+
+        Rect sourceRect = RuntimeUiSpriteFactory.GetMapFramePixelRect();
+        Vector4 sourceBorder = RuntimeUiSpriteFactory.GetMapFrameBorder();
+        Color tint = new Color(1f, 1f, 1f, alpha);
+
+        float left = Mathf.Min(borderWidth, rect.width * 0.5f);
+        float right = Mathf.Min(borderWidth, rect.width - left);
+        float bottom = Mathf.Min(borderHeight, rect.height * 0.5f);
+        float top = Mathf.Min(borderHeight, rect.height - bottom);
+
+        float srcLeft = Mathf.Min(sourceBorder.x, sourceRect.width * 0.5f);
+        float srcRight = Mathf.Min(sourceBorder.z, sourceRect.width - srcLeft);
+        float srcBottom = Mathf.Min(sourceBorder.y, sourceRect.height * 0.5f);
+        float srcTop = Mathf.Min(sourceBorder.w, sourceRect.height - srcBottom);
+
+        float centerWidth = Mathf.Max(0f, rect.width - left - right);
+        float centerHeight = Mathf.Max(0f, rect.height - top - bottom);
+        float srcCenterWidth = Mathf.Max(0f, sourceRect.width - srcLeft - srcRight);
+        float srcCenterHeight = Mathf.Max(0f, sourceRect.height - srcTop - srcBottom);
+
+        DrawMapFrameSlice(frameTexture, tint,
+            new Rect(rect.x, rect.y, left, bottom),
+            new Rect(sourceRect.x, sourceRect.y, srcLeft, srcBottom));
+        DrawMapFrameSlice(frameTexture, tint,
+            new Rect(rect.x + left, rect.y, centerWidth, bottom),
+            new Rect(sourceRect.x + srcLeft, sourceRect.y, srcCenterWidth, srcBottom));
+        DrawMapFrameSlice(frameTexture, tint,
+            new Rect(rect.xMax - right, rect.y, right, bottom),
+            new Rect(sourceRect.xMax - srcRight, sourceRect.y, srcRight, srcBottom));
+
+        DrawMapFrameSlice(frameTexture, tint,
+            new Rect(rect.x, rect.y + bottom, left, centerHeight),
+            new Rect(sourceRect.x, sourceRect.y + srcBottom, srcLeft, srcCenterHeight));
+        DrawMapFrameSlice(frameTexture, tint,
+            new Rect(rect.x + left, rect.y + bottom, centerWidth, centerHeight),
+            new Rect(sourceRect.x + srcLeft, sourceRect.y + srcBottom, srcCenterWidth, srcCenterHeight));
+        DrawMapFrameSlice(frameTexture, tint,
+            new Rect(rect.xMax - right, rect.y + bottom, right, centerHeight),
+            new Rect(sourceRect.xMax - srcRight, sourceRect.y + srcBottom, srcRight, srcCenterHeight));
+
+        DrawMapFrameSlice(frameTexture, tint,
+            new Rect(rect.x, rect.yMax - top, left, top),
+            new Rect(sourceRect.x, sourceRect.yMax - srcTop, srcLeft, srcTop));
+        DrawMapFrameSlice(frameTexture, tint,
+            new Rect(rect.x + left, rect.yMax - top, centerWidth, top),
+            new Rect(sourceRect.x + srcLeft, sourceRect.yMax - srcTop, srcCenterWidth, srcTop));
+        DrawMapFrameSlice(frameTexture, tint,
+            new Rect(rect.xMax - right, rect.yMax - top, right, top),
+            new Rect(sourceRect.xMax - srcRight, sourceRect.yMax - srcTop, srcRight, srcTop));
+    }
+
+    private static void DrawMapFrameSlice(Texture texture, Color tint, Rect destinationRect, Rect sourceRect)
+    {
+        if (destinationRect.width <= 0.001f || destinationRect.height <= 0.001f ||
+            sourceRect.width <= 0.001f || sourceRect.height <= 0.001f)
+        {
+            return;
+        }
+
+        DrawTintedTexture(destinationRect, texture, tint, BuildUvRect(texture, sourceRect));
+    }
+
+    private static Rect LerpRect(Rect from, Rect to, float t)
+    {
+        return new Rect(
+            Mathf.Lerp(from.x, to.x, t),
+            Mathf.Lerp(from.y, to.y, t),
+            Mathf.Lerp(from.width, to.width, t),
+            Mathf.Lerp(from.height, to.height, t));
     }
 
     private static void DrawFilledRect(Rect rect, Color color)
@@ -527,12 +959,30 @@ public class RuntimeMiniMapHud : MonoBehaviour
         GUI.color = previousColor;
     }
 
-    private static void DrawBorder(Rect rect, float thickness)
+    private static void DrawMarkerTexture(Rect rect, Texture texture, Rect uvRect, Color color, bool flipX, bool flipY)
     {
-        DrawFilledRect(new Rect(rect.x, rect.y, rect.width, thickness), BorderColor);
-        DrawFilledRect(new Rect(rect.x, rect.yMax - thickness, rect.width, thickness), BorderColor);
-        DrawFilledRect(new Rect(rect.x, rect.y, thickness, rect.height), BorderColor);
-        DrawFilledRect(new Rect(rect.xMax - thickness, rect.y, thickness, rect.height), BorderColor);
+        Rect actualUvRect = uvRect;
+        if (flipX)
+        {
+            actualUvRect.x += actualUvRect.width;
+            actualUvRect.width *= -1f;
+        }
+
+        if (flipY)
+        {
+            actualUvRect.y += actualUvRect.height;
+            actualUvRect.height *= -1f;
+        }
+
+        DrawTintedTexture(rect, texture, color, actualUvRect);
+    }
+
+    private static void DrawBorder(Rect rect, float thickness, Color color)
+    {
+        DrawFilledRect(new Rect(rect.x, rect.y, rect.width, thickness), color);
+        DrawFilledRect(new Rect(rect.x, rect.yMax - thickness, rect.width, thickness), color);
+        DrawFilledRect(new Rect(rect.x, rect.y, thickness, rect.height), color);
+        DrawFilledRect(new Rect(rect.xMax - thickness, rect.y, thickness, rect.height), color);
     }
 
     private static Rect ExpandRect(Rect rect, float padding)
@@ -542,6 +992,104 @@ public class RuntimeMiniMapHud : MonoBehaviour
             rect.y - padding,
             rect.width + padding * 2f,
             rect.height + padding * 2f);
+    }
+
+    private static Rect ExpandRect(Rect rect, float paddingX, float paddingY)
+    {
+        return new Rect(
+            rect.x - paddingX,
+            rect.y - paddingY,
+            rect.width + paddingX * 2f,
+            rect.height + paddingY * 2f);
+    }
+
+    private static Rect BuildUvRect(Texture texture, Rect sourceRect)
+    {
+        float width = Mathf.Max(1f, texture.width);
+        float height = Mathf.Max(1f, texture.height);
+        return new Rect(
+            sourceRect.x / width,
+            sourceRect.y / height,
+            sourceRect.width / width,
+            sourceRect.height / height);
+    }
+
+    private static Rect GetAspectFitRect(Rect containerRect, float aspect)
+    {
+        Vector2 fittedSize = BuildAspectFitSize(containerRect.width, containerRect.height, aspect);
+        return new Rect(
+            containerRect.center.x - fittedSize.x * 0.5f,
+            containerRect.center.y - fittedSize.y * 0.5f,
+            fittedSize.x,
+            fittedSize.y);
+    }
+
+    private static Rect BuildAspectFitRect(Vector2 center, float maxWidth, float maxHeight, float aspect)
+    {
+        Vector2 size = BuildAspectFitSize(maxWidth, maxHeight, aspect);
+        return new Rect(center.x - size.x * 0.5f, center.y - size.y * 0.5f, size.x, size.y);
+    }
+
+    private static Vector2 BuildAspectFitSize(float maxWidth, float maxHeight, float aspect)
+    {
+        float safeAspect = Mathf.Max(0.2f, aspect);
+        float width = maxHeight * safeAspect;
+        float height = maxHeight;
+
+        if (width > maxWidth)
+        {
+            float scale = maxWidth / width;
+            width *= scale;
+            height *= scale;
+        }
+
+        return new Vector2(width, height);
+    }
+
+    private static void ConfigureMarkerLayerRect(RectTransform rectTransform, Vector2 size, Vector2 anchoredPosition)
+    {
+        rectTransform.anchorMin = new Vector2(0.5f, 0.5f);
+        rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
+        rectTransform.pivot = new Vector2(0.5f, 0.5f);
+        rectTransform.sizeDelta = size;
+        rectTransform.anchoredPosition = anchoredPosition;
+    }
+
+    private static void ApplyMarkerToRawImage(RawImage image, Texture texture, Rect uvRect, Color color)
+    {
+        if (image == null)
+        {
+            return;
+        }
+
+        image.texture = texture;
+        image.uvRect = uvRect;
+        image.color = color;
+    }
+
+    private bool ShouldHideForGameplayOverlay()
+    {
+        if (UIRootManager.Instance != null && UIRootManager.Instance.IsAnyGameplayBlockingUIOpen())
+        {
+            return true;
+        }
+
+        return UIManager.Instance != null && UIManager.Instance.IsHandbookOpen;
+    }
+
+    private static GameObject CreateOverlayUIObject(string name, Transform parent)
+    {
+        GameObject obj = new GameObject(name, typeof(RectTransform));
+        obj.transform.SetParent(parent, false);
+        return obj;
+    }
+
+    private static void StretchRect(RectTransform rectTransform)
+    {
+        rectTransform.anchorMin = Vector2.zero;
+        rectTransform.anchorMax = Vector2.one;
+        rectTransform.offsetMin = Vector2.zero;
+        rectTransform.offsetMax = Vector2.zero;
     }
 
     private static bool IsSupportedScene(string sceneName)

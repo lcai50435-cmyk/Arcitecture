@@ -13,6 +13,9 @@ public class PlayerAttributeManager : MonoBehaviour
     private readonly Dictionary<AttributeBonusType, float> temporaryBonuses =
         new Dictionary<AttributeBonusType, float>();
 
+    private readonly Dictionary<AttributeBonusType, float> backpackBonuses =
+        new Dictionary<AttributeBonusType, float>();
+
     private readonly Dictionary<AttributeBonusType, float> permanentBonuses =
         new Dictionary<AttributeBonusType, float>();
 
@@ -79,7 +82,9 @@ public class PlayerAttributeManager : MonoBehaviour
     public void ApplyAllBonus()
     {
         ResolveReferences();
+        PlayerLoadoutRuntime.EnsureCurrentWeaponUnlocked();
         EnsureDesignBaseline();
+        RebuildBackpackBonuses();
 
         if (characterCore == null || characterCore.baseStats == null)
         {
@@ -135,6 +140,35 @@ public class PlayerAttributeManager : MonoBehaviour
 
             AddToBonusMap(permanentBonuses, reward.bonusType, reward.bonusValue);
             AddToBonusMap(permanentBonuses, reward.subBonusType, reward.subBonusValue);
+        }
+    }
+
+    private void RebuildBackpackBonuses()
+    {
+        backpackBonuses.Clear();
+
+        BackpackMananger backpack = BackpackMananger.Instance;
+        if (backpack == null || backpack.backpackItems == null)
+        {
+            return;
+        }
+
+        for (int i = 0; i < backpack.backpackItems.Count; i++)
+        {
+            ArchitecturalCrystal? nullableItem = backpack.backpackItems[i];
+            if (!nullableItem.HasValue)
+            {
+                continue;
+            }
+
+            ArchitecturalCrystal item = nullableItem.Value;
+            if (!item.IsCommonStructure)
+            {
+                continue;
+            }
+
+            AddToBonusMap(backpackBonuses, item.bonusType, item.bonusValue);
+            AddToBonusMap(backpackBonuses, item.subBonusType, item.subBonusValue);
         }
     }
 
@@ -258,6 +292,11 @@ public class PlayerAttributeManager : MonoBehaviour
         if (temporaryBonuses.TryGetValue(type, out float temporaryValue))
         {
             total += temporaryValue;
+        }
+
+        if (backpackBonuses.TryGetValue(type, out float backpackValue))
+        {
+            total += backpackValue;
         }
 
         if (permanentBonuses.TryGetValue(type, out float permanentValue))

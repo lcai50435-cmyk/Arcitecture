@@ -144,25 +144,76 @@ public class EnemyCombatFeedback : MonoBehaviour
     private void SpawnDamageNumber(float damage)
     {
         GameObject numberObject = new GameObject("DamageNumber");
-        numberObject.transform.SetParent(transform, false);
-        numberObject.transform.localPosition = new Vector3(0f, 0.75f, 0f);
+        numberObject.transform.position = GetDamageNumberSpawnPosition();
 
         TextMesh textMesh = numberObject.AddComponent<TextMesh>();
-        textMesh.text = Mathf.Max(0f, damage).ToString("0");
-        textMesh.anchor = TextAnchor.MiddleCenter;
-        textMesh.alignment = TextAlignment.Center;
-        textMesh.fontSize = 32;
-        textMesh.characterSize = 0.08f;
-        textMesh.color = new Color(0.98f, 0.86f, 0.28f, 1f);
+        string damageText = Mathf.Max(0f, damage).ToString("0");
+        ConfigureDamageText(textMesh, damageText, new Color(0.98f, 0.86f, 0.28f, 1f));
 
         MeshRenderer meshRenderer = numberObject.GetComponent<MeshRenderer>();
         if (meshRenderer != null)
         {
-            meshRenderer.sortingOrder = 32;
+            if (ownerRenderer != null)
+            {
+                meshRenderer.sortingLayerID = ownerRenderer.sortingLayerID;
+                meshRenderer.sortingOrder = ownerRenderer.sortingOrder + 6;
+            }
+            else
+            {
+                meshRenderer.sortingOrder = 32;
+            }
+        }
+
+        GameObject shadowObject = new GameObject("Shadow");
+        shadowObject.transform.SetParent(numberObject.transform, false);
+        shadowObject.transform.localPosition = new Vector3(0.04f, -0.04f, 0f);
+
+        TextMesh shadowText = shadowObject.AddComponent<TextMesh>();
+        ConfigureDamageText(shadowText, damageText, new Color(0.15f, 0.08f, 0.03f, 0.85f));
+
+        MeshRenderer shadowRenderer = shadowObject.GetComponent<MeshRenderer>();
+        if (shadowRenderer != null)
+        {
+            if (ownerRenderer != null)
+            {
+                shadowRenderer.sortingLayerID = ownerRenderer.sortingLayerID;
+                shadowRenderer.sortingOrder = ownerRenderer.sortingOrder + 5;
+            }
+            else
+            {
+                shadowRenderer.sortingOrder = 31;
+            }
         }
 
         EnemyDamageNumberMotion motion = numberObject.AddComponent<EnemyDamageNumberMotion>();
         motion.Initialize();
+    }
+
+    private static void ConfigureDamageText(TextMesh textMesh, string value, Color color)
+    {
+        if (textMesh == null)
+        {
+            return;
+        }
+
+        textMesh.text = value;
+        textMesh.anchor = TextAnchor.MiddleCenter;
+        textMesh.alignment = TextAlignment.Center;
+        textMesh.fontSize = 28;
+        textMesh.characterSize = 0.06f;
+        textMesh.fontStyle = FontStyle.Bold;
+        textMesh.color = color;
+    }
+
+    private Vector3 GetDamageNumberSpawnPosition()
+    {
+        Vector3 center = ownerRenderer != null ? ownerRenderer.bounds.center : transform.position;
+        float horizontalOffset = Random.Range(-0.24f, 0.24f);
+        float verticalOffset = ownerRenderer != null
+            ? Mathf.Max(0.14f, ownerRenderer.bounds.extents.y * 0.2f)
+            : 0.18f;
+
+        return center + new Vector3(horizontalOffset, verticalOffset, 0f);
     }
 
     private static Sprite GetRuntimeSprite()
@@ -192,20 +243,20 @@ public class EnemyDamageNumberMotion : MonoBehaviour
 
     public void Initialize()
     {
-        velocity = new Vector3(Random.Range(-0.12f, 0.12f), 0.55f, 0f);
-        lifetime = 0.65f;
+        velocity = new Vector3(Random.Range(-0.08f, 0.08f), 0.34f, 0f);
+        lifetime = 0.55f;
     }
 
     private void Update()
     {
-        transform.localPosition += velocity * Time.deltaTime;
+        transform.position += velocity * Time.deltaTime;
         lifetime -= Time.deltaTime;
 
         TextMesh textMesh = GetComponent<TextMesh>();
         if (textMesh != null)
         {
             Color color = textMesh.color;
-            color.a = Mathf.Clamp01(lifetime / 0.65f);
+            color.a = Mathf.Clamp01(lifetime / 0.55f);
             textMesh.color = color;
         }
 

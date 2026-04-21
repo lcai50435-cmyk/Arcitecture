@@ -17,6 +17,7 @@ public class RunStageConfig
     public float elapsedStartTime;
     public int enemyHp;
     public int enemyAttack;
+    public float enemyDefense;
     public float enemySpeed;
     public float spawnInterval;
     public int targetAliveCount;
@@ -33,6 +34,11 @@ public class DropTableConfig
 public class RunStageDirector : MonoBehaviour
 {
     private const string GameSceneName = "GameScene";
+    private const float StageRefreshInterval = 0.2f;
+    private const float SpawnProbeRadius = 3.5f;
+    private const int SpawnProbeAttempts = 16;
+    private static readonly Vector2 SpawnProbeSize = new Vector2(0.55f, 0.55f);
+    private static readonly string[] FallbackBlockedKeywords = { "Water", "Obstacle", "Building" };
 
     private static readonly ArchitecturalType[] CommonStructureTypes =
     {
@@ -52,7 +58,9 @@ public class RunStageDirector : MonoBehaviour
 
     private GameCountDownManager countdownManager;
     private RunStageConfig currentStage;
+    private ResolvedStageState currentStageState;
     private float spawnTimer;
+    private float stageRefreshTimer;
     private bool countdownFinishedHandled;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
@@ -95,7 +103,10 @@ public class RunStageDirector : MonoBehaviour
         RuntimeMiniMapHud.EnsureInstance();
         BindCountdownManager();
         CaptureExistingEnemiesAsTemplates();
-        ApplyStage(GetStageForElapsed(GetElapsedTime()));
+
+        float elapsedTime = GetElapsedTime();
+        ApplyStage(GetStageForElapsed(elapsedTime));
+        RefreshResolvedStage(elapsedTime, true);
     }
 
     private void Update()
@@ -121,18 +132,28 @@ public class RunStageDirector : MonoBehaviour
         }
 
         EnsureStageConfigs();
-        RunStageConfig nextStage = GetStageForElapsed(GetElapsedTime());
+        float elapsedTime = GetElapsedTime();
+        RunStageConfig nextStage = GetStageForElapsed(elapsedTime);
         if (nextStage != currentStage)
         {
             ApplyStage(nextStage);
+            RefreshResolvedStage(elapsedTime, true);
+        }
+        else
+        {
+            stageRefreshTimer += Time.deltaTime;
+            if (currentStageState == null || stageRefreshTimer >= StageRefreshInterval)
+            {
+                RefreshResolvedStage(elapsedTime);
+            }
         }
 
         spawnTimer += Time.deltaTime;
-        if (currentStage != null && spawnTimer >= currentStage.spawnInterval)
+        if (currentStageState != null && spawnTimer >= currentStageState.spawnInterval)
         {
             spawnTimer = 0f;
 
-            if (GetAliveEnemyCount() < currentStage.targetAliveCount)
+            if (GetAliveEnemyCount() < currentStageState.targetAliveCount)
             {
                 SpawnOneEnemy();
             }
@@ -165,6 +186,7 @@ public class RunStageDirector : MonoBehaviour
             elapsedStartTime = 0f,
             enemyHp = 100,
             enemyAttack = 10,
+            enemyDefense = 0f,
             enemySpeed = 0.8f,
             spawnInterval = 2f,
             targetAliveCount = 4
@@ -175,6 +197,7 @@ public class RunStageDirector : MonoBehaviour
             elapsedStartTime = 180f,
             enemyHp = 130,
             enemyAttack = 13,
+            enemyDefense = 2f,
             enemySpeed = 1f,
             spawnInterval = 1.5f,
             targetAliveCount = 6
@@ -185,6 +208,7 @@ public class RunStageDirector : MonoBehaviour
             elapsedStartTime = 240f,
             enemyHp = 180,
             enemyAttack = 18,
+            enemyDefense = 4f,
             enemySpeed = 1.2f,
             spawnInterval = 1f,
             targetAliveCount = 8
@@ -248,7 +272,8 @@ public class RunStageDirector : MonoBehaviour
             return;
         }
 
-        ApplyStageToEnemy(enemyObject, currentStage ?? GetStageForElapsed(GetElapsedTime()));
+        ResolvedStageState stageState = currentStageState ?? ResolveStageState(GetElapsedTime());
+        ApplyStageToEnemy(enemyObject, stageState);
 
         RunStageEnemyBinding binding = enemyObject.GetComponent<RunStageEnemyBinding>();
         if (binding == null)
@@ -273,15 +298,82 @@ public class RunStageDirector : MonoBehaviour
 
         currentStage = stage;
         spawnTimer = 0f;
+        stageRefreshTimer = 0f;
+    }
+
+    private void RefreshResolvedStage(float elapsedTime, bool force = false)
+    {
+        if (!force && stageRefreshTimer < StageRefreshInterval)
+        {
+            return;
+        }
+
+        stageRefreshTimer = 0f;
+        currentStageState = ResolveStageState(elapsedTime);
 
         EnemyStatsManager[] aliveEnemies = FindObjectsOfType<EnemyStatsManager>();
         for (int i = 0; i < aliveEnemies.Length; i++)
         {
-            ApplyStageToEnemy(aliveEnemies[i].gameObject, stage);
+            ApplyStageToEnemy(aliveEnemies[i].gameObject, currentStageState);
         }
     }
 
-    private void ApplyStageToEnemy(GameObject enemyObject, RunStageConfig stage)
+    private ResolvedStageState ResolveStageState(float elapsedTime)
+    {
+        RunStageConfig stage = GetStageForElapsed(elapsedTime);
+        RunStageConfig nextStage = GetNextStage(stage);
+        float progress = GetStageProgress(stage, nextStage, elapsedTime);
+
+        if (stage == null)
+        {
+            return null;
+        }
+
+        return new ResolvedStageState
+        {
+            phase = stage.phase,
+            enemyHp = Mathf.RoundToInt(Mathf.Lerp(stage.enemyHp, nextStage != null ? nextStage.enemyHp : stage.enemyHp, progress)),
+            enemyAttack = Mathf.Lerp(stage.enemyAttack, nextStage != null ? nextStage.enemyAttack : stage.enemyAttack, progress),
+            enemyDefense = Mathf.Lerp(stage.enemyDefense, nextStage != null ? nextStage.enemyDefense : stage.enemyDefense, progress),
+            enemySpeed = Mathf.Lerp(stage.enemySpeed, nextStage != null ? nextStage.enemySpeed : stage.enemySpeed, progress),
+            spawnInterval = Mathf.Lerp(stage.spawnInterval, nextStage != null ? nextStage.spawnInterval : stage.spawnInterval, progress),
+            targetAliveCount = Mathf.RoundToInt(Mathf.Lerp(stage.targetAliveCount, nextStage != null ? nextStage.targetAliveCount : stage.targetAliveCount, progress))
+        };
+    }
+
+    private RunStageConfig GetNextStage(RunStageConfig stage)
+    {
+        if (stage == null)
+        {
+            return null;
+        }
+
+        int stageIndex = stageConfigs.IndexOf(stage);
+        if (stageIndex < 0 || stageIndex >= stageConfigs.Count - 1)
+        {
+            return null;
+        }
+
+        return stageConfigs[stageIndex + 1];
+    }
+
+    private float GetStageProgress(RunStageConfig stage, RunStageConfig nextStage, float elapsedTime)
+    {
+        if (stage == null || nextStage == null)
+        {
+            return 0f;
+        }
+
+        float duration = nextStage.elapsedStartTime - stage.elapsedStartTime;
+        if (duration <= Mathf.Epsilon)
+        {
+            return 1f;
+        }
+
+        return Mathf.Clamp01((elapsedTime - stage.elapsedStartTime) / duration);
+    }
+
+    private void ApplyStageToEnemy(GameObject enemyObject, ResolvedStageState stage)
     {
         if (enemyObject == null || stage == null)
         {
@@ -308,6 +400,7 @@ public class RunStageDirector : MonoBehaviour
 
         core.stats.maxHp = stage.enemyHp;
         core.stats.attackDamage = stage.enemyAttack;
+        core.stats.defense = stage.enemyDefense;
         core.stats.moveSpeed = stage.enemySpeed;
         core.currentHp = Mathf.Clamp(stage.enemyHp * healthRatio, 0f, stage.enemyHp);
     }
@@ -319,16 +412,112 @@ public class RunStageDirector : MonoBehaviour
             return;
         }
 
-        EnemySpawnTemplate template = spawnTemplates[UnityEngine.Random.Range(0, spawnTemplates.Count)];
-        if (template.template == null)
+        int startIndex = UnityEngine.Random.Range(0, spawnTemplates.Count);
+        for (int i = 0; i < spawnTemplates.Count; i++)
         {
+            EnemySpawnTemplate template = spawnTemplates[(startIndex + i) % spawnTemplates.Count];
+            if (template.template == null)
+            {
+                continue;
+            }
+
+            if (!TryResolveSpawnPosition(template, out Vector3 spawnPosition))
+            {
+                continue;
+            }
+
+            GameObject enemyObject = Instantiate(template.template, spawnPosition, template.rotation);
+            enemyObject.name = template.template.name.Replace("_Template", string.Empty);
+            enemyObject.SetActive(true);
+            PrepareEnemyInstance(enemyObject);
             return;
         }
+    }
 
-        GameObject enemyObject = Instantiate(template.template, template.position, template.rotation);
-        enemyObject.name = template.template.name.Replace("_Template", string.Empty);
-        enemyObject.SetActive(true);
-        PrepareEnemyInstance(enemyObject);
+    private bool TryResolveSpawnPosition(EnemySpawnTemplate template, out Vector3 spawnPosition)
+    {
+        EnemyAvoidObstacle avoidObstacle = template.template.GetComponent<EnemyAvoidObstacle>();
+        if (TryGetValidSpawnPoint(template.position, template.position, template.position.z, avoidObstacle, out spawnPosition))
+        {
+            return true;
+        }
+
+        for (int attempt = 0; attempt < SpawnProbeAttempts; attempt++)
+        {
+            Vector2 candidate = (Vector2)template.position + UnityEngine.Random.insideUnitCircle * SpawnProbeRadius;
+            if (TryGetValidSpawnPoint(candidate, template.position, template.position.z, avoidObstacle, out spawnPosition))
+            {
+                return true;
+            }
+        }
+
+        spawnPosition = default;
+        return false;
+    }
+
+    private bool TryGetValidSpawnPoint(
+        Vector2 candidate,
+        Vector2 templateOrigin,
+        float zPosition,
+        EnemyAvoidObstacle avoidObstacle,
+        out Vector3 spawnPosition)
+    {
+        Vector2 resolvedPoint = avoidObstacle != null
+            ? avoidObstacle.SnapWorldPositionToReachableGrid(candidate, templateOrigin)
+            : candidate;
+
+        if (IsSpawnPointBlocked(resolvedPoint, avoidObstacle))
+        {
+            spawnPosition = default;
+            return false;
+        }
+
+        spawnPosition = new Vector3(resolvedPoint.x, resolvedPoint.y, zPosition);
+        return true;
+    }
+
+    private bool IsSpawnPointBlocked(Vector2 point, EnemyAvoidObstacle avoidObstacle)
+    {
+        if (avoidObstacle != null)
+        {
+            return avoidObstacle.IsPointBlocked(point);
+        }
+
+        Collider2D[] overlaps = Physics2D.OverlapBoxAll(point, SpawnProbeSize, 0f);
+        for (int i = 0; i < overlaps.Length; i++)
+        {
+            Collider2D collider = overlaps[i];
+            if (collider == null)
+            {
+                continue;
+            }
+
+            if (IsFallbackBlockedCollider(collider))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private bool IsFallbackBlockedCollider(Collider2D collider)
+    {
+        if (collider.CompareTag("Water") || collider.CompareTag("Obstacle") || collider.CompareTag("Building"))
+        {
+            return true;
+        }
+
+        string colliderName = collider.name;
+        for (int i = 0; i < FallbackBlockedKeywords.Length; i++)
+        {
+            if (colliderName.IndexOf(FallbackBlockedKeywords[i], StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private void SpawnDrop(Vector3 position)
@@ -477,6 +666,17 @@ public class RunStageDirector : MonoBehaviour
         public GameObject template;
         public Vector3 position;
         public Quaternion rotation;
+    }
+
+    private sealed class ResolvedStageState
+    {
+        public RunStagePhase phase;
+        public float enemyHp;
+        public float enemyAttack;
+        public float enemyDefense;
+        public float enemySpeed;
+        public float spawnInterval;
+        public int targetAliveCount;
     }
 }
 

@@ -46,10 +46,7 @@ public class CatalogueUnlockSlotButton : MonoBehaviour
             button.onClick.AddListener(OnClickSlot);
         }
 
-        if (dialogUI == null)
-        {
-            dialogUI = FindObjectOfType<Dialog>();
-        }
+        ResolveDialogReference();
 
         RefreshVisual();
     }
@@ -94,7 +91,7 @@ public class CatalogueUnlockSlotButton : MonoBehaviour
 
     private void ShowDescription()
     {
-        if (dialogUI == null)
+        if (!ResolveDialogReference())
         {
             Debug.LogWarning("Dialog 未绑定");
             return;
@@ -132,8 +129,20 @@ public class CatalogueUnlockSlotButton : MonoBehaviour
 
     public void RefreshVisual()
     {
+        if (button == null)
+        {
+            button = GetComponent<Button>();
+        }
+
+        if (button != null)
+        {
+            button.enabled = true;
+            button.interactable = true;
+        }
+
         if (targetImage != null)
         {
+            targetImage.raycastTarget = true;
             targetImage.color = IsUnlocked
                 ? new Color(1f, 1f, 1f, 1f)
                 : new Color(0.5f, 0.5f, 0.5f, 1f);
@@ -168,12 +177,7 @@ public class CatalogueUnlockSlotButton : MonoBehaviour
 
     private void ShowRewardDialog(BuildingRewardDefinition slotReward, BuildingRewardDefinition completionReward)
     {
-        if (dialogUI == null)
-        {
-            dialogUI = FindObjectOfType<Dialog>();
-        }
-
-        if (dialogUI == null)
+        if (!ResolveDialogReference())
         {
             return;
         }
@@ -188,5 +192,16 @@ public class CatalogueUnlockSlotButton : MonoBehaviour
         }
 
         dialogUI.ShowClickCloseDialog(content);
+    }
+
+    private bool ResolveDialogReference()
+    {
+        if (dialogUI != null)
+        {
+            return true;
+        }
+
+        dialogUI = FindObjectOfType<Dialog>(true);
+        return dialogUI != null;
     }
 }

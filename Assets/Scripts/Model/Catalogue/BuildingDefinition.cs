@@ -8,6 +8,8 @@ public class BuildingRewardDefinition
     public string rewardId;
     public string title;
     [TextArea(2, 6)] public string description;
+    public bool unlocksWeapon;
+    public WeaponType unlockedWeaponType = WeaponType.DirectInk;
     public AttributeBonusType bonusType = AttributeBonusType.None;
     public float bonusValue;
     public AttributeBonusType subBonusType = AttributeBonusType.None;
@@ -66,14 +68,11 @@ public static class BuildingDefinitionLibrary
                             "厚重夯土墙兼具隔热、承重与耐久能力，是土楼长期使用的基础。",
                             CreateReward("fujian_tulou_small_3", "土楼小奖励", "墨笔耐久上限提升 10。", AttributeBonusType.Durability, 10f))
                     },
-                    completionReward = CreateReward(
+                    completionReward = CreateWeaponUnlockReward(
                         "fujian_tulou_big",
                         "土楼大奖励",
-                        "解锁福建土楼完整条目，生命上限提升 15，防御提升 2。",
-                        AttributeBonusType.MaxHealth,
-                        15f,
-                        AttributeBonusType.Defense,
-                        2f)
+                        "解锁福建土楼完整条目，并永久解锁爆墨基型。",
+                        WeaponType.BurstInk)
                 }
             },
             {
@@ -102,14 +101,11 @@ public static class BuildingDefinitionLibrary
                             "桥体在交通与自然冲击间长期服役，体现古代工匠对材料与结构的把控。",
                             CreateReward("zhaozhou_bridge_small_3", "赵州桥小奖励", "墨笔耐久上限提升 10。", AttributeBonusType.Durability, 10f))
                     },
-                    completionReward = CreateReward(
+                    completionReward = CreateWeaponUnlockReward(
                         "zhaozhou_bridge_big",
                         "赵州桥大奖励",
-                        "解锁赵州桥完整条目，攻击提升 6，移动速度提升 0.35。",
-                        AttributeBonusType.AttackPower,
-                        6f,
-                        AttributeBonusType.MoveSpeed,
-                        0.35f)
+                        "解锁赵州桥完整条目，并永久解锁贯墨基型。",
+                        WeaponType.PierceInk)
                 }
             },
             {
@@ -138,14 +134,11 @@ public static class BuildingDefinitionLibrary
                             "通过天井组织通风、采光与雨水回收，是民居空间智慧的核心节点。",
                             CreateReward("anhui_water_town_small_3", "水乡小奖励", "生命上限提升 10。", AttributeBonusType.MaxHealth, 10f))
                     },
-                    completionReward = CreateReward(
+                    completionReward = CreateWeaponUnlockReward(
                         "anhui_water_town_big",
                         "水乡大奖励",
-                        "解锁安徽水乡民居完整条目，移动速度提升 0.35，防御提升 3。",
-                        AttributeBonusType.MoveSpeed,
-                        0.35f,
-                        AttributeBonusType.Defense,
-                        3f)
+                        "解锁安徽水乡民居完整条目，并永久解锁流墨基型。",
+                        WeaponType.FlowInk)
                 }
             }
         };
@@ -193,6 +186,22 @@ public static class BuildingDefinitionLibrary
             bonusValue = bonusValue,
             subBonusType = subBonusType,
             subBonusValue = subBonusValue
+        };
+    }
+
+    private static BuildingRewardDefinition CreateWeaponUnlockReward(
+        string rewardId,
+        string title,
+        string description,
+        WeaponType weaponType)
+    {
+        return new BuildingRewardDefinition
+        {
+            rewardId = rewardId,
+            title = title,
+            description = description,
+            unlocksWeapon = true,
+            unlockedWeaponType = weaponType
         };
     }
 }

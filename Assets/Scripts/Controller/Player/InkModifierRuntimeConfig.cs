@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 public enum InkModifierType
@@ -184,5 +185,106 @@ public static class InkModifierRuntimeConfig
                 modifierType = InkModifierType.ProjectileCount;
                 return false;
         }
+    }
+
+    public static string GetVolleyLabel(int projectileCount)
+    {
+        int safeCount = Mathf.Max(1, projectileCount);
+        switch (safeCount)
+        {
+            case 1:
+                return "单发";
+            case 2:
+                return "二连发";
+            case 3:
+                return "三连发";
+            case 4:
+                return "四连发";
+            default:
+                return $"{safeCount}连发";
+        }
+    }
+
+    public static string BuildActiveModifierSummary(BackpackMananger backpack, WeaponType weaponType)
+    {
+        WeaponAttackProfile profile = WeaponAttackProfile.FromWeaponType(weaponType);
+        InkAttackRuntimeConfig config = profile.ApplyToInkConfig(BuildFromBackpack(backpack));
+        List<string> parts = new List<string>();
+
+        if (config.projectileCount > 1)
+        {
+            parts.Add(GetVolleyLabel(config.projectileCount));
+        }
+
+        if (config.maxHitCount > 1)
+        {
+            parts.Add($"命中上限 {config.maxHitCount}");
+        }
+
+        if (config.projectileScale > 1.01f)
+        {
+            parts.Add($"体积 x{config.projectileScale:0.00}");
+        }
+
+        if (config.debuff.slowRatio > 0f)
+        {
+            parts.Add($"减速 {config.debuff.slowRatio:P0}");
+        }
+
+        if (config.debuff.knockbackForce > 0f)
+        {
+            parts.Add($"击退 {config.debuff.knockbackForce:0.0}");
+        }
+
+        if (config.speedMultiplier > 1.01f)
+        {
+            parts.Add($"速度 x{config.speedMultiplier:0.00}");
+        }
+
+        if (config.lifetimeMultiplier > 1.01f)
+        {
+            parts.Add($"射程 x{config.lifetimeMultiplier:0.00}");
+        }
+
+        return parts.Count > 0 ? string.Join(" / ", parts) : "当前无临时构筑效果";
+    }
+
+    public static string BuildCrystalActivationText(ArchitecturalCrystal crystal, BackpackMananger backpack, WeaponType weaponType)
+    {
+        if (!crystal.IsCommonStructure)
+        {
+            return string.Empty;
+        }
+
+        WeaponAttackProfile profile = WeaponAttackProfile.FromWeaponType(weaponType);
+        InkAttackRuntimeConfig config = profile.ApplyToInkConfig(BuildFromBackpack(backpack));
+
+        string effectLine;
+        switch (crystal.type)
+        {
+            case ArchitecturalType.Brackets:
+                effectLine = $"已生效：{GetVolleyLabel(config.projectileCount)}";
+                break;
+            case ArchitecturalType.MortiseAndTenonJoint:
+                effectLine = $"已生效：命中上限 {config.maxHitCount}";
+                break;
+            case ArchitecturalType.Tile:
+                effectLine = $"已生效：墨迹体积 x{config.projectileScale:0.00}";
+                break;
+            case ArchitecturalType.TampedEarth:
+                effectLine = $"已生效：减速 {config.debuff.slowRatio:P0}";
+                break;
+            case ArchitecturalType.GroundMass:
+                effectLine = $"已生效：击退 {config.debuff.knockbackForce:0.0}";
+                break;
+            case ArchitecturalType.BeamFrame:
+                effectLine = $"已生效：速度 x{config.speedMultiplier:0.00} / 射程 x{config.lifetimeMultiplier:0.00}";
+                break;
+            default:
+                effectLine = "已生效";
+                break;
+        }
+
+        return $"{crystal.DisplayName} {effectLine}\n当前构筑：{BuildActiveModifierSummary(backpack, weaponType)}";
     }
 }

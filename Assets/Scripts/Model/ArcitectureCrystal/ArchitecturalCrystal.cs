@@ -148,6 +148,8 @@ public struct ArchitecturalCrystal
 
 public static class ArchitecturalCrystalFactory
 {
+    private static Sprite runtimeSpecialStructureSprite;
+
     public static ArchitecturalCrystal CreateCommonStructure(
         ArchitecturalType type,
         Sprite icon = null,
@@ -172,11 +174,14 @@ public static class ArchitecturalCrystalFactory
         Sprite icon = null,
         Sprite backIcon = null)
     {
+        Sprite specialIcon = icon != null ? icon : GetOrCreateSpecialStructureSprite();
+        Sprite specialBackIcon = backIcon != null ? backIcon : specialIcon;
+
         return new ArchitecturalCrystal(
             ArchitecturalType.MortiseAndTenonJoint,
             0,
-            icon,
-            backIcon != null ? backIcon : icon,
+            specialIcon,
+            specialBackIcon,
             "专用结构材料，可用于点亮建筑录槽位。",
             AttributeBonusType.None,
             0f,
@@ -185,6 +190,69 @@ public static class ArchitecturalCrystalFactory
             true,
             ArchitecturalResourceCategory.SpecialStructure,
             0);
+    }
+
+    private static Sprite GetOrCreateSpecialStructureSprite()
+    {
+        if (runtimeSpecialStructureSprite != null)
+        {
+            return runtimeSpecialStructureSprite;
+        }
+
+        const int size = 32;
+        Texture2D texture = new Texture2D(size, size, TextureFormat.RGBA32, false);
+        texture.filterMode = FilterMode.Point;
+        texture.wrapMode = TextureWrapMode.Clamp;
+
+        Color outline = new Color32(103, 63, 20, 255);
+        Color shadow = new Color32(154, 105, 35, 255);
+        Color fill = new Color32(238, 191, 90, 255);
+        Color highlight = new Color32(255, 231, 156, 255);
+
+        Vector2 center = new Vector2((size - 1) * 0.5f, (size - 1) * 0.5f);
+        float radius = 10.5f;
+
+        for (int y = 0; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                float dx = Mathf.Abs(x - center.x);
+                float dy = Mathf.Abs(y - center.y);
+                float manhattan = dx + dy * 1.18f;
+
+                Color color = Color.clear;
+                if (manhattan <= radius + 1.5f)
+                {
+                    color = outline;
+                }
+
+                if (manhattan <= radius)
+                {
+                    color = shadow;
+                }
+
+                if (manhattan <= radius - 1.8f)
+                {
+                    color = fill;
+                }
+
+                if (manhattan <= radius - 4.2f && y >= center.y - 5f)
+                {
+                    color = highlight;
+                }
+
+                texture.SetPixel(x, y, color);
+            }
+        }
+
+        texture.Apply();
+        runtimeSpecialStructureSprite = Sprite.Create(
+            texture,
+            new Rect(0f, 0f, size, size),
+            new Vector2(0.5f, 0.5f),
+            100f);
+        runtimeSpecialStructureSprite.name = "RuntimeSpecialStructureSprite";
+        return runtimeSpecialStructureSprite;
     }
 
     public static ArchitecturalCrystal CreateInkSupply(

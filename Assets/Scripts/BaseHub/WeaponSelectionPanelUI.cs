@@ -9,6 +9,7 @@ public class WeaponSelectionPanelUI : MonoBehaviour
 
     [SerializeField] private Color selectedColor = new Color(0.86f, 0.67f, 0.34f, 1f);
     [SerializeField] private Color normalColor = new Color(0.18f, 0.15f, 0.12f, 0.92f);
+    [SerializeField] private Color lockedColor = new Color(0.14f, 0.14f, 0.14f, 0.56f);
 
     private PlayerProfileData profileData;
 
@@ -16,6 +17,19 @@ public class WeaponSelectionPanelUI : MonoBehaviour
     {
         profileData = profile;
         RefreshSelected();
+    }
+
+    private void OnEnable()
+    {
+        RuntimeProgressState.EnsureInstance().OnStateChanged += RefreshSelected;
+    }
+
+    private void OnDisable()
+    {
+        if (RuntimeProgressState.Instance != null)
+        {
+            RuntimeProgressState.Instance.OnStateChanged -= RefreshSelected;
+        }
     }
 
     public void RegisterOption(
@@ -26,7 +40,7 @@ public class WeaponSelectionPanelUI : MonoBehaviour
     {
         if (data == null || button == null) return;
 
-        WeaponOptionView view = new WeaponOptionView(data, background, stateLabel);
+        WeaponOptionView view = new WeaponOptionView(data, button, background, stateLabel);
         optionViews.Add(view);
 
         button.onClick.AddListener(() =>
@@ -41,27 +55,51 @@ public class WeaponSelectionPanelUI : MonoBehaviour
     {
         if (profileData == null) return;
 
+        PlayerLoadoutRuntime.EnsureCurrentWeaponUnlocked();
+        profileData.currentWeaponType = PlayerLoadoutRuntime.CurrentWeaponType;
+        profileData.currentInkType = PlayerLoadoutRuntime.CurrentInkType;
+
         foreach (WeaponOptionView view in optionViews)
         {
+            bool unlocked = PlayerLoadoutRuntime.IsWeaponUnlocked(view.Data.weaponType);
             bool selected = view.Data.weaponType == profileData.currentWeaponType;
 
             if (view.Background != null)
-                view.Background.color = selected ? selectedColor : normalColor;
+            {
+                view.Background.color = !unlocked
+                    ? lockedColor
+                    : selected
+                        ? selectedColor
+                        : normalColor;
+            }
 
             if (view.StateLabel != null)
-                view.StateLabel.text = selected ? "当前装备" : "点击装备";
+            {
+                view.StateLabel.text = !unlocked
+                    ? "未解锁"
+                    : selected
+                        ? "当前装备"
+                        : "点击装备";
+            }
+
+            if (view.Button != null)
+            {
+                view.Button.interactable = unlocked;
+            }
         }
     }
 
     private sealed class WeaponOptionView
     {
         public readonly WeaponOptionData Data;
+        public readonly Button Button;
         public readonly Image Background;
         public readonly TextMeshProUGUI StateLabel;
 
-        public WeaponOptionView(WeaponOptionData data, Image background, TextMeshProUGUI stateLabel)
+        public WeaponOptionView(WeaponOptionData data, Button button, Image background, TextMeshProUGUI stateLabel)
         {
             Data = data;
+            Button = button;
             Background = background;
             StateLabel = stateLabel;
         }

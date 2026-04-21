@@ -38,12 +38,24 @@ public class PlayerMove : MonoBehaviour
 
     void Update()
     {
-        // 若脚本禁用则直接不处理
-        // if (!enabled) return;
-
         if (core == null || core.stats == null) return;
 
         moveSpeed = core.stats.moveSpeed;
+
+        if (UIRootManager.Instance != null && UIRootManager.Instance.IsAnyGameplayBlockingUIOpen())
+        {
+            if (rb != null)
+            {
+                rb.velocity = Vector2.zero;
+            }
+
+            if (AnimatorParameterUtility.CanDrive(animator))
+            {
+                AnimatorParameterUtility.SetBoolIfPresent(animator, "IsMoving", false);
+            }
+
+            return;
+        }
 
         if (!canMove) return;
 

@@ -13,6 +13,8 @@ public class BackpackMananger : MonoBehaviour
 
     public delegate void FirstPickTipEvent(ArchitecturalCrystal crystal);
     public event FirstPickTipEvent OnFirstTimePickItemType;
+    public event System.Action<ArchitecturalCrystal> OnItemPicked;
+    public event System.Action OnInventoryChanged;
 
     private void Awake()
     {
@@ -99,11 +101,15 @@ public class BackpackMananger : MonoBehaviour
             crystal.inkRestoreValue);
 
         backpackItems[emptyIndex] = newItem;
+        RefreshPlayerTemporaryAttributes();
 
         if (shouldShowFirstPick)
         {
             OnFirstTimePickItemType?.Invoke(newItem);
         }
+
+        OnItemPicked?.Invoke(newItem);
+        OnInventoryChanged?.Invoke();
 
         Debug.Log($"拾取 {newItem.DisplayName}，放入背包格子 {emptyIndex}");
         return true;
@@ -115,6 +121,8 @@ public class BackpackMananger : MonoBehaviour
         if (!backpackItems[index].HasValue) return;
 
         backpackItems[index] = null;
+        RefreshPlayerTemporaryAttributes();
+        OnInventoryChanged?.Invoke();
         Debug.Log($"清空第 {index} 个背包物品");
     }
 
@@ -130,9 +138,22 @@ public class BackpackMananger : MonoBehaviour
 
     public void ClearAllItems()
     {
+        bool removedAnyItem = false;
         for (int i = 0; i < backpackItems.Count; i++)
         {
-            RemoveItem(i);
+            if (!backpackItems[i].HasValue)
+            {
+                continue;
+            }
+
+            backpackItems[i] = null;
+            removedAnyItem = true;
+        }
+
+        if (removedAnyItem)
+        {
+            RefreshPlayerTemporaryAttributes();
+            OnInventoryChanged?.Invoke();
         }
 
         Debug.Log("背包已清空");
@@ -169,5 +190,17 @@ public class BackpackMananger : MonoBehaviour
         }
 
         playerAttack.AddInk(crystal.inkRestoreValue);
+    }
+
+    private void RefreshPlayerTemporaryAttributes()
+    {
+        PlayerAttributeManager attributeManager = PlayerAttributeManager.Instance != null
+            ? PlayerAttributeManager.Instance
+            : FindObjectOfType<PlayerAttributeManager>();
+
+        if (attributeManager != null)
+        {
+            attributeManager.ApplyAllBonus();
+        }
     }
 }

@@ -21,6 +21,12 @@ public class PlayerInteraction : MonoBehaviour
 
     void Update()
     {
+        if (IsGameplayUiBlockingInteraction())
+        {
+            ClearCurrentInteractable();
+            return;
+        }
+
         UpdateCurrentInteractable();
 
         if (Input.GetKeyDown(KeyCode.F))
@@ -113,6 +119,16 @@ public class PlayerInteraction : MonoBehaviour
         currentInteractable = null;
         currentInteractableCollider = null;
         HideInteractUI();
+    }
+
+    private static bool IsGameplayUiBlockingInteraction()
+    {
+        if (UIRootManager.Instance != null && UIRootManager.Instance.IsAnyGameplayBlockingUIOpen())
+        {
+            return true;
+        }
+
+        return UIManager.Instance != null && UIManager.Instance.IsHandbookOpen;
     }
 
     private void OnDrawGizmosSelected()

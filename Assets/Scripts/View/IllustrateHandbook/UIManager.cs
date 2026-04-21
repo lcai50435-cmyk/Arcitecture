@@ -26,6 +26,8 @@ public class UIManager : MonoBehaviour
     private bool wasPlayerEnabled = true;
     private Dialog dialogUI;
 
+    public bool IsHandbookOpen => isHandbookOpen;
+
     private void Awake()
     {
         if (Instance == null)

@@ -162,6 +162,8 @@ public class SubmitSelectionPanelUI : MonoBehaviour
             return;
         }
 
+        int specialInventory = RuntimeProgressState.EnsureInstance().AvailableSpecialStructureInventory;
+
         for (int i = 0; i < slotUIs.Length; i++)
         {
             SubmitSelectionSlotUI slot = slotUIs[i];
@@ -172,8 +174,20 @@ public class SubmitSelectionPanelUI : MonoBehaviour
 
             int realIndex = slot.slotIndex;
             ArchitecturalCrystal? nullableItem = backpack.GetItem(realIndex);
-            ArchitecturalCrystal item = nullableItem.HasValue ? nullableItem.Value : default;
-            slot.Refresh(item, nullableItem.HasValue);
+            if (nullableItem.HasValue)
+            {
+                slot.Refresh(nullableItem.Value, true);
+                continue;
+            }
+
+            if (specialInventory > 0)
+            {
+                slot.Refresh(ArchitecturalCrystalFactory.CreateSpecialStructureMaterial(), true);
+                specialInventory--;
+                continue;
+            }
+
+            slot.Refresh(default, false);
         }
     }
 

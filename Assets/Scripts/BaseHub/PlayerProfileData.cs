@@ -17,12 +17,18 @@ public class PlayerProfileData : MonoBehaviour
 
     private void Awake()
     {
+        PlayerLoadoutRuntime.EnsureCurrentWeaponUnlocked();
         currentInkType = PlayerLoadoutRuntime.CurrentInkType;
         currentWeaponType = PlayerLoadoutRuntime.CurrentWeaponType;
     }
 
     public void SelectWeapon(WeaponType weaponType)
     {
+        if (!PlayerLoadoutRuntime.IsWeaponUnlocked(weaponType))
+        {
+            return;
+        }
+
         currentWeaponType = weaponType;
         currentInkType = weaponType.ToInkType();
         PlayerLoadoutRuntime.CurrentWeaponType = weaponType;
@@ -30,8 +36,14 @@ public class PlayerProfileData : MonoBehaviour
 
     public void SelectInkType(InkType inkType)
     {
+        WeaponType weaponType = inkType.ToWeaponType();
+        if (!PlayerLoadoutRuntime.IsWeaponUnlocked(weaponType))
+        {
+            return;
+        }
+
         currentInkType = inkType;
-        currentWeaponType = inkType.ToWeaponType();
+        currentWeaponType = weaponType;
         PlayerLoadoutRuntime.CurrentInkType = inkType;
     }
 }

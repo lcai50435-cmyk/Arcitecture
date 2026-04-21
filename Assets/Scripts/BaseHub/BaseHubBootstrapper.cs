@@ -135,7 +135,11 @@ public class BaseHubBootstrapper : MonoBehaviour
         rootRect.sizeDelta = new Vector2(420f, 108f);
 
         Image background = root.AddComponent<Image>();
-        background.color = new Color(0.04f, 0.03f, 0.03f, 0.78f);
+        RuntimeUiSpriteFactory.ApplyRoundedSprite(
+            background,
+            new Color(0.04f, 0.03f, 0.03f, 0.78f),
+            10,
+            12);
 
         StatusHudWidgets healthWidgets = CreateStatusHudRow(
             root.transform,
@@ -194,7 +198,11 @@ public class BaseHubBootstrapper : MonoBehaviour
         barRect.sizeDelta = new Vector2(220f, 18f);
 
         Image background = barObject.AddComponent<Image>();
-        background.color = new Color(0.19f, 0.16f, 0.15f, 1f);
+        RuntimeUiSpriteFactory.ApplyRoundedSprite(
+            background,
+            new Color(0.19f, 0.16f, 0.15f, 1f),
+            7,
+            10);
 
         Slider slider = barObject.AddComponent<Slider>();
         slider.direction = Slider.Direction.LeftToRight;
@@ -213,7 +221,7 @@ public class BaseHubBootstrapper : MonoBehaviour
         fillRect.offsetMin = Vector2.zero;
         fillRect.offsetMax = Vector2.zero;
         Image fillImage = fillObject.AddComponent<Image>();
-        fillImage.color = fillColor;
+        RuntimeUiSpriteFactory.ApplyRoundedSprite(fillImage, fillColor, 7, 10);
         slider.fillRect = fillRect;
 
         ValueTrans valueTrans = barObject.AddComponent<ValueTrans>();
@@ -478,6 +486,14 @@ public class BaseHubBootstrapper : MonoBehaviour
         if (illustratedHandbook != null) illustratedHandbook.SetActive(false);
         if (detailedInformation != null) detailedInformation.SetActive(false);
 
+        ConfigureRuntimeUiRootManager(
+            handbookRoot,
+            illustratedHandbook,
+            detailedInformation,
+            dialogCanvas,
+            packBagCanvas,
+            interactPrompt);
+
         RuntimeProgressState.EnsureInstance();
         CatalogueUnlockSelectionManager.EnsureInstance();
 
@@ -498,6 +514,71 @@ public class BaseHubBootstrapper : MonoBehaviour
         backpackUI?.RefreshUI();
 
         return illustratedHandbook;
+    }
+
+    private static void ConfigureRuntimeUiRootManager(
+        GameObject handbookRoot,
+        GameObject illustratedHandbook,
+        GameObject detailedInformation,
+        GameObject dialogCanvas,
+        GameObject packBagCanvas,
+        GameObject interactPrompt)
+    {
+        if (handbookRoot == null)
+        {
+            return;
+        }
+
+        UIRootManager rootManager = handbookRoot.GetComponentInChildren<UIRootManager>(true);
+        if (rootManager == null)
+        {
+            rootManager = handbookRoot.AddComponent<UIRootManager>();
+        }
+
+        rootManager.handbookUI = EnsureCanvasGroup(illustratedHandbook);
+        rootManager.dialogUI = EnsureCanvasGroup(dialogCanvas);
+        rootManager.backpackUI = EnsureCanvasGroup(packBagCanvas);
+        rootManager.interactTipUI = EnsureCanvasGroup(interactPrompt);
+
+        DetailedInformationUI detailUi = handbookRoot.GetComponentInChildren<DetailedInformationUI>(true);
+        if (detailUi != null)
+        {
+            rootManager.detailUIPage1 = EnsureCanvasGroup(detailUi.backGround1);
+            rootManager.detailUIPage2 = EnsureCanvasGroup(detailUi.backGround2);
+        }
+        else
+        {
+            rootManager.detailUIPage1 = EnsureCanvasGroup(detailedInformation);
+            rootManager.detailUIPage2 = null;
+        }
+
+        SubmitSelectionPanelUI[] submitPanels = handbookRoot.GetComponentsInChildren<SubmitSelectionPanelUI>(true);
+        rootManager.submitSelectionUI1 = submitPanels.Length > 0 ? EnsureCanvasGroup(submitPanels[0].panelRoot != null ? submitPanels[0].panelRoot : submitPanels[0].gameObject) : null;
+        rootManager.submitSelectionUI2 = submitPanels.Length > 1 ? EnsureCanvasGroup(submitPanels[1].panelRoot != null ? submitPanels[1].panelRoot : submitPanels[1].gameObject) : null;
+        rootManager.submitSelectionUI3 = submitPanels.Length > 2 ? EnsureCanvasGroup(submitPanels[2].panelRoot != null ? submitPanels[2].panelRoot : submitPanels[2].gameObject) : null;
+
+        rootManager.HideHandbook();
+        rootManager.HideAllDetail();
+        rootManager.HideAllSubmitSelection();
+        rootManager.HideDialog();
+        rootManager.ShowInteractTip();
+        rootManager.ShowBackpack();
+    }
+
+    private static CanvasGroup EnsureCanvasGroup(GameObject target)
+    {
+        if (target == null)
+        {
+            return null;
+        }
+
+        CanvasGroup canvasGroup = target.GetComponent<CanvasGroup>();
+        if (canvasGroup == null)
+        {
+            canvasGroup = target.AddComponent<CanvasGroup>();
+        }
+
+        return canvasGroup;
     }
 
     private static void EnsureBaseHandbookRuntimeSystems(GameObject playerObject)
@@ -623,33 +704,59 @@ public class BaseHubBootstrapper : MonoBehaviour
     private SpiritPanelUI CreateSpiritPanel(Transform parent)
     {
         GameObject root = CreateModalRoot("SpiritPanel", parent);
-        GameObject panel = CreateCenteredPanel("SpiritContent", root.transform, new Vector2(860f, 600f));
+        GameObject panel = CreateCenteredPanel("SpiritContent", root.transform, new Vector2(940f, 650f));
+        Image panelBackground = panel.GetComponent<Image>();
+        RuntimeUiSpriteFactory.ApplySpiritPanelFrameSprite(panelBackground, Color.white);
+
+        GameObject avatarPanel = CreateUIObject("AvatarPanel", panel.transform);
+        SetCenteredRect(avatarPanel.GetComponent<RectTransform>(), new Vector2(-252f, -14f), new Vector2(246f, 392f));
+        Image avatarPanelImage = avatarPanel.AddComponent<Image>();
+        RuntimeUiSpriteFactory.ApplyRoundedSprite(avatarPanelImage, new Color(0.13f, 0.17f, 0.14f, 0.20f), 18, 16, 1.2f);
+
+        GameObject avatarFrame = CreateUIObject("AvatarFrame", avatarPanel.transform);
+        SetCenteredRect(avatarFrame.GetComponent<RectTransform>(), new Vector2(0f, 0f), new Vector2(198f, 310f));
+        Image avatarFrameImage = avatarFrame.AddComponent<Image>();
+        RuntimeUiSpriteFactory.ApplyRoundedSprite(avatarFrameImage, new Color(0.97f, 0.97f, 0.95f, 0.88f), 16, 14, 1.2f);
+
+        GameObject avatarObject = CreateUIObject("Avatar", avatarFrame.transform);
+        SetStretch(avatarObject.GetComponent<RectTransform>(), 18f, 18f, 18f, 18f);
+        Image avatarImage = avatarObject.AddComponent<Image>();
+        avatarImage.color = Color.white;
+        avatarImage.preserveAspect = true;
+
+        GameObject contentPanel = CreateUIObject("ContentPanel", panel.transform);
+        SetCenteredRect(contentPanel.GetComponent<RectTransform>(), new Vector2(150f, -18f), new Vector2(500f, 408f));
+        Image contentPanelImage = contentPanel.AddComponent<Image>();
+        RuntimeUiSpriteFactory.ApplyRoundedSprite(contentPanelImage, new Color(0.15f, 0.18f, 0.14f, 0.16f), 18, 16, 1.2f);
 
         TextMeshProUGUI title = CreateText(
             "Title",
             panel.transform,
             "精灵 · 玩家属性",
             40,
-            new Color(0.96f, 0.83f, 0.52f, 1f),
+            new Color(0.20f, 0.24f, 0.16f, 1f),
             TextAlignmentOptions.Center);
-        SetCenteredRect(title.rectTransform, new Vector2(0f, 234f), new Vector2(600f, 66f));
+        SetCenteredRect(title.rectTransform, new Vector2(0f, 252f), new Vector2(620f, 66f));
 
-        Button closeButton = CreateButton("CloseButton", panel.transform, "×", new Color(0.42f, 0.16f, 0.12f, 1f), new Vector2(64f, 48f));
-        closeButton.GetComponent<RectTransform>().anchoredPosition = new Vector2(372f, 252f);
+        Button closeButton = CreateButton("CloseButton", panel.transform, "×", new Color(0.19f, 0.24f, 0.17f, 0.92f), new Vector2(58f, 42f));
+        RuntimeUiSpriteFactory.ApplyRoundedSprite(closeButton.GetComponent<Image>(), new Color(0.19f, 0.24f, 0.17f, 0.92f), 12, 12, 1.2f);
+        closeButton.GetComponent<RectTransform>().anchoredPosition = new Vector2(402f, 258f);
 
-        Button statsTabButton = CreateButton("StatsTabButton", panel.transform, "属性", new Color(0.38f, 0.25f, 0.12f, 1f), new Vector2(140f, 48f));
-        statsTabButton.GetComponent<RectTransform>().anchoredPosition = new Vector2(-90f, 176f);
+        Button statsTabButton = CreateButton("StatsTabButton", panel.transform, "属性", new Color(0.33f, 0.42f, 0.28f, 0.94f), new Vector2(132f, 44f));
+        RuntimeUiSpriteFactory.ApplyRoundedSprite(statsTabButton.GetComponent<Image>(), new Color(0.33f, 0.42f, 0.28f, 0.94f), 12, 12, 1.2f);
+        statsTabButton.GetComponent<RectTransform>().anchoredPosition = new Vector2(78f, 188f);
 
-        Button weaponTabButton = CreateButton("WeaponTabButton", panel.transform, "墨水", new Color(0.22f, 0.18f, 0.14f, 1f), new Vector2(140f, 48f));
-        weaponTabButton.GetComponent<RectTransform>().anchoredPosition = new Vector2(90f, 176f);
+        Button weaponTabButton = CreateButton("WeaponTabButton", panel.transform, "墨水", new Color(0.25f, 0.28f, 0.22f, 0.94f), new Vector2(132f, 44f));
+        RuntimeUiSpriteFactory.ApplyRoundedSprite(weaponTabButton.GetComponent<Image>(), new Color(0.25f, 0.28f, 0.22f, 0.94f), 12, 12, 1.2f);
+        weaponTabButton.GetComponent<RectTransform>().anchoredPosition = new Vector2(226f, 188f);
 
-        GameObject statsPage = CreateUIObject("StatsPage", panel.transform);
-        SetCenteredRect(statsPage.GetComponent<RectTransform>(), new Vector2(0f, -36f), new Vector2(720f, 360f));
+        GameObject statsPage = CreateUIObject("StatsPage", contentPanel.transform);
+        SetStretch(statsPage.GetComponent<RectTransform>(), 26f, 26f, 26f, 26f);
         PlayerStatsPanelUI statsPanel = statsPage.AddComponent<PlayerStatsPanelUI>();
-        BuildStatsPage(statsPage.transform, statsPanel);
+        BuildStatsPage(statsPage.transform, statsPanel, avatarImage);
 
-        GameObject weaponPage = CreateUIObject("WeaponPage", panel.transform);
-        SetCenteredRect(weaponPage.GetComponent<RectTransform>(), new Vector2(0f, -36f), new Vector2(720f, 360f));
+        GameObject weaponPage = CreateUIObject("WeaponPage", contentPanel.transform);
+        SetStretch(weaponPage.GetComponent<RectTransform>(), 26f, 26f, 26f, 26f);
         WeaponSelectionPanelUI weaponPanel = weaponPage.AddComponent<WeaponSelectionPanelUI>();
         BuildWeaponPage(weaponPage.transform, weaponPanel);
 
@@ -660,26 +767,16 @@ public class BaseHubBootstrapper : MonoBehaviour
         return spiritPanel;
     }
 
-    private void BuildStatsPage(Transform parent, PlayerStatsPanelUI statsPanel)
+    private void BuildStatsPage(Transform parent, PlayerStatsPanelUI statsPanel, Image avatarImage)
     {
-        GameObject avatarFrame = CreateUIObject("AvatarFrame", parent);
-        SetCenteredRect(avatarFrame.GetComponent<RectTransform>(), new Vector2(-240f, 72f), new Vector2(170f, 170f));
-        Image frameImage = avatarFrame.AddComponent<Image>();
-        frameImage.color = new Color(0.17f, 0.14f, 0.10f, 1f);
-
-        GameObject avatarObject = CreateUIObject("Avatar", avatarFrame.transform);
-        SetStretch(avatarObject.GetComponent<RectTransform>(), 16f, 16f, 16f, 16f);
-        Image avatarImage = avatarObject.AddComponent<Image>();
-        avatarImage.color = new Color(0.92f, 0.78f, 0.52f, 1f);
-        avatarImage.preserveAspect = true;
-
         GameObject rows = CreateUIObject("StatRows", parent);
-        SetCenteredRect(rows.GetComponent<RectTransform>(), new Vector2(130f, 32f), new Vector2(430f, 280f));
+        SetStretch(rows.GetComponent<RectTransform>(), 4f, 8f, 4f, 8f);
         VerticalLayoutGroup layout = rows.AddComponent<VerticalLayoutGroup>();
         layout.childAlignment = TextAnchor.MiddleLeft;
-        layout.spacing = 14f;
+        layout.spacing = 16f;
         layout.childForceExpandHeight = false;
         layout.childForceExpandWidth = true;
+        layout.padding = new RectOffset(6, 6, 10, 10);
 
         TextMeshProUGUI health = CreateRowText(rows.transform, "生命：-");
         TextMeshProUGUI maxHealth = CreateRowText(rows.transform, "生命上限：-");
@@ -694,11 +791,13 @@ public class BaseHubBootstrapper : MonoBehaviour
     private void BuildWeaponPage(Transform parent, WeaponSelectionPanelUI weaponPanel)
     {
         GameObject list = CreateUIObject("WeaponOptions", parent);
-        SetCenteredRect(list.GetComponent<RectTransform>(), Vector2.zero, new Vector2(680f, 440f));
+        SetStretch(list.GetComponent<RectTransform>(), 2f, 8f, 2f, 8f);
         VerticalLayoutGroup layout = list.AddComponent<VerticalLayoutGroup>();
-        layout.spacing = 18f;
+        layout.spacing = 14f;
+        layout.childAlignment = TextAnchor.UpperCenter;
         layout.childForceExpandHeight = false;
         layout.childForceExpandWidth = true;
+        layout.padding = new RectOffset(4, 4, 10, 10);
 
         CreateWeaponOption(list.transform, weaponPanel, WeaponType.DirectInk, "直墨", "标准墨迹，稳定直射，适合作为通用基型。");
         CreateWeaponOption(list.transform, weaponPanel, WeaponType.BurstInk, "爆墨", "命中后爆散成片，擅长处理聚集敌人。");
@@ -713,31 +812,32 @@ public class BaseHubBootstrapper : MonoBehaviour
         string title,
         string description)
     {
-        Button button = CreateButton($"{type}Button", parent, string.Empty, new Color(0.18f, 0.15f, 0.12f, 0.92f), new Vector2(680f, 86f));
+        Button button = CreateButton($"{type}Button", parent, string.Empty, new Color(0.19f, 0.22f, 0.18f, 0.92f), new Vector2(432f, 82f));
         LayoutElement layoutElement = button.gameObject.AddComponent<LayoutElement>();
-        layoutElement.preferredHeight = 86f;
+        layoutElement.preferredHeight = 82f;
 
         Image background = button.GetComponent<Image>();
-        TextMeshProUGUI titleText = CreateText("Title", button.transform, title, 26, new Color(0.96f, 0.83f, 0.52f, 1f), TextAlignmentOptions.MidlineLeft);
+        RuntimeUiSpriteFactory.ApplyRoundedSprite(background, new Color(0.19f, 0.22f, 0.18f, 0.92f), 14, 12, 1.2f);
+        TextMeshProUGUI titleText = CreateText("Title", button.transform, title, 24, new Color(0.96f, 0.83f, 0.52f, 1f), TextAlignmentOptions.MidlineLeft);
         titleText.rectTransform.anchorMin = new Vector2(0f, 0.5f);
         titleText.rectTransform.anchorMax = new Vector2(0f, 0.5f);
         titleText.rectTransform.pivot = new Vector2(0f, 0.5f);
-        titleText.rectTransform.anchoredPosition = new Vector2(28f, 14f);
-        titleText.rectTransform.sizeDelta = new Vector2(240f, 32f);
+        titleText.rectTransform.anchoredPosition = new Vector2(24f, 17f);
+        titleText.rectTransform.sizeDelta = new Vector2(240f, 28f);
 
-        TextMeshProUGUI descText = CreateText("Description", button.transform, description, 20, new Color(0.86f, 0.80f, 0.70f, 1f), TextAlignmentOptions.MidlineLeft);
+        TextMeshProUGUI descText = CreateText("Description", button.transform, description, 17, new Color(0.86f, 0.80f, 0.70f, 1f), TextAlignmentOptions.MidlineLeft);
         descText.rectTransform.anchorMin = new Vector2(0f, 0.5f);
         descText.rectTransform.anchorMax = new Vector2(0f, 0.5f);
         descText.rectTransform.pivot = new Vector2(0f, 0.5f);
-        descText.rectTransform.anchoredPosition = new Vector2(28f, -20f);
-        descText.rectTransform.sizeDelta = new Vector2(420f, 28f);
+        descText.rectTransform.anchoredPosition = new Vector2(24f, -15f);
+        descText.rectTransform.sizeDelta = new Vector2(276f, 24f);
 
-        TextMeshProUGUI stateText = CreateText("State", button.transform, "点击装备", 22, Color.white, TextAlignmentOptions.Center);
+        TextMeshProUGUI stateText = CreateText("State", button.transform, "点击装备", 18, Color.white, TextAlignmentOptions.Center);
         stateText.rectTransform.anchorMin = new Vector2(1f, 0.5f);
         stateText.rectTransform.anchorMax = new Vector2(1f, 0.5f);
         stateText.rectTransform.pivot = new Vector2(1f, 0.5f);
-        stateText.rectTransform.anchoredPosition = new Vector2(-28f, 0f);
-        stateText.rectTransform.sizeDelta = new Vector2(150f, 36f);
+        stateText.rectTransform.anchoredPosition = new Vector2(-20f, 0f);
+        stateText.rectTransform.sizeDelta = new Vector2(110f, 32f);
 
         WeaponOptionData data = new WeaponOptionData
         {
