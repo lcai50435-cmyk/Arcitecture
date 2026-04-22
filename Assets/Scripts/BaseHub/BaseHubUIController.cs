@@ -305,7 +305,7 @@ public class BaseHubUIController : MonoBehaviour
 
     private void HandleSettingsPanelClosed()
     {
-        if (!string.Equals(SceneManager.GetActiveScene().name, "BaseScene", System.StringComparison.Ordinal))
+        if (!string.Equals(SceneManager.GetActiveScene().name, "NewBase", System.StringComparison.Ordinal))
         {
             return;
         }

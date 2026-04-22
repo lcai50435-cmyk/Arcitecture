@@ -66695,6 +66695,7 @@ GameObject:
   - component: {fileID: 1376576344}
   - component: {fileID: 1376576343}
   - component: {fileID: 1376576342}
+  - component: {fileID: 1376576345}
   m_Layer: 0
   m_Name: ArchitecturalRecord
   m_TagString: Untagged
@@ -66860,6 +66861,21 @@ Tilemap:
     e31: 0
     e32: 0
     e33: 1
+--- !u!114 &1376576345
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1376576340}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9c497f4f4d02488ca74c953bf4f6f86a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  faceRoot: {fileID: 0}
+  playerTag: Player
+  horizontalDeadZone: 0.05
 --- !u!1 &1382865536
 GameObject:
   m_ObjectHideFlags: 0

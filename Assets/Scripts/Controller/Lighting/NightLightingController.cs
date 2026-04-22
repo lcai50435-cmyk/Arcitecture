@@ -69,7 +69,7 @@ public sealed class NightLightingController : MonoBehaviour
     private const string OverlayObjectName = "NightWorldOverlay";
     private const string AccentRootObjectName = "NightAccentRoot";
     private const string MainSceneName = "MainScene";
-    private const string BaseSceneName = "BaseScene";
+    private const string BaseSceneName = "NewBase";
     private const string DeadSceneName = "DeadScene";
     private const int OverlaySortingOrder = 28000;
     private const float BindingRefreshInterval = 0.35f;

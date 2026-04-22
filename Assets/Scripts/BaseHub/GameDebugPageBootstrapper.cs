@@ -10,7 +10,7 @@ using UnityEngine.UI;
 
 public class GameDebugPageBootstrapper : MonoBehaviour
 {
-    private const string BaseSceneName = "BaseScene";
+    private const string BaseSceneName = "NewBase";
     private const float RefreshInterval = 0.2f;
     private const string RequiredDebugCharacters = "调试面板按住显示当前场景基地允许攻击生命上限耐久攻击力移动速度防御建筑结构材料武器墨水属性技能关闭开关预留版本穿透效果命中图鉴进度专用福建土楼赵州桥安徽水乡民居槽位完成总召唤怪物随机火石只TabEsc";
     private static readonly string[] DebugFontNames =

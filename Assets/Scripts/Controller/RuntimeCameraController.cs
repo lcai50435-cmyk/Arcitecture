@@ -5,7 +5,7 @@ using UnityEngine.SceneManagement;
 public sealed class RuntimeCameraController : MonoBehaviour
 {
     private const string ControllerObjectName = "RuntimeCameraController";
-    private const string BaseSceneName = "BaseScene";
+    private const string BaseSceneName = "NewBase";
 
     private const float GameplayFollowSmoothBase = 0.08f;
     private const float GameplayFollowSmoothHighRisk = 0.06f;

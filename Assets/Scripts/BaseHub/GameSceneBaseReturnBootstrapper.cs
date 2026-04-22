@@ -5,7 +5,7 @@ using UnityEngine.UI;
 
 public class GameSceneBaseReturnBootstrapper : MonoBehaviour
 {
-    private const string BaseSceneName = "BaseScene";
+    private const string BaseSceneName = "NewBase";
     private const KeyCode PlayerPanelHotkey = KeyCode.I;
     private const string PlayerUiCanvasName = "PlayerUI";
     private const string RuntimePanelCanvasName = "RuntimePlayerPanelCanvas";
