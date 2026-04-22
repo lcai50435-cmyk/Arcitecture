@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 public class BaseHubUIController : MonoBehaviour
 {
@@ -25,6 +26,7 @@ public class BaseHubUIController : MonoBehaviour
     private bool wasCanMove;
     private bool wasBodySimulated = true;
     private bool wasInkAttackEnabled;
+    private RuntimeSettingsPanel settingsPanel;
 
     public void Configure(
         GameObject playerObject,
@@ -48,11 +50,31 @@ public class BaseHubUIController : MonoBehaviour
 
         isClosingModal = false;
         ClosePanelsOnly();
+        EnsureSettingsPanel();
     }
 
     private void Update()
     {
+        HandleSettingsHotkey();
+        HandlePlayerPanelHotkey();
+    }
+
+    private void OnDestroy()
+    {
+        if (settingsPanel != null)
+        {
+            settingsPanel.ContinueRequested -= HandleSettingsPanelClosed;
+        }
+    }
+
+    private void HandlePlayerPanelHotkey()
+    {
         if (!Input.GetKeyDown(PlayerPanelHotkey) || spiritPanel == null || isClosingModal)
+        {
+            return;
+        }
+
+        if (settingsPanel != null && settingsPanel.IsShown)
         {
             return;
         }
@@ -68,6 +90,48 @@ public class BaseHubUIController : MonoBehaviour
         }
 
         OpenSpiritPanel();
+    }
+
+    private void HandleSettingsHotkey()
+    {
+        KeyCode pauseKey = GameSettingsStore.GetKeyBinding(GameInputAction.Pause);
+        if (pauseKey == KeyCode.None || !Input.GetKeyDown(pauseKey))
+        {
+            return;
+        }
+
+        if (RuntimeMiniMapHud.Instance != null && RuntimeMiniMapHud.Instance.IsExpandedViewVisible)
+        {
+            return;
+        }
+
+        EnsureSettingsPanel();
+        if (settingsPanel == null)
+        {
+            return;
+        }
+
+        if (settingsPanel.IsShown)
+        {
+            if (!settingsPanel.IsCapturingBinding)
+            {
+                settingsPanel.RequestContinueGame();
+            }
+
+            return;
+        }
+
+        if (UIRootManager.Instance != null && UIRootManager.Instance.IsModalFlowOpen)
+        {
+            return;
+        }
+
+        if (UIRootManager.Instance != null && UIRootManager.Instance.IsAnyGameplayBlockingUIOpen())
+        {
+            return;
+        }
+
+        OpenSettingsPanel();
     }
 
     public void OpenIllustratedHandbook(RuntimeModalOpenSource source = RuntimeModalOpenSource.None)
@@ -118,6 +182,21 @@ public class BaseHubUIController : MonoBehaviour
         }
 
         CompleteCloseAll();
+    }
+
+    public void OpenSettingsPanel()
+    {
+        EnsureSettingsPanel();
+        if (settingsPanel == null || settingsPanel.IsShown)
+        {
+            return;
+        }
+
+        LockPlayer();
+        SetInteractTipVisible(false);
+        RuntimeCameraController.EnsureInstance().ClearHubFocus();
+        UIRootManager.Instance?.HideBackpack();
+        settingsPanel.Show(SettingsPanelContext.BaseHub);
     }
 
     private void OpenModal(GameObject panel, RuntimeModalType modalType, RuntimeModalOpenSource source)
@@ -204,6 +283,37 @@ public class BaseHubUIController : MonoBehaviour
     {
         if (interactTipUI != null)
             interactTipUI.SetActive(visible);
+    }
+
+    private void EnsureSettingsPanel()
+    {
+        RuntimeSettingsPanel panel = RuntimeSettingsPanel.EnsureInstance();
+        if (settingsPanel == panel)
+        {
+            return;
+        }
+
+        if (settingsPanel != null)
+        {
+            settingsPanel.ContinueRequested -= HandleSettingsPanelClosed;
+        }
+
+        settingsPanel = panel;
+        settingsPanel.ContinueRequested -= HandleSettingsPanelClosed;
+        settingsPanel.ContinueRequested += HandleSettingsPanelClosed;
+    }
+
+    private void HandleSettingsPanelClosed()
+    {
+        if (!string.Equals(SceneManager.GetActiveScene().name, "BaseScene", System.StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        UIRootManager.Instance?.ShowBackpack();
+        SetInteractTipVisible(false);
+        UnlockPlayer();
+        RuntimeCameraController.EnsureInstance().ClearHubFocus();
     }
 
     private void CompleteCloseAll()

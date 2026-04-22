@@ -586,6 +586,7 @@ public class UIRootManager : MonoBehaviour
     public bool IsAnyGameplayBlockingUIOpen()
     {
         return IsModalFlowOpen ||
+               (RuntimeSettingsPanel.Instance != null && RuntimeSettingsPanel.Instance.IsShown) ||
                IsCanvasGroupOpen(handbookUI) ||
                IsCanvasGroupOpen(detailUIPage1) ||
                IsCanvasGroupOpen(detailUIPage2) ||
@@ -1216,7 +1217,7 @@ public class RuntimePauseMenu : MonoBehaviour
 
         if (show)
         {
-            settingsPanel.Show();
+            settingsPanel.Show(SettingsPanelContext.Gameplay);
             return;
         }
 

@@ -200,6 +200,33 @@ public class RunStageDirector : MonoBehaviour
         return director != null && director.TrySpawnPickupAmbush(pickupPosition);
     }
 
+    public bool DebugSpawnEnemy(string enemyKeyword = null, int count = 1)
+    {
+        if (runtimeSuspended || count <= 0)
+        {
+            return false;
+        }
+
+        CaptureExistingEnemiesAsTemplates();
+        if (spawnTemplates.Count == 0)
+        {
+            return false;
+        }
+
+        RefreshResolvedStage(GetElapsedTime(), true);
+
+        bool spawnedAny = false;
+        for (int i = 0; i < count; i++)
+        {
+            if (TrySpawnDebugEnemy(enemyKeyword))
+            {
+                spawnedAny = true;
+            }
+        }
+
+        return spawnedAny;
+    }
+
     public void SuspendRuntime()
     {
         runtimeSuspended = true;
@@ -484,10 +511,7 @@ public class RunStageDirector : MonoBehaviour
                 continue;
             }
 
-            GameObject enemyObject = Instantiate(template.template, spawnPosition, template.rotation);
-            enemyObject.name = template.template.name.Replace("_Template", string.Empty);
-            enemyObject.SetActive(true);
-            PrepareEnemyInstance(enemyObject);
+            SpawnEnemyFromTemplate(template, spawnPosition);
             return;
         }
     }
@@ -543,14 +567,77 @@ public class RunStageDirector : MonoBehaviour
                 continue;
             }
 
-            GameObject enemyObject = Instantiate(template.template, spawnPosition, template.rotation);
-            enemyObject.name = template.template.name.Replace("_Template", string.Empty);
-            enemyObject.SetActive(true);
-            PrepareEnemyInstance(enemyObject);
+            SpawnEnemyFromTemplate(template, spawnPosition);
             return true;
         }
 
         return false;
+    }
+
+    private bool TrySpawnDebugEnemy(string enemyKeyword)
+    {
+        int startIndex = UnityEngine.Random.Range(0, spawnTemplates.Count);
+        bool hasSpawnAnchor = TryGetDebugSpawnAnchor(out Vector3 spawnAnchor);
+
+        for (int i = 0; i < spawnTemplates.Count; i++)
+        {
+            EnemySpawnTemplate template = spawnTemplates[(startIndex + i) % spawnTemplates.Count];
+            if (template.template == null || !TemplateMatchesKeyword(template, enemyKeyword))
+            {
+                continue;
+            }
+
+            bool resolved = hasSpawnAnchor
+                ? TryResolvePickupAmbushPosition(template, spawnAnchor, out Vector3 spawnPosition)
+                : TryResolveSpawnPosition(template, out spawnPosition);
+
+            if (!resolved)
+            {
+                continue;
+            }
+
+            SpawnEnemyFromTemplate(template, spawnPosition);
+            return true;
+        }
+
+        return false;
+    }
+
+    private bool TryGetDebugSpawnAnchor(out Vector3 spawnAnchor)
+    {
+        GameObject player = GameObject.FindGameObjectWithTag("Player");
+        if (player == null)
+        {
+            CharacterCore playerCore = FindObjectOfType<CharacterCore>();
+            player = playerCore != null ? playerCore.gameObject : null;
+        }
+
+        if (player == null)
+        {
+            spawnAnchor = default;
+            return false;
+        }
+
+        spawnAnchor = player.transform.position;
+        return true;
+    }
+
+    private static bool TemplateMatchesKeyword(EnemySpawnTemplate template, string enemyKeyword)
+    {
+        if (template == null || template.template == null || string.IsNullOrWhiteSpace(enemyKeyword))
+        {
+            return true;
+        }
+
+        return template.template.name.IndexOf(enemyKeyword, StringComparison.OrdinalIgnoreCase) >= 0;
+    }
+
+    private void SpawnEnemyFromTemplate(EnemySpawnTemplate template, Vector3 spawnPosition)
+    {
+        GameObject enemyObject = Instantiate(template.template, spawnPosition, template.rotation);
+        enemyObject.name = template.template.name.Replace("_Template", string.Empty);
+        enemyObject.SetActive(true);
+        PrepareEnemyInstance(enemyObject);
     }
 
     private bool TryResolvePickupAmbushPosition(EnemySpawnTemplate template, Vector3 pickupPosition, out Vector3 spawnPosition)

@@ -25,6 +25,7 @@ public class GameOverUI : MonoBehaviour
     private CanvasGroup rootCanvasGroup;
     private Canvas overlayCanvas;
     private CanvasGroup overlayCanvasGroup;
+    private RuntimeSettingsPanel settingsPanel;
 
     private void Start()
     {
@@ -41,7 +42,35 @@ public class GameOverUI : MonoBehaviour
         Time.timeScale = 1f;
         PreparePageFade();
         PrepareBlackOverlay();
+        EnsureSettingsPanel();
         StartCoroutine(PlayEntranceSequence());
+    }
+
+    private void Update()
+    {
+        KeyCode pauseKey = GameSettingsStore.GetKeyBinding(GameInputAction.Pause);
+        if (pauseKey == KeyCode.None || !Input.GetKeyDown(pauseKey))
+        {
+            return;
+        }
+
+        EnsureSettingsPanel();
+        if (settingsPanel == null)
+        {
+            return;
+        }
+
+        if (settingsPanel.IsShown)
+        {
+            if (!settingsPanel.IsCapturingBinding)
+            {
+                settingsPanel.RequestContinueGame();
+            }
+
+            return;
+        }
+
+        settingsPanel.Show(SettingsPanelContext.BaseHub);
     }
 
     private void OnDestroy()
@@ -62,6 +91,11 @@ public class GameOverUI : MonoBehaviour
             overlayCanvas = null;
             overlayCanvasGroup = null;
         }
+    }
+
+    private void EnsureSettingsPanel()
+    {
+        settingsPanel = RuntimeSettingsPanel.EnsureInstance();
     }
 
     public void RestartGame()
@@ -96,9 +130,7 @@ public class GameOverUI : MonoBehaviour
 
     private static void ResetRuntimeState()
     {
-        Time.timeScale = 1f;
-        RuntimeCollectedCrystalRegistry.EnsureInstance().Clear();
-        BackpackMananger.Instance?.ClearAllItems();
+        RuntimeSessionResetService.ResetGameplayTransientState();
     }
 
     private void PreparePageFade()
