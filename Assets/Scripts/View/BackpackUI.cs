@@ -83,9 +83,10 @@ public class BackpackUI : MonoBehaviour
             if (item.HasValue)
             {
                 ArchitecturalCrystal crystal = item.Value;
-                image.sprite = crystal.backIcon != null
+                Sprite displaySprite = crystal.backIcon != null
                     ? crystal.backIcon
                     : (crystal.icon != null ? crystal.icon : RuntimeCrystalDropFactory.ResolveSprite(crystal));
+                image.sprite = RuntimeSpriteDisplaySanitizer.GetDisplaySprite(displaySprite);
                 image.color = Color.white;
                 image.enabled = true;
             }
@@ -241,6 +242,19 @@ public class BackpackUI : MonoBehaviour
     {
         screenPosition = default;
         slotSize = default;
+
+        BackpackSlot[] slots = FindObjectsOfType<BackpackSlot>(true);
+        for (int i = 0; i < slots.Length; i++)
+        {
+            BackpackSlot slot = slots[i];
+            if (slot != null &&
+                slot.slotIndex == slotIndex &&
+                slot.transform.IsChildOf(transform) &&
+                slot.TryGetScreenCenter(out screenPosition, out slotSize))
+            {
+                return true;
+            }
+        }
 
         if (backPackGrid == null || slotIndex < 0 || slotIndex >= backPackGrid.Length)
         {

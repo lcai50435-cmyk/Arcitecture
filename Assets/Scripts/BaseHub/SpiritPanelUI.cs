@@ -46,6 +46,7 @@ public class SpiritPanelUI : MonoBehaviour
         profileData = profile;
         statsPanel?.Bind(core, profile);
         weaponPanel?.Bind(profile);
+        RefreshAll();
     }
 
     public void SetCloseAction(UnityAction closeAction)
@@ -60,25 +61,47 @@ public class SpiritPanelUI : MonoBehaviour
     {
         gameObject.SetActive(true);
         ShowStatsPage();
-        statsPanel?.Refresh();
-        weaponPanel?.RefreshSelected();
+        RefreshAll();
     }
 
     public void ShowStatsPage()
     {
         SetPage(true);
         if (titleText != null) titleText.text = "精灵 · 玩家属性";
+        statsPanel?.Refresh();
     }
 
     public void ShowWeaponPage()
     {
         SetPage(false);
         if (titleText != null) titleText.text = "精灵 · 墨水基型";
+        weaponPanel?.RefreshSelected();
+    }
+
+    private void Update()
+    {
+        if (!gameObject.activeInHierarchy)
+        {
+            return;
+        }
+
+        if (statsPage != null && statsPage.activeInHierarchy)
+        {
+            statsPanel?.Refresh();
+        }
+
+        weaponPanel?.RefreshSelected();
     }
 
     private void SetPage(bool showStats)
     {
         if (statsPage != null) statsPage.SetActive(showStats);
         if (weaponPage != null) weaponPage.SetActive(!showStats);
+    }
+
+    private void RefreshAll()
+    {
+        statsPanel?.Refresh();
+        weaponPanel?.RefreshSelected();
     }
 }

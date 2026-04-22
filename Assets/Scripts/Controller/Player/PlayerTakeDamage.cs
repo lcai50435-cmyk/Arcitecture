@@ -20,6 +20,7 @@ public class PlayerTakeDamage : MonoBehaviour
     {
         characterCore = GetComponent<CharacterCore>();
         healthTrans = GameplayStatusHudRuntime.EnsureHealthGauge(healthTrans);
+        PlayerCriticalStateFeedback.Ensure(gameObject);
 
         characterCore.OnTakeDamage += PlayHurtAnimation;
 

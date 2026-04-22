@@ -2,6 +2,8 @@ using UnityEngine;
 
 public class BaseHubUIController : MonoBehaviour
 {
+    private const KeyCode PlayerPanelHotkey = KeyCode.I;
+
     [SerializeField] private GameObject illustratedHandbookPanel;
     [SerializeField] private SpiritPanelUI spiritPanel;
     [SerializeField] private StageSelectionPanelUI stageSelectionPanel;
@@ -13,6 +15,10 @@ public class BaseHubUIController : MonoBehaviour
     private Rigidbody2D playerBody;
     private PlayerInteraction playerInteraction;
     private BaseHubInkAttack playerInkAttack;
+    private Transform handbookFocusTarget;
+    private Transform spiritFocusTarget;
+    private Transform stageFocusTarget;
+    private Transform albumFocusTarget;
     private bool isClosingModal;
     private bool hasSavedPlayerState;
     private bool wasMoveEnabled;
@@ -44,8 +50,29 @@ public class BaseHubUIController : MonoBehaviour
         ClosePanelsOnly();
     }
 
+    private void Update()
+    {
+        if (!Input.GetKeyDown(PlayerPanelHotkey) || spiritPanel == null || isClosingModal)
+        {
+            return;
+        }
+
+        if (UIRootManager.Instance != null && UIRootManager.Instance.IsModalFlowOpen)
+        {
+            if (UIRootManager.Instance.ActiveModalType == RuntimeModalType.Spirit)
+            {
+                CloseAll();
+            }
+
+            return;
+        }
+
+        OpenSpiritPanel();
+    }
+
     public void OpenIllustratedHandbook(RuntimeModalOpenSource source = RuntimeModalOpenSource.None)
     {
+        ApplyCameraFocus(RuntimeModalType.Handbook, source);
         if (UIManager.Instance != null)
         {
             UIManager.Instance.OpenIllustratedHandbook(source);
@@ -57,18 +84,21 @@ public class BaseHubUIController : MonoBehaviour
 
     public void OpenSpiritPanel(RuntimeModalOpenSource source = RuntimeModalOpenSource.None)
     {
+        ApplyCameraFocus(RuntimeModalType.Spirit, source);
         OpenModal(spiritPanel != null ? spiritPanel.gameObject : null, RuntimeModalType.Spirit, source);
         spiritPanel?.Open();
     }
 
     public void OpenStageSelectionPanel(RuntimeModalOpenSource source = RuntimeModalOpenSource.None)
     {
+        ApplyCameraFocus(RuntimeModalType.Stage, source);
         OpenModal(stageSelectionPanel != null ? stageSelectionPanel.gameObject : null, RuntimeModalType.Stage, source);
         stageSelectionPanel?.Open();
     }
 
     public void OpenAlbumPanel(RuntimeModalOpenSource source = RuntimeModalOpenSource.None)
     {
+        ApplyCameraFocus(RuntimeModalType.Album, source);
         OpenModal(albumPanel != null ? albumPanel.gameObject : null, RuntimeModalType.Album, source);
         albumPanel?.Open();
     }
@@ -181,6 +211,60 @@ public class BaseHubUIController : MonoBehaviour
         ClosePanelsOnly();
         SetInteractTipVisible(false);
         UnlockPlayer();
+        RuntimeCameraController.EnsureInstance().ClearHubFocus();
         isClosingModal = false;
+    }
+
+    private void ApplyCameraFocus(RuntimeModalType modalType, RuntimeModalOpenSource source)
+    {
+        RuntimeCameraController controller = RuntimeCameraController.EnsureInstance();
+        if (source != RuntimeModalOpenSource.Interact)
+        {
+            controller.ClearHubFocus();
+            return;
+        }
+
+        Transform focusTarget = ResolveFocusTarget(modalType);
+        if (focusTarget != null)
+        {
+            controller.SetHubFocusTarget(focusTarget);
+        }
+        else
+        {
+            controller.ClearHubFocus();
+        }
+    }
+
+    private Transform ResolveFocusTarget(RuntimeModalType modalType)
+    {
+        switch (modalType)
+        {
+            case RuntimeModalType.Handbook:
+                handbookFocusTarget = ResolveCachedFocusTarget(handbookFocusTarget, () => FindObjectOfType<BaseHubBookInteract>(true));
+                return handbookFocusTarget;
+            case RuntimeModalType.Spirit:
+                spiritFocusTarget = ResolveCachedFocusTarget(spiritFocusTarget, () => FindObjectOfType<SpiritInteract>(true));
+                return spiritFocusTarget;
+            case RuntimeModalType.Stage:
+                stageFocusTarget = ResolveCachedFocusTarget(stageFocusTarget, () => FindObjectOfType<BaseHubGameSceneInteract>(true));
+                return stageFocusTarget;
+            case RuntimeModalType.Album:
+                albumFocusTarget = ResolveCachedFocusTarget(albumFocusTarget, () => FindObjectOfType<BaseHubAlbumInteract>(true));
+                return albumFocusTarget;
+            default:
+                return null;
+        }
+    }
+
+    private static Transform ResolveCachedFocusTarget<T>(Transform cachedTarget, System.Func<T> resolver)
+        where T : Component
+    {
+        if (cachedTarget != null)
+        {
+            return cachedTarget;
+        }
+
+        T component = resolver != null ? resolver() : null;
+        return component != null ? component.transform : null;
     }
 }

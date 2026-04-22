@@ -102,6 +102,18 @@ public sealed class ScreenAdaptationManager : MonoBehaviour
         return null;
     }
 
+    public static bool TryGetAdaptedOrthographicSize(Camera camera, out float size)
+    {
+        ScreenAdaptationManager manager = EnsureInstance();
+        return manager.TryResolveAdaptedOrthographicSize(camera, out size);
+    }
+
+    public static void RegisterBaseOrthographicSize(Camera camera, float baseSize, bool applyCurrentScale = false)
+    {
+        ScreenAdaptationManager manager = EnsureInstance();
+        manager.RegisterCameraBaseOrthographicSize(camera, baseSize, applyCurrentScale);
+    }
+
     private void RefreshAdaptation()
     {
         ApplyCameraAdaptation();
@@ -126,13 +138,9 @@ public sealed class ScreenAdaptationManager : MonoBehaviour
                 baseOrthographicSizes[cameraId] = camera.orthographicSize;
             }
 
-            float targetSize = baseOrthographicSizes[cameraId] * GameSettingsStore.GetViewZoomMultiplier(GameSettingsStore.GetViewZoomIndex());
-            if (currentAspect < DesignAspect)
-            {
-                targetSize *= DesignAspect / Mathf.Max(currentAspect, 0.01f);
-            }
+            float targetSize = ResolveAdaptedOrthographicSize(baseOrthographicSizes[cameraId], currentAspect);
 
-            if (!Mathf.Approximately(camera.orthographicSize, targetSize))
+            if (!ShouldDeferCameraSizeWrite(camera) && !Mathf.Approximately(camera.orthographicSize, targetSize))
             {
                 camera.orthographicSize = targetSize;
             }
@@ -204,6 +212,64 @@ public sealed class ScreenAdaptationManager : MonoBehaviour
 
         multiplier = camera.orthographicSize / Mathf.Max(baseSize * aspectCompensation, 0.01f);
         return true;
+    }
+
+    private bool TryResolveAdaptedOrthographicSize(Camera camera, out float size)
+    {
+        if (camera == null || !camera.orthographic)
+        {
+            size = 0f;
+            return false;
+        }
+
+        if (!baseOrthographicSizes.TryGetValue(camera.GetInstanceID(), out float baseSize) || baseSize <= 0.01f)
+        {
+            size = camera.orthographicSize;
+            return true;
+        }
+
+        size = ResolveAdaptedOrthographicSize(baseSize, GetCurrentAspect());
+        return true;
+    }
+
+    private void RegisterCameraBaseOrthographicSize(Camera camera, float baseSize, bool applyCurrentScale)
+    {
+        if (camera == null || !camera.orthographic || baseSize <= 0.01f)
+        {
+            return;
+        }
+
+        int cameraId = camera.GetInstanceID();
+        baseOrthographicSizes[cameraId] = baseSize;
+
+        if (!applyCurrentScale || ShouldDeferCameraSizeWrite(camera))
+        {
+            return;
+        }
+
+        float targetSize = ResolveAdaptedOrthographicSize(baseSize, GetCurrentAspect());
+        if (!Mathf.Approximately(camera.orthographicSize, targetSize))
+        {
+            camera.orthographicSize = targetSize;
+        }
+    }
+
+    private static float ResolveAdaptedOrthographicSize(float baseSize, float currentAspect)
+    {
+        float targetSize = baseSize * GameSettingsStore.GetViewZoomMultiplier(GameSettingsStore.GetViewZoomIndex());
+        if (currentAspect < DesignAspect)
+        {
+            targetSize *= DesignAspect / Mathf.Max(currentAspect, 0.01f);
+        }
+
+        return targetSize;
+    }
+
+    private static bool ShouldDeferCameraSizeWrite(Camera camera)
+    {
+        return camera != null
+            && camera.CompareTag("MainCamera")
+            && (GameplayStageIntroDirector.IsIntroActive || GameplayFailureController.IsFailureActive);
     }
 
     private static Camera ResolvePrimaryOrthographicCamera()

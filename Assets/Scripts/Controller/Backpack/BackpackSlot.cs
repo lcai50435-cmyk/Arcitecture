@@ -48,6 +48,29 @@ public class BackpackSlot : MonoBehaviour, IPointerDownHandler, IPointerUpHandle
         }
     }
 
+    public bool TryGetScreenCenter(out Vector2 screenCenter, out Vector2 size)
+    {
+        screenCenter = default;
+        size = default;
+
+        RectTransform rectTransform = transform as RectTransform;
+        if (rectTransform == null)
+        {
+            return false;
+        }
+
+        Canvas parentCanvas = GetComponentInParent<Canvas>();
+        Camera canvasCamera = parentCanvas != null && parentCanvas.renderMode != RenderMode.ScreenSpaceOverlay
+            ? parentCanvas.worldCamera
+            : null;
+
+        screenCenter = RectTransformUtility.WorldToScreenPoint(
+            canvasCamera,
+            rectTransform.TransformPoint(rectTransform.rect.center));
+        size = Vector2.Scale(rectTransform.rect.size, rectTransform.lossyScale);
+        return true;
+    }
+
     private void Update()
     {
         if (isHovered)
@@ -444,6 +467,7 @@ public sealed class RuntimeBackpackHoverHud : MonoBehaviour
         }
 
         Sprite resolvedIcon = crystal.backIcon != null ? crystal.backIcon : crystal.icon;
+        resolvedIcon = RuntimeSpriteDisplaySanitizer.GetDisplaySprite(resolvedIcon);
         bool contentChanged = cachedTitle != title
             || cachedDescription != description
             || cachedIcon != resolvedIcon;

@@ -127,9 +127,11 @@ public static class RuntimeCrystalDropFactory
         Sprite dropSprite = interactive && presentation == RuntimeDropPresentation.ClosedLootBag
             ? ResolveClosedLootBagSprite() ?? revealedSprite
             : revealedSprite;
+        Sprite sanitizedDropSprite = RuntimeSpriteDisplaySanitizer.GetDisplaySprite(dropSprite);
+        Sprite sanitizedRevealedSprite = RuntimeSpriteDisplaySanitizer.GetDisplaySprite(revealedSprite);
 
         SpriteRenderer renderer = dropObject.AddComponent<SpriteRenderer>();
-        renderer.sprite = dropSprite;
+        renderer.sprite = sanitizedDropSprite != null ? sanitizedDropSprite : dropSprite;
         renderer.sortingOrder = sortingOrder;
 
         if (interactive)
@@ -140,8 +142,12 @@ public static class RuntimeCrystalDropFactory
             CrystalInteractHandler handler = dropObject.AddComponent<CrystalInteractHandler>();
             handler.type = crystal.type;
             handler.expValue = crystal.expValue;
-            handler.icon = crystal.icon != null ? crystal.icon : revealedSprite;
-            handler.backIcon = crystal.backIcon != null ? crystal.backIcon : handler.icon;
+            handler.icon = crystal.icon != null
+                ? RuntimeSpriteDisplaySanitizer.GetDisplaySprite(crystal.icon)
+                : (sanitizedRevealedSprite != null ? sanitizedRevealedSprite : revealedSprite);
+            handler.backIcon = crystal.backIcon != null
+                ? RuntimeSpriteDisplaySanitizer.GetDisplaySprite(crystal.backIcon)
+                : handler.icon;
             handler.bonusType = crystal.bonusType;
             handler.bonusValue = crystal.bonusValue;
             handler.subBonusType = crystal.subBonusType;
@@ -152,8 +158,8 @@ public static class RuntimeCrystalDropFactory
             handler.textDescription = crystal.textDescription;
             handler.persistCollectedAcrossSceneLoads = false;
             handler.startClosedAsLootBag = presentation == RuntimeDropPresentation.ClosedLootBag;
-            handler.closedLootBagSprite = dropSprite;
-            handler.revealedLootSprite = revealedSprite;
+            handler.closedLootBagSprite = sanitizedDropSprite != null ? sanitizedDropSprite : dropSprite;
+            handler.revealedLootSprite = sanitizedRevealedSprite != null ? sanitizedRevealedSprite : revealedSprite;
         }
 
         return dropObject;

@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -6,17 +7,20 @@ public sealed class RuntimeBackpackPickupAnimator : MonoBehaviour
 {
     private const string CanvasName = "RuntimeBackpackPickupAnimatorCanvas";
     private const int SortingOrder = 292;
-    private const float FlightDuration = 0.42f;
-    private const float FlashDuration = 0.22f;
-    private const float ArcHeight = 84f;
-    private const float MinIconSize = 44f;
-    private const float MaxIconSize = 70f;
+    private const float FlightDuration = 0.56f;
+    private const float FlashDuration = 0.24f;
+    private const float ArcHeight = 112f;
+    private const float MinIconSize = 56f;
+    private const float MaxIconSize = 88f;
 
     public static RuntimeBackpackPickupAnimator Instance { get; private set; }
 
     private Canvas canvas;
     private RectTransform canvasRect;
     private Sprite whiteSprite;
+    private readonly Dictionary<int, List<Image>> overlayImagesByAnimation = new Dictionary<int, List<Image>>();
+    private int nextAnimationId = 1;
+    private int activeAnimationCount;
 
     public static bool TryAnimateLootBagPickup(
         ArchitecturalCrystal crystal,
@@ -92,6 +96,20 @@ public sealed class RuntimeBackpackPickupAnimator : MonoBehaviour
         EnsureCanvas();
     }
 
+    private void OnDisable()
+    {
+        CleanupAllAnimationOverlays();
+    }
+
+    private void OnDestroy()
+    {
+        CleanupAllAnimationOverlays();
+        if (Instance == this)
+        {
+            Instance = null;
+        }
+    }
+
     private void PlayAnimation(
         BackpackUI backpackUi,
         BackpackMananger backpack,
@@ -101,10 +119,18 @@ public sealed class RuntimeBackpackPickupAnimator : MonoBehaviour
         int slotIndex)
     {
         EnsureCanvas();
-        StartCoroutine(AnimatePickupRoutine(backpackUi, backpack, crystal, worldPosition, travelSprite, slotIndex));
+        if (activeAnimationCount == 0)
+        {
+            CleanupStaleOverlayChildren();
+        }
+
+        int animationId = nextAnimationId++;
+        activeAnimationCount++;
+        StartCoroutine(AnimatePickupRoutine(animationId, backpackUi, backpack, crystal, worldPosition, travelSprite, slotIndex));
     }
 
     private IEnumerator AnimatePickupRoutine(
+        int animationId,
         BackpackUI backpackUi,
         BackpackMananger backpack,
         ArchitecturalCrystal crystal,
@@ -127,10 +153,11 @@ public sealed class RuntimeBackpackPickupAnimator : MonoBehaviour
             Sprite flightSprite = travelSprite != null
                 ? travelSprite
                 : (crystal.backIcon != null ? crystal.backIcon : RuntimeCrystalDropFactory.ResolveSprite(crystal));
+            flightSprite = RuntimeSpriteDisplaySanitizer.GetDisplaySprite(flightSprite);
 
-            Image flyingIcon = CreateOverlayImage("FlyingLootBag", flightSprite);
+            Image flyingIcon = CreateOverlayImage(animationId, "FlyingLootBag", flightSprite);
             RectTransform flyingRect = flyingIcon.rectTransform;
-            float baseIconSize = Mathf.Clamp(Mathf.Max(slotSize.x, slotSize.y) * 0.92f, MinIconSize, MaxIconSize);
+            float baseIconSize = Mathf.Clamp(Mathf.Max(slotSize.x, slotSize.y) * 1.08f, MinIconSize, MaxIconSize);
             flyingRect.sizeDelta = new Vector2(baseIconSize, baseIconSize);
             flyingRect.anchoredPosition = startPoint;
 
@@ -142,15 +169,15 @@ public sealed class RuntimeBackpackPickupAnimator : MonoBehaviour
                 float t = Mathf.Clamp01(elapsed / FlightDuration);
                 float eased = EaseOutCubic(t);
                 flyingRect.anchoredPosition = EvaluateQuadraticBezier(startPoint, controlPoint, endPoint, eased);
-                flyingRect.localScale = Vector3.one * Mathf.Lerp(1f, 0.72f, eased);
-                flyingIcon.color = new Color(1f, 1f, 1f, Mathf.Lerp(1f, 0.94f, eased));
+                flyingRect.localScale = Vector3.one * Mathf.Lerp(1.1f, 0.82f, eased);
+                flyingIcon.color = new Color(1f, 1f, 1f, Mathf.Lerp(1f, 0.97f, eased));
                 yield return null;
             }
 
             flyingRect.anchoredPosition = endPoint;
-            Destroy(flyingIcon.gameObject);
+            DestroyOverlayImage(animationId, flyingIcon);
 
-            yield return PlaySlotFlash(endPoint, slotSize, () =>
+            yield return PlaySlotFlash(animationId, endPoint, slotSize, () =>
             {
                 ResolvePickup(backpack, crystal, slotIndex);
                 pickupResolved = true;
@@ -158,6 +185,17 @@ public sealed class RuntimeBackpackPickupAnimator : MonoBehaviour
         }
         finally
         {
+            CleanupAnimationOverlays(animationId);
+            if (activeAnimationCount > 0)
+            {
+                activeAnimationCount--;
+            }
+
+            if (activeAnimationCount == 0)
+            {
+                CleanupStaleOverlayChildren();
+            }
+
             if (!pickupResolved && backpack != null)
             {
                 backpack.CancelReservedSlot(slotIndex);
@@ -170,9 +208,9 @@ public sealed class RuntimeBackpackPickupAnimator : MonoBehaviour
         }
     }
 
-    private IEnumerator PlaySlotFlash(Vector2 slotPoint, Vector2 slotSize, System.Action onReveal)
+    private IEnumerator PlaySlotFlash(int animationId, Vector2 slotPoint, Vector2 slotSize, System.Action onReveal)
     {
-        Image flashImage = CreateOverlayImage("SlotRevealFlash", GetWhiteSprite());
+        Image flashImage = CreateOverlayImage(animationId, "SlotRevealFlash", GetWhiteSprite());
         RectTransform flashRect = flashImage.rectTransform;
         float flashSize = Mathf.Max(Mathf.Max(slotSize.x, slotSize.y) * 1.22f, 64f);
         flashRect.sizeDelta = new Vector2(flashSize, flashSize);
@@ -209,7 +247,7 @@ public sealed class RuntimeBackpackPickupAnimator : MonoBehaviour
             onReveal?.Invoke();
         }
 
-        Destroy(flashImage.gameObject);
+        DestroyOverlayImage(animationId, flashImage);
     }
 
     private void ResolvePickup(BackpackMananger backpack, ArchitecturalCrystal crystal, int slotIndex)
@@ -310,7 +348,7 @@ public sealed class RuntimeBackpackPickupAnimator : MonoBehaviour
             out canvasPoint);
     }
 
-    private Image CreateOverlayImage(string objectName, Sprite sprite)
+    private Image CreateOverlayImage(int animationId, string objectName, Sprite sprite)
     {
         GameObject imageObject = new GameObject(objectName, typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
         RectTransform imageRect = imageObject.GetComponent<RectTransform>();
@@ -322,9 +360,113 @@ public sealed class RuntimeBackpackPickupAnimator : MonoBehaviour
         Image image = imageObject.GetComponent<Image>();
         image.sprite = sprite;
         image.preserveAspect = true;
+        image.maskable = false;
         image.raycastTarget = false;
         image.color = Color.white;
+        RegisterOverlayImage(animationId, image);
         return image;
+    }
+
+    private void RegisterOverlayImage(int animationId, Image image)
+    {
+        if (image == null)
+        {
+            return;
+        }
+
+        if (!overlayImagesByAnimation.TryGetValue(animationId, out List<Image> overlayImages))
+        {
+            overlayImages = new List<Image>();
+            overlayImagesByAnimation[animationId] = overlayImages;
+        }
+
+        overlayImages.Add(image);
+    }
+
+    private void DestroyOverlayImage(int animationId, Image image)
+    {
+        if (image == null)
+        {
+            return;
+        }
+
+        if (overlayImagesByAnimation.TryGetValue(animationId, out List<Image> overlayImages))
+        {
+            overlayImages.Remove(image);
+        }
+
+        if (image.gameObject.activeSelf)
+        {
+            image.gameObject.SetActive(false);
+        }
+
+        Destroy(image.gameObject);
+    }
+
+    private void CleanupAnimationOverlays(int animationId)
+    {
+        if (!overlayImagesByAnimation.TryGetValue(animationId, out List<Image> overlayImages))
+        {
+            return;
+        }
+
+        for (int i = overlayImages.Count - 1; i >= 0; i--)
+        {
+            Image image = overlayImages[i];
+            if (image == null)
+            {
+                continue;
+            }
+
+            if (image.gameObject.activeSelf)
+            {
+                image.gameObject.SetActive(false);
+            }
+
+            Destroy(image.gameObject);
+        }
+
+        overlayImagesByAnimation.Remove(animationId);
+    }
+
+    private void CleanupAllAnimationOverlays()
+    {
+        foreach (int animationId in new List<int>(overlayImagesByAnimation.Keys))
+        {
+            CleanupAnimationOverlays(animationId);
+        }
+
+        activeAnimationCount = 0;
+        CleanupStaleOverlayChildren();
+    }
+
+    private void CleanupStaleOverlayChildren()
+    {
+        if (canvasRect == null)
+        {
+            return;
+        }
+
+        for (int i = canvasRect.childCount - 1; i >= 0; i--)
+        {
+            Transform child = canvasRect.GetChild(i);
+            if (child == null)
+            {
+                continue;
+            }
+
+            if (child.name != "FlyingLootBag" && child.name != "SlotRevealFlash")
+            {
+                continue;
+            }
+
+            if (child.gameObject.activeSelf)
+            {
+                child.gameObject.SetActive(false);
+            }
+
+            Destroy(child.gameObject);
+        }
     }
 
     private Sprite GetWhiteSprite()

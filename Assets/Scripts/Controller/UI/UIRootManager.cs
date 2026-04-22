@@ -580,6 +580,7 @@ public class UIRootManager : MonoBehaviour
         HideAllSubmitSelection();
         ShowBackpack();
         ShowInteractTip();
+        RuntimeCameraController.EnsureInstance().ClearHubFocus();
     }
 
     public bool IsAnyGameplayBlockingUIOpen()

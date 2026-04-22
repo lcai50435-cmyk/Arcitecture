@@ -13,17 +13,22 @@ public sealed class GameplayStageIntroDirector : MonoBehaviour
     private const string OverlayCanvasName = "GameplayStageIntroCanvas";
     private const string RevealGraphicName = "StageRevealOverlay";
     private const string TitleRootName = "StageTitleRoot";
-    private const int OverlaySortingOrder = 10020;
+    private const int OverlaySortingOrder = 12020;
+    private const float IntroDurationScale = 0.8f;
 
-    private const float TitleFadeInDuration = 0.34f;
-    private const float TitleHoldDuration = 1.08f;
-    private const float TitleFadeOutDuration = 0.42f;
-    private const float OverviewRevealDuration = 0.52f;
-    private const float OverviewHoldDuration = 1.5f;
-    private const float CameraTravelDuration = 1.24f;
-    private const float PortalAppearDuration = 0.24f;
-    private const float PortalEjectDuration = 0.88f;
-    private const float PortalFadeDuration = 0.22f;
+    private const float TitleFadeInDuration = 0.36f * IntroDurationScale;
+    private const float TitleHoldDuration = 1.28f * IntroDurationScale;
+    private const float TitleFadeOutDuration = 0.56f * IntroDurationScale;
+    private const float OverviewRevealDuration = 0.82f * IntroDurationScale;
+    private const float OverviewHoldDuration = 0.28f * IntroDurationScale;
+    private const float CameraTravelDuration = 1.24f * IntroDurationScale;
+    private const float PortalAppearDuration = 0.24f * IntroDurationScale;
+    private const float PortalEjectDuration = 0.88f * IntroDurationScale;
+    private const float PortalFadeDuration = 0.22f * IntroDurationScale;
+    private const float GameplayUiFadeInDuration = 0.52f * IntroDurationScale;
+    private const float BackpackFadeInDelay = 0.16f * IntroDurationScale;
+    private const float BlackoutFallbackFadeDuration = 0.14f * IntroDurationScale;
+    private const float TitleRevealStartDuringFade = 0.38f;
 
     private const float PortalSideOffset = 1.42f;
     private const float PortalVerticalOffset = -0.08f;
@@ -31,22 +36,34 @@ public sealed class GameplayStageIntroDirector : MonoBehaviour
     private const float PlayerPortalBurstHeight = 1.56f;
     private const float PlayerPortalCameraLift = 0.22f;
     private const float PortalMaskReleaseProgress = 0.24f;
-    private const float CameraOverviewPadding = 3.4f;
-    private const float BlackoutRevealRadius = 0.5f;
-    private const float BlackoutRevealFeather = 1f;
+    private const float CameraOverviewPadding = 1.2f;
     private const float CameraApproachSideOffset = 0.92f;
-    private const float CameraApproachLift = 0.66f;
-    private const float CameraApproachSizeMultiplier = 1.08f;
+    private const float CameraApproachLift = 0.18f;
+    private const float CameraApproachSizeMultiplier = 1f;
     private const float CameraTravelCurveStrength = 1.48f;
-    private const float CameraTravelCurveLift = 0.92f;
+    private const float CameraTravelCurveLift = 0.28f;
+    private const float CameraOverviewRawSizeMultiplier = 2.96f;
+    private const float CameraOverviewMinLandingSizeMultiplier = 5f;
+    private const float CameraOverviewMaxLandingSizeMultiplier = 6.08f;
+    private const float CameraOverviewLandingBias = 0.15f;
+    private const float CameraOverviewDownwardBiasRatio = 0.04f;
+    private const float TitleRevealLeadProgress = 0.34f;
 
     private static readonly Color OverlayColor = new Color(0.02f, 0.03f, 0.05f, 0.97f);
+    private static readonly Color BlackoutColor = new Color(0f, 0f, 0f, 1f);
     private static readonly Color TitlePrimaryColor = new Color(0.97f, 0.94f, 0.88f, 1f);
     private static readonly Color TitleSecondaryColor = new Color(0.83f, 0.93f, 1f, 1f);
     private static readonly Color PortalCoreColor = new Color(0.60f, 0.93f, 1f, 0.95f);
     private static readonly Color PortalGlowColor = new Color(0.20f, 0.72f, 1f, 0.68f);
+    private static readonly Vector2 RevealStartClearRadii = new Vector2(1f, 1f);
+    private static readonly Vector2 RevealStartFeatherRadii = new Vector2(18f, 14f);
+    private static readonly Vector2 RevealLeadClearScale = new Vector2(0.18f, 0.07f);
+    private static readonly Vector2 RevealLeadFeatherScale = new Vector2(0.16f, 0.09f);
+    private static readonly Vector2 RevealFinishClearScale = new Vector2(0.68f, 0.42f);
+    private static readonly Vector2 RevealFinishFeatherScale = new Vector2(0.30f, 0.18f);
 
     public static bool IsIntroActive { get; private set; }
+    public static bool HasOverlayCoverage { get; private set; }
 
     private GameplayStageDefinition stageDefinition;
     private Transform playerTransform;
@@ -72,6 +89,7 @@ public sealed class GameplayStageIntroDirector : MonoBehaviour
 
     private Canvas overlayCanvas;
     private RectTransform overlayRect;
+    private Image blackoutImage;
     private StageIntroRevealGraphic revealGraphic;
     private CanvasGroup titleCanvasGroup;
     private RectTransform titleRoot;
@@ -103,6 +121,7 @@ public sealed class GameplayStageIntroDirector : MonoBehaviour
         if (!GameplayStageCatalog.IsGameplayScene(scene.name))
         {
             IsIntroActive = false;
+            HasOverlayCoverage = false;
             return;
         }
 
@@ -121,6 +140,7 @@ public sealed class GameplayStageIntroDirector : MonoBehaviour
     private void Awake()
     {
         ResolveStageDefinition();
+        EnsureOverlay();
         TryResolveSceneReferences();
         FreezeGameplayImmediate();
     }
@@ -146,6 +166,7 @@ public sealed class GameplayStageIntroDirector : MonoBehaviour
         }
 
         IsIntroActive = false;
+        HasOverlayCoverage = false;
     }
 
     private IEnumerator RunIntroRoutine()
@@ -170,8 +191,8 @@ public sealed class GameplayStageIntroDirector : MonoBehaviour
         FreezeGameplayImmediate();
         EnsureOverlay();
 
-        CameraPose overviewPose = ResolveOverviewCameraPose();
         CameraPose landingPose = ResolveLandingCameraPose();
+        CameraPose overviewPose = ResolveOverviewCameraPose(landingPose);
         float portalSideSign = ResolvePortalSideSign(overviewPose, landingPose);
         ApplyCameraPose(overviewPose);
 
@@ -183,8 +204,12 @@ public sealed class GameplayStageIntroDirector : MonoBehaviour
         yield return HoldOverviewShot(overviewPose);
         yield return PlayCameraTravel(overviewPose, landingPose, portalSideSign);
         yield return PlayPortalEject(landingPose, portalSideSign);
+        RestoreGameplayState(false);
+        yield return PlayGameplayUiFadeIn();
 
-        RestoreAndFinish();
+        IsIntroActive = false;
+        stateRestored = true;
+        Destroy(gameObject);
     }
 
     private IEnumerator PlayTitleIntro()
@@ -207,10 +232,7 @@ public sealed class GameplayStageIntroDirector : MonoBehaviour
         {
             elapsed += Time.unscaledDeltaTime;
             ApplyRuntimeUiSuppression();
-            revealGraphic.SetReveal(
-                new Vector2(BlackoutRevealRadius, BlackoutRevealRadius),
-                new Vector2(BlackoutRevealFeather, BlackoutRevealFeather),
-                OverlayColor.a);
+            ApplyFullBlackOverlay();
             yield return null;
         }
 
@@ -220,18 +242,30 @@ public sealed class GameplayStageIntroDirector : MonoBehaviour
             elapsed += Time.unscaledDeltaTime;
             float t = Mathf.Clamp01(elapsed / TitleFadeOutDuration);
             float titleFade = EaseInOutCubic(t);
-            float revealFade = EaseOutCubic(Mathf.Clamp01(t * 1.16f));
 
             titleCanvasGroup.alpha = 1f - titleFade;
             titleRoot.localScale = Vector3.one * Mathf.Lerp(1f, 1.02f, t);
             ApplyRuntimeUiSuppression();
-            revealGraphic.SetReveal(
-                new Vector2(BlackoutRevealRadius, BlackoutRevealRadius),
-                new Vector2(BlackoutRevealFeather, BlackoutRevealFeather),
-                Mathf.Lerp(OverlayColor.a, 0.16f, revealFade));
+
+            if (t < TitleRevealStartDuringFade)
+            {
+                ApplyFullBlackOverlay();
+            }
+            else
+            {
+                float revealT = Mathf.InverseLerp(TitleRevealStartDuringFade, 1f, t);
+                float revealProgress = Mathf.Lerp(0f, TitleRevealLeadProgress, EaseOutCubic(Mathf.Clamp01(revealT * 1.08f)));
+                float revealAlpha = Mathf.Lerp(OverlayColor.a, OverlayColor.a * 0.92f, EaseOutCubic(revealT));
+                float blackoutFade = 1f - EaseOutCubic(Mathf.Clamp01(revealT / BlackoutFallbackFadeDuration));
+
+                SetBlackoutAlpha(blackoutFade);
+                ApplyRevealProgress(revealProgress, revealAlpha);
+            }
+
             yield return null;
         }
 
+        SetBlackoutAlpha(0f);
         titleCanvasGroup.alpha = 0f;
     }
 
@@ -246,17 +280,57 @@ public sealed class GameplayStageIntroDirector : MonoBehaviour
             float eased = EaseInOutCubic(t);
 
             ApplyRuntimeUiSuppression();
-            revealGraphic.SetReveal(
-                new Vector2(BlackoutRevealRadius, BlackoutRevealRadius),
-                new Vector2(BlackoutRevealFeather, BlackoutRevealFeather),
+            SetBlackoutAlpha(0f);
+            ApplyRevealProgress(
+                Mathf.Lerp(TitleRevealLeadProgress, 1f, eased),
                 Mathf.Lerp(startAlpha, 0f, eased));
             yield return null;
         }
 
-        revealGraphic.SetReveal(
-            new Vector2(BlackoutRevealRadius, BlackoutRevealRadius),
-            new Vector2(BlackoutRevealFeather, BlackoutRevealFeather),
-            0f);
+        SetBlackoutAlpha(0f);
+        ApplyRevealProgress(1f, 0f);
+    }
+
+    private IEnumerator PlayGameplayUiFadeIn()
+    {
+        GameplayStatusHudRuntime.SetVisible(true);
+        GameplayStatusHudRuntime.SetAlpha(0f);
+        RuntimeMiniMapHud.SetExternallyHidden(false);
+        RuntimeMiniMapHud.SetExternalAlpha(0f);
+
+        UIRootManager uiRoot = UIRootManager.Instance;
+        if (uiRoot != null && uiRoot.backpackUI != null)
+        {
+            uiRoot.HideBackpack(true);
+        }
+
+        float elapsed = 0f;
+        bool backpackShown = false;
+        while (elapsed < GameplayUiFadeInDuration)
+        {
+            elapsed += Time.unscaledDeltaTime;
+            float t = Mathf.Clamp01(elapsed / GameplayUiFadeInDuration);
+            float eased = EaseOutCubic(t);
+
+            GameplayStatusHudRuntime.SetAlpha(eased);
+            RuntimeMiniMapHud.SetExternalAlpha(eased);
+
+            if (!backpackShown && elapsed >= BackpackFadeInDelay && uiRoot != null && uiRoot.backpackUI != null)
+            {
+                uiRoot.ShowBackpack(false);
+                backpackShown = true;
+            }
+
+            yield return null;
+        }
+
+        GameplayStatusHudRuntime.SetAlpha(1f);
+        RuntimeMiniMapHud.SetExternalAlpha(1f);
+
+        if (!backpackShown && uiRoot != null && uiRoot.backpackUI != null)
+        {
+            uiRoot.ShowBackpack(false);
+        }
     }
 
     private IEnumerator HoldOverviewShot(CameraPose overviewPose)
@@ -428,16 +502,17 @@ public sealed class GameplayStageIntroDirector : MonoBehaviour
         countdownManager?.SetInBaseState(true);
 
         DetachMainCamera();
+        TrySnapCameraToImmediateOverview();
     }
 
-    private void RestoreAndFinish()
+    private void RestoreAndFinish(bool showUiImmediately = true)
     {
-        RestoreGameplayState();
+        RestoreGameplayState(showUiImmediately);
         stateRestored = true;
         Destroy(gameObject);
     }
 
-    private void RestoreGameplayState()
+    private void RestoreGameplayState(bool showUiImmediately = true)
     {
         if (playerMove != null)
         {
@@ -467,21 +542,39 @@ public sealed class GameplayStageIntroDirector : MonoBehaviour
         countdownManager?.SetInBaseState(false);
         runStageDirector?.ResumeRuntime();
 
+        if (showUiImmediately)
+        {
+            GameplayStatusHudRuntime.SetVisible(true);
+            GameplayStatusHudRuntime.SetAlpha(1f);
+            RuntimeMiniMapHud.SetExternallyHidden(false);
+            RuntimeMiniMapHud.SetExternalAlpha(1f);
+
+            if (UIRootManager.Instance != null && UIRootManager.Instance.backpackUI != null)
+            {
+                UIRootManager.Instance.ShowBackpack(true);
+            }
+
+            IsIntroActive = false;
+            return;
+        }
+
         GameplayStatusHudRuntime.SetVisible(true);
+        GameplayStatusHudRuntime.SetAlpha(0f);
         RuntimeMiniMapHud.SetExternallyHidden(false);
+        RuntimeMiniMapHud.SetExternalAlpha(0f);
 
         if (UIRootManager.Instance != null && UIRootManager.Instance.backpackUI != null)
         {
-            UIRootManager.Instance.ShowBackpack(true);
+            UIRootManager.Instance.HideBackpack(true);
         }
-
-        IsIntroActive = false;
     }
 
     private void ApplyRuntimeUiSuppression()
     {
         GameplayStatusHudRuntime.SetVisible(false);
+        GameplayStatusHudRuntime.SetAlpha(0f);
         RuntimeMiniMapHud.SetExternallyHidden(true);
+        RuntimeMiniMapHud.SetExternalAlpha(0f);
 
         if (UIRootManager.Instance == null)
         {
@@ -588,6 +681,11 @@ public sealed class GameplayStageIntroDirector : MonoBehaviour
         originalCameraLocalRotation = cameraTransform.localRotation;
         originalCameraLocalScale = cameraTransform.localScale;
         originalCameraOrthographicSize = mainCamera != null ? mainCamera.orthographicSize : 5f;
+        if (mainCamera != null)
+        {
+            ScreenAdaptationManager.RegisterBaseOrthographicSize(mainCamera, originalCameraOrthographicSize);
+        }
+
         originalCameraWorldOffset = playerTransform != null
             ? cameraTransform.position - playerTransform.position
             : cameraTransform.position;
@@ -630,7 +728,7 @@ public sealed class GameplayStageIntroDirector : MonoBehaviour
 
     private void EnsureOverlay()
     {
-        if (overlayCanvas != null && revealGraphic != null)
+        if (overlayCanvas != null && blackoutImage != null && revealGraphic != null)
         {
             return;
         }
@@ -665,6 +763,18 @@ public sealed class GameplayStageIntroDirector : MonoBehaviour
         overlayRect.localScale = Vector3.one;
 
         GameObject revealObject = new GameObject(RevealGraphicName, typeof(RectTransform), typeof(StageIntroRevealGraphic));
+        GameObject blackoutObject = new GameObject("StageBlackout", typeof(RectTransform), typeof(Image));
+        blackoutObject.transform.SetParent(overlayRect, false);
+        RectTransform blackoutRect = blackoutObject.GetComponent<RectTransform>();
+        blackoutRect.anchorMin = Vector2.zero;
+        blackoutRect.anchorMax = Vector2.one;
+        blackoutRect.offsetMin = Vector2.zero;
+        blackoutRect.offsetMax = Vector2.zero;
+        blackoutImage = blackoutObject.GetComponent<Image>();
+        blackoutImage.color = BlackoutColor;
+        blackoutImage.raycastTarget = false;
+        blackoutObject.transform.SetAsFirstSibling();
+
         revealObject.transform.SetParent(overlayRect, false);
         RectTransform revealRect = revealObject.GetComponent<RectTransform>();
         revealRect.anchorMin = Vector2.zero;
@@ -674,10 +784,9 @@ public sealed class GameplayStageIntroDirector : MonoBehaviour
         revealGraphic = revealObject.GetComponent<StageIntroRevealGraphic>();
         revealGraphic.raycastTarget = false;
         revealGraphic.SetBaseColor(OverlayColor);
-        revealGraphic.SetReveal(
-            new Vector2(BlackoutRevealRadius, BlackoutRevealRadius),
-            new Vector2(BlackoutRevealFeather, BlackoutRevealFeather),
-            OverlayColor.a);
+        revealObject.transform.SetAsLastSibling();
+        ApplyFullBlackOverlay();
+        HasOverlayCoverage = true;
 
         GameObject titleObject = new GameObject(TitleRootName, typeof(RectTransform), typeof(CanvasGroup));
         titleObject.transform.SetParent(overlayRect, false);
@@ -689,6 +798,7 @@ public sealed class GameplayStageIntroDirector : MonoBehaviour
         titleRoot.sizeDelta = new Vector2(1700f, 520f);
         titleCanvasGroup = titleObject.GetComponent<CanvasGroup>();
         titleCanvasGroup.alpha = 0f;
+        titleObject.transform.SetAsLastSibling();
 
         TMP_FontAsset titleFont = TmpRuntimeFontFallback.WarmupCharacters(
             $"{stageDefinition?.stageLabel}{stageDefinition?.mapTitle}{stageDefinition?.displayName}")
@@ -719,6 +829,95 @@ public sealed class GameplayStageIntroDirector : MonoBehaviour
             new Vector2(1700f, 220f));
 
         Canvas.ForceUpdateCanvases();
+    }
+
+    private void ApplyFullBlackOverlay()
+    {
+        SetBlackoutAlpha(1f);
+        SetRevealGraphicVisible(false);
+    }
+
+    private void ApplyRevealProgress(float progress, float alpha)
+    {
+        if (revealGraphic == null)
+        {
+            return;
+        }
+
+        SetRevealGraphicVisible(alpha > 0.001f);
+
+        float clampedProgress = Mathf.Clamp01(progress);
+        Vector2 leadClear = ResolveOverlayScaledRadii(RevealLeadClearScale, new Vector2(240f, 54f));
+        Vector2 leadFeather = ResolveOverlayScaledRadii(RevealLeadFeatherScale, new Vector2(220f, 92f));
+        Vector2 finishClear = ResolveOverlayScaledRadii(RevealFinishClearScale, new Vector2(1200f, 420f));
+        Vector2 finishFeather = ResolveOverlayScaledRadii(RevealFinishFeatherScale, new Vector2(560f, 220f));
+
+        Vector2 clear;
+        Vector2 feather;
+
+        if (clampedProgress <= TitleRevealLeadProgress)
+        {
+            float leadT = EaseOutCubic(clampedProgress / Mathf.Max(0.01f, TitleRevealLeadProgress));
+            clear = Vector2.Lerp(RevealStartClearRadii, leadClear, leadT);
+            feather = Vector2.Lerp(RevealStartFeatherRadii, leadFeather, leadT);
+        }
+        else
+        {
+            float finishT = EaseInOutCubic((clampedProgress - TitleRevealLeadProgress) / Mathf.Max(0.01f, 1f - TitleRevealLeadProgress));
+            clear = Vector2.Lerp(leadClear, finishClear, finishT);
+            feather = Vector2.Lerp(leadFeather, finishFeather, finishT);
+        }
+
+        revealGraphic.SetReveal(clear, feather, alpha);
+    }
+
+    private void SetBlackoutAlpha(float alpha)
+    {
+        if (blackoutImage == null)
+        {
+            return;
+        }
+
+        Color color = BlackoutColor;
+        color.a = Mathf.Clamp01(alpha);
+        blackoutImage.color = color;
+
+        bool shouldShow = color.a > 0.001f;
+        if (blackoutImage.gameObject.activeSelf != shouldShow)
+        {
+            blackoutImage.gameObject.SetActive(shouldShow);
+        }
+    }
+
+    private void SetRevealGraphicVisible(bool visible)
+    {
+        if (revealGraphic == null)
+        {
+            return;
+        }
+
+        if (revealGraphic.gameObject.activeSelf != visible)
+        {
+            revealGraphic.gameObject.SetActive(visible);
+        }
+    }
+
+    private Vector2 ResolveOverlayScaledRadii(Vector2 scale, Vector2 minimum)
+    {
+        if (overlayRect == null)
+        {
+            return minimum;
+        }
+
+        Rect rect = overlayRect.rect;
+        if (rect.width <= 0.001f || rect.height <= 0.001f)
+        {
+            return minimum;
+        }
+
+        return new Vector2(
+            Mathf.Max(minimum.x, rect.width * scale.x),
+            Mathf.Max(minimum.y, rect.height * scale.y));
     }
 
     private static TextMeshProUGUI CreateTitleText(
@@ -823,22 +1022,35 @@ public sealed class GameplayStageIntroDirector : MonoBehaviour
         playerTransform.position = position;
     }
 
-    private CameraPose ResolveOverviewCameraPose()
+    private CameraPose ResolveOverviewCameraPose(CameraPose landingPose)
     {
         if (mainCamera == null)
         {
-            return new CameraPose(Vector3.zero, 5f);
+            return landingPose;
         }
 
         if (!TryResolveTilemapWorldBounds(out Bounds bounds))
         {
-            return ResolveLandingCameraPose();
+            return landingPose;
         }
 
+        CameraPose rawOverviewPose = ResolveRawOverviewCameraPose(bounds);
+        float size = Mathf.Clamp(
+            rawOverviewPose.orthographicSize * CameraOverviewRawSizeMultiplier,
+            landingPose.orthographicSize * CameraOverviewMinLandingSizeMultiplier,
+            landingPose.orthographicSize * CameraOverviewMaxLandingSizeMultiplier);
+
+        Vector3 position = Vector3.Lerp(rawOverviewPose.position, landingPose.position, CameraOverviewLandingBias);
+        position.y -= size * CameraOverviewDownwardBiasRatio;
+        position.z = rawOverviewPose.position.z;
+        return new CameraPose(position, size);
+    }
+
+    private CameraPose ResolveRawOverviewCameraPose(Bounds bounds)
+    {
         float verticalSize = bounds.extents.y + CameraOverviewPadding;
         float horizontalSize = (bounds.extents.x + CameraOverviewPadding * 1.35f) / Mathf.Max(0.1f, mainCamera.aspect);
-        float size = Mathf.Max(originalCameraOrthographicSize * 1.45f, verticalSize, horizontalSize);
-
+        float size = Mathf.Max(verticalSize, horizontalSize);
         Vector3 position = new Vector3(bounds.center.x, bounds.center.y, cameraTransform.position.z);
         return new CameraPose(position, size);
     }
@@ -928,6 +1140,18 @@ public sealed class GameplayStageIntroDirector : MonoBehaviour
 
         cameraTransform.position = pose.position;
         mainCamera.orthographicSize = pose.orthographicSize;
+    }
+
+    private void TrySnapCameraToImmediateOverview()
+    {
+        if (mainCamera == null || cameraTransform == null)
+        {
+            return;
+        }
+
+        CameraPose landingPose = ResolveLandingCameraPose();
+        CameraPose overviewPose = ResolveOverviewCameraPose(landingPose);
+        ApplyCameraPose(overviewPose);
     }
 
     private PortalFxInstance CreatePortalFx(Vector3 position)

@@ -88,6 +88,7 @@ public class BaseHubBootstrapper : MonoBehaviour
         BaseHubAlbumPanel albumPanel = CreateAlbumPanel(canvas.transform, uiController);
 
         GameObject player = CreatePlayer(prompt);
+        RuntimeCameraController.EnsureInstance().BindFollowTarget(player.transform);
         CharacterCore characterCore = player.GetComponent<CharacterCore>();
         PlayerProfileData profileData = player.GetComponent<PlayerProfileData>();
         GameObject handbookPanel = CreateBaseHandbookUI(player, prompt.Root);
@@ -118,6 +119,7 @@ public class BaseHubBootstrapper : MonoBehaviour
         camera.orthographicSize = 5.8f;
         camera.backgroundColor = new Color(0.03f, 0.04f, 0.05f, 1f);
         camera.transform.position = new Vector3(0f, -0.1f, -10f);
+        ScreenAdaptationManager.RefreshNow();
     }
 
     private void EnsureEventSystem()
@@ -715,68 +717,7 @@ public class BaseHubBootstrapper : MonoBehaviour
 
     private SpiritPanelUI CreateSpiritPanel(Transform parent)
     {
-        GameObject root = CreateModalRoot("SpiritPanel", parent);
-        GameObject panel = CreateCenteredPanel("SpiritContent", root.transform, new Vector2(940f, 650f));
-        Image panelBackground = panel.GetComponent<Image>();
-        RuntimeUiSpriteFactory.ApplySpiritPanelFrameSprite(panelBackground, Color.white);
-
-        GameObject avatarPanel = CreateUIObject("AvatarPanel", panel.transform);
-        SetCenteredRect(avatarPanel.GetComponent<RectTransform>(), new Vector2(-252f, -14f), new Vector2(246f, 392f));
-        Image avatarPanelImage = avatarPanel.AddComponent<Image>();
-        RuntimeUiSpriteFactory.ApplyRoundedSprite(avatarPanelImage, new Color(0.13f, 0.17f, 0.14f, 0.20f), 18, 16, 1.2f);
-
-        GameObject avatarFrame = CreateUIObject("AvatarFrame", avatarPanel.transform);
-        SetCenteredRect(avatarFrame.GetComponent<RectTransform>(), new Vector2(0f, 0f), new Vector2(198f, 310f));
-        Image avatarFrameImage = avatarFrame.AddComponent<Image>();
-        RuntimeUiSpriteFactory.ApplyRoundedSprite(avatarFrameImage, new Color(0.97f, 0.97f, 0.95f, 0.88f), 16, 14, 1.2f);
-
-        GameObject avatarObject = CreateUIObject("Avatar", avatarFrame.transform);
-        SetStretch(avatarObject.GetComponent<RectTransform>(), 18f, 18f, 18f, 18f);
-        Image avatarImage = avatarObject.AddComponent<Image>();
-        avatarImage.color = Color.white;
-        avatarImage.preserveAspect = true;
-
-        GameObject contentPanel = CreateUIObject("ContentPanel", panel.transform);
-        SetCenteredRect(contentPanel.GetComponent<RectTransform>(), new Vector2(150f, -18f), new Vector2(500f, 408f));
-        Image contentPanelImage = contentPanel.AddComponent<Image>();
-        RuntimeUiSpriteFactory.ApplyRoundedSprite(contentPanelImage, new Color(0.15f, 0.18f, 0.14f, 0.16f), 18, 16, 1.2f);
-
-        TextMeshProUGUI title = CreateText(
-            "Title",
-            panel.transform,
-            "精灵 · 玩家属性",
-            40,
-            new Color(0.20f, 0.24f, 0.16f, 1f),
-            TextAlignmentOptions.Center);
-        SetCenteredRect(title.rectTransform, new Vector2(0f, 252f), new Vector2(620f, 66f));
-
-        Button closeButton = CreateButton("CloseButton", panel.transform, "×", new Color(0.19f, 0.24f, 0.17f, 0.92f), new Vector2(58f, 42f));
-        RuntimeUiSpriteFactory.ApplyRoundedSprite(closeButton.GetComponent<Image>(), new Color(0.19f, 0.24f, 0.17f, 0.92f), 12, 12, 1.2f);
-        closeButton.GetComponent<RectTransform>().anchoredPosition = new Vector2(402f, 258f);
-
-        Button statsTabButton = CreateButton("StatsTabButton", panel.transform, "属性", new Color(0.33f, 0.42f, 0.28f, 0.94f), new Vector2(132f, 44f));
-        RuntimeUiSpriteFactory.ApplyRoundedSprite(statsTabButton.GetComponent<Image>(), new Color(0.33f, 0.42f, 0.28f, 0.94f), 12, 12, 1.2f);
-        statsTabButton.GetComponent<RectTransform>().anchoredPosition = new Vector2(78f, 188f);
-
-        Button weaponTabButton = CreateButton("WeaponTabButton", panel.transform, "墨水", new Color(0.25f, 0.28f, 0.22f, 0.94f), new Vector2(132f, 44f));
-        RuntimeUiSpriteFactory.ApplyRoundedSprite(weaponTabButton.GetComponent<Image>(), new Color(0.25f, 0.28f, 0.22f, 0.94f), 12, 12, 1.2f);
-        weaponTabButton.GetComponent<RectTransform>().anchoredPosition = new Vector2(226f, 188f);
-
-        GameObject statsPage = CreateUIObject("StatsPage", contentPanel.transform);
-        SetStretch(statsPage.GetComponent<RectTransform>(), 26f, 26f, 26f, 26f);
-        PlayerStatsPanelUI statsPanel = statsPage.AddComponent<PlayerStatsPanelUI>();
-        BuildStatsPage(statsPage.transform, statsPanel, avatarImage);
-
-        GameObject weaponPage = CreateUIObject("WeaponPage", contentPanel.transform);
-        SetStretch(weaponPage.GetComponent<RectTransform>(), 26f, 26f, 26f, 26f);
-        WeaponSelectionPanelUI weaponPanel = weaponPage.AddComponent<WeaponSelectionPanelUI>();
-        BuildWeaponPage(weaponPage.transform, weaponPanel);
-
-        SpiritPanelUI spiritPanel = root.AddComponent<SpiritPanelUI>();
-        spiritPanel.Configure(statsPage, weaponPage, statsTabButton, weaponTabButton, closeButton, title, statsPanel, weaponPanel);
-
-        root.SetActive(false);
-        return spiritPanel;
+        return RuntimePlayerPanelBuilder.Create(parent, "SpiritPanel");
     }
 
     private StageSelectionPanelUI CreateStageSelectionPanel(Transform parent, BaseHubUIController uiController)
@@ -1445,6 +1386,8 @@ public class BaseHubBootstrapper : MonoBehaviour
         profile.maxDurability = 100f;
         profile.currentInkType = PlayerLoadoutRuntime.CurrentInkType;
         profile.currentWeaponType = PlayerLoadoutRuntime.CurrentWeaponType;
+        profile.effectiveInkType = PlayerLoadoutRuntime.CurrentInkType;
+        profile.effectiveWeaponType = PlayerLoadoutRuntime.CurrentWeaponType;
 
         if (playerObject.GetComponent<PlayerAttributeManager>() == null)
         {
@@ -1472,6 +1415,9 @@ public class BaseHubBootstrapper : MonoBehaviour
 
         playerObject.AddComponent<BaseHubInkAttack>();
 
+        NightLightingController.EnsureProjectedShadow(playerObject);
+        NightLightingController.RemoveLocalLight(playerObject);
+
         return playerObject;
     }
 
@@ -1493,6 +1439,17 @@ public class BaseHubBootstrapper : MonoBehaviour
 
         BaseHubBookInteract interact = book.AddComponent<BaseHubBookInteract>();
         interact.Configure(uiController);
+
+        if (!useDetailedHubMap)
+        {
+            NightLightingController.EnsureLocalLight(
+                book,
+                1.4f,
+                0.06f,
+                0.02f,
+                new Vector3(0f, 0.32f, 0f),
+                new Color(1f, 0.82f, 0.58f, 1f));
+        }
     }
 
     private void CreateSpiritInteractable(BaseHubUIController uiController)
@@ -1513,6 +1470,17 @@ public class BaseHubBootstrapper : MonoBehaviour
 
         SpiritInteract interact = spirit.AddComponent<SpiritInteract>();
         interact.Configure(uiController);
+
+        if (!useDetailedHubMap)
+        {
+            NightLightingController.EnsureLocalLight(
+                spirit,
+                1.4f,
+                0.06f,
+                0.02f,
+                new Vector3(0f, 0.32f, 0f),
+                new Color(0.76f, 0.90f, 1f, 1f));
+        }
     }
 
     private void CreateAlbumInteractable(BaseHubUIController uiController)
@@ -1531,6 +1499,14 @@ public class BaseHubBootstrapper : MonoBehaviour
 
         BaseHubAlbumInteract interact = album.AddComponent<BaseHubAlbumInteract>();
         interact.Configure(uiController);
+
+        NightLightingController.EnsureLocalLight(
+            album,
+            1.3f,
+            0.08f,
+            0.03f,
+            new Vector3(0f, 0.28f, 0f),
+            new Color(1f, 0.84f, 0.64f, 1f));
     }
 
     private void CreateGameSceneInteractable(BaseHubUIController uiController)
@@ -1551,6 +1527,17 @@ public class BaseHubBootstrapper : MonoBehaviour
 
         BaseHubGameSceneInteract interact = gate.AddComponent<BaseHubGameSceneInteract>();
         interact.Configure(uiController);
+
+        if (!useDetailedHubMap)
+        {
+            NightLightingController.EnsureLocalLight(
+                gate,
+                1.7f,
+                0.08f,
+                0.03f,
+                new Vector3(0f, 0.36f, 0f),
+                new Color(1f, 0.82f, 0.58f, 1f));
+        }
     }
 
     private void CreateTrainingDummies()
@@ -1593,6 +1580,15 @@ public class BaseHubBootstrapper : MonoBehaviour
 
         dummy.AddComponent<BaseHubTrainingDummy>();
         dummy.AddComponent<EnemyCombatFeedback>();
+
+        NightLightingController.EnsureProjectedShadow(dummy);
+        NightLightingController.EnsureLocalLight(
+            dummy,
+            1.2f,
+            0.04f,
+            0.02f,
+            new Vector3(0f, 0.28f, 0f),
+            new Color(1f, 0.88f, 0.72f, 1f));
     }
 
     private GameObject CreateInteractionAnchor(string name, Vector3 position)

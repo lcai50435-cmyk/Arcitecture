@@ -5,6 +5,8 @@ using UnityEngine.UI;
 
 public class SceneLoader : MonoBehaviour
 {
+    private const int GameplayIntroHandoffMaxFrames = 24;
+
     [SerializeField] private Animator animator;
     [SerializeField] private float fadeDuration = 0.35f;
     [SerializeField] private int mainMenuIndex = 0;
@@ -113,6 +115,7 @@ public class SceneLoader : MonoBehaviour
 
         yield return loadOperation;
         yield return null;
+        yield return WaitForGameplayIntroOverlayCoverage();
 
         EnsureOverlay();
         yield return FadeOverlay(0f);
@@ -134,6 +137,32 @@ public class SceneLoader : MonoBehaviour
 
         Debug.LogError("SceneLoader 缺少可用的场景目标。");
         return null;
+    }
+
+    private IEnumerator WaitForGameplayIntroOverlayCoverage()
+    {
+        Scene activeScene = SceneManager.GetActiveScene();
+        if (!GameplayStageCatalog.IsGameplayScene(activeScene.name))
+        {
+            yield break;
+        }
+
+        int remainingFrames = GameplayIntroHandoffMaxFrames;
+        while (remainingFrames-- > 0)
+        {
+            Scene currentScene = SceneManager.GetActiveScene();
+            if (!GameplayStageCatalog.IsGameplayScene(currentScene.name))
+            {
+                yield break;
+            }
+
+            if (GameplayStageIntroDirector.HasOverlayCoverage || !GameplayStageIntroDirector.IsIntroActive)
+            {
+                yield break;
+            }
+
+            yield return null;
+        }
     }
 
     private void EnsureOverlay()

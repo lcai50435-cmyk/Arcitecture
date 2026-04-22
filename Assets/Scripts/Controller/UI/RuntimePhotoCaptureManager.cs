@@ -512,6 +512,7 @@ public sealed class RuntimePhotoCaptureManager : MonoBehaviour
     {
         GameplayStatusHudRuntime.SetVisible(!hidden);
         RuntimeMiniMapHud.SetExternallyHidden(hidden);
+        RuntimeSubtitleFeedHud.SetExternallyHidden(hidden);
 
         if (UIRootManager.Instance != null)
         {

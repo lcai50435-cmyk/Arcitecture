@@ -40,7 +40,9 @@ public class PlayerDeathSceneLoader : MonoBehaviour
     {
         Debug.Log("玩家死亡，进入失败结算");
 
-        if (RuntimeGameplayFailureBridge.TryTriggerFailure("PlayerDeath", gameOverSceneName))
+        if (GameplayFailureController.TryTriggerFailure(
+            GameplayFailureReason.PlayerDeath,
+            gameOverSceneName))
         {
             return;
         }

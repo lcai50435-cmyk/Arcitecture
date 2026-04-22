@@ -179,8 +179,7 @@ public class PlayerAttack : CharacterAttack
         {
             profile.currentDurability = ink;
             profile.maxDurability = maxInk;
-            profile.currentInkType = effectiveWeaponType.ToInkType();
-            profile.currentWeaponType = effectiveWeaponType;
+            profile.SetEffectiveWeapon(effectiveWeaponType);
         }
     }
 }

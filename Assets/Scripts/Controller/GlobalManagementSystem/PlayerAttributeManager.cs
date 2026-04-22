@@ -222,8 +222,8 @@ public class PlayerAttributeManager : MonoBehaviour
             profileData.currentDurability = playerAttack.ink;
         }
 
-        profileData.currentInkType = effectiveWeaponType.ToInkType();
-        profileData.currentWeaponType = effectiveWeaponType;
+        profileData.SyncSelectedLoadoutFromRuntime();
+        profileData.SetEffectiveWeapon(effectiveWeaponType);
     }
 
     private void ResolveReferences()

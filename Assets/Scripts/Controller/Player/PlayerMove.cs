@@ -41,6 +41,8 @@ public class PlayerMove : MonoBehaviour
         {
             gameObject.AddComponent<PlayerTreeOcclusionFader>();
         }
+
+        RuntimeCameraController.EnsureInstance().BindFollowTarget(transform);
     }
 
     void Update()

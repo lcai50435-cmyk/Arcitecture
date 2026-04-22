@@ -62,6 +62,14 @@ public class RunStageDirector : MonoBehaviour
     private bool countdownFinishedHandled;
     private bool runtimeSuspended;
 
+    public static float ActiveCameraTension { get; private set; }
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void ResetRuntimeState()
+    {
+        ActiveCameraTension = 0f;
+    }
+
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void Bootstrap()
     {
@@ -172,6 +180,8 @@ public class RunStageDirector : MonoBehaviour
         {
             countdownManager.OnCountdownFinished -= HandleCountdownFinished;
         }
+
+        ActiveCameraTension = 0f;
     }
 
     public void HandleEnemyDeath(Vector3 position)
@@ -318,6 +328,8 @@ public class RunStageDirector : MonoBehaviour
         {
             enemyObject.AddComponent<EnemyCombatFeedback>();
         }
+
+        NightLightingController.EnsureProjectedShadow(enemyObject);
     }
 
     private void ApplyStage(RunStageConfig stage)
@@ -328,8 +340,22 @@ public class RunStageDirector : MonoBehaviour
         }
 
         currentStage = stage;
+        ActiveCameraTension = ResolveCameraTension(stage.phase);
         spawnTimer = 0f;
         stageRefreshTimer = 0f;
+    }
+
+    private static float ResolveCameraTension(RunStagePhase phase)
+    {
+        switch (phase)
+        {
+            case RunStagePhase.Mid:
+                return 0.45f;
+            case RunStagePhase.HighRisk:
+                return 1f;
+            default:
+                return 0f;
+        }
     }
 
     private void RefreshResolvedStage(float elapsedTime, bool force = false)
@@ -693,7 +719,9 @@ public class RunStageDirector : MonoBehaviour
         }
 
         countdownFinishedHandled = true;
-        if (!RuntimeGameplayFailureBridge.TryTriggerFailure("TimeExpired", "DeadScene"))
+        if (!GameplayFailureController.TryTriggerFailure(
+            GameplayFailureReason.TimeExpired,
+            "DeadScene"))
         {
             Time.timeScale = 1f;
             SceneLoader loader = SceneLoader.EnsureInstance();

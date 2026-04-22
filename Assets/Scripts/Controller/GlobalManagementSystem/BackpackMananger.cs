@@ -202,6 +202,7 @@ public class BackpackMananger : MonoBehaviour
         if (crystal.IsInkSupply)
         {
             ApplyInkSupply(crystal);
+            OnItemPicked?.Invoke(crystal);
             Debug.Log($"拾取 {crystal.DisplayName}，恢复墨笔耐久 {crystal.inkRestoreValue}");
             success = true;
             return true;
@@ -210,6 +211,7 @@ public class BackpackMananger : MonoBehaviour
         if (crystal.IsSpecialStructure)
         {
             RuntimeProgressState.EnsureInstance().AddSpecialStructureInventory(1);
+            OnItemPicked?.Invoke(crystal);
             OnInventoryChanged?.Invoke();
             Debug.Log($"拾取 {crystal.DisplayName}，已加入专用材料库存");
             success = true;

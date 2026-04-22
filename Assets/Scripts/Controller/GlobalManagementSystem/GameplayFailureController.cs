@@ -20,17 +20,15 @@ public class GameplayFailureController : MonoBehaviour
     private const float DropScatterArcHeight = 0.55f;
     private const float SceneTransitionDelay = 0.16f;
     private const string FailureOverlayCanvasName = "FailureSpotlightCanvas";
-    private const string FailureOverlayGraphicName = "FailureSpotlightOverlay";
     private const int FailureOverlaySortingOrder = 12000;
     private const float SpotlightFadeInDuration = 0.18f;
     private const float SpotlightFocusDuration = 1.1f;
-    private const float SpotlightHoldDuration = 0.3f;
+    private const float SpotlightHoldDuration = 0.5f;
     private const float SpotlightStartAlpha = 0.9f;
     private const float SpotlightEndAlpha = 1f;
-    private static readonly Vector2 SpotlightStartClearRadii = new Vector2(260f, 180f);
-    private static readonly Vector2 SpotlightEndClearRadii = new Vector2(44f, 64f);
-    private static readonly Vector2 SpotlightStartFeatherRadii = new Vector2(96f, 84f);
-    private static readonly Vector2 SpotlightEndFeatherRadii = new Vector2(28f, 24f);
+    private static readonly Vector2 SpotlightStartFrameSize = new Vector2(1520f, 920f);
+    private static readonly Vector2 SpotlightFallbackEndFrameSize = new Vector2(220f, 280f);
+    private static readonly Vector2 SpotlightFramePadding = new Vector2(110f, 120f);
     private static readonly Color FailureOverlayColor = Color.black;
 
     public static GameplayFailureController Instance { get; private set; }
@@ -39,7 +37,14 @@ public class GameplayFailureController : MonoBehaviour
     private bool isFailureActive;
     private Canvas failureOverlayCanvas;
     private RectTransform failureOverlayRect;
-    private StageIntroRevealGraphic failureRevealGraphic;
+    private RectTransform failureTopPanelRect;
+    private RectTransform failureBottomPanelRect;
+    private RectTransform failureLeftPanelRect;
+    private RectTransform failureRightPanelRect;
+    private Image failureTopPanelImage;
+    private Image failureBottomPanelImage;
+    private Image failureLeftPanelImage;
+    private Image failureRightPanelImage;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void Bootstrap()
@@ -93,7 +98,14 @@ public class GameplayFailureController : MonoBehaviour
             Destroy(failureOverlayCanvas.gameObject);
             failureOverlayCanvas = null;
             failureOverlayRect = null;
-            failureRevealGraphic = null;
+            failureTopPanelRect = null;
+            failureBottomPanelRect = null;
+            failureLeftPanelRect = null;
+            failureRightPanelRect = null;
+            failureTopPanelImage = null;
+            failureBottomPanelImage = null;
+            failureLeftPanelImage = null;
+            failureRightPanelImage = null;
         }
 
         if (Instance == this)
@@ -264,7 +276,7 @@ public class GameplayFailureController : MonoBehaviour
     private float PlayDeathSpotlightTransition(Vector3 focusWorldPosition)
     {
         EnsureFailureOverlay();
-        if (failureRevealGraphic == null)
+        if (!HasFailureOverlayPanels())
         {
             return 0f;
         }
@@ -275,7 +287,7 @@ public class GameplayFailureController : MonoBehaviour
 
     private void EnsureFailureOverlay()
     {
-        if (failureOverlayCanvas != null && failureRevealGraphic != null)
+        if (failureOverlayCanvas != null && HasFailureOverlayPanels())
         {
             return;
         }
@@ -309,33 +321,25 @@ public class GameplayFailureController : MonoBehaviour
         failureOverlayRect.offsetMax = Vector2.zero;
         failureOverlayRect.localScale = Vector3.one;
 
-        GameObject revealObject = new GameObject(
-            FailureOverlayGraphicName,
-            typeof(RectTransform),
-            typeof(StageIntroRevealGraphic));
-        revealObject.transform.SetParent(failureOverlayRect, false);
+        failureTopPanelImage = CreateFailureOverlayPanel("FailureTopPanel", out failureTopPanelRect);
+        failureBottomPanelImage = CreateFailureOverlayPanel("FailureBottomPanel", out failureBottomPanelRect);
+        failureLeftPanelImage = CreateFailureOverlayPanel("FailureLeftPanel", out failureLeftPanelRect);
+        failureRightPanelImage = CreateFailureOverlayPanel("FailureRightPanel", out failureRightPanelRect);
 
-        RectTransform revealRect = revealObject.GetComponent<RectTransform>();
-        revealRect.anchorMin = Vector2.zero;
-        revealRect.anchorMax = Vector2.one;
-        revealRect.offsetMin = Vector2.zero;
-        revealRect.offsetMax = Vector2.zero;
-        revealRect.localScale = Vector3.one;
-
-        failureRevealGraphic = revealObject.GetComponent<StageIntroRevealGraphic>();
-        failureRevealGraphic.raycastTarget = false;
-        failureRevealGraphic.SetBaseColor(FailureOverlayColor);
-        failureRevealGraphic.SetReveal(SpotlightStartClearRadii, SpotlightStartFeatherRadii, 0f);
+        Canvas.ForceUpdateCanvases();
+        ApplySpotlightWindow(Vector2.zero, SpotlightStartFrameSize, 0f);
     }
 
     private IEnumerator AnimateFailureSpotlight(Vector3 focusWorldPosition)
     {
-        if (failureRevealGraphic == null)
+        if (!HasFailureOverlayPanels())
         {
             yield break;
         }
 
         Vector2 focusViewport = ResolveFocusViewport(focusWorldPosition);
+        Vector2 focusAnchoredPosition = ResolveFocusAnchoredPosition(focusViewport);
+        Vector2 targetFrameSize = ResolveFocusFrameSize(focusWorldPosition);
 
         float elapsed = 0f;
         while (elapsed < SpotlightFadeInDuration)
@@ -344,11 +348,7 @@ public class GameplayFailureController : MonoBehaviour
             float t = Mathf.Clamp01(elapsed / Mathf.Max(0.01f, SpotlightFadeInDuration));
             float easedT = Mathf.SmoothStep(0f, 1f, t);
             float alpha = Mathf.Lerp(0f, SpotlightStartAlpha, easedT);
-            failureRevealGraphic.SetReveal(
-                SpotlightStartClearRadii,
-                SpotlightStartFeatherRadii,
-                alpha,
-                focusViewport);
+            ApplySpotlightWindow(focusAnchoredPosition, SpotlightStartFrameSize, alpha);
             yield return null;
         }
 
@@ -358,18 +358,13 @@ public class GameplayFailureController : MonoBehaviour
             elapsed += Time.unscaledDeltaTime;
             float t = Mathf.Clamp01(elapsed / Mathf.Max(0.01f, SpotlightFocusDuration));
             float easedT = Mathf.SmoothStep(0f, 1f, t);
-            Vector2 clearRadii = Vector2.Lerp(SpotlightStartClearRadii, SpotlightEndClearRadii, easedT);
-            Vector2 featherRadii = Vector2.Lerp(SpotlightStartFeatherRadii, SpotlightEndFeatherRadii, easedT);
+            Vector2 frameSize = Vector2.Lerp(SpotlightStartFrameSize, targetFrameSize, easedT);
             float alpha = Mathf.Lerp(SpotlightStartAlpha, SpotlightEndAlpha, easedT);
-            failureRevealGraphic.SetReveal(clearRadii, featherRadii, alpha, focusViewport);
+            ApplySpotlightWindow(focusAnchoredPosition, frameSize, alpha);
             yield return null;
         }
 
-        failureRevealGraphic.SetReveal(
-            SpotlightEndClearRadii,
-            SpotlightEndFeatherRadii,
-            SpotlightEndAlpha,
-            focusViewport);
+        ApplySpotlightWindow(focusAnchoredPosition, targetFrameSize, SpotlightEndAlpha);
 
         if (SpotlightHoldDuration > 0f)
         {
@@ -399,6 +394,209 @@ public class GameplayFailureController : MonoBehaviour
         return new Vector2(
             Mathf.Clamp01(viewportPoint.x),
             Mathf.Clamp01(viewportPoint.y));
+    }
+
+    private Vector2 ResolveFocusAnchoredPosition(Vector2 focusViewport)
+    {
+        if (failureOverlayRect == null)
+        {
+            return Vector2.zero;
+        }
+
+        Rect rect = failureOverlayRect.rect;
+        float width = rect.width > 1f ? rect.width : Screen.width;
+        float height = rect.height > 1f ? rect.height : Screen.height;
+        return new Vector2(
+            (focusViewport.x - 0.5f) * width,
+            (focusViewport.y - 0.5f) * height);
+    }
+
+    private Vector2 ResolveFocusFrameSize(Vector3 focusWorldPosition)
+    {
+        if (failureOverlayRect == null)
+        {
+            return SpotlightFallbackEndFrameSize;
+        }
+
+        Rect rect = failureOverlayRect.rect;
+        float canvasWidth = rect.width > 1f ? rect.width : Screen.width;
+        float canvasHeight = rect.height > 1f ? rect.height : Screen.height;
+
+        Camera targetCamera = Camera.main;
+        if (targetCamera == null)
+        {
+            targetCamera = FindObjectOfType<Camera>();
+        }
+
+        GameObject playerObject = GameObject.FindGameObjectWithTag("Player");
+        Renderer playerRenderer = playerObject != null ? playerObject.GetComponentInChildren<Renderer>() : null;
+        if (targetCamera == null || playerRenderer == null)
+        {
+            return SpotlightFallbackEndFrameSize;
+        }
+
+        Bounds bounds = playerRenderer.bounds;
+        Vector3 center = bounds.center;
+        Vector3 extents = bounds.extents;
+        Vector3[] corners =
+        {
+            center + new Vector3(-extents.x, -extents.y, 0f),
+            center + new Vector3(-extents.x, extents.y, 0f),
+            center + new Vector3(extents.x, -extents.y, 0f),
+            center + new Vector3(extents.x, extents.y, 0f)
+        };
+
+        float minX = 1f;
+        float minY = 1f;
+        float maxX = 0f;
+        float maxY = 0f;
+        bool hasValidCorner = false;
+
+        for (int i = 0; i < corners.Length; i++)
+        {
+            Vector3 viewportPoint = targetCamera.WorldToViewportPoint(corners[i]);
+            if (viewportPoint.z < 0f)
+            {
+                continue;
+            }
+
+            hasValidCorner = true;
+            minX = Mathf.Min(minX, viewportPoint.x);
+            minY = Mathf.Min(minY, viewportPoint.y);
+            maxX = Mathf.Max(maxX, viewportPoint.x);
+            maxY = Mathf.Max(maxY, viewportPoint.y);
+        }
+
+        if (!hasValidCorner)
+        {
+            return SpotlightFallbackEndFrameSize;
+        }
+
+        float frameWidth = (maxX - minX) * canvasWidth + SpotlightFramePadding.x;
+        float frameHeight = (maxY - minY) * canvasHeight + SpotlightFramePadding.y;
+        return new Vector2(
+            Mathf.Clamp(frameWidth, SpotlightFallbackEndFrameSize.x, canvasWidth),
+            Mathf.Clamp(frameHeight, SpotlightFallbackEndFrameSize.y, canvasHeight));
+    }
+
+    private bool HasFailureOverlayPanels()
+    {
+        return failureTopPanelRect != null &&
+               failureBottomPanelRect != null &&
+               failureLeftPanelRect != null &&
+               failureRightPanelRect != null &&
+               failureTopPanelImage != null &&
+               failureBottomPanelImage != null &&
+               failureLeftPanelImage != null &&
+               failureRightPanelImage != null;
+    }
+
+    private Image CreateFailureOverlayPanel(string name, out RectTransform panelRect)
+    {
+        GameObject panelObject = new GameObject(
+            name,
+            typeof(RectTransform),
+            typeof(CanvasRenderer),
+            typeof(Image));
+        panelObject.transform.SetParent(failureOverlayRect, false);
+
+        panelRect = panelObject.GetComponent<RectTransform>();
+        panelRect.anchorMin = new Vector2(0.5f, 0.5f);
+        panelRect.anchorMax = new Vector2(0.5f, 0.5f);
+        panelRect.pivot = new Vector2(0.5f, 0.5f);
+        panelRect.anchoredPosition = Vector2.zero;
+        panelRect.sizeDelta = Vector2.zero;
+        panelRect.localScale = Vector3.one;
+
+        Image panelImage = panelObject.GetComponent<Image>();
+        panelImage.color = new Color(
+            FailureOverlayColor.r,
+            FailureOverlayColor.g,
+            FailureOverlayColor.b,
+            0f);
+        panelImage.raycastTarget = false;
+        return panelImage;
+    }
+
+    private void ApplySpotlightWindow(Vector2 anchoredPosition, Vector2 frameSize, float alpha)
+    {
+        if (!HasFailureOverlayPanels() || failureOverlayRect == null)
+        {
+            return;
+        }
+
+        Rect rect = failureOverlayRect.rect;
+        float canvasWidth = rect.width > 1f ? rect.width : Screen.width;
+        float canvasHeight = rect.height > 1f ? rect.height : Screen.height;
+        float frameWidth = Mathf.Clamp(frameSize.x, 1f, canvasWidth);
+        float frameHeight = Mathf.Clamp(frameSize.y, 1f, canvasHeight);
+        float halfFrameWidth = frameWidth * 0.5f;
+        float halfFrameHeight = frameHeight * 0.5f;
+        float clampedCenterX = Mathf.Clamp(
+            anchoredPosition.x,
+            -canvasWidth * 0.5f + halfFrameWidth,
+            canvasWidth * 0.5f - halfFrameWidth);
+        float clampedCenterY = Mathf.Clamp(
+            anchoredPosition.y,
+            -canvasHeight * 0.5f + halfFrameHeight,
+            canvasHeight * 0.5f - halfFrameHeight);
+
+        float leftWidth = Mathf.Max(0f, clampedCenterX - halfFrameWidth + canvasWidth * 0.5f);
+        float rightWidth = Mathf.Max(0f, canvasWidth * 0.5f - (clampedCenterX + halfFrameWidth));
+        float bottomHeight = Mathf.Max(0f, clampedCenterY - halfFrameHeight + canvasHeight * 0.5f);
+        float topHeight = Mathf.Max(0f, canvasHeight * 0.5f - (clampedCenterY + halfFrameHeight));
+
+        SetOverlayPanelRect(
+            failureTopPanelRect,
+            new Vector2(0f, clampedCenterY + halfFrameHeight + topHeight * 0.5f),
+            new Vector2(canvasWidth, topHeight));
+        SetOverlayPanelRect(
+            failureBottomPanelRect,
+            new Vector2(0f, -canvasHeight * 0.5f + bottomHeight * 0.5f),
+            new Vector2(canvasWidth, bottomHeight));
+        SetOverlayPanelRect(
+            failureLeftPanelRect,
+            new Vector2(-canvasWidth * 0.5f + leftWidth * 0.5f, clampedCenterY),
+            new Vector2(leftWidth, frameHeight));
+        SetOverlayPanelRect(
+            failureRightPanelRect,
+            new Vector2(clampedCenterX + halfFrameWidth + rightWidth * 0.5f, clampedCenterY),
+            new Vector2(rightWidth, frameHeight));
+
+        SetOverlayPanelAlpha(Mathf.Clamp01(alpha));
+    }
+
+    private static void SetOverlayPanelRect(RectTransform panelRect, Vector2 anchoredPosition, Vector2 sizeDelta)
+    {
+        if (panelRect == null)
+        {
+            return;
+        }
+
+        panelRect.anchoredPosition = anchoredPosition;
+        panelRect.sizeDelta = new Vector2(
+            Mathf.Max(0f, sizeDelta.x),
+            Mathf.Max(0f, sizeDelta.y));
+    }
+
+    private void SetOverlayPanelAlpha(float alpha)
+    {
+        SetOverlayPanelImageAlpha(failureTopPanelImage, alpha);
+        SetOverlayPanelImageAlpha(failureBottomPanelImage, alpha);
+        SetOverlayPanelImageAlpha(failureLeftPanelImage, alpha);
+        SetOverlayPanelImageAlpha(failureRightPanelImage, alpha);
+    }
+
+    private static void SetOverlayPanelImageAlpha(Image image, float alpha)
+    {
+        if (image == null)
+        {
+            return;
+        }
+
+        Color color = image.color;
+        color.a = alpha;
+        image.color = color;
     }
 
     private float PlayDropScatterAnimation(List<ArchitecturalCrystal> droppedItems, Vector3 origin)
