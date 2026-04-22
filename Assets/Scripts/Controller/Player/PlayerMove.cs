@@ -47,6 +47,7 @@ public class PlayerMove : MonoBehaviour
             gameObject.AddComponent<PlayerTreeOcclusionFader>();
         }
 
+        SpriteCompanionRuntime.EnsureForPlayer(gameObject);
         RuntimeCameraController.EnsureInstance().BindFollowTarget(transform);
     }
 
@@ -91,6 +92,10 @@ public class PlayerMove : MonoBehaviour
         if (isMoving)
         {
             directionTracker?.UpdateMoveDirection(currentMoveDir);
+            if (core != null)
+            {
+                core.lastFacingDirection = currentMoveDir.normalized;
+            }
         }
 
         // 从工具类获取最后朝向，更新动画
