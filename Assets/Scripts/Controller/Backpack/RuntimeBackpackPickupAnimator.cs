@@ -49,6 +49,7 @@ public sealed class RuntimeBackpackPickupAnimator : MonoBehaviour
         backpackUi.EnsureVisibleForIncomingPickup();
         if (!backpackUi.TryGetSlotScreenPosition(slotIndex, out _, out _))
         {
+            backpackUi.EndIncomingPickupPresentation();
             backpack.CancelReservedSlot(slotIndex);
             return false;
         }
@@ -160,6 +161,11 @@ public sealed class RuntimeBackpackPickupAnimator : MonoBehaviour
             if (!pickupResolved && backpack != null)
             {
                 backpack.CancelReservedSlot(slotIndex);
+            }
+
+            if (backpackUi != null)
+            {
+                backpackUi.EndIncomingPickupPresentation();
             }
         }
     }

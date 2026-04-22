@@ -1,8 +1,11 @@
 ﻿using TMPro;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 public class PlayerInteraction : MonoBehaviour
 {
+    private const string InteractPromptId = "player_interact";
+
     [Header("交互提示UI")]
     public GameObject fImage;
     public GameObject boxPanel;
@@ -14,15 +17,22 @@ public class PlayerInteraction : MonoBehaviour
     private IInteractable currentInteractable;
     private Collider2D currentInteractableCollider;
     private bool suppressInteractUi;
+    private PlayerMove playerMove;
 
     private void Awake()
     {
+        playerMove = GetComponent<PlayerMove>();
         ResolveRuntimeReferences();
     }
 
     void Start()
     {
         ResolveRuntimeReferences();
+        HideInteractUI();
+    }
+
+    private void OnDisable()
+    {
         HideInteractUI();
     }
 
@@ -35,6 +45,12 @@ public class PlayerInteraction : MonoBehaviour
         }
 
         if (IsGameplayUiBlockingInteraction())
+        {
+            ClearCurrentInteractable();
+            return;
+        }
+
+        if (ShouldHoldFloatingPromptUntilPlayerIsControllable())
         {
             ClearCurrentInteractable();
             return;
@@ -116,27 +132,45 @@ public class PlayerInteraction : MonoBehaviour
 
     private void ShowInteractUI(string tip)
     {
-        if (suppressInteractUi)
+        if (suppressInteractUi || ShouldHoldFloatingPromptUntilPlayerIsControllable())
         {
             return;
         }
 
         ResolveRuntimeReferences();
 
+        if (UseFloatingPromptStyle())
+        {
+            HideLegacyPromptVisual();
+            RuntimeFollowPromptHud.ShowOrUpdate(
+                InteractPromptId,
+                transform,
+                RuntimeFollowPromptHud.FormatCompactKey(GameSettingsStore.GetKeyBinding(GameInputAction.Interact)),
+                tip,
+                0);
+            return;
+        }
+
         if (fImage != null)
+        {
             fImage.SetActive(true);
+        }
 
         if (boxPanel != null)
+        {
             boxPanel.SetActive(true);
+        }
 
         if (boxText != null)
+        {
             boxText.text = tip;
+        }
     }
 
     public void HideInteractUI()
     {
-        if (fImage != null) fImage.SetActive(false);
-        if (boxPanel != null) boxPanel.SetActive(false);
+        RuntimeFollowPromptHud.Hide(InteractPromptId);
+        HideLegacyPromptVisual();
     }
 
     public void ClearCurrentInteractable()
@@ -177,5 +211,44 @@ public class PlayerInteraction : MonoBehaviour
         {
             boxText = boxPanel.GetComponentInChildren<TextMeshProUGUI>(true);
         }
+
+        if (UseFloatingPromptStyle())
+        {
+            HideLegacyPromptVisual();
+        }
+    }
+
+    private void HideLegacyPromptVisual()
+    {
+        if (fImage != null)
+        {
+            fImage.SetActive(false);
+        }
+
+        if (boxPanel != null)
+        {
+            boxPanel.SetActive(false);
+        }
+    }
+
+    private static bool UseFloatingPromptStyle()
+    {
+        return GameplayStageCatalog.IsGameplayScene(SceneManager.GetActiveScene().name);
+    }
+
+    private bool ShouldHoldFloatingPromptUntilPlayerIsControllable()
+    {
+        if (!UseFloatingPromptStyle())
+        {
+            return false;
+        }
+
+        if (GameplayStageIntroDirector.IsIntroActive)
+        {
+            return true;
+        }
+
+        playerMove ??= GetComponent<PlayerMove>();
+        return playerMove != null && (!playerMove.enabled || !playerMove.canMove);
     }
 }

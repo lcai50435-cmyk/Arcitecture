@@ -1,9 +1,11 @@
 using TMPro;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 public class BackpackUI : MonoBehaviour
 {
+    private const string TogglePromptId = "backpack_toggle";
     private const float ToggleHotspotY = -168f;
     private const float ToggleHotspotWidth = 138f;
     private const float ToggleHotspotHeight = 44f;
@@ -29,9 +31,13 @@ public class BackpackUI : MonoBehaviour
     private Vector2 currentTargetPosition;
     private Vector2 slideVelocity;
     private float alphaVelocity;
+    private Transform cachedPlayerTransform;
     private bool slideInitialized;
     private bool isCollapsed;
     private bool isRuntimeVisible = true;
+    private int pickupPresentationLockCount;
+    private float pickupToggleSuppressUntilTime;
+    private bool shouldRestoreCollapsedAfterPickupPresentation;
 
     private void Start()
     {
@@ -52,6 +58,7 @@ public class BackpackUI : MonoBehaviour
 
     private void OnDisable()
     {
+        HideFollowTogglePrompt();
         UnsubscribeRuntimeEvents();
     }
 
@@ -133,11 +140,12 @@ public class BackpackUI : MonoBehaviour
         }
 
         RefreshToggleHintVisual();
+        UpdateFollowTogglePrompt();
     }
 
     private void HandleToggleShortcut()
     {
-        if (!isRuntimeVisible)
+        if (!isRuntimeVisible || IsPickupPresentationLocked)
         {
             return;
         }
@@ -171,6 +179,11 @@ public class BackpackUI : MonoBehaviour
         EnsureSlideToggle();
         isRuntimeVisible = visible;
 
+        if (!visible)
+        {
+            HideFollowTogglePrompt();
+        }
+
         if (immediate)
         {
             ApplyRuntimeVisibilityInstant();
@@ -179,14 +192,48 @@ public class BackpackUI : MonoBehaviour
 
     public void EnsureVisibleForIncomingPickup()
     {
+        BeginIncomingPickupPresentation();
+    }
+
+    public void BeginIncomingPickupPresentation()
+    {
         EnsureCanvasGroup();
         EnsureSlideToggle();
 
-        isRuntimeVisible = true;
-        isCollapsed = false;
+        if (pickupPresentationLockCount == 0)
+        {
+            shouldRestoreCollapsedAfterPickupPresentation = isCollapsed;
+        }
 
-        ApplySlidePositionInstant();
+        pickupPresentationLockCount++;
+        isRuntimeVisible = true;
+        SetCollapsedState(false, true);
         ApplyRuntimeVisibilityInstant();
+        RefreshToggleHintVisual();
+    }
+
+    public void EndIncomingPickupPresentation()
+    {
+        if (pickupPresentationLockCount <= 0)
+        {
+            return;
+        }
+
+        pickupPresentationLockCount--;
+        if (pickupPresentationLockCount > 0)
+        {
+            return;
+        }
+
+        bool shouldCollapseBack = shouldRestoreCollapsedAfterPickupPresentation;
+        shouldRestoreCollapsedAfterPickupPresentation = false;
+
+        if (shouldCollapseBack)
+        {
+            SetCollapsedState(true);
+            pickupToggleSuppressUntilTime = Time.unscaledTime + SlideSmoothTime + 0.03f;
+        }
+
         RefreshToggleHintVisual();
     }
 
@@ -294,10 +341,12 @@ public class BackpackUI : MonoBehaviour
 
     private void ToggleCollapsedState()
     {
-        isCollapsed = !isCollapsed;
-        currentTargetPosition = isCollapsed
-            ? expandedAnchoredPosition + new Vector2(0f, -CollapseSlideDistance)
-            : expandedAnchoredPosition;
+        if (IsPickupPresentationLocked)
+        {
+            return;
+        }
+
+        SetCollapsedState(!isCollapsed);
     }
 
     private void ApplySlidePositionInstant()
@@ -307,11 +356,27 @@ public class BackpackUI : MonoBehaviour
             return;
         }
 
+        SyncCurrentTargetPosition();
+        slideVelocity = Vector2.zero;
+        rectTransform.anchoredPosition = GetAnimatedTargetPosition();
+    }
+
+    private void SetCollapsedState(bool collapsed, bool immediate = false)
+    {
+        isCollapsed = collapsed;
+        SyncCurrentTargetPosition();
+
+        if (immediate)
+        {
+            ApplySlidePositionInstant();
+        }
+    }
+
+    private void SyncCurrentTargetPosition()
+    {
         currentTargetPosition = isCollapsed
             ? expandedAnchoredPosition + new Vector2(0f, -CollapseSlideDistance)
             : expandedAnchoredPosition;
-        slideVelocity = Vector2.zero;
-        rectTransform.anchoredPosition = GetAnimatedTargetPosition();
     }
 
     private void EnsureToggleHintText()
@@ -394,6 +459,20 @@ public class BackpackUI : MonoBehaviour
                 toggleHintText.text = "收起 [B]";
             }
         }
+
+        if (UseFollowTogglePromptStyle())
+        {
+            // gameplay 场景里统一改成贴玩家侧边的小提示，底部热区仅保留点击能力。
+            toggleHotspotRect.localScale = Vector3.one;
+            Color hiddenColor = toggleHotspotImage.color;
+            hiddenColor.a = 0f;
+            toggleHotspotImage.color = hiddenColor;
+
+            if (toggleHintText != null)
+            {
+                toggleHintText.enabled = false;
+            }
+        }
     }
 
     private void EnsureCanvasGroup()
@@ -413,6 +492,60 @@ public class BackpackUI : MonoBehaviour
     private Vector2 GetAnimatedTargetPosition()
     {
         return currentTargetPosition + (isRuntimeVisible ? Vector2.zero : new Vector2(0f, -ModalHideSlideDistance));
+    }
+
+    private void UpdateFollowTogglePrompt()
+    {
+        if (!ShouldShowFollowTogglePrompt())
+        {
+            HideFollowTogglePrompt();
+            return;
+        }
+
+        Transform playerTransform = ResolvePlayerTransform();
+        if (playerTransform == null)
+        {
+            HideFollowTogglePrompt();
+            return;
+        }
+
+        RuntimeFollowPromptHud.ShowOrUpdate(
+            TogglePromptId,
+            playerTransform,
+            "B",
+            isCollapsed ? "展开背包" : "收起背包",
+            1);
+    }
+
+    private void HideFollowTogglePrompt()
+    {
+        RuntimeFollowPromptHud.Hide(TogglePromptId);
+    }
+
+    private bool ShouldShowFollowTogglePrompt()
+    {
+        // 玩法场景里不再显示 B 的展开/收起跟随提示，只保留原有切换能力。
+        return false;
+    }
+
+    private bool IsPickupPresentationLocked =>
+        pickupPresentationLockCount > 0 || Time.unscaledTime < pickupToggleSuppressUntilTime;
+
+    private Transform ResolvePlayerTransform()
+    {
+        if (cachedPlayerTransform != null)
+        {
+            return cachedPlayerTransform;
+        }
+
+        GameObject playerObject = GameObject.FindGameObjectWithTag("Player");
+        cachedPlayerTransform = playerObject != null ? playerObject.transform : null;
+        return cachedPlayerTransform;
+    }
+
+    private static bool UseFollowTogglePromptStyle()
+    {
+        return GameplayStageCatalog.IsGameplayScene(SceneManager.GetActiveScene().name);
     }
 
     private void ApplyRuntimeVisibilityInstant()

@@ -32,6 +32,8 @@ public class RuntimeMiniMapHud : MonoBehaviour
     private const float LargeFramePaddingX = 16f;
     private const float LargeFramePaddingY = 14f;
     private const float ExpandedMoveSpeedMultiplier = 0.1f;
+    private const float CollapseFadeStartProgress = 0.10f;
+    private const float CollapseFadeEndProgress = 0.02f;
 
     private static readonly Color PanelColor = new Color(0.07f, 0.10f, 0.14f, 0.86f);
     private static readonly Color ExpandedPanelColor = new Color(0.07f, 0.10f, 0.14f, 0.96f);
@@ -72,6 +74,7 @@ public class RuntimeMiniMapHud : MonoBehaviour
     private float mKeyPressedAt = -1f;
     private float expandProgress;
     private float expandVelocity;
+    private float externalAlphaMultiplier = 1f;
     private bool sceneBindingsReady;
     private bool externallyHidden;
 
@@ -147,6 +150,18 @@ public class RuntimeMiniMapHud : MonoBehaviour
             hud.SetVisible(false);
             hud.UpdateSmallMapOverlay();
         }
+    }
+
+    public static void SetExternalAlpha(float alpha)
+    {
+        RuntimeMiniMapHud hud = EnsureInstance();
+        if (hud == null)
+        {
+            return;
+        }
+
+        hud.externalAlphaMultiplier = Mathf.Clamp01(alpha);
+        hud.UpdateSmallMapOverlay();
     }
 
     private void Awake()
@@ -285,12 +300,8 @@ public class RuntimeMiniMapHud : MonoBehaviour
         }
 
         float easedExpandProgress = GetEasedExpandProgress();
-        Rect smallMapSlotRect = new Rect(
-            Screen.width - SmallMapSize - Margin,
-            Margin,
-            SmallMapSize,
-            SmallMapSize);
-        Rect smallMapRect = GetAspectFitRect(smallMapSlotRect, MapAspect);
+        float overlayAlpha = GetExpandedOverlayAlpha(easedExpandProgress);
+        GetSmallMapLayout(out Rect smallMapRect, out _);
         Rect largeMapSlotRect = new Rect(
             (Screen.width - LargeMapWidth) * 0.5f,
             (Screen.height - LargeMapHeight) * 0.5f,
@@ -299,7 +310,7 @@ public class RuntimeMiniMapHud : MonoBehaviour
         Rect largeMapRect = GetAspectFitRect(largeMapSlotRect, MapAspect);
         Rect mapRect = LerpRect(smallMapRect, largeMapRect, easedExpandProgress);
 
-        if (easedExpandProgress <= 0.001f)
+        if (easedExpandProgress <= 0.001f || overlayAlpha <= 0.001f)
         {
             return;
         }
@@ -309,11 +320,11 @@ public class RuntimeMiniMapHud : MonoBehaviour
         Rect frameRect = ExpandRect(mapRect, framePaddingX, framePaddingY);
         float frameBorderWidth = Mathf.Lerp(10f, 20f, easedExpandProgress);
         float frameBorderHeight = Mathf.Lerp(10f, 18f, easedExpandProgress);
-        float frameAlpha = Mathf.Lerp(0.25f, 1f, easedExpandProgress);
+        float frameAlpha = Mathf.Lerp(0.25f, 1f, easedExpandProgress) * overlayAlpha;
         DrawMapFrame(frameRect, frameBorderWidth, frameBorderHeight, frameAlpha);
 
-        GUI.DrawTexture(mapRect, renderTexture, ScaleMode.StretchToFill, false);
-        DrawPlayerMarker(mapRect);
+        DrawTintedTexture(mapRect, renderTexture, new Color(1f, 1f, 1f, overlayAlpha));
+        DrawPlayerMarker(mapRect, overlayAlpha);
     }
 
     private void OnDestroy()
@@ -434,14 +445,14 @@ public class RuntimeMiniMapHud : MonoBehaviour
 
         if (cachedMainCamera != null)
         {
-            miniMapCamera.cullingMask = cachedMainCamera.cullingMask;
+            miniMapCamera.cullingMask = NightLightingController.ExcludeEffectLayerFromMask(cachedMainCamera.cullingMask);
             miniMapCamera.backgroundColor = cachedMainCamera.backgroundColor;
             miniMapCamera.nearClipPlane = cachedMainCamera.nearClipPlane;
             miniMapCamera.farClipPlane = cachedMainCamera.farClipPlane;
         }
         else
         {
-            miniMapCamera.cullingMask = ~0;
+            miniMapCamera.cullingMask = NightLightingController.ExcludeEffectLayerFromMask(~0);
             miniMapCamera.nearClipPlane = -50f;
             miniMapCamera.farClipPlane = 50f;
         }
@@ -589,6 +600,7 @@ public class RuntimeMiniMapHud : MonoBehaviour
         float smallMapAlpha = visible && sceneBindingsReady && !ShouldHideForGameplayOverlay()
             ? 1f - Mathf.Clamp01(Mathf.InverseLerp(0f, 0.24f, easedExpandProgress))
             : 0f;
+        smallMapAlpha *= externalAlphaMultiplier;
         bool shouldShow = smallMapAlpha > 0.001f;
 
         if (smallMapRoot.gameObject.activeSelf != shouldShow)
@@ -606,31 +618,35 @@ public class RuntimeMiniMapHud : MonoBehaviour
             return;
         }
 
+        GetSmallMapLayout(out Rect collapsedMapRect, out Rect collapsedFrameRect);
+
         smallMapRoot.anchorMin = new Vector2(1f, 1f);
         smallMapRoot.anchorMax = new Vector2(1f, 1f);
         smallMapRoot.pivot = new Vector2(1f, 1f);
-        smallMapRoot.anchoredPosition = new Vector2(-Margin, -Margin);
-
-        Vector2 mapSize = BuildAspectFitSize(SmallMapSize, SmallMapSize, MapAspect);
-        smallMapRoot.sizeDelta = new Vector2(
-            mapSize.x + SmallFramePaddingX * 2f,
-            mapSize.y + SmallFramePaddingY * 2f);
+        smallMapRoot.anchoredPosition = new Vector2(
+            -(Screen.width - collapsedFrameRect.xMax),
+            -collapsedFrameRect.yMin);
+        smallMapRoot.sizeDelta = collapsedFrameRect.size;
         smallMapRoot.SetAsLastSibling();
+
+        Vector2 mapAnchoredOffset = new Vector2(
+            collapsedMapRect.center.x - collapsedFrameRect.center.x,
+            collapsedFrameRect.center.y - collapsedMapRect.center.y);
 
         if (smallMapViewportRect != null)
         {
             ConfigureMarkerLayerRect(
                 smallMapViewportRect,
-                mapSize,
-                Vector2.zero);
+                collapsedMapRect.size,
+                mapAnchoredOffset);
         }
 
         if (smallMapImageRect != null)
         {
             ConfigureMarkerLayerRect(
                 smallMapImageRect,
-                mapSize,
-                Vector2.zero);
+                collapsedMapRect.size,
+                mapAnchoredOffset);
         }
 
         if (smallMapImage != null && smallMapImage.texture != renderTexture)
@@ -701,7 +717,7 @@ public class RuntimeMiniMapHud : MonoBehaviour
         playerMove.SetExternalMoveSpeedMultiplier(1f);
     }
 
-    private void DrawPlayerMarker(Rect mapRect)
+    private void DrawPlayerMarker(Rect mapRect, float alpha)
     {
         GetMarkerVisual(out Texture markerTexture, out Rect uvRect, out float aspect, out bool flipX, out bool flipY);
 
@@ -711,10 +727,10 @@ public class RuntimeMiniMapHud : MonoBehaviour
             expanded ? ExpandedMarkerMaxHeight : SmallMarkerMaxHeight,
             aspect);
 
-        DrawPlayerSpriteMarker(markerRect, markerTexture, uvRect, flipX, flipY);
+        DrawPlayerSpriteMarker(markerRect, markerTexture, uvRect, flipX, flipY, alpha);
     }
 
-    private void DrawPlayerSpriteMarker(Rect rect, Texture markerTexture, Rect uvRect, bool flipX, bool flipY)
+    private void DrawPlayerSpriteMarker(Rect rect, Texture markerTexture, Rect uvRect, bool flipX, bool flipY, float alpha)
     {
         float outlineOffset = expanded ? 1.8f : 1.1f;
         float glowPadding = expanded ? 7f : 4f;
@@ -731,15 +747,15 @@ public class RuntimeMiniMapHud : MonoBehaviour
         };
 
         Rect glowRect = ExpandRect(rect, glowPadding);
-        DrawMarkerTexture(glowRect, markerTexture, uvRect, MarkerGlowColor, flipX, flipY);
+        DrawMarkerTexture(glowRect, markerTexture, uvRect, MultiplyAlpha(MarkerGlowColor, alpha), flipX, flipY);
 
         for (int i = 0; i < offsets.Length; i++)
         {
             Rect outlineRect = new Rect(rect.x + offsets[i].x, rect.y + offsets[i].y, rect.width, rect.height);
-            DrawMarkerTexture(outlineRect, markerTexture, uvRect, MarkerOutlineColor, flipX, flipY);
+            DrawMarkerTexture(outlineRect, markerTexture, uvRect, MultiplyAlpha(MarkerOutlineColor, alpha), flipX, flipY);
         }
 
-        DrawMarkerTexture(rect, markerTexture, uvRect, Color.white, flipX, flipY);
+        DrawMarkerTexture(rect, markerTexture, uvRect, MultiplyAlpha(Color.white, alpha), flipX, flipY);
     }
 
     private Texture2D GetMarkerFigureTexture()
@@ -984,6 +1000,31 @@ public class RuntimeMiniMapHud : MonoBehaviour
         return progress * progress * (3f - 2f * progress);
     }
 
+    private float GetExpandedOverlayAlpha(float easedExpandProgress)
+    {
+        if (expanded)
+        {
+            return 1f;
+        }
+
+        return Mathf.Clamp01(
+            Mathf.InverseLerp(
+                CollapseFadeEndProgress,
+                CollapseFadeStartProgress,
+                easedExpandProgress));
+    }
+
+    private static void GetSmallMapLayout(out Rect mapRect, out Rect frameRect)
+    {
+        Rect smallMapSlotRect = new Rect(
+            Screen.width - SmallMapSize - Margin,
+            Margin,
+            SmallMapSize,
+            SmallMapSize);
+        mapRect = GetAspectFitRect(smallMapSlotRect, MapAspect);
+        frameRect = ExpandRect(mapRect, SmallFramePaddingX, SmallFramePaddingY);
+    }
+
     private static void DrawPanel(Rect panelRect, Color fillColor, Color borderColor)
     {
         DrawFilledRect(panelRect, fillColor);
@@ -1147,6 +1188,12 @@ public class RuntimeMiniMapHud : MonoBehaviour
             sourceRect.y / height,
             sourceRect.width / width,
             sourceRect.height / height);
+    }
+
+    private static Color MultiplyAlpha(Color color, float alpha)
+    {
+        color.a *= Mathf.Clamp01(alpha);
+        return color;
     }
 
     private static Rect GetAspectFitRect(Rect containerRect, float aspect)
