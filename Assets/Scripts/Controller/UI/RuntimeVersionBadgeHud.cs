@@ -12,7 +12,7 @@ public sealed class RuntimeVersionBadgeHud : MonoBehaviour
     private const float EdgeMargin = 2f;
     private const float MainSceneBottomOffset = 2f;
     private const float BaseAndGameplayBottomOffset = 2f;
-    private const float RightInsetRatio = 0.15f;
+    private const float RightInsetRatio = 0.10f;
 
     private static readonly Color TextColor = new Color(0.92f, 0.94f, 0.97f, 0.96f);
 
