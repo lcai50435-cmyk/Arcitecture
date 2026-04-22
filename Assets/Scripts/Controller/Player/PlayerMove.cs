@@ -34,6 +34,11 @@ public class PlayerMove : MonoBehaviour
             rb = GetComponent<Rigidbody2D>();
         }
 
+        if (rb != null)
+        {
+            rb.interpolation = RigidbodyInterpolation2D.Interpolate;
+        }
+
         // 获取朝向跟踪组件
         directionTracker = GetComponent<DirectionTracker>();
 

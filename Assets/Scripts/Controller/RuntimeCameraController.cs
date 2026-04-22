@@ -257,8 +257,8 @@ public sealed class RuntimeCameraController : MonoBehaviour
         hasSmoothedFollowPose = true;
         hasSmoothedSize = true;
 
-        controlledCamera.transform.position = basePosition;
         controlledCamera.orthographicSize = desiredSize;
+        controlledCamera.transform.position = SnapCameraPosition(basePosition, desiredSize);
     }
 
     private void LateUpdate()
@@ -343,8 +343,10 @@ public sealed class RuntimeCameraController : MonoBehaviour
                 deltaTime);
         }
 
-        controlledCamera.transform.position = smoothedFollowPosition + EvaluateTransientOffset(deltaTime);
         controlledCamera.orthographicSize = smoothedOrthographicSize;
+        controlledCamera.transform.position = SnapCameraPosition(
+            smoothedFollowPosition + EvaluateTransientOffset(deltaTime),
+            smoothedOrthographicSize);
     }
 
     private void EnsureSceneHook()
@@ -651,6 +653,25 @@ public sealed class RuntimeCameraController : MonoBehaviour
         }
 
         return Mathf.Lerp(GameplayFollowSmoothBase, GameplayFollowSmoothHighRisk, currentDangerTension);
+    }
+
+    private Vector3 SnapCameraPosition(Vector3 position, float orthographicSize)
+    {
+        if (controlledCamera == null || !controlledCamera.orthographic)
+        {
+            return position;
+        }
+
+        float safeScreenHeight = Mathf.Max(Screen.height, 1);
+        float worldUnitsPerPixel = (orthographicSize * 2f) / safeScreenHeight;
+        if (worldUnitsPerPixel <= 0.00001f)
+        {
+            return position;
+        }
+
+        position.x = Mathf.Round(position.x / worldUnitsPerPixel) * worldUnitsPerPixel;
+        position.y = Mathf.Round(position.y / worldUnitsPerPixel) * worldUnitsPerPixel;
+        return position;
     }
 
     private Vector3 EvaluateTransientOffset(float deltaTime)
