@@ -84,6 +84,7 @@ public class PlayerAttack : CharacterAttack
         RefreshInkUI();
 
         base.TriggerAttack();
+        MusicManager.PlaySfx(SfxCueId.PlayerAttack);
 
         Vector2 lastDir = directionTracker != null ? directionTracker.LastDirection : Vector2.right;
         if (lastDir == Vector2.zero)

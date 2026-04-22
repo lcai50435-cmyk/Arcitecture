@@ -29,7 +29,7 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
     private const int DisplayRefreshFrameBudget = 12;
 
     private const string RequiredCharacters =
-        "设置游戏已暂停当前没有未应用更改存在未应用更改继续游戏会自动应用声音画面按键存档恢复默认取消应用总音量音乐音量控制全部游戏声音背景音乐实时预览屏幕大小显示模式视野缩放影响游戏相机可见范围待应用窗口尺寸窗口模式与全屏切换当前生效信息以下内容来自当前运行中的实际状态攻击交互地图暂停拍照留念纪念截图点击右侧按钮后按任意键或鼠标键进行绑定等待输入正在为当前暂停键重置存档清空本地建筑进度关卡选择武器状态和留念相册设置项会保留没有可重置的数据再次点击将立即清空本地进度与相册截图并返回主菜单此操作不可恢复完成后重置结束后会返回主菜单便于从干净状态重新开始返回主菜单图形音量键位等设置不会被重置保留设置确认重置，。“”0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-+/():.% ";
+        "设置游戏已暂停当前没有未应用更改存在未应用更改继续游戏会自动应用声音画面按键存档恢复默认取消应用总音量音乐音量音效音量控制全部游戏声音背景音乐攻击与发射声音单独强度实时预览屏幕大小显示模式视野缩放影响游戏相机可见范围待应用窗口尺寸窗口模式与全屏切换当前生效信息以下内容来自当前运行中的实际状态攻击交互地图暂停拍照留念纪念截图点击右侧按钮后按任意键或鼠标键进行绑定等待输入正在为当前暂停键重置存档清空本地建筑进度关卡选择武器状态和留念相册设置项会保留没有可重置的数据再次点击将立即清空本地进度与相册截图并返回主菜单此操作不可恢复完成后重置结束后会返回主菜单便于从干净状态重新开始返回主菜单图形音量键位等设置不会被重置保留设置确认重置，。“”0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-+/():.% ";
 
     private static readonly string[] RuntimeFontNames =
     {
@@ -116,6 +116,7 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
     private TextMeshProUGUI captureHintText;
     private TextMeshProUGUI masterVolumeValueText;
     private TextMeshProUGUI musicVolumeValueText;
+    private TextMeshProUGUI sfxVolumeValueText;
     private TextMeshProUGUI resolutionValueText;
     private TextMeshProUGUI displayModeValueText;
     private TextMeshProUGUI viewZoomValueText;
@@ -483,6 +484,13 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
             164f,
             () => ChangeMusicVolume(-0.05f),
             () => ChangeMusicVolume(0.05f));
+        sfxVolumeValueText = CreateStepperCard(
+            pageRoot,
+            "音效音量",
+            "攻击与发射声音单独强度，调整时会实时预览",
+            296f,
+            () => ChangeSfxVolume(-0.05f),
+            () => ChangeSfxVolume(0.05f));
     }
 
     private void CreateDisplayPage(Transform parent)
@@ -931,6 +939,20 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
         RefreshFooterState();
     }
 
+    private void ChangeSfxVolume(float delta)
+    {
+        if (draftSettings == null)
+        {
+            return;
+        }
+
+        draftSettings.sfxVolume = Mathf.Clamp01(draftSettings.sfxVolume + delta);
+        GameSettingsStore.PreviewDraftAudio(draftSettings);
+        RefreshAudioPage();
+        RefreshSubtitle();
+        RefreshFooterState();
+    }
+
     private void ChangeResolution(int delta)
     {
         if (draftSettings == null)
@@ -1012,6 +1034,11 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
         if (musicVolumeValueText != null)
         {
             musicVolumeValueText.text = $"{Mathf.RoundToInt(draftSettings.musicVolume * 100f)}%";
+        }
+
+        if (sfxVolumeValueText != null)
+        {
+            sfxVolumeValueText.text = $"{Mathf.RoundToInt(draftSettings.sfxVolume * 100f)}%";
         }
     }
 

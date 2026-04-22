@@ -55,6 +55,7 @@ public class FireMonAttack : EnemyAttack
 
         // 触发 CharacterAttack 的核心攻击逻辑（停止移动、播放动画等）
         base.TriggerAttack();
+        MusicManager.PlaySfx(SfxCueId.FireMonsterCast);
 
         if (player == null)
         {

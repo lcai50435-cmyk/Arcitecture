@@ -20,6 +20,7 @@ public sealed class GameSettingsDraft
 {
     public float masterVolume;
     public float musicVolume;
+    public float sfxVolume;
     public int resolutionIndex;
     public GameDisplayMode displayMode;
     public int viewZoomIndex;
@@ -35,6 +36,7 @@ public sealed class GameSettingsDraft
         {
             masterVolume = masterVolume,
             musicVolume = musicVolume,
+            sfxVolume = sfxVolume,
             resolutionIndex = resolutionIndex,
             displayMode = displayMode,
             viewZoomIndex = viewZoomIndex,
@@ -93,11 +95,13 @@ public static class GameSettingsStore
     private const string LegacyMasterVolumeKey = "GameVolume";
     private const string MasterVolumeKey = "GameSettings.MasterVolume";
     private const string MusicVolumeKey = "GameSettings.MusicVolume";
+    private const string SfxVolumeKey = "GameSettings.SfxVolume";
     private const string ResolutionIndexKey = "ResolutionIndex";
     private const string DisplayModeKey = "GameSettings.DisplayMode";
     private const string ViewZoomIndexKey = "GameSettings.ViewZoomIndex";
     private const float DefaultMasterVolume = 1f;
     private const float DefaultMusicVolume = 0.85f;
+    private const float DefaultSfxVolume = 1f;
     private const int DefaultResolutionIndex = 3;
     private const int DefaultViewZoomIndex = 1;
 
@@ -130,6 +134,7 @@ public static class GameSettingsStore
         {
             masterVolume = LoadSavedMasterVolume(),
             musicVolume = Mathf.Clamp01(PlayerPrefs.GetFloat(MusicVolumeKey, DefaultMusicVolume)),
+            sfxVolume = Mathf.Clamp01(PlayerPrefs.GetFloat(SfxVolumeKey, DefaultSfxVolume)),
             resolutionIndex = Mathf.Clamp(PlayerPrefs.GetInt(ResolutionIndexKey, DefaultResolutionIndex), 0, ResolutionOptions.Length - 1),
             displayMode = LoadSavedDisplayMode(),
             viewZoomIndex = Mathf.Clamp(PlayerPrefs.GetInt(ViewZoomIndexKey, DefaultViewZoomIndex), 0, ViewZoomMultipliers.Length - 1),
@@ -152,6 +157,7 @@ public static class GameSettingsStore
         {
             masterVolume = DefaultMasterVolume,
             musicVolume = DefaultMusicVolume,
+            sfxVolume = DefaultSfxVolume,
             resolutionIndex = DefaultResolutionIndex,
             displayMode = GameDisplayMode.Windowed,
             viewZoomIndex = DefaultViewZoomIndex,
@@ -173,12 +179,16 @@ public static class GameSettingsStore
         GameSettingsDraft source = draft ?? LoadSavedSettings();
         float masterVolume = Mathf.Clamp01(source.masterVolume);
         float musicVolume = Mathf.Clamp01(source.musicVolume);
+        float sfxVolume = Mathf.Clamp01(source.sfxVolume);
 
         AudioListener.volume = masterVolume;
 
-        if (MusicManager.Instance != null)
+        MusicManager manager = MusicManager.Instance != null
+            ? MusicManager.Instance
+            : MusicManager.EnsureInstance();
+        if (manager != null)
         {
-            MusicManager.Instance.SetVolume(masterVolume * musicVolume);
+            manager.ApplyVolumeSettings(masterVolume, musicVolume, sfxVolume);
         }
     }
 
@@ -188,6 +198,7 @@ public static class GameSettingsStore
 
         PlayerPrefs.SetFloat(MasterVolumeKey, Mathf.Clamp01(source.masterVolume));
         PlayerPrefs.SetFloat(MusicVolumeKey, Mathf.Clamp01(source.musicVolume));
+        PlayerPrefs.SetFloat(SfxVolumeKey, Mathf.Clamp01(source.sfxVolume));
         PlayerPrefs.SetInt(ResolutionIndexKey, Mathf.Clamp(source.resolutionIndex, 0, ResolutionOptions.Length - 1));
         PlayerPrefs.SetInt(DisplayModeKey, (int)source.displayMode);
         PlayerPrefs.SetInt(ViewZoomIndexKey, Mathf.Clamp(source.viewZoomIndex, 0, ViewZoomMultipliers.Length - 1));
@@ -211,6 +222,7 @@ public static class GameSettingsStore
 
         return !Mathf.Approximately(savedSettings.masterVolume, draftSettings.masterVolume) ||
                !Mathf.Approximately(savedSettings.musicVolume, draftSettings.musicVolume) ||
+               !Mathf.Approximately(savedSettings.sfxVolume, draftSettings.sfxVolume) ||
                savedSettings.resolutionIndex != draftSettings.resolutionIndex ||
                savedSettings.displayMode != draftSettings.displayMode ||
                savedSettings.viewZoomIndex != draftSettings.viewZoomIndex ||
@@ -261,6 +273,11 @@ public static class GameSettingsStore
         return LoadSavedSettings().musicVolume;
     }
 
+    public static float GetSfxVolume()
+    {
+        return LoadSavedSettings().sfxVolume;
+    }
+
     public static void ApplyDisplaySettings()
     {
         GameSettingsDraft savedSettings = LoadSavedSettings();
@@ -298,6 +315,13 @@ public static class GameSettingsStore
     {
         GameSettingsDraft savedSettings = LoadSavedSettings();
         savedSettings.musicVolume = Mathf.Clamp01(value);
+        SaveCompatChange(savedSettings, applyImmediately);
+    }
+
+    public static void SetSfxVolume(float value, bool applyImmediately = true)
+    {
+        GameSettingsDraft savedSettings = LoadSavedSettings();
+        savedSettings.sfxVolume = Mathf.Clamp01(value);
         SaveCompatChange(savedSettings, applyImmediately);
     }
 
@@ -460,6 +484,7 @@ public static class GameSettingsStore
 
         PlayerPrefs.SetFloat(MasterVolumeKey, Mathf.Clamp01(draft.masterVolume));
         PlayerPrefs.SetFloat(MusicVolumeKey, Mathf.Clamp01(draft.musicVolume));
+        PlayerPrefs.SetFloat(SfxVolumeKey, Mathf.Clamp01(draft.sfxVolume));
         PlayerPrefs.SetInt(ResolutionIndexKey, Mathf.Clamp(draft.resolutionIndex, 0, ResolutionOptions.Length - 1));
         PlayerPrefs.SetInt(DisplayModeKey, (int)draft.displayMode);
         PlayerPrefs.SetInt(ViewZoomIndexKey, Mathf.Clamp(draft.viewZoomIndex, 0, ViewZoomMultipliers.Length - 1));

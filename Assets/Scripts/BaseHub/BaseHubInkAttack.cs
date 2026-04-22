@@ -39,6 +39,7 @@ public class BaseHubInkAttack : MonoBehaviour
         WeaponAttackProfile profile = WeaponAttackProfile.FromWeaponType(PlayerLoadoutRuntime.CurrentWeaponType);
         InkAttackRuntimeConfig config = profile.ApplyToInkConfig(InkModifierRuntimeConfig.BuildFromBackpack(BackpackMananger.Instance));
         cooldownTimer = profile.AttackInterval;
+        MusicManager.PlaySfx(SfxCueId.PlayerAttack);
 
         Vector2 direction = directionTracker != null ? directionTracker.LastDirection : Vector2.right;
         if (direction == Vector2.zero)
