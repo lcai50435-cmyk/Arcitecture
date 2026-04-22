@@ -586,6 +586,7 @@ public class UIRootManager : MonoBehaviour
     public bool IsAnyGameplayBlockingUIOpen()
     {
         return IsModalFlowOpen ||
+               (RuntimeSettingsPanel.Instance != null && RuntimeSettingsPanel.Instance.IsShown) ||
                IsCanvasGroupOpen(handbookUI) ||
                IsCanvasGroupOpen(detailUIPage1) ||
                IsCanvasGroupOpen(detailUIPage2) ||
@@ -671,9 +672,9 @@ public class UIRootManager : MonoBehaviour
             detailedInformationController == null ||
             submitPanelControllers == null ||
             submitPanelControllers.Length == 0 ||
-            (spiritPanelUI == null && SceneManager.GetActiveScene().name == "BaseScene") ||
-            (stageSelectionPanelUI == null && SceneManager.GetActiveScene().name == "BaseScene") ||
-            (albumPanelUI == null && SceneManager.GetActiveScene().name == "BaseScene"))
+            (spiritPanelUI == null && SceneManager.GetActiveScene().name == "NewBase") ||
+            (stageSelectionPanelUI == null && SceneManager.GetActiveScene().name == "NewBase") ||
+            (albumPanelUI == null && SceneManager.GetActiveScene().name == "NewBase"))
         {
             RefreshRuntimeBindings();
         }
@@ -1216,7 +1217,7 @@ public class RuntimePauseMenu : MonoBehaviour
 
         if (show)
         {
-            settingsPanel.Show();
+            settingsPanel.Show(SettingsPanelContext.Gameplay);
             return;
         }
 

@@ -81,9 +81,7 @@ public sealed class MainMenuController : MonoBehaviour
 
     private Button exitButton;
     private Button continueButton;
-    private SettingsManager settingsManager;
     private RectTransform menuCanvasRect;
-    private RectTransform settingsPanelRect;
     private RectTransform menuRootRect;
     private Canvas runtimeCanvas;
     private RectTransform runtimeCanvasRect;
@@ -177,9 +175,7 @@ public sealed class MainMenuController : MonoBehaviour
             return;
         }
 
-        bool settingsOpen = settingsManager != null
-            && settingsManager.settingsPanel != null
-            && settingsManager.settingsPanel.activeInHierarchy;
+        bool settingsOpen = RuntimeSettingsPanel.Instance != null && RuntimeSettingsPanel.Instance.IsShown;
 
         if (menuRootRect.gameObject.activeSelf == settingsOpen)
         {
@@ -212,7 +208,6 @@ public sealed class MainMenuController : MonoBehaviour
         Button legacyStartButton = FindNamedButton("Start Game");
         Button legacySetupButton = FindNamedButton("Set up");
         exitButton = FindNamedButton("Exit");
-        settingsManager = FindObjectOfType<SettingsManager>(true);
 
         if (legacyStartButton == null || legacySetupButton == null || exitButton == null)
         {
@@ -226,10 +221,6 @@ public sealed class MainMenuController : MonoBehaviour
             Debug.LogWarning("MainMenuController 初始化失败：未找到主菜单 Canvas。");
             return;
         }
-
-        settingsPanelRect = settingsManager != null && settingsManager.settingsPanel != null
-            ? settingsManager.settingsPanel.transform as RectTransform
-            : null;
 
         legacyStartButton.gameObject.SetActive(false);
         legacySetupButton.gameObject.SetActive(false);
@@ -511,16 +502,7 @@ public sealed class MainMenuController : MonoBehaviour
     private void OpenSettingsPanel()
     {
         CloseSlotPanel();
-
-        if (settingsManager == null)
-        {
-            settingsManager = FindObjectOfType<SettingsManager>(true);
-        }
-
-        if (settingsManager != null)
-        {
-            settingsManager.OpenSettings();
-        }
+        RuntimeSettingsPanel.EnsureInstance().Show(SettingsPanelContext.MainMenu);
     }
 
     private void OpenSlotPanel(MainMenuSlotPanelMode mode)

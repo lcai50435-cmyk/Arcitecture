@@ -13,7 +13,7 @@ public class SceneLoader : MonoBehaviour
     [SerializeField] private int baseSceneIndex = 1;
     [SerializeField] private int gameSceneIndex = 2;
     [SerializeField] private string mainMenuSceneName = "MainScene";
-    [SerializeField] private string baseSceneName = "BaseScene";
+    [SerializeField] private string baseSceneName = "NewBase";
     [SerializeField] private string gameSceneName = "GameScene";
 
     public static SceneLoader Instance;

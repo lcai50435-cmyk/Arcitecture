@@ -45,6 +45,7 @@ public sealed class RuntimeSubtitleFeedHud : MonoBehaviour
     private readonly List<TextMeshProUGUI> rowTexts = new List<TextMeshProUGUI>();
 
     private Canvas canvas;
+    private RectTransform canvasRect;
     private RectTransform rootRect;
     private TMP_FontAsset hudFontAsset;
     private BackpackMananger backpack;
@@ -126,6 +127,7 @@ public sealed class RuntimeSubtitleFeedHud : MonoBehaviour
 
         Instance = this;
         DontDestroyOnLoad(gameObject);
+        CleanupLegacySelfCanvas();
         EnsureUi();
         HandleSceneChanged(SceneManager.GetActiveScene().name);
         TrySubscribe();
@@ -263,6 +265,7 @@ public sealed class RuntimeSubtitleFeedHud : MonoBehaviour
     private void EnsureUi()
     {
         if (canvas != null &&
+            canvasRect != null &&
             rootRect != null &&
             rowTexts.Count == MaxVisibleEntries &&
             rowShadowTexts.Count == MaxVisibleEntries)
@@ -271,40 +274,18 @@ public sealed class RuntimeSubtitleFeedHud : MonoBehaviour
             return;
         }
 
-        canvas = GetComponent<Canvas>();
-        if (canvas == null)
+        EnsureCanvasInfrastructure();
+
+        if (canvasRect == null)
         {
-            canvas = gameObject.AddComponent<Canvas>();
+            return;
         }
-
-        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-        canvas.overrideSorting = true;
-        canvas.sortingOrder = SortingOrder;
-
-        CanvasScaler scaler = GetComponent<CanvasScaler>();
-        if (scaler == null)
-        {
-            scaler = gameObject.AddComponent<CanvasScaler>();
-        }
-
-        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-        scaler.referenceResolution = new Vector2(1920f, 1080f);
-        scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
-        scaler.matchWidthOrHeight = 0.5f;
-
-        GraphicRaycaster raycaster = GetComponent<GraphicRaycaster>();
-        if (raycaster == null)
-        {
-            raycaster = gameObject.AddComponent<GraphicRaycaster>();
-        }
-
-        raycaster.enabled = false;
 
         if (rootRect == null)
         {
             GameObject rootObject = new GameObject(RootName, typeof(RectTransform));
             rootRect = rootObject.GetComponent<RectTransform>();
-            rootRect.SetParent(canvas.transform, false);
+            rootRect.SetParent(canvasRect, false);
             rootRect.anchorMin = new Vector2(0f, 0f);
             rootRect.anchorMax = new Vector2(0f, 0f);
             rootRect.pivot = new Vector2(0f, 0f);
@@ -313,9 +294,88 @@ public sealed class RuntimeSubtitleFeedHud : MonoBehaviour
                 RootWidth,
                 RootPadding * 2f + MaxVisibleEntries * RowHeight + (MaxVisibleEntries - 1) * RowSpacing);
         }
+        else if (rootRect.parent != canvasRect)
+        {
+            rootRect.SetParent(canvasRect, false);
+        }
 
         CleanupLegacyVisuals();
         RebuildRows();
+    }
+
+    private void EnsureCanvasInfrastructure()
+    {
+        if (canvas != null && canvasRect != null)
+        {
+            return;
+        }
+
+        Transform existingCanvas = transform.Find(CanvasName);
+        GameObject canvasObject = existingCanvas != null
+            ? existingCanvas.gameObject
+            : new GameObject(
+                CanvasName,
+                typeof(RectTransform),
+                typeof(Canvas),
+                typeof(CanvasScaler),
+                typeof(GraphicRaycaster));
+
+        canvasObject.transform.SetParent(transform, false);
+
+        canvas = canvasObject.GetComponent<Canvas>();
+        if (canvas == null)
+        {
+            canvas = canvasObject.AddComponent<Canvas>();
+        }
+
+        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        canvas.overrideSorting = true;
+        canvas.sortingOrder = SortingOrder;
+
+        CanvasScaler scaler = canvasObject.GetComponent<CanvasScaler>();
+        if (scaler == null)
+        {
+            scaler = canvasObject.AddComponent<CanvasScaler>();
+        }
+
+        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+        scaler.referenceResolution = new Vector2(1920f, 1080f);
+        scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
+        scaler.matchWidthOrHeight = 0.5f;
+
+        GraphicRaycaster raycaster = canvasObject.GetComponent<GraphicRaycaster>();
+        if (raycaster != null)
+        {
+            raycaster.enabled = false;
+        }
+
+        canvasRect = canvasObject.GetComponent<RectTransform>();
+        canvasRect.anchorMin = Vector2.zero;
+        canvasRect.anchorMax = Vector2.one;
+        canvasRect.offsetMin = Vector2.zero;
+        canvasRect.offsetMax = Vector2.zero;
+        canvasRect.localScale = Vector3.one;
+    }
+
+    private void CleanupLegacySelfCanvas()
+    {
+        Canvas legacyCanvas = GetComponent<Canvas>();
+        if (legacyCanvas != null)
+        {
+            Destroy(legacyCanvas);
+        }
+
+        CanvasScaler legacyScaler = GetComponent<CanvasScaler>();
+        if (legacyScaler != null)
+        {
+            Destroy(legacyScaler);
+        }
+
+        GraphicRaycaster legacyRaycaster = GetComponent<GraphicRaycaster>();
+        if (legacyRaycaster != null)
+        {
+            Destroy(legacyRaycaster);
+        }
     }
 
     private void RebuildRows()
@@ -446,6 +506,7 @@ public sealed class RuntimeSubtitleFeedHud : MonoBehaviour
             }
 
             SubtitleEntry entry = entries[entries.Count - 1 - i];
+            TmpRuntimeFontFallback.WarmupCharacters(entry.DisplayText);
             rowCanvasGroup.alpha = 1f;
             rowText.color = RowTextColors[Mathf.Min(i, RowTextColors.Length - 1)];
             rowShadowText.color = RowShadowColors[Mathf.Min(i, RowShadowColors.Length - 1)];

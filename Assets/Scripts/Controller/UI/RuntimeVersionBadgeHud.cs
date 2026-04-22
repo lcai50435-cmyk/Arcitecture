@@ -6,7 +6,7 @@ using UnityEngine.UI;
 public sealed class RuntimeVersionBadgeHud : MonoBehaviour
 {
     private const string MainSceneName = "MainScene";
-    private const string BaseSceneName = "BaseScene";
+    private const string BaseSceneName = "NewBase";
     private const string CanvasName = "RuntimeVersionBadgeCanvas";
     private const int SortingOrder = 360;
     private const float EdgeMargin = 2f;

@@ -8,6 +8,13 @@ using UnityEngine.SceneManagement;
 using UnityEngine.TextCore.LowLevel;
 using UnityEngine.UI;
 
+public enum SettingsPanelContext
+{
+    MainMenu = 0,
+    BaseHub = 1,
+    Gameplay = 2
+}
+
 public sealed class RuntimeSettingsPanel : MonoBehaviour
 {
     private enum SettingsTab
@@ -29,7 +36,7 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
     private const int DisplayRefreshFrameBudget = 12;
 
     private const string RequiredCharacters =
-        "设置游戏已暂停当前没有未应用更改存在未应用更改继续游戏会自动应用声音画面按键存档恢复默认取消应用总音量音乐音量音效音量控制全部游戏声音背景音乐攻击与发射声音单独强度实时预览屏幕大小显示模式视野缩放影响游戏相机可见范围待应用窗口尺寸窗口模式与全屏切换当前生效信息以下内容来自当前运行中的实际状态攻击交互地图暂停拍照留念纪念截图点击右侧按钮后按任意键或鼠标键进行绑定等待输入正在为当前暂停键重置存档清空本地建筑进度关卡选择武器状态和留念相册设置项会保留没有可重置的数据再次点击将立即清空本地进度与相册截图并返回主菜单此操作不可恢复完成后重置结束后会返回主菜单便于从干净状态重新开始返回主菜单图形音量键位等设置不会被重置保留设置确认重置，。“”0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-+/():.% ";
+        "设置游戏已暂停当前没有未应用更改存在未应用更改继续游戏会自动应用关闭时会自动应用关闭设置会自动应用声音画面按键存档恢复默认取消应用总音量音乐音量音效音量控制全部游戏声音背景音乐攻击与发射声音单独强度实时预览屏幕大小显示模式视野缩放影响游戏相机可见范围待应用窗口尺寸窗口模式与全屏切换当前生效信息以下内容来自当前运行中的实际状态攻击交互地图暂停拍照留念纪念截图点击右侧按钮后按任意键或鼠标键进行绑定等待输入正在为当前暂停键重置存档清空本地建筑进度关卡选择武器状态和留念相册设置项会保留没有可重置的数据再次点击将立即清空本地进度与相册截图，并返回主菜单此操作不可恢复完成后重置结束后会返回主菜单便于从干净状态重新开始重置结束后会留在主菜单返回主菜单图形音量键位等设置不会被重置保留设置确认重置关闭应用并继续继续游戏应用并关闭关闭返回主界面应用并返回不保存返回确认返回当前战斗会直接结束并回到主界面未应用改动会先写入设置不会重置存档或相册会放弃当前未应用改动并回到主界面返回取消留在当前页面，。“”0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-+/():.% ";
 
     private static readonly string[] RuntimeFontNames =
     {
@@ -65,6 +72,8 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
     private static readonly Color DangerButtonColor = new Color(0.55f, 0.25f, 0.22f, 0.88f);
     private static readonly Color DangerButtonArmedColor = new Color(0.84f, 0.30f, 0.26f, 0.96f);
     private static readonly Color DangerButtonTextColor = new Color(0.99f, 0.95f, 0.92f, 1f);
+    private static readonly Color ConfirmOverlayColor = new Color(0.03f, 0.04f, 0.06f, 0.82f);
+    private static readonly Color ConfirmPanelColor = new Color(0.11f, 0.13f, 0.18f, 0.96f);
     private static readonly Color TitleColor = new Color(0.96f, 0.98f, 1f, 1f);
     private static readonly Color DescriptionColor = new Color(0.70f, 0.78f, 0.88f, 1f);
     private static readonly Color ValueChipColor = new Color(0.16f, 0.20f, 0.28f, 0.78f);
@@ -101,9 +110,11 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
     private Coroutine backdropRefreshCoroutine;
     private Vector2 panelVisibleAnchoredPosition;
     private SettingsTab currentTab = SettingsTab.Audio;
+    private SettingsPanelContext currentContext = SettingsPanelContext.Gameplay;
     private GameInputAction? pendingBindingAction;
     private float captureReadyAt;
     private bool resetSaveArmed;
+    private bool returnToMenuConfirmOpen;
     private Texture2D capturedBackdropTexture;
     private RenderTexture blurredBackdropTexture;
     private float animationProgress;
@@ -122,15 +133,34 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
     private TextMeshProUGUI viewZoomValueText;
     private TextMeshProUGUI runtimeInfoValueText;
     private TextMeshProUGUI saveResetSummaryText;
+    private TextMeshProUGUI dataResetDescriptionText;
+    private TextMeshProUGUI dataCompletionDescriptionText;
+    private TextMeshProUGUI dataCompletionValueText;
     private Button applyButton;
     private TextMeshProUGUI applyButtonLabel;
     private Image applyButtonImage;
     private Button continueButton;
     private TextMeshProUGUI continueButtonLabel;
     private Image continueButtonImage;
+    private Button returnToMenuButton;
+    private TextMeshProUGUI returnToMenuButtonLabel;
+    private Image returnToMenuButtonImage;
     private Button resetSaveButton;
     private TextMeshProUGUI resetSaveButtonLabel;
     private Image resetSaveButtonImage;
+    private RectTransform returnToMenuConfirmRoot;
+    private CanvasGroup returnToMenuConfirmCanvasGroup;
+    private TextMeshProUGUI returnToMenuConfirmTitleText;
+    private TextMeshProUGUI returnToMenuConfirmBodyText;
+    private Button returnToMenuConfirmPrimaryButton;
+    private TextMeshProUGUI returnToMenuConfirmPrimaryButtonLabel;
+    private Image returnToMenuConfirmPrimaryButtonImage;
+    private Button returnToMenuConfirmSecondaryButton;
+    private TextMeshProUGUI returnToMenuConfirmSecondaryButtonLabel;
+    private Image returnToMenuConfirmSecondaryButtonImage;
+    private Button returnToMenuConfirmCancelButton;
+    private TextMeshProUGUI returnToMenuConfirmCancelButtonLabel;
+    private Image returnToMenuConfirmCancelButtonImage;
 
     public static RuntimeSettingsPanel EnsureInstance()
     {
@@ -205,8 +235,9 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
         }
     }
 
-    public void Show()
+    public void Show(SettingsPanelContext context)
     {
+        currentContext = context;
         EnsureUi();
         LoadDraftState();
         RefreshAll();
@@ -250,6 +281,8 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
         savedSettings = null;
         draftSettings = null;
         resetSaveArmed = false;
+        returnToMenuConfirmOpen = false;
+        SetReturnToMenuConfirmVisible(false);
         ReleaseBlurBackdrop();
         ApplyAnimationState(0f);
         SetPanelVisibility(false);
@@ -283,6 +316,7 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
         draftSettings = GameSettingsStore.CreateDraftFromSaved();
         pendingBindingAction = null;
         resetSaveArmed = false;
+        returnToMenuConfirmOpen = false;
     }
 
     private void EnsureUi()
@@ -349,6 +383,7 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
         BuildTabs(panel.transform);
         BuildPages(panel.transform);
         BuildFooter(panel.transform);
+        BuildReturnToMenuConfirm(panel.transform);
 
         ApplyAnimationState(0f);
     }
@@ -450,6 +485,22 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
         applyButtonImage = applyButton.GetComponent<Image>();
         applyButtonLabel = applyButton.GetComponentInChildren<TextMeshProUGUI>();
 
+        returnToMenuButton = CreateButton(
+            "ReturnToMenuButton",
+            footerRoot,
+            "返回主界面",
+            SecondaryButtonColor,
+            SecondaryButtonTextColor,
+            new Vector2(196f, FooterButtonHeight));
+        RectTransform returnRect = returnToMenuButton.GetComponent<RectTransform>();
+        returnRect.anchorMin = new Vector2(1f, 0.5f);
+        returnRect.anchorMax = new Vector2(1f, 0.5f);
+        returnRect.pivot = new Vector2(1f, 0.5f);
+        returnRect.anchoredPosition = new Vector2(-(FooterButtonWidth * 2f + 48f), 0f);
+        returnToMenuButton.onClick.AddListener(HandleReturnToMenuRequested);
+        returnToMenuButtonImage = returnToMenuButton.GetComponent<Image>();
+        returnToMenuButtonLabel = returnToMenuButton.GetComponentInChildren<TextMeshProUGUI>();
+
         continueButton = CreateButton(
             "FooterContinueButton",
             footerRoot,
@@ -465,6 +516,92 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
         continueButton.onClick.AddListener(HandleContinueRequested);
         continueButtonLabel = continueButton.GetComponentInChildren<TextMeshProUGUI>();
         continueButtonImage = continueButton.GetComponent<Image>();
+    }
+
+    private void BuildReturnToMenuConfirm(Transform parent)
+    {
+        returnToMenuConfirmRoot = CreateContainer("ReturnToMenuConfirmRoot", parent, Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f));
+        StretchRect(returnToMenuConfirmRoot);
+        returnToMenuConfirmCanvasGroup = returnToMenuConfirmRoot.gameObject.AddComponent<CanvasGroup>();
+
+        Image overlay = CreateImage("ConfirmOverlay", returnToMenuConfirmRoot, ConfirmOverlayColor, 0, 0);
+        StretchRect(overlay.rectTransform);
+        overlay.raycastTarget = true;
+
+        Image panel = CreateImage("ConfirmPanel", returnToMenuConfirmRoot, ConfirmPanelColor, 24, 18);
+        RectTransform panelRect = panel.rectTransform;
+        panelRect.anchorMin = new Vector2(0.5f, 0.5f);
+        panelRect.anchorMax = new Vector2(0.5f, 0.5f);
+        panelRect.pivot = new Vector2(0.5f, 0.5f);
+        panelRect.sizeDelta = new Vector2(760f, 304f);
+        panelRect.anchoredPosition = new Vector2(0f, 18f);
+
+        returnToMenuConfirmTitleText = CreateText("Title", panelRect, string.Empty, 34f, TitleColor, TextAlignmentOptions.Left);
+        RectTransform titleRect = returnToMenuConfirmTitleText.rectTransform;
+        titleRect.anchorMin = new Vector2(0f, 1f);
+        titleRect.anchorMax = new Vector2(0f, 1f);
+        titleRect.pivot = new Vector2(0f, 1f);
+        titleRect.sizeDelta = new Vector2(600f, 44f);
+        titleRect.anchoredPosition = new Vector2(34f, -26f);
+
+        returnToMenuConfirmBodyText = CreateText("Body", panelRect, string.Empty, 22f, DescriptionColor, TextAlignmentOptions.Left);
+        RectTransform bodyRect = returnToMenuConfirmBodyText.rectTransform;
+        bodyRect.anchorMin = new Vector2(0f, 1f);
+        bodyRect.anchorMax = new Vector2(1f, 1f);
+        bodyRect.pivot = new Vector2(0f, 1f);
+        bodyRect.offsetMin = new Vector2(34f, -168f);
+        bodyRect.offsetMax = new Vector2(-34f, -88f);
+        returnToMenuConfirmBodyText.enableWordWrapping = true;
+
+        returnToMenuConfirmPrimaryButton = CreateButton(
+            "PrimaryButton",
+            panelRect,
+            "应用并返回",
+            PrimaryButtonColor,
+            PrimaryButtonTextColor,
+            new Vector2(188f, 56f));
+        RectTransform primaryRect = returnToMenuConfirmPrimaryButton.GetComponent<RectTransform>();
+        primaryRect.anchorMin = new Vector2(1f, 0f);
+        primaryRect.anchorMax = new Vector2(1f, 0f);
+        primaryRect.pivot = new Vector2(1f, 0f);
+        primaryRect.anchoredPosition = new Vector2(-34f, 30f);
+        returnToMenuConfirmPrimaryButton.onClick.AddListener(() => ExecuteReturnToMainMenu(true));
+        returnToMenuConfirmPrimaryButtonImage = returnToMenuConfirmPrimaryButton.GetComponent<Image>();
+        returnToMenuConfirmPrimaryButtonLabel = returnToMenuConfirmPrimaryButton.GetComponentInChildren<TextMeshProUGUI>();
+
+        returnToMenuConfirmSecondaryButton = CreateButton(
+            "SecondaryButton",
+            panelRect,
+            "不保存返回",
+            SecondaryButtonColor,
+            SecondaryButtonTextColor,
+            new Vector2(188f, 56f));
+        RectTransform secondaryRect = returnToMenuConfirmSecondaryButton.GetComponent<RectTransform>();
+        secondaryRect.anchorMin = new Vector2(1f, 0f);
+        secondaryRect.anchorMax = new Vector2(1f, 0f);
+        secondaryRect.pivot = new Vector2(1f, 0f);
+        secondaryRect.anchoredPosition = new Vector2(-234f, 30f);
+        returnToMenuConfirmSecondaryButton.onClick.AddListener(() => ExecuteReturnToMainMenu(false));
+        returnToMenuConfirmSecondaryButtonImage = returnToMenuConfirmSecondaryButton.GetComponent<Image>();
+        returnToMenuConfirmSecondaryButtonLabel = returnToMenuConfirmSecondaryButton.GetComponentInChildren<TextMeshProUGUI>();
+
+        returnToMenuConfirmCancelButton = CreateButton(
+            "CancelButton",
+            panelRect,
+            "取消",
+            SecondaryButtonColor,
+            SecondaryButtonTextColor,
+            new Vector2(156f, 56f));
+        RectTransform confirmCancelRect = returnToMenuConfirmCancelButton.GetComponent<RectTransform>();
+        confirmCancelRect.anchorMin = new Vector2(0f, 0f);
+        confirmCancelRect.anchorMax = new Vector2(0f, 0f);
+        confirmCancelRect.pivot = new Vector2(0f, 0f);
+        confirmCancelRect.anchoredPosition = new Vector2(34f, 30f);
+        returnToMenuConfirmCancelButton.onClick.AddListener(HideReturnToMenuConfirm);
+        returnToMenuConfirmCancelButtonImage = returnToMenuConfirmCancelButton.GetComponent<Image>();
+        returnToMenuConfirmCancelButtonLabel = returnToMenuConfirmCancelButton.GetComponentInChildren<TextMeshProUGUI>();
+
+        SetReturnToMenuConfirmVisible(false);
     }
 
     private void CreateAudioPage(Transform parent)
@@ -565,14 +702,14 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
         titleRect.sizeDelta = new Vector2(360f, 34f);
         titleRect.anchoredPosition = new Vector2(30f, -18f);
 
-        TextMeshProUGUI descriptionText = CreateText(
+        dataResetDescriptionText = CreateText(
             "Description",
             cardRect,
             "清空本地建筑进度、关卡选择、武器状态和留念相册，设置项会保留。",
             20f,
             DescriptionColor,
             TextAlignmentOptions.Left);
-        RectTransform descriptionRect = descriptionText.rectTransform;
+        RectTransform descriptionRect = dataResetDescriptionText.rectTransform;
         descriptionRect.anchorMin = new Vector2(0f, 1f);
         descriptionRect.anchorMax = new Vector2(0f, 1f);
         descriptionRect.pivot = new Vector2(0f, 1f);
@@ -603,7 +740,14 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
         resetSaveButtonImage = resetSaveButton.GetComponent<Image>();
         resetSaveButtonLabel = resetSaveButton.GetComponentInChildren<TextMeshProUGUI>();
 
-        CreateStaticInfoCard(pageRoot, "完成后", "重置结束后会返回主菜单，便于从干净状态重新开始", 236f, "返回主菜单");
+        CreateStaticInfoCard(
+            pageRoot,
+            "完成后",
+            "重置结束后会返回主菜单，便于从干净状态重新开始",
+            236f,
+            "返回主菜单",
+            out dataCompletionDescriptionText,
+            out dataCompletionValueText);
         CreateStaticInfoCard(pageRoot, "保留项", "图形、音量、键位等设置不会被重置", 360f, "保留设置");
     }
 
@@ -730,7 +874,20 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
         float topOffset,
         string value)
     {
+        CreateStaticInfoCard(parent, title, description, topOffset, value, out _, out _);
+    }
+
+    private void CreateStaticInfoCard(
+        Transform parent,
+        string title,
+        string description,
+        float topOffset,
+        string value,
+        out TextMeshProUGUI descriptionText,
+        out TextMeshProUGUI valueText)
+    {
         RectTransform cardRoot = CreateCardRoot(parent, title, description, topOffset);
+        descriptionText = FindCardDescription(cardRoot);
 
         Image valueChip = CreateImage("StaticChip", cardRoot, ValueChipColor, 18, 14);
         RectTransform chipRect = valueChip.rectTransform;
@@ -740,7 +897,7 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
         chipRect.sizeDelta = new Vector2(260f, 56f);
         chipRect.anchoredPosition = new Vector2(-30f, 0f);
 
-        TextMeshProUGUI valueText = CreateText("Value", valueChip.transform, value, 22f, ValueTextColor, TextAlignmentOptions.Center);
+        valueText = CreateText("Value", valueChip.transform, value, 22f, ValueTextColor, TextAlignmentOptions.Center);
         StretchRect(valueText.rectTransform);
     }
 
@@ -771,6 +928,17 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
         descriptionRect.anchoredPosition = new Vector2(30f, 18f);
 
         return cardRect;
+    }
+
+    private static TextMeshProUGUI FindCardDescription(RectTransform cardRoot)
+    {
+        if (cardRoot == null)
+        {
+            return null;
+        }
+
+        Transform description = cardRoot.Find("Description");
+        return description != null ? description.GetComponent<TextMeshProUGUI>() : null;
     }
 
     private void CreateTabButton(Transform parent, SettingsTab tab, string label, float xOffset)
@@ -817,6 +985,7 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
     {
         pendingBindingAction = null;
         resetSaveArmed = false;
+        returnToMenuConfirmOpen = false;
         if (draftSettings != null && GameSettingsStore.IsDirty(savedSettings, draftSettings))
         {
             ApplyDraftAndRefreshState();
@@ -827,6 +996,12 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
 
     private void HandleCancelRequested()
     {
+        if (returnToMenuConfirmOpen)
+        {
+            HideReturnToMenuConfirm();
+            return;
+        }
+
         pendingBindingAction = null;
         resetSaveArmed = false;
         if (savedSettings != null)
@@ -842,6 +1017,7 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
     {
         pendingBindingAction = null;
         resetSaveArmed = false;
+        returnToMenuConfirmOpen = false;
         if (draftSettings == null || !GameSettingsStore.IsDirty(savedSettings, draftSettings))
         {
             return;
@@ -861,14 +1037,59 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
     {
         pendingBindingAction = null;
         resetSaveArmed = false;
+        returnToMenuConfirmOpen = false;
         draftSettings = GameSettingsStore.CreateDefaultDraft();
         GameSettingsStore.PreviewDraftAudio(draftSettings);
         RefreshAll();
     }
 
+    private void HandleReturnToMenuRequested()
+    {
+        if (!SupportsReturnToMainMenu())
+        {
+            return;
+        }
+
+        pendingBindingAction = null;
+        resetSaveArmed = false;
+        returnToMenuConfirmOpen = true;
+        RefreshAll();
+    }
+
+    private void ExecuteReturnToMainMenu(bool applyPendingChanges)
+    {
+        bool isDirty = GameSettingsStore.IsDirty(savedSettings, draftSettings);
+        returnToMenuConfirmOpen = false;
+
+        if (applyPendingChanges)
+        {
+            if (isDirty)
+            {
+                ApplyDraftAndRefreshState();
+            }
+        }
+        else if (savedSettings != null)
+        {
+            GameSettingsStore.PreviewDraftAudio(savedSettings);
+            draftSettings = GameSettingsStore.DiscardDraft(savedSettings);
+        }
+
+        Hide(() =>
+        {
+            ContinueRequested?.Invoke();
+            if (currentContext == SettingsPanelContext.Gameplay)
+            {
+                RuntimeSessionResetService.ResetGameplayTransientState();
+            }
+
+            NavigateToMainMenu();
+        });
+    }
+
     private void HandleResetSaveRequested()
     {
         pendingBindingAction = null;
+        returnToMenuConfirmOpen = false;
 
         if (!GameSaveResetService.HasAnySaveData())
         {
@@ -888,15 +1109,7 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
         GameSaveResetService.ResetAllSaveData();
         HideImmediate();
         ContinueRequested?.Invoke();
-
-        SceneLoader loader = SceneLoader.EnsureInstance();
-        if (loader != null)
-        {
-            loader.ToMenu();
-            return;
-        }
-
-        SceneManager.LoadScene("MainScene");
+        NavigateToMainMenu();
     }
 
     private void ApplyDraftAndRefreshState()
@@ -1002,6 +1215,7 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
         RefreshDataPage();
         RefreshTabState();
         RefreshFooterState();
+        RefreshReturnToMenuConfirmState();
     }
 
     private void RefreshSubtitle()
@@ -1011,12 +1225,33 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
             return;
         }
 
-        GameSettingsDraft source = draftSettings ?? savedSettings ?? GameSettingsStore.LoadSavedSettings();
-        string pauseKey = GameSettingsStore.GetKeyDisplayName(source.GetBinding(GameInputAction.Pause));
         bool isDirty = GameSettingsStore.IsDirty(savedSettings, draftSettings);
-        subtitleText.text = isDirty
-            ? $"存在未应用更改，继续游戏会自动应用。当前暂停键：{pauseKey}"
-            : $"当前没有未应用更改。当前暂停键：{pauseKey}";
+        switch (currentContext)
+        {
+            case SettingsPanelContext.MainMenu:
+                subtitleText.text = isDirty
+                    ? "存在未应用更改，关闭时会自动应用。"
+                    : "当前没有未应用更改。";
+                break;
+            case SettingsPanelContext.BaseHub:
+            {
+                GameSettingsDraft source = draftSettings ?? savedSettings ?? GameSettingsStore.LoadSavedSettings();
+                string pauseKey = GameSettingsStore.GetKeyDisplayName(source.GetBinding(GameInputAction.Pause));
+                subtitleText.text = isDirty
+                    ? $"存在未应用更改，关闭设置会自动应用。当前暂停键：{pauseKey}"
+                    : $"当前没有未应用更改。当前暂停键：{pauseKey}";
+                break;
+            }
+            default:
+            {
+                GameSettingsDraft source = draftSettings ?? savedSettings ?? GameSettingsStore.LoadSavedSettings();
+                string pauseKey = GameSettingsStore.GetKeyDisplayName(source.GetBinding(GameInputAction.Pause));
+                subtitleText.text = isDirty
+                    ? $"存在未应用更改，继续游戏会自动应用。当前暂停键：{pauseKey}"
+                    : $"当前没有未应用更改。当前暂停键：{pauseKey}";
+                break;
+            }
+        }
     }
 
     private void RefreshAudioPage()
@@ -1123,6 +1358,27 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
     {
         bool hasSaveData = GameSaveResetService.HasAnySaveData();
 
+        if (dataResetDescriptionText != null)
+        {
+            dataResetDescriptionText.text = currentContext == SettingsPanelContext.MainMenu
+                ? "清空本地建筑进度、关卡选择、武器状态和留念相册，设置项会保留。"
+                : "清空本地建筑进度、关卡选择、武器状态和留念相册，设置项会保留。";
+        }
+
+        if (dataCompletionDescriptionText != null)
+        {
+            dataCompletionDescriptionText.text = currentContext == SettingsPanelContext.MainMenu
+                ? "重置结束后会留在主菜单，便于从干净状态重新开始"
+                : "重置结束后会返回主菜单，便于从干净状态重新开始";
+        }
+
+        if (dataCompletionValueText != null)
+        {
+            dataCompletionValueText.text = currentContext == SettingsPanelContext.MainMenu
+                ? "留在主菜单"
+                : "返回主菜单";
+        }
+
         if (saveResetSummaryText != null)
         {
             if (!hasSaveData)
@@ -1198,21 +1454,151 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
                 isDirty ? PrimaryButtonTextColor : DisabledButtonTextColor);
         }
 
-        if (continueButtonLabel != null)
+        string continueLabel = ResolveContinueButtonLabel(isDirty);
+        Color continueColor = isDirty ? PrimaryButtonColor : SecondaryButtonColor;
+        Color continueTextColor = isDirty ? PrimaryButtonTextColor : SecondaryButtonTextColor;
+        SetButtonState(
+            continueButton,
+            continueButtonImage,
+            continueButtonLabel,
+            true,
+            continueColor,
+            continueTextColor,
+            continueLabel);
+
+        bool showReturnToMenu = SupportsReturnToMainMenu();
+        if (returnToMenuButton != null)
         {
-            continueButtonLabel.text = "应用并继续";
+            returnToMenuButton.gameObject.SetActive(showReturnToMenu);
         }
 
-        if (continueButton != null)
+        if (showReturnToMenu)
         {
             SetButtonState(
-                continueButton,
-                continueButtonImage,
-                continueButtonLabel,
-                isDirty,
-                isDirty ? PrimaryButtonColor : DisabledPrimaryButtonColor,
-                isDirty ? PrimaryButtonTextColor : DisabledPrimaryButtonTextColor);
+                returnToMenuButton,
+                returnToMenuButtonImage,
+                returnToMenuButtonLabel,
+                true,
+                SecondaryButtonColor,
+                SecondaryButtonTextColor,
+                "返回主界面");
         }
+    }
+
+    private void RefreshReturnToMenuConfirmState()
+    {
+        bool isDirty = GameSettingsStore.IsDirty(savedSettings, draftSettings);
+        SetReturnToMenuConfirmVisible(returnToMenuConfirmOpen && SupportsReturnToMainMenu());
+
+        if (returnToMenuConfirmTitleText == null || returnToMenuConfirmBodyText == null)
+        {
+            return;
+        }
+
+        if (currentContext == SettingsPanelContext.Gameplay)
+        {
+            returnToMenuConfirmTitleText.text = "确认返回主界面";
+            returnToMenuConfirmBodyText.text = isDirty
+                ? "当前战斗会直接结束并回到主界面。\n未应用改动会先写入设置，不会重置存档或相册。"
+                : "当前战斗会直接结束并回到主界面。\n不会重置存档或相册。";
+        }
+        else
+        {
+            returnToMenuConfirmTitleText.text = "确认返回主界面";
+            returnToMenuConfirmBodyText.text = isDirty
+                ? "会先处理当前未应用改动，然后回到主界面。\n不会重置存档或相册。"
+                : "会直接回到主界面。\n不会重置存档或相册。";
+        }
+
+        SetButtonState(
+            returnToMenuConfirmPrimaryButton,
+            returnToMenuConfirmPrimaryButtonImage,
+            returnToMenuConfirmPrimaryButtonLabel,
+            true,
+            PrimaryButtonColor,
+            PrimaryButtonTextColor,
+            isDirty ? "应用并返回" : "返回主界面");
+
+        bool showDiscardButton = isDirty;
+        if (returnToMenuConfirmSecondaryButton != null)
+        {
+            returnToMenuConfirmSecondaryButton.gameObject.SetActive(showDiscardButton);
+        }
+
+        if (showDiscardButton)
+        {
+            SetButtonState(
+                returnToMenuConfirmSecondaryButton,
+                returnToMenuConfirmSecondaryButtonImage,
+                returnToMenuConfirmSecondaryButtonLabel,
+                true,
+                SecondaryButtonColor,
+                SecondaryButtonTextColor,
+                "不保存返回");
+        }
+
+        SetButtonState(
+            returnToMenuConfirmCancelButton,
+            returnToMenuConfirmCancelButtonImage,
+            returnToMenuConfirmCancelButtonLabel,
+            true,
+            SecondaryButtonColor,
+            SecondaryButtonTextColor,
+            "取消");
+    }
+
+    private string ResolveContinueButtonLabel(bool isDirty)
+    {
+        switch (currentContext)
+        {
+            case SettingsPanelContext.MainMenu:
+                return "关闭";
+            case SettingsPanelContext.BaseHub:
+                return isDirty ? "应用并关闭" : "关闭设置";
+            default:
+                return isDirty ? "应用并继续" : "继续游戏";
+        }
+    }
+
+    private bool SupportsReturnToMainMenu()
+    {
+        return currentContext != SettingsPanelContext.MainMenu;
+    }
+
+    private void HideReturnToMenuConfirm()
+    {
+        if (!returnToMenuConfirmOpen)
+        {
+            return;
+        }
+
+        returnToMenuConfirmOpen = false;
+        RefreshReturnToMenuConfirmState();
+    }
+
+    private void SetReturnToMenuConfirmVisible(bool visible)
+    {
+        if (returnToMenuConfirmRoot == null || returnToMenuConfirmCanvasGroup == null)
+        {
+            return;
+        }
+
+        returnToMenuConfirmRoot.gameObject.SetActive(visible);
+        returnToMenuConfirmCanvasGroup.alpha = visible ? 1f : 0f;
+        returnToMenuConfirmCanvasGroup.interactable = visible;
+        returnToMenuConfirmCanvasGroup.blocksRaycasts = visible;
+    }
+
+    private void NavigateToMainMenu()
+    {
+        SceneLoader loader = SceneLoader.EnsureInstance();
+        if (loader != null)
+        {
+            loader.ToMenu();
+            return;
+        }
+
+        SceneManager.LoadScene("MainScene");
     }
 
     private static void SetButtonState(
@@ -1223,6 +1609,18 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
         Color backgroundColor,
         Color textColor)
     {
+        SetButtonState(button, image, label, interactable, backgroundColor, textColor, null);
+    }
+
+    private static void SetButtonState(
+        Button button,
+        Image image,
+        TextMeshProUGUI label,
+        bool interactable,
+        Color backgroundColor,
+        Color textColor,
+        string overrideText)
+    {
         if (button == null || image == null || label == null)
         {
             return;
@@ -1231,6 +1629,10 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
         button.interactable = interactable;
         image.color = backgroundColor;
         label.color = textColor;
+        if (!string.IsNullOrEmpty(overrideText))
+        {
+            label.text = overrideText;
+        }
     }
 
     private static bool HasDisplayChanges(GameSettingsDraft saved, GameSettingsDraft draft)

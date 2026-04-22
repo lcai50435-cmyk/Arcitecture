@@ -5,7 +5,7 @@ using UnityEngine.UI;
 
 public class RuntimeMiniMapHud : MonoBehaviour
 {
-    private const string BaseSceneName = "BaseScene";
+    private const string BaseSceneName = "NewBase";
     private const string CameraName = "RuntimeMiniMapCamera";
     private const string OverlayCanvasName = "RuntimeMiniMapOverlayCanvas";
     private const string SmallMapRootName = "RuntimeMiniMapRoot";

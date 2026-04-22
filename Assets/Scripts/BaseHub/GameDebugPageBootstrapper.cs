@@ -10,9 +10,9 @@ using UnityEngine.UI;
 
 public class GameDebugPageBootstrapper : MonoBehaviour
 {
-    private const string BaseSceneName = "BaseScene";
+    private const string BaseSceneName = "NewBase";
     private const float RefreshInterval = 0.2f;
-    private const string RequiredDebugCharacters = "调试面板按住显示当前场景基地允许攻击生命上限耐久攻击力移动速度防御建筑结构材料武器墨水属性技能关闭开关预留版本穿透效果命中图鉴进度专用福建土楼赵州桥安徽水乡民居槽位完成总TabEsc";
+    private const string RequiredDebugCharacters = "调试面板按住显示当前场景基地允许攻击生命上限耐久攻击力移动速度防御建筑结构材料武器墨水属性技能关闭开关预留版本穿透效果命中图鉴进度专用福建土楼赵州桥安徽水乡民居槽位完成总召唤怪物随机火石只TabEsc";
     private static readonly string[] DebugFontNames =
     {
         "Arial Unicode MS",
@@ -220,6 +220,7 @@ public class GameDebugPageBootstrapper : MonoBehaviour
         GameObject section = CreateSection(parent, "场景与敌人");
         CreateActionRow(section.transform, "玩家位置", ("回出生点", () => TeleportPlayer(Vector3.zero)), ("去图鉴", () => TeleportPlayer(new Vector3(123.5f, 18f, 0f))));
         CreateActionRow(section.transform, "敌人", ("清空敌人", ClearEnemies), ("敌人重置", ResetEnemies));
+        CreateActionRow(section.transform, "召唤怪物", ("随机1只", () => SummonEnemies(null, 1)), ("火怪1只", () => SummonEnemies("FireMonster", 1)), ("石怪1只", () => SummonEnemies("StoneMonster", 1)));
         CreateActionRow(section.transform, "场景", ("回基地", GameSceneBaseReturnBootstrapper.SubmitCatalogueAndReturnToBase), ("刷新状态", RefreshStatus));
     }
 
@@ -539,6 +540,30 @@ public class GameDebugPageBootstrapper : MonoBehaviour
                 enemies[i].ResetState();
                 enemies[i].ResolvePlayerTargetIfMissing();
             }
+        }
+
+        RefreshStatus();
+    }
+
+    private void SummonEnemies(string enemyKeyword, int count)
+    {
+        if (count <= 0)
+        {
+            return;
+        }
+
+        RunStageDirector director = FindObjectOfType<RunStageDirector>();
+        if (director == null)
+        {
+            Debug.LogWarning("当前场景未找到 RunStageDirector，无法召唤怪物");
+            return;
+        }
+
+        if (!director.DebugSpawnEnemy(enemyKeyword, count))
+        {
+            string enemyDisplayName = string.IsNullOrWhiteSpace(enemyKeyword) ? "随机怪物" : enemyKeyword;
+            Debug.LogWarning($"未能召唤{enemyDisplayName}，请确认场景里已有对应敌人模板");
+            return;
         }
 
         RefreshStatus();
