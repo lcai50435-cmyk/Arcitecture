@@ -204,10 +204,12 @@ public sealed class GameplayStageIntroDirector : MonoBehaviour
         yield return HoldOverviewShot(overviewPose);
         yield return PlayCameraTravel(overviewPose, landingPose, portalSideSign);
         yield return PlayPortalEject(landingPose, portalSideSign);
-        RestoreGameplayState(false);
+        RestoreGameplayUiState(false);
         yield return PlayGameplayUiFadeIn();
 
+        bool adoptedRuntimeCamera = TryAdoptRuntimeCameraPose();
         IsIntroActive = false;
+        RestoreGameplayRuntimeState(!adoptedRuntimeCamera);
         stateRestored = true;
         Destroy(gameObject);
     }
@@ -514,6 +516,47 @@ public sealed class GameplayStageIntroDirector : MonoBehaviour
 
     private void RestoreGameplayState(bool showUiImmediately = true)
     {
+        RestoreGameplayUiState(showUiImmediately);
+        RestoreGameplayRuntimeState(true);
+
+        if (showUiImmediately)
+        {
+            IsIntroActive = false;
+        }
+    }
+
+    private void RestoreGameplayUiState(bool showUiImmediately = true)
+    {
+        ShowPlayerRenderers(null);
+
+        if (showUiImmediately)
+        {
+            GameplayStatusHudRuntime.SetVisible(true);
+            GameplayStatusHudRuntime.SetAlpha(1f);
+            RuntimeMiniMapHud.SetExternallyHidden(false);
+            RuntimeMiniMapHud.SetExternalAlpha(1f);
+
+            if (UIRootManager.Instance != null && UIRootManager.Instance.backpackUI != null)
+            {
+                UIRootManager.Instance.ShowBackpack(true);
+            }
+
+            return;
+        }
+
+        GameplayStatusHudRuntime.SetVisible(true);
+        GameplayStatusHudRuntime.SetAlpha(0f);
+        RuntimeMiniMapHud.SetExternallyHidden(false);
+        RuntimeMiniMapHud.SetExternalAlpha(0f);
+
+        if (UIRootManager.Instance != null && UIRootManager.Instance.backpackUI != null)
+        {
+            UIRootManager.Instance.HideBackpack(true);
+        }
+    }
+
+    private void RestoreGameplayRuntimeState(bool restoreCameraPose)
+    {
         if (playerMove != null)
         {
             playerMove.canMove = true;
@@ -536,37 +579,13 @@ public sealed class GameplayStageIntroDirector : MonoBehaviour
             playerInteraction.ClearCurrentInteractable();
         }
 
-        ShowPlayerRenderers(null);
-        RestoreMainCamera();
+        if (restoreCameraPose)
+        {
+            RestoreMainCamera();
+        }
 
         countdownManager?.SetInBaseState(false);
         runStageDirector?.ResumeRuntime();
-
-        if (showUiImmediately)
-        {
-            GameplayStatusHudRuntime.SetVisible(true);
-            GameplayStatusHudRuntime.SetAlpha(1f);
-            RuntimeMiniMapHud.SetExternallyHidden(false);
-            RuntimeMiniMapHud.SetExternalAlpha(1f);
-
-            if (UIRootManager.Instance != null && UIRootManager.Instance.backpackUI != null)
-            {
-                UIRootManager.Instance.ShowBackpack(true);
-            }
-
-            IsIntroActive = false;
-            return;
-        }
-
-        GameplayStatusHudRuntime.SetVisible(true);
-        GameplayStatusHudRuntime.SetAlpha(0f);
-        RuntimeMiniMapHud.SetExternallyHidden(false);
-        RuntimeMiniMapHud.SetExternalAlpha(0f);
-
-        if (UIRootManager.Instance != null && UIRootManager.Instance.backpackUI != null)
-        {
-            UIRootManager.Instance.HideBackpack(true);
-        }
     }
 
     private void ApplyRuntimeUiSuppression()
@@ -724,6 +743,18 @@ public sealed class GameplayStageIntroDirector : MonoBehaviour
         }
 
         cameraDetached = false;
+    }
+
+    private bool TryAdoptRuntimeCameraPose()
+    {
+        if (playerTransform == null)
+        {
+            return false;
+        }
+
+        RuntimeCameraController controller = RuntimeCameraController.EnsureInstance();
+        controller.BindFollowTarget(playerTransform);
+        return controller.AdoptCurrentCameraPose();
     }
 
     private void EnsureOverlay()

@@ -56,6 +56,7 @@ public sealed class RuntimeCameraController : MonoBehaviour
     private bool hasSmoothedFollowPose;
     private bool hasSmoothedSize;
     private bool wasExternallyDriven;
+    private bool hasAdoptedExternalPose;
 
     private Vector3 smoothedFollowPosition;
     private Vector3 followVelocity;
@@ -237,6 +238,43 @@ public sealed class RuntimeCameraController : MonoBehaviour
         targetDangerTension = Mathf.Clamp01(value);
     }
 
+    public bool AdoptCurrentCameraPose()
+    {
+        if (!IsSupportedScene())
+        {
+            return false;
+        }
+
+        ResolveSceneBindingsIfNeeded();
+        if (controlledCamera == null || followTarget == null)
+        {
+            return false;
+        }
+
+        Vector3 adoptedPosition = controlledCamera.transform.position;
+        float adoptedSize = controlledCamera.orthographicSize;
+        Vector3 adoptedOffset = adoptedPosition - followTarget.position;
+        if (Mathf.Abs(adoptedOffset.z) <= 0.01f)
+        {
+            adoptedOffset.z = controlledCamera.transform.position.z;
+        }
+
+        defaultWorldOffset = adoptedOffset;
+        hasCapturedDefaultOffset = true;
+        smoothedFollowPosition = adoptedPosition;
+        smoothedOrthographicSize = adoptedSize;
+        hasSmoothedFollowPose = true;
+        hasSmoothedSize = true;
+        followVelocity = Vector3.zero;
+        lookAheadOffset = Vector3.zero;
+        lookAheadVelocity = Vector3.zero;
+        orthographicSizeVelocity = 0f;
+        ClearTransientMotion();
+        hasAdoptedExternalPose = true;
+        wasExternallyDriven = true;
+        return true;
+    }
+
     public void SnapToDesiredPose()
     {
         ResolveCameraIfNeeded();
@@ -290,6 +328,11 @@ public sealed class RuntimeCameraController : MonoBehaviour
         {
             wasExternallyDriven = false;
             ClearTransientMotion();
+            if (ConsumeAdoptedExternalPose())
+            {
+                return;
+            }
+
             CaptureDefaultOffsetIfNeeded(true);
             SnapToDesiredPose();
             return;
@@ -378,6 +421,7 @@ public sealed class RuntimeCameraController : MonoBehaviour
         targetDangerTension = 0f;
         ClearTransientMotion();
         wasExternallyDriven = false;
+        hasAdoptedExternalPose = false;
 
         if (followTarget == null || !followTarget || followTarget.gameObject.scene.name != sceneName)
         {
@@ -653,6 +697,20 @@ public sealed class RuntimeCameraController : MonoBehaviour
         }
 
         return Mathf.Lerp(GameplayFollowSmoothBase, GameplayFollowSmoothHighRisk, currentDangerTension);
+    }
+
+    private bool ConsumeAdoptedExternalPose()
+    {
+        if (!hasAdoptedExternalPose)
+        {
+            return false;
+        }
+
+        hasAdoptedExternalPose = false;
+        followVelocity = Vector3.zero;
+        lookAheadVelocity = Vector3.zero;
+        orthographicSizeVelocity = 0f;
+        return true;
     }
 
     private Vector3 SnapCameraPosition(Vector3 position, float orthographicSize)
