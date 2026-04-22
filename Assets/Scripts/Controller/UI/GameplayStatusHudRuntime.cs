@@ -512,6 +512,7 @@ public static class GameplayStatusHudRuntime
 
 public sealed class RuntimeFollowPromptHud : MonoBehaviour
 {
+    private const string PlayerInteractPromptId = "player_interact";
     private const string CanvasName = "RuntimeFollowPromptCanvas";
     private const int OverlaySortingOrder = 244;
     private const float SideOffset = 48f;
@@ -519,24 +520,42 @@ public sealed class RuntimeFollowPromptHud : MonoBehaviour
     private const float VerticalSpacing = 30f;
     private const float ScreenMargin = 18f;
     private const float AnchorWorldHeightOffset = 0.04f;
+    private const float PlayerInteractDistanceMultiplier = 1.4f;
+    private const float VisibilityAnimationDuration = 0.18f;
+    private const float ShowSlideDistance = 36f;
+    private const float HideSlideDistance = 30f;
+    private const float HiddenScale = 0.97f;
+    private const float MaxBlurDistance = 5f;
+    private const float MaxBlurAlpha = 0.22f;
 
     private static readonly Color PromptBackgroundColor = new Color(0.08f, 0.06f, 0.04f, 0.82f);
     private static readonly Color KeyChipColor = new Color(0.86f, 0.67f, 0.34f, 1f);
     private static readonly Color KeyTextColor = new Color(0.11f, 0.08f, 0.05f, 1f);
     private static readonly Color LabelTextColor = new Color(0.96f, 0.91f, 0.80f, 1f);
+    private static readonly Color MotionBlurColor = new Color(0.10f, 0.08f, 0.05f, 1f);
 
     private sealed class PromptBinding
     {
         public string Id;
         public Transform Anchor;
         public RectTransform Root;
+        public CanvasGroup RootCanvasGroup;
+        public Image RootBackground;
         public HorizontalLayoutGroup RootLayout;
+        public Image KeyBackground;
         public LayoutElement KeyLayout;
         public LayoutElement LabelLayout;
         public TextMeshProUGUI KeyText;
         public TextMeshProUGUI LabelText;
+        public Shadow RootShadow;
+        public Shadow KeyShadow;
+        public Shadow KeyTextShadow;
+        public Shadow LabelTextShadow;
         public int Priority;
         public bool RequestedVisible;
+        public float VisibilityProgress;
+        public Vector2 LastResolvedLocalPoint;
+        public bool HasResolvedLocalPoint;
     }
 
     private static RuntimeFollowPromptHud instance;
@@ -603,10 +622,6 @@ public sealed class RuntimeFollowPromptHud : MonoBehaviour
         }
 
         binding.RequestedVisible = false;
-        if (binding.Root != null)
-        {
-            binding.Root.gameObject.SetActive(false);
-        }
     }
 
     public static string FormatCompactKey(KeyCode keyCode)
@@ -682,22 +697,25 @@ public sealed class RuntimeFollowPromptHud : MonoBehaviour
 
         foreach (PromptBinding binding in promptBindings.Values)
         {
-            bool shouldShow = binding.RequestedVisible &&
-                              binding.Anchor != null &&
-                              binding.Root != null &&
-                              mainCamera != null;
-
-            if (!shouldShow)
+            if (binding.Root == null)
             {
-                if (binding.Root != null && binding.Root.gameObject.activeSelf)
-                {
-                    binding.Root.gameObject.SetActive(false);
-                }
-
                 continue;
             }
 
-            activeBindings.Add(binding);
+            bool canResolveTarget = binding.RequestedVisible &&
+                                    binding.Anchor != null &&
+                                    mainCamera != null;
+
+            if (canResolveTarget)
+            {
+                activeBindings.Add(binding);
+                continue;
+            }
+
+            UpdatePromptPresentation(
+                binding,
+                binding.HasResolvedLocalPoint ? binding.LastResolvedLocalPoint : binding.Root.anchoredPosition,
+                false);
         }
 
         activeBindings.Sort((left, right) => left.Priority.CompareTo(right.Priority));
@@ -806,8 +824,10 @@ public sealed class RuntimeFollowPromptHud : MonoBehaviour
             $"Prompt_{promptId}",
             typeof(RectTransform),
             typeof(Image),
+            typeof(CanvasGroup),
             typeof(HorizontalLayoutGroup),
-            typeof(ContentSizeFitter));
+            typeof(ContentSizeFitter),
+            typeof(Shadow));
         rootObject.transform.SetParent(canvasRect, false);
 
         RectTransform rootRect = rootObject.GetComponent<RectTransform>();
@@ -819,6 +839,14 @@ public sealed class RuntimeFollowPromptHud : MonoBehaviour
         Image background = rootObject.GetComponent<Image>();
         RuntimeUiSpriteFactory.ApplyRoundedSprite(background, PromptBackgroundColor, 6, 8, 1.2f);
         background.raycastTarget = false;
+
+        CanvasGroup canvasGroup = rootObject.GetComponent<CanvasGroup>();
+        canvasGroup.alpha = 0f;
+        canvasGroup.interactable = false;
+        canvasGroup.blocksRaycasts = false;
+
+        Shadow rootShadow = rootObject.GetComponent<Shadow>();
+        ConfigurePromptShadow(rootShadow);
 
         HorizontalLayoutGroup layout = rootObject.GetComponent<HorizontalLayoutGroup>();
         layout.padding = new RectOffset(7, 11, 4, 4);
@@ -837,12 +865,16 @@ public sealed class RuntimeFollowPromptHud : MonoBehaviour
             "KeyChip",
             typeof(RectTransform),
             typeof(Image),
-            typeof(LayoutElement));
+            typeof(LayoutElement),
+            typeof(Shadow));
         keyChip.transform.SetParent(rootObject.transform, false);
 
         Image keyBackground = keyChip.GetComponent<Image>();
         RuntimeUiSpriteFactory.ApplyRoundedSprite(keyBackground, KeyChipColor, 4, 6, 1.2f);
         keyBackground.raycastTarget = false;
+
+        Shadow keyShadow = keyChip.GetComponent<Shadow>();
+        ConfigurePromptShadow(keyShadow);
 
         LayoutElement keyLayout = keyChip.GetComponent<LayoutElement>();
         keyLayout.preferredWidth = 23f;
@@ -857,12 +889,15 @@ public sealed class RuntimeFollowPromptHud : MonoBehaviour
             TextAlignmentOptions.Center);
         StretchRect(keyText.rectTransform);
         keyText.fontStyle = FontStyles.Bold;
+        Shadow keyTextShadow = keyText.gameObject.AddComponent<Shadow>();
+        ConfigurePromptShadow(keyTextShadow);
 
         GameObject labelObject = new GameObject(
             "Label",
             typeof(RectTransform),
             typeof(LayoutElement),
-            typeof(TextMeshProUGUI));
+            typeof(TextMeshProUGUI),
+            typeof(Shadow));
         labelObject.transform.SetParent(rootObject.transform, false);
 
         LayoutElement labelLayout = labelObject.GetComponent<LayoutElement>();
@@ -878,18 +913,30 @@ public sealed class RuntimeFollowPromptHud : MonoBehaviour
         labelText.raycastTarget = false;
         labelText.text = "交互";
 
+        Shadow labelTextShadow = labelObject.GetComponent<Shadow>();
+        ConfigurePromptShadow(labelTextShadow);
+
         PromptBinding binding = new PromptBinding
         {
             Id = promptId,
             Root = rootRect,
+            RootCanvasGroup = canvasGroup,
+            RootBackground = background,
             RootLayout = layout,
+            KeyBackground = keyBackground,
             KeyLayout = keyLayout,
             LabelLayout = labelLayout,
             KeyText = keyText,
-            LabelText = labelText
+            LabelText = labelText,
+            RootShadow = rootShadow,
+            KeyShadow = keyShadow,
+            KeyTextShadow = keyTextShadow,
+            LabelTextShadow = labelTextShadow
         };
 
         ApplyPromptMetrics(binding);
+        ApplyPromptMotionBlur(binding, 0f, true);
+        rootRect.localScale = new Vector3(HiddenScale, HiddenScale, 1f);
         rootObject.SetActive(false);
         promptBindings[promptId] = binding;
         return binding;
@@ -902,11 +949,20 @@ public sealed class RuntimeFollowPromptHud : MonoBehaviour
             return;
         }
 
+        binding.RootCanvasGroup ??= binding.Root.GetComponent<CanvasGroup>();
+        binding.RootBackground ??= binding.Root.GetComponent<Image>();
         binding.RootLayout ??= binding.Root.GetComponent<HorizontalLayoutGroup>();
+        binding.RootShadow ??= binding.Root.GetComponent<Shadow>();
+        Transform keyChip = binding.Root.Find("KeyChip");
+        Transform label = binding.Root.Find("Label");
+        binding.KeyBackground ??= keyChip?.GetComponent<Image>();
         binding.KeyLayout ??= binding.Root.Find("KeyChip")?.GetComponent<LayoutElement>();
         binding.LabelLayout ??= binding.Root.Find("Label")?.GetComponent<LayoutElement>();
+        binding.KeyShadow ??= keyChip?.GetComponent<Shadow>();
         binding.KeyText ??= binding.Root.Find("KeyChip/KeyText")?.GetComponent<TextMeshProUGUI>();
-        binding.LabelText ??= binding.Root.Find("Label")?.GetComponent<TextMeshProUGUI>();
+        binding.KeyTextShadow ??= binding.Root.Find("KeyChip/KeyText")?.GetComponent<Shadow>();
+        binding.LabelText ??= label?.GetComponent<TextMeshProUGUI>();
+        binding.LabelTextShadow ??= label?.GetComponent<Shadow>();
     }
 
     private static void ApplyPromptMetrics(PromptBinding binding)
@@ -954,6 +1010,11 @@ public sealed class RuntimeFollowPromptHud : MonoBehaviour
         {
             binding.LabelText.fontSize = 14f;
         }
+
+        ConfigurePromptShadow(binding.RootShadow);
+        ConfigurePromptShadow(binding.KeyShadow);
+        ConfigurePromptShadow(binding.KeyTextShadow);
+        ConfigurePromptShadow(binding.LabelTextShadow);
     }
 
     private void UpdatePromptPosition(PromptBinding binding, Camera mainCamera, int stackIndex)
@@ -972,19 +1033,15 @@ public sealed class RuntimeFollowPromptHud : MonoBehaviour
             return;
         }
 
-        if (!binding.Root.gameObject.activeSelf)
-        {
-            binding.Root.gameObject.SetActive(true);
-        }
-
         LayoutRebuilder.ForceRebuildLayoutImmediate(binding.Root);
 
         float promptWidth = Mathf.Max(binding.Root.rect.width, 112f);
         float promptHeight = Mathf.Max(binding.Root.rect.height, 26f);
         bool preferRight = screenPoint.x <= Screen.width * 0.68f;
+        float promptSideOffset = GetPromptSideOffset(binding);
         float targetScreenX = preferRight
-            ? screenPoint.x + SideOffset + promptWidth * 0.5f
-            : screenPoint.x - SideOffset - promptWidth * 0.5f;
+            ? screenPoint.x + promptSideOffset + promptWidth * 0.5f
+            : screenPoint.x - promptSideOffset - promptWidth * 0.5f;
         targetScreenX = Mathf.Clamp(
             targetScreenX,
             ScreenMargin + promptWidth * 0.5f,
@@ -1000,8 +1057,122 @@ public sealed class RuntimeFollowPromptHud : MonoBehaviour
                 null,
                 out Vector2 localPoint))
         {
-            binding.Root.anchoredPosition = localPoint;
+            binding.LastResolvedLocalPoint = localPoint;
+            binding.HasResolvedLocalPoint = true;
+            UpdatePromptPresentation(binding, localPoint, true);
         }
+    }
+
+    private void UpdatePromptPresentation(PromptBinding binding, Vector2 targetLocalPoint, bool visible)
+    {
+        if (binding?.Root == null)
+        {
+            return;
+        }
+
+        float duration = Mathf.Max(0.0001f, VisibilityAnimationDuration);
+        float progressStep = Time.unscaledDeltaTime / duration;
+        float targetProgress = visible ? 1f : 0f;
+
+        binding.VisibilityProgress = Mathf.MoveTowards(binding.VisibilityProgress, targetProgress, progressStep);
+
+        if (!visible && binding.VisibilityProgress <= 0.0001f)
+        {
+            if (binding.RootCanvasGroup != null)
+            {
+                binding.RootCanvasGroup.alpha = 0f;
+            }
+
+            binding.Root.localScale = new Vector3(HiddenScale, HiddenScale, 1f);
+            ApplyPromptMotionBlur(binding, 0f, false);
+            if (binding.Root.gameObject.activeSelf)
+            {
+                binding.Root.gameObject.SetActive(false);
+            }
+
+            return;
+        }
+
+        if (!binding.Root.gameObject.activeSelf)
+        {
+            binding.Root.gameObject.SetActive(true);
+        }
+
+        float easedProgress = Mathf.SmoothStep(0f, 1f, binding.VisibilityProgress);
+        float blurAmount = 1f - easedProgress;
+        float slideDistance = visible ? ShowSlideDistance : HideSlideDistance;
+        float slideOffsetX = slideDistance * blurAmount;
+
+        binding.Root.anchoredPosition = targetLocalPoint + new Vector2(slideOffsetX, 0f);
+        binding.Root.localScale = Vector3.one * Mathf.Lerp(HiddenScale, 1f, easedProgress);
+
+        if (binding.RootCanvasGroup != null)
+        {
+            binding.RootCanvasGroup.alpha = easedProgress;
+        }
+
+        ApplyPromptMotionBlur(binding, blurAmount, visible);
+    }
+
+    private static float GetPromptSideOffset(PromptBinding binding)
+    {
+        if (binding != null && binding.Id == PlayerInteractPromptId)
+        {
+            return SideOffset * PlayerInteractDistanceMultiplier;
+        }
+
+        return SideOffset;
+    }
+
+    private static void ConfigurePromptShadow(Shadow shadow)
+    {
+        if (shadow == null)
+        {
+            return;
+        }
+
+        shadow.effectColor = Color.clear;
+        shadow.effectDistance = Vector2.zero;
+        shadow.useGraphicAlpha = true;
+        shadow.enabled = false;
+    }
+
+    private static void ApplyPromptMotionBlur(PromptBinding binding, float blurAmount, bool visible)
+    {
+        if (binding == null)
+        {
+            return;
+        }
+
+        float clampedBlur = Mathf.Clamp01(blurAmount);
+        float blurDistance = MaxBlurDistance * clampedBlur;
+        float blurAlpha = MaxBlurAlpha * clampedBlur;
+        float direction = visible ? 1f : -1f;
+
+        ApplyShadowState(binding.RootShadow, blurDistance * direction, blurAlpha * 0.9f);
+        ApplyShadowState(binding.KeyShadow, blurDistance * 0.85f * direction, blurAlpha * 0.85f);
+        ApplyShadowState(binding.KeyTextShadow, blurDistance * 0.75f * direction, blurAlpha);
+        ApplyShadowState(binding.LabelTextShadow, blurDistance * direction, blurAlpha);
+    }
+
+    private static void ApplyShadowState(Shadow shadow, float horizontalOffset, float alpha)
+    {
+        if (shadow == null)
+        {
+            return;
+        }
+
+        if (alpha <= 0.001f)
+        {
+            shadow.enabled = false;
+            shadow.effectColor = Color.clear;
+            shadow.effectDistance = Vector2.zero;
+            return;
+        }
+
+        shadow.enabled = true;
+        shadow.effectColor = new Color(MotionBlurColor.r, MotionBlurColor.g, MotionBlurColor.b, alpha);
+        shadow.effectDistance = new Vector2(horizontalOffset, 0f);
     }
 
     private TextMeshProUGUI CreatePromptText(
