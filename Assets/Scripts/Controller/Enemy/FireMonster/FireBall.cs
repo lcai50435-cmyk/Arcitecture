@@ -26,6 +26,12 @@ public class FireBall : MonoBehaviour
 
     private void Start()
     {
+        NightLightingController.EnsureTransientFxLight(
+            gameObject,
+            0.95f,
+            0.12f,
+            NightLightingController.GetGameplayFireballLightColor());
+
         // 未命中10秒自动销毁
         Destroy(gameObject, autoDestroyTime);
     }

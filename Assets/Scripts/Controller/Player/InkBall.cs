@@ -88,6 +88,11 @@ public class InkBall : MonoBehaviour
         nextScale.y *= Mathf.Max(0.01f, config.projectileScale * config.projectileStretch.y);
         transform.localScale = nextScale;
         ApplyVisualStyle();
+        NightLightingController.EnsureTransientFxLight(
+            gameObject,
+            0.90f,
+            0.10f,
+            displayColor);
         ScheduleDestroyTimer();
     }
 
@@ -284,6 +289,12 @@ public class InkBall : MonoBehaviour
         renderer.sprite = GetRuntimeSprite();
         renderer.color = pulseColor;
         renderer.sortingOrder = 12;
+
+        NightLightingController.EnsureTransientFxLight(
+            pulseObject,
+            Mathf.Max(0.2f, pulseScale) * 1.8f,
+            0.14f,
+            pulseColor);
 
         InkImpactPulse pulse = pulseObject.AddComponent<InkImpactPulse>();
         pulse.Initialize(pulseColor, pulseDuration, expansionMultiplier);

@@ -75,9 +75,13 @@ public sealed class NightLightingController : MonoBehaviour
     private const float BindingRefreshInterval = 0.35f;
 
     private static readonly Color GameplayLightColor = new Color(0.96f, 0.86f, 0.62f, 1f);
+    private static readonly Color GameplayEnemyLightColor = new Color(1f, 0.42f, 0.26f, 1f);
+    private static readonly Color GameplayFireballLightColor = new Color(1f, 0.56f, 0.28f, 1f);
     private static readonly Color BaseWarmLightColor = new Color(1f, 0.81f, 0.56f, 1f);
     private static readonly Color MainSceneLightColor = new Color(0.80f, 0.90f, 1f, 1f);
     private static readonly Color DeadSceneLightColor = new Color(0.54f, 0.72f, 1f, 1f);
+    private static readonly Vector3 GameplayPlayerLightOffset = new Vector3(0f, 0.14f, 0f);
+    private static readonly Vector3 GameplayEnemyLightOffset = new Vector3(0f, 0.12f, 0f);
 
     private static readonly Dictionary<string, SceneNightProfile> Profiles = new Dictionary<string, SceneNightProfile>(StringComparer.Ordinal)
     {
@@ -120,9 +124,9 @@ public sealed class NightLightingController : MonoBehaviour
                 true,
                 0f,
                 new Color(0.06f, 0.10f, 0.18f, 1f),
-                0.14f,
-                0.42f,
-                new Color(0.02f, 0.05f, 0.10f, 1f),
+                0.18f,
+                0.48f,
+                new Color(0.01f, 0.03f, 0.07f, 1f),
                 0.95f,
                 1.30f,
                 new Color(0.04f, 0.05f, 0.08f, 0.44f),
@@ -136,9 +140,9 @@ public sealed class NightLightingController : MonoBehaviour
                 true,
                 0f,
                 new Color(0.06f, 0.10f, 0.18f, 1f),
-                0.14f,
-                0.45f,
-                new Color(0.02f, 0.05f, 0.10f, 1f),
+                0.18f,
+                0.52f,
+                new Color(0.01f, 0.03f, 0.07f, 1f),
                 0.98f,
                 1.34f,
                 new Color(0.04f, 0.05f, 0.08f, 0.46f),
@@ -152,9 +156,9 @@ public sealed class NightLightingController : MonoBehaviour
                 true,
                 0f,
                 new Color(0.06f, 0.10f, 0.18f, 1f),
-                0.15f,
-                0.48f,
-                new Color(0.02f, 0.05f, 0.10f, 1f),
+                0.20f,
+                0.56f,
+                new Color(0.01f, 0.03f, 0.07f, 1f),
                 1.00f,
                 1.38f,
                 new Color(0.04f, 0.05f, 0.08f, 0.48f),
@@ -386,7 +390,8 @@ public sealed class NightLightingController : MonoBehaviour
         float baseIntensity = 0.20f,
         float nightBoost = 0.14f,
         Vector3? localOffset = null,
-        Color? lightColor = null)
+        Color? lightColor = null,
+        bool scaleWithSceneLightMultiplier = true)
     {
         if (target == null)
         {
@@ -404,8 +409,63 @@ public sealed class NightLightingController : MonoBehaviour
             Mathf.Max(0.1f, radius),
             Mathf.Max(0f, baseIntensity),
             Mathf.Max(0f, nightBoost),
-            localOffset ?? new Vector3(0f, 0.18f, 0f));
+            localOffset ?? new Vector3(0f, 0.18f, 0f),
+            scaleWithSceneLightMultiplier);
         return lightSource;
+    }
+
+    public static NightLocalLightSource EnsureGameplayPlayerLight(GameObject target)
+    {
+        if (target == null)
+        {
+            return null;
+        }
+
+        return EnsureLocalLight(
+            target,
+            1.65f,
+            0.045f,
+            0.035f,
+            GameplayPlayerLightOffset,
+            ResolveGameplayPlayerLightColor(target));
+    }
+
+    public static NightLocalLightSource EnsureGameplayEnemyLight(GameObject target)
+    {
+        if (target == null)
+        {
+            return null;
+        }
+
+        return EnsureLocalLight(
+            target,
+            1.35f,
+            0.035f,
+            0.025f,
+            GameplayEnemyLightOffset,
+            GameplayEnemyLightColor);
+    }
+
+    public static NightLocalLightSource EnsureTransientFxLight(
+        GameObject target,
+        float radius,
+        float baseIntensity,
+        Color lightColor,
+        Vector3? localOffset = null)
+    {
+        if (target == null)
+        {
+            return null;
+        }
+
+        return EnsureLocalLight(
+            target,
+            radius,
+            baseIntensity,
+            0f,
+            localOffset ?? Vector3.zero,
+            lightColor,
+            false);
     }
 
     public static void RemoveLocalLight(GameObject target)
@@ -600,7 +660,7 @@ public sealed class NightLightingController : MonoBehaviour
         if (player != null)
         {
             EnsureProjectedShadow(player);
-            RemoveLocalLight(player);
+            EnsureGameplayPlayerLight(player);
         }
 
         GameObject catalogue = FindByTagSafe("Catalogue");
@@ -619,6 +679,7 @@ public sealed class NightLightingController : MonoBehaviour
             }
 
             EnsureProjectedShadow(enemy.gameObject);
+            EnsureGameplayEnemyLight(enemy.gameObject);
         }
     }
 
@@ -920,6 +981,34 @@ public sealed class NightLightingController : MonoBehaviour
         {
             return null;
         }
+    }
+
+    private static Color ResolveGameplayPlayerLightColor(GameObject playerObject)
+    {
+        WeaponType effectiveWeaponType = PlayerLoadoutRuntime.CurrentWeaponType;
+
+        if (playerObject != null)
+        {
+            PlayerProfileData profileData = playerObject.GetComponent<PlayerProfileData>();
+            if (profileData != null)
+            {
+                effectiveWeaponType = profileData.effectiveWeaponType;
+            }
+        }
+
+        if (BackpackMananger.Instance != null)
+        {
+            effectiveWeaponType = RuntimeWeaponTypeResolver.ResolveEffectiveWeaponType(
+                BackpackMananger.Instance,
+                effectiveWeaponType);
+        }
+
+        return InkTypeCatalog.GetDisplayColor(effectiveWeaponType);
+    }
+
+    public static Color GetGameplayFireballLightColor()
+    {
+        return GameplayFireballLightColor;
     }
 
     private static GameObject FindSceneObjectByName(string name)

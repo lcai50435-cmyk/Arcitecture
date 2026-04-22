@@ -11,6 +11,7 @@ public sealed class NightLocalLightSource : MonoBehaviour
     [SerializeField] private float baseIntensity = 0.2f;
     [SerializeField] private float nightBoost = 0.14f;
     [SerializeField] private Vector3 localOffset = new Vector3(0f, 0.18f, 0f);
+    [SerializeField] private bool scaleWithSceneLightMultiplier = true;
 
     private SpriteRenderer lightRenderer;
 
@@ -19,13 +20,15 @@ public sealed class NightLocalLightSource : MonoBehaviour
         float radius,
         float baseIntensity,
         float nightBoost,
-        Vector3 localOffset)
+        Vector3 localOffset,
+        bool scaleWithSceneLightMultiplier)
     {
         this.lightColor = color;
         this.radius = Mathf.Max(0.1f, radius);
         this.baseIntensity = Mathf.Max(0f, baseIntensity);
         this.nightBoost = Mathf.Max(0f, nightBoost);
         this.localOffset = localOffset;
+        this.scaleWithSceneLightMultiplier = scaleWithSceneLightMultiplier;
 
         EnsureRenderer();
         UpdateVisual();
@@ -72,7 +75,7 @@ public sealed class NightLocalLightSource : MonoBehaviour
             return;
         }
 
-        float controllerMultiplier = NightLightingController.ActiveLightMultiplier;
+        float controllerMultiplier = scaleWithSceneLightMultiplier ? NightLightingController.ActiveLightMultiplier : 1f;
         float intensity = (baseIntensity + nightBoost * NightLightingController.ActiveNightProgress) * controllerMultiplier;
         bool visible = NightLightingController.HasActiveProfile && intensity > 0.001f;
 

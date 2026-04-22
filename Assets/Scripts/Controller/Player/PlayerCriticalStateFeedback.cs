@@ -14,7 +14,7 @@ public class PlayerCriticalStateFeedback : MonoBehaviour
     private const float ReferenceWidth = 1920f;
     private const float ReferenceHeight = 1080f;
     private const int OverlaySortingOrder = 11000;
-    private const int EdgeParticleCount = 20;
+    private const int EdgeParticleCount = 24;
     private const float Tau = Mathf.PI * 2f;
 
     private static readonly Color VignetteColor = new Color(0.85f, 0.08f, 0.03f, 0f);
@@ -427,15 +427,16 @@ public class PlayerCriticalStateFeedback : MonoBehaviour
             Rect = rect,
             Image = image,
             Along = Random.value,
-            AlongSpeed = direction * Random.Range(0.18f, 0.42f),
-            DriftSpeed = Random.Range(0.8f, 1.8f),
-            BaseSize = Random.Range(12f, 24f),
+            AlongSpeed = direction * Random.Range(0.16f, 0.4f),
+            DriftSpeed = Random.Range(0.75f, 1.7f),
+            BaseSize = Random.Range(10f, 20f),
             Phase = Random.Range(0f, Tau),
             ColorT = Random.Range(0f, 1f),
-            AlphaScale = Random.Range(0.65f, 1f),
-            JitterScale = Random.Range(0.55f, 1.15f)
+            AlphaScale = Random.Range(0.78f, 1.15f),
+            JitterScale = Random.Range(0.55f, 1.05f)
         };
 
+        rect.localRotation = Quaternion.identity;
         rect.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, particle.BaseSize);
         rect.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, particle.BaseSize);
         return particle;
@@ -461,9 +462,9 @@ public class PlayerCriticalStateFeedback : MonoBehaviour
         }
 
         float pulse = 0.5f + 0.5f * Mathf.Sin(currentTime * Mathf.Lerp(1.9f, 2.8f, displayDanger));
-        float pulseGain = 0.92f + pulse * (0.1f + displayDanger * 0.1f) + damageBurst * 0.08f;
-        float effectStrength = displayPresence * Mathf.Lerp(0.62f, 1f, displayDanger);
-        float thickness = Mathf.Lerp(112f, 180f, displayDanger) * pulseGain;
+        float pulseGain = 0.98f + pulse * (0.16f + displayDanger * 0.14f) + damageBurst * 0.1f;
+        float effectStrength = displayPresence * Mathf.Lerp(0.72f, 1f, displayDanger);
+        float thickness = Mathf.Lerp(128f, 212f, displayDanger) * pulseGain;
 
         UpdateVignette(effectStrength, pulse);
         UpdateFlowBands(currentTime, thickness, effectStrength, pulseGain);
@@ -472,7 +473,7 @@ public class PlayerCriticalStateFeedback : MonoBehaviour
 
     private void UpdateVignette(float effectStrength, float pulse)
     {
-        float alpha = effectStrength * (0.06f + displayDanger * 0.1f + pulse * 0.04f) + damageBurst * 0.035f;
+        float alpha = effectStrength * (0.1f + displayDanger * 0.13f + pulse * 0.05f) + damageBurst * 0.04f;
         Color color = VignetteColor;
         color.a = alpha;
         vignetteImage.color = color;
@@ -480,10 +481,10 @@ public class PlayerCriticalStateFeedback : MonoBehaviour
 
     private void UpdateFlowBands(float currentTime, float thickness, float effectStrength, float pulseGain)
     {
-        float primaryAlpha = effectStrength * (0.13f + displayDanger * 0.12f) * pulseGain + damageBurst * 0.04f;
-        float secondaryAlpha = effectStrength * (0.08f + displayDanger * 0.11f) * pulseGain + damageBurst * 0.035f;
-        float primaryTiles = Mathf.Lerp(1.05f, 1.38f, displayDanger);
-        float secondaryTiles = Mathf.Lerp(1.3f, 1.76f, displayDanger);
+        float primaryAlpha = effectStrength * (0.2f + displayDanger * 0.16f) * pulseGain + damageBurst * 0.055f;
+        float secondaryAlpha = effectStrength * (0.13f + displayDanger * 0.14f) * pulseGain + damageBurst * 0.05f;
+        float primaryTiles = Mathf.Lerp(0.98f, 1.28f, displayDanger);
+        float secondaryTiles = Mathf.Lerp(1.18f, 1.58f, displayDanger);
 
         for (int i = 0; i < edgeBands.Length; i++)
         {
@@ -549,7 +550,7 @@ public class PlayerCriticalStateFeedback : MonoBehaviour
         float height = screenRect.height > 1f ? screenRect.height : Screen.height;
         float halfWidth = width * 0.5f;
         float halfHeight = height * 0.5f;
-        float travelGain = 0.34f + displayDanger * 0.55f + damageBurst * 0.25f;
+        float travelGain = 0.34f + displayDanger * 0.5f + damageBurst * 0.22f;
 
         for (int i = 0; i < screenParticles.Length; i++)
         {
@@ -563,20 +564,21 @@ public class PlayerCriticalStateFeedback : MonoBehaviour
 
             float shimmer = 0.55f + 0.45f * Mathf.Sin(currentTime * (1.1f + particle.DriftSpeed) + particle.Phase);
             float depthWave = 0.5f + 0.5f * Mathf.Sin(currentTime * particle.DriftSpeed + particle.Phase * 0.7f);
-            float depth = Mathf.Lerp(0.06f, 0.9f, depthWave);
-            float edgeOffset = thickness * (0.08f + depth * 0.82f);
-            float tangentJitter = Mathf.Sin(currentTime * (0.85f + particle.DriftSpeed * 0.4f) + particle.Phase) * thickness * 0.05f * particle.JitterScale;
+            float depth = Mathf.Lerp(0.08f, 0.86f, depthWave);
+            float edgeOffset = thickness * (0.08f + depth * 0.72f);
+            float tangentJitter = Mathf.Sin(currentTime * (0.85f + particle.DriftSpeed * 0.4f) + particle.Phase) * thickness * 0.045f * particle.JitterScale;
             Vector2 anchoredPosition = ResolveParticlePosition(particle.Side, particle.Along, edgeOffset, tangentJitter, halfWidth, halfHeight);
 
-            float alpha = effectStrength * (0.08f + displayDanger * 0.09f) * particle.AlphaScale * (0.72f + shimmer * 0.38f)
-                          + damageBurst * 0.03f;
+            float alpha = effectStrength * (0.09f + displayDanger * 0.08f) * particle.AlphaScale * (0.72f + shimmer * 0.36f)
+                          + damageBurst * 0.028f;
             Color color = Color.Lerp(EmberLowColor, EmberHighColor, particle.ColorT);
             color.a = alpha;
             particle.Image.color = color;
             particle.Image.enabled = alpha > 0.001f;
 
-            float size = particle.BaseSize * (0.82f + shimmer * 0.35f) * (0.86f + displayDanger * 0.45f + damageBurst * 0.25f);
+            float size = particle.BaseSize * (0.82f + shimmer * 0.35f) * (0.9f + displayDanger * 0.38f + damageBurst * 0.18f);
             particle.Rect.anchoredPosition = anchoredPosition;
+            particle.Rect.localRotation = Quaternion.identity;
             particle.Rect.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, size);
             particle.Rect.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, size);
         }
@@ -739,9 +741,9 @@ public class PlayerCriticalStateFeedback : MonoBehaviour
                 float radial = Mathf.Sqrt(nx * nx + ny * ny);
                 float square = Mathf.Max(Mathf.Abs(nx), Mathf.Abs(ny));
                 float alpha = Mathf.Lerp(
-                    1f - Mathf.SmoothStep(0.2f, 1f, radial),
+                    1f - Mathf.SmoothStep(0.18f, 1f, radial),
                     1f - Mathf.SmoothStep(0.1f, 1f, square),
-                    0.35f);
+                    0.32f);
                 alpha = Mathf.Clamp01(alpha);
                 texture.SetPixel(x, y, new Color(1f, 1f, 1f, alpha));
             }

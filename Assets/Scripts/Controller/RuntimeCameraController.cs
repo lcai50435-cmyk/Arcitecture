@@ -7,15 +7,15 @@ public sealed class RuntimeCameraController : MonoBehaviour
     private const string ControllerObjectName = "RuntimeCameraController";
     private const string BaseSceneName = "BaseScene";
 
-    private const float GameplayFollowSmoothBase = 0.12f;
-    private const float GameplayFollowSmoothHighRisk = 0.09f;
-    private const float BaseFollowSmooth = 0.18f;
+    private const float GameplayFollowSmoothBase = 0.08f;
+    private const float GameplayFollowSmoothHighRisk = 0.06f;
+    private const float BaseFollowSmooth = 0.13f;
 
     private const float GameplayLookAheadBase = 0.55f;
     private const float GameplayLookAheadHighRisk = 0.68f;
     private const float BaseLookAhead = 0.32f;
-    private const float LookAheadMoveSmooth = 0.10f;
-    private const float LookAheadReturnSmooth = 0.16f;
+    private const float LookAheadMoveSmooth = 0.07f;
+    private const float LookAheadReturnSmooth = 0.11f;
 
     private const float BaseFocusOffsetRatio = 0.14f;
     private const float BaseFocusZoomMultiplier = 0.93f;

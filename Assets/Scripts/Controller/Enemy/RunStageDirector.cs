@@ -330,6 +330,7 @@ public class RunStageDirector : MonoBehaviour
         }
 
         NightLightingController.EnsureProjectedShadow(enemyObject);
+        NightLightingController.EnsureGameplayEnemyLight(enemyObject);
     }
 
     private void ApplyStage(RunStageConfig stage)
