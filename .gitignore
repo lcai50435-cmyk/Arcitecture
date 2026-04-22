@@ -84,6 +84,9 @@ InitTestScene*.unity*
 # Addressables default ignores, before user customizations
 /ServerData
 /[Aa]ssets/StreamingAssets/aa*
+/Assets/StreamingAssets/runtime-build-info.json
+/Assets/StreamingAssets/runtime-build-info.json.meta
+/Assets/StreamingAssets.meta
 /[Aa]ssets/AddressableAssetsData/link.xml*
 /[Aa]ssets/Addressables_Temp*
 # By default, Addressables content builds will generate addressables_content_state.bin
