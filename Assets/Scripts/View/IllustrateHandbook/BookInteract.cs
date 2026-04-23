@@ -17,13 +17,19 @@ public class BookInteract : MonoBehaviour, IInteractable
             return;
         }
 
+        if (IllustratedUISceneLoader.Open(
+                RuntimeModalOpenSource.Interact,
+                IllustratedHandbookPage.IllustratedHandbook))
+        {
+            return;
+        }
+
         if (illustratedHandbook != null)
         {
             UIManager.Instance?.OpenIllustratedHandbook(RuntimeModalOpenSource.Interact);
+            return;
         }
-        else
-        {
-            Debug.LogError("图鉴面板未赋值");
-        }
+
+        Debug.LogError("图鉴面板未赋值");
     }
 }

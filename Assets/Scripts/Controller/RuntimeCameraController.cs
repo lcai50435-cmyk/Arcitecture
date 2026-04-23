@@ -130,7 +130,7 @@ public sealed class RuntimeCameraController : MonoBehaviour
     private static void HandleSceneLoaded(Scene scene, LoadSceneMode mode)
     {
         RuntimeCameraController controller = EnsureInstance();
-        controller.HandleSceneChanged(scene.name);
+        controller.HandleSceneChanged(SceneManager.GetActiveScene().name);
     }
 
     private void Awake()

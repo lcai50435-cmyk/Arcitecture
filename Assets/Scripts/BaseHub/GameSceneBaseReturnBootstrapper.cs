@@ -96,7 +96,12 @@ public class GameSceneBaseReturnBootstrapper : MonoBehaviour
         {
             if (rootManager.ActiveModalType == RuntimeModalType.Handbook)
             {
-                UIManager handbookManager = UIManager.Instance ?? FindObjectOfType<UIManager>(true);
+                UIManager handbookManager = null;
+                if (!IllustratedUISceneLoader.TryGetUIManager(out handbookManager))
+                {
+                    handbookManager = UIManager.Instance ?? FindObjectOfType<UIManager>(true);
+                }
+
                 if (handbookManager != null)
                 {
                     handbookManager.CloseIllustratedHandbook();
@@ -241,16 +246,20 @@ public class GameSceneBaseReturnBootstrapper : MonoBehaviour
             return;
         }
 
-        UIManager handbookManager = UIManager.Instance ?? FindObjectOfType<UIManager>(true);
-        if (handbookManager != null && handbookManager.illustratedHandbook != null)
+        playerProfile.SyncRuntimeState(
+            playerCore,
+            playerAttack,
+            playerObject != null && playerObject.TryGetComponent(out SpriteRenderer spriteRenderer)
+                ? spriteRenderer.sprite
+                : null);
+
+        if (IllustratedUISceneLoader.Open(
+                RuntimeModalOpenSource.None,
+                IllustratedHandbookPage.PersonalInformation,
+                null,
+                null,
+                playerObject))
         {
-            playerProfile.SyncRuntimeState(
-                playerCore,
-                playerAttack,
-                playerObject != null && playerObject.TryGetComponent(out SpriteRenderer spriteRenderer)
-                    ? spriteRenderer.sprite
-                    : null);
-            handbookManager.OpenIllustratedHandbook(RuntimeModalOpenSource.None, IllustratedHandbookPage.PersonalInformation);
             return;
         }
 

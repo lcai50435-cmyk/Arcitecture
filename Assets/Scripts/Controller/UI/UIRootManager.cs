@@ -261,7 +261,10 @@ public class UIRootManager : MonoBehaviour
         bool isGameplayScene = GameplayStageCatalog.IsGameplayScene(activeSceneName);
         bool isBaseScene = string.Equals(activeSceneName, "NewBase", StringComparison.Ordinal);
 
-        handbookManager = FindObjectOfType<UIManager>(true);
+        if (!IllustratedUISceneLoader.TryGetUIManager(out handbookManager))
+        {
+            handbookManager = FindObjectOfType<UIManager>(true);
+        }
         baseHubUiController = FindObjectOfType<BaseHubUIController>(true);
         dialogController = FindObjectOfType<Dialog>(true);
         detailedInformationController = isGameplayScene ? FindObjectOfType<DetailedInformationUI>(true) : null;
@@ -923,22 +926,43 @@ public class UIRootManager : MonoBehaviour
             return;
         }
 
+        if (IllustratedUISceneLoader.TryGetUIManager(out UIManager illustratedSceneManager) &&
+            illustratedSceneManager != null &&
+            illustratedSceneManager.IsHandbookOpen)
+        {
+            illustratedSceneManager.CloseIllustratedHandbook();
+            return;
+        }
+
         if (IsAnyGameplayBlockingUIOpen())
         {
             return;
         }
 
-        if (handbookManager == null || handbookManager.illustratedHandbook == null)
+        IllustratedUISceneLoader.Open(
+            RuntimeModalOpenSource.None,
+            IllustratedHandbookPage.IllustratedHandbook,
+            null,
+            interactTipUI != null ? interactTipUI.gameObject : null,
+            ResolveRuntimePlayerObject());
+    }
+
+    private static GameObject ResolveRuntimePlayerObject()
+    {
+        GameObject playerObject = GameObject.FindGameObjectWithTag("Player");
+        if (playerObject != null)
         {
-            RefreshRuntimeBindings();
+            return playerObject;
         }
 
-        if (handbookManager == null || handbookManager.IsHandbookOpen)
+        PlayerMove playerMove = FindObjectOfType<PlayerMove>(true);
+        if (playerMove != null)
         {
-            return;
+            return playerMove.gameObject;
         }
 
-        handbookManager.OpenIllustratedHandbook();
+        PlayerAttack playerAttack = FindObjectOfType<PlayerAttack>(true);
+        return playerAttack != null ? playerAttack.gameObject : null;
     }
 
     private SubmitSelectionPanelUI FindSubmitPanel(RuntimeModalType type)
@@ -1062,15 +1086,29 @@ public class UIRootManager : MonoBehaviour
         }
 
         Canvas canvas = target.GetComponent<Canvas>();
+        if (canvas == null &&
+            string.Equals(target.name, IllustratedHandbookTabsController.RootObjectName, StringComparison.Ordinal))
+        {
+            Transform illustratedPage = target.transform.Find(IllustratedHandbookTabsController.IllustratedHandbookCanvasName);
+            if (illustratedPage != null)
+            {
+                canvas = illustratedPage.GetComponent<Canvas>();
+            }
+        }
+
         if (canvas == null)
         {
             canvas = target.AddComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            canvas.worldCamera = null;
+            canvas.planeDistance = 100f;
         }
 
         canvas.overrideSorting = true;
         canvas.sortingOrder = RuntimeModalStyle.ModalSortingOrder;
 
-        if (target.GetComponent<GraphicRaycaster>() == null)
+        if (ReferenceEquals(canvas.gameObject, target) &&
+            target.GetComponent<GraphicRaycaster>() == null)
         {
             target.AddComponent<GraphicRaycaster>();
         }

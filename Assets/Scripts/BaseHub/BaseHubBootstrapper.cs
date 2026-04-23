@@ -465,71 +465,11 @@ public class BaseHubBootstrapper : MonoBehaviour
     private GameObject CreateBaseHandbookUI(GameObject playerObject, GameObject interactPrompt)
     {
         EnsureBaseHandbookRuntimeSystems(playerObject);
-
-        GameObject handbookRoot = TryInstantiatePrefabObject(handbookUIPrefab);
-        if (handbookRoot == null)
-        {
-            GameObject prefab = ResolveHandbookPrefab();
-            handbookRoot = TryInstantiatePrefabObject(prefab);
-        }
-
-        if (handbookRoot == null)
-        {
-            Debug.LogError("基地图鉴预制体未绑定，且未找到可用的图鉴 UI 预制体。");
-            return null;
-        }
-
-        handbookRoot.name = "BaseHandbookUI";
-
-        UIManager uiManager = handbookRoot.GetComponentInChildren<UIManager>(true);
-        IllustratedHandbookTabsController.EnsureInstalled(uiManager);
-
-        GameObject illustratedHandbook = uiManager != null && uiManager.illustratedHandbook != null
-            ? uiManager.illustratedHandbook
-            : FindChildByName(handbookRoot.transform, "IllustratedHandbookCanvas");
-        GameObject detailedInformation = FindChildByName(handbookRoot.transform, "DetailedInformationCanvas");
-        GameObject dialogCanvas = FindChildByName(handbookRoot.transform, "DialogCanvas");
-        GameObject packBagCanvas = FindChildByName(handbookRoot.transform, "PackBagCanvas");
-        GameObject interactionCanvas = FindChildByName(handbookRoot.transform, "InteractionCanvas");
-
-        if (dialogCanvas != null) dialogCanvas.SetActive(false);
-        if (packBagCanvas != null) ConfigureBaseBackpackCanvas(packBagCanvas);
-        if (interactionCanvas != null) interactionCanvas.SetActive(false);
-        if (illustratedHandbook != null) illustratedHandbook.SetActive(false);
-        if (detailedInformation != null) detailedInformation.SetActive(false);
-
-        ConfigureRuntimeUiRootManager(
-            handbookRoot,
-            illustratedHandbook,
-            detailedInformation,
-            dialogCanvas,
-            packBagCanvas,
-            interactPrompt);
-
         RuntimeProgressState.EnsureInstance();
         CatalogueUnlockSelectionManager.EnsureInstance();
-
-        if (uiManager == null)
-        {
-            uiManager = UIManager.Instance;
-        }
-
-        uiManager?.ConfigureForRuntime(
-            illustratedHandbook,
-            detailedInformation,
-            new[] { interactPrompt },
-            interactPrompt,
-            playerObject);
-
-        UIRootManager runtimeRootManager = handbookRoot.GetComponentInChildren<UIRootManager>(true);
-        runtimeRootManager?.RefreshRuntimeBindings();
-
         BackpackUI backpackUI = BackpackUI.EnsureRuntimeInstance();
         backpackUI?.RefreshUI();
-
-        return uiManager != null && uiManager.illustratedHandbook != null
-            ? uiManager.illustratedHandbook
-            : illustratedHandbook;
+        return null;
     }
 
     private static void ConfigureRuntimeUiRootManager(

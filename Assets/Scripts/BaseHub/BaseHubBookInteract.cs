@@ -13,6 +13,13 @@ public class BaseHubBookInteract : MonoBehaviour, IInteractable
 
     public void OnInteract()
     {
+        if (IllustratedUISceneLoader.Open(
+                RuntimeModalOpenSource.Interact,
+                IllustratedHandbookPage.IllustratedHandbook))
+        {
+            return;
+        }
+
         if (UIManager.Instance != null)
         {
             UIManager.Instance.OpenIllustratedHandbook(RuntimeModalOpenSource.Interact);

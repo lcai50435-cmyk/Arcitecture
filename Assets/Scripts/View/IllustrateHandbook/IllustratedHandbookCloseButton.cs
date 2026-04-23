@@ -22,6 +22,6 @@ public class IllustratedHandbookCloseButton : MonoBehaviour
             return;
         }
 
-        UIManager.Instance?.RestoreUI();
+        IllustratedUISceneLoader.Close();
     }
 }

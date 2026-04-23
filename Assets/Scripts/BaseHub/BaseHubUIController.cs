@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -200,6 +201,15 @@ public class BaseHubUIController : MonoBehaviour
         RuntimeModalOpenSource source)
     {
         ApplyCameraFocus(focusType, source);
+        GameObject[] hideTargets = interactTipUI != null
+            ? new[] { interactTipUI }
+            : Array.Empty<GameObject>();
+
+        if (IllustratedUISceneLoader.Open(source, page, hideTargets, interactTipUI, player))
+        {
+            return;
+        }
+
         if (UIManager.Instance != null)
         {
             UIManager.Instance.OpenIllustratedHandbook(source, page);
