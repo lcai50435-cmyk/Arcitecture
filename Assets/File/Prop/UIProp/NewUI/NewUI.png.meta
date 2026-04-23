@@ -113,19 +113,19 @@ TextureImporter:
       name: NewUI_0
       rect:
         serializedVersion: 2
-        x: 33
-        y: 674
+        x: 31
+        y: 669
         width: 164
         height: 164
       alignment: 0
-      pivot: {x: 0.5, y: 0.5}
+      pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
       outline: []
       physicsShape: []
       tessellationDetail: 0
       bones: []
-      spriteID: 5e8fc599e5989424089fb886c546df56
-      internalID: 710039819
+      spriteID: 7a49c443c54c49a4a8a76649b62de518
+      internalID: 190598998
       vertices: []
       indices: 
       edges: []
@@ -135,144 +135,18 @@ TextureImporter:
       rect:
         serializedVersion: 2
         x: 32
-        y: 521
+        y: 518
         width: 164
         height: 164
       alignment: 0
-      pivot: {x: 0.5, y: 0.5}
-      border: {x: 0, y: 0, z: 0, w: 0}
-      outline: []
-      physicsShape: []
-      tessellationDetail: 0
-      bones: []
-      spriteID: 0d1214f0c67c3f94280ac7918e454669
-      internalID: 120461854
-      vertices: []
-      indices: 
-      edges: []
-      weights: []
-    - serializedVersion: 2
-      name: NewUI_2
-      rect:
-        serializedVersion: 2
-        x: 648
-        y: 873
-        width: 313
-        height: 79
-      alignment: 0
-      pivot: {x: 0.5, y: 0.5}
-      border: {x: 0, y: 0, z: 0, w: 0}
-      outline: []
-      physicsShape: []
-      tessellationDetail: 0
-      bones: []
-      spriteID: 22bd25cb0a7791e4b999f26e73933da5
-      internalID: 1965973890
-      vertices: []
-      indices: 
-      edges: []
-      weights: []
-    - serializedVersion: 2
-      name: NewUI_3
-      rect:
-        serializedVersion: 2
-        x: 647
-        y: 714
-        width: 314
-        height: 90
-      alignment: 0
-      pivot: {x: 0.5, y: 0.5}
-      border: {x: 0, y: 0, z: 0, w: 0}
-      outline: []
-      physicsShape: []
-      tessellationDetail: 0
-      bones: []
-      spriteID: 04274ba1b745e6444ae86bfc07938d1a
-      internalID: 1222553839
-      vertices: []
-      indices: 
-      edges: []
-      weights: []
-    - serializedVersion: 2
-      name: NewUI_4
-      rect:
-        serializedVersion: 2
-        x: 647
-        y: 558
-        width: 310
-        height: 90
-      alignment: 0
-      pivot: {x: 0.5, y: 0.5}
-      border: {x: 0, y: 0, z: 0, w: 0}
-      outline: []
-      physicsShape: []
-      tessellationDetail: 0
-      bones: []
-      spriteID: 552a16d19114f16478ccb0464a344b75
-      internalID: -1513306425
-      vertices: []
-      indices: 
-      edges: []
-      weights: []
-    - serializedVersion: 2
-      name: NewUI_5
-      rect:
-        serializedVersion: 2
-        x: 619
-        y: 874
-        width: 29
-        height: 77
-      alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
       outline: []
       physicsShape: []
       tessellationDetail: 0
       bones: []
-      spriteID: 2599d01ab6da345468ae9b829807daf0
-      internalID: 1167973318
-      vertices: []
-      indices: 
-      edges: []
-      weights: []
-    - serializedVersion: 2
-      name: NewUI_6
-      rect:
-        serializedVersion: 2
-        x: 616
-        y: 714
-        width: 31
-        height: 90
-      alignment: 0
-      pivot: {x: 0, y: 0}
-      border: {x: 0, y: 0, z: 0, w: 0}
-      outline: []
-      physicsShape: []
-      tessellationDetail: 0
-      bones: []
-      spriteID: 3fc2ffc6646fc024390c4482735e5841
-      internalID: -1509765183
-      vertices: []
-      indices: 
-      edges: []
-      weights: []
-    - serializedVersion: 2
-      name: NewUI_7
-      rect:
-        serializedVersion: 2
-        x: 618
-        y: 558
-        width: 29
-        height: 90
-      alignment: 0
-      pivot: {x: 0, y: 0}
-      border: {x: 0, y: 0, z: 0, w: 0}
-      outline: []
-      physicsShape: []
-      tessellationDetail: 0
-      bones: []
-      spriteID: af0a4915eafe67641901b8237f63ae13
-      internalID: 70321582
+      spriteID: 1655ead968de75144bf004a651fd0a6c
+      internalID: 1584865162
       vertices: []
       indices: 
       edges: []
@@ -288,14 +162,8 @@ TextureImporter:
     weights: []
     secondaryTextures: []
     nameFileIdTable:
-      NewUI_0: 710039819
-      NewUI_1: 120461854
-      NewUI_2: 1965973890
-      NewUI_3: 1222553839
-      NewUI_4: -1513306425
-      NewUI_5: 1167973318
-      NewUI_6: -1509765183
-      NewUI_7: 70321582
+      NewUI_0: 190598998
+      NewUI_1: 1584865162
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 
