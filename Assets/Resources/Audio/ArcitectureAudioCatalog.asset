@@ -28,7 +28,19 @@ MonoBehaviour:
   sfxCues:
   - cueId: 1
     clip: {fileID: 8300000, guid: 9a5af67e0c4749b5953cff8624e1d24c, type: 3}
+    variants: []
     gain: 0.72
   - cueId: 2
     clip: {fileID: 8300000, guid: 0441c830d1da44a1acab5766312ebd98, type: 3}
+    variants: []
     gain: 0.68
+  - cueId: 3
+    clip: {fileID: 0}
+    variants:
+    - {fileID: 8300000, guid: 1d2a5de0298c4115bd9e5ae47e369a19, type: 3}
+    - {fileID: 8300000, guid: 1b6b76b4d69f4da785e54ae43e698cdf, type: 3}
+    - {fileID: 8300000, guid: d6a711d03e8649f7bd4b4a77dfc1cf68, type: 3}
+    - {fileID: 8300000, guid: f30c870849d74f50820ebf4abd853b6a, type: 3}
+    - {fileID: 8300000, guid: 6d43f9f9f8324be7b4d3c7546802eadd, type: 3}
+    - {fileID: 8300000, guid: b4fa813c733b4346860c6371af6dec33, type: 3}
+    gain: 0.74

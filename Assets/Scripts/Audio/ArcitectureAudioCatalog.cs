@@ -14,7 +14,8 @@ public enum SfxCueId
 {
     None = 0,
     PlayerAttack = 1,
-    FireMonsterCast = 2
+    FireMonsterCast = 2,
+    HandbookBookmark = 3
 }
 
 [Serializable]
@@ -30,6 +31,7 @@ public struct SfxCueDefinition
 {
     public SfxCueId cueId;
     public AudioClip clip;
+    public AudioClip[] variants;
     [Range(0f, 1f)] public float gain;
 }
 
@@ -71,11 +73,48 @@ public sealed class ArcitectureAudioCatalog : ScriptableObject
         {
             if (sfxCues[i].cueId == cueId)
             {
-                return sfxCues[i].clip;
+                return SelectSfxClip(sfxCues[i]);
             }
         }
 
         return null;
+    }
+
+    private static AudioClip SelectSfxClip(SfxCueDefinition definition)
+    {
+        AudioClip[] variants = definition.variants;
+        if (variants != null && variants.Length > 0)
+        {
+            int validCount = 0;
+            for (int i = 0; i < variants.Length; i++)
+            {
+                if (variants[i] != null)
+                {
+                    validCount++;
+                }
+            }
+
+            if (validCount > 0)
+            {
+                int targetIndex = UnityEngine.Random.Range(0, validCount);
+                for (int i = 0; i < variants.Length; i++)
+                {
+                    if (variants[i] == null)
+                    {
+                        continue;
+                    }
+
+                    if (targetIndex == 0)
+                    {
+                        return variants[i];
+                    }
+
+                    targetIndex--;
+                }
+            }
+        }
+
+        return definition.clip;
     }
 
     public float GetSfxGain(SfxCueId cueId)
