@@ -23,10 +23,18 @@ public class BaseHubInkAttack : MonoBehaviour
             return;
         }
 
-        if (Input.GetKeyDown(GameSettingsStore.GetKeyBinding(GameInputAction.Attack)))
+        KeyCode attackKey = GameSettingsStore.GetKeyBinding(GameInputAction.Attack);
+        if (attackKey == KeyCode.None || !Input.GetKeyDown(attackKey))
         {
-            Fire();
+            return;
         }
+
+        if (RuntimeUiInputGuard.ShouldBlockGameplayAttack(attackKey))
+        {
+            return;
+        }
+
+        Fire();
     }
 
     private void Fire()

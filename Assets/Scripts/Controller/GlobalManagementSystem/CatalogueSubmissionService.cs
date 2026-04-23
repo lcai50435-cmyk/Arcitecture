@@ -1,8 +1,22 @@
+using UnityEngine;
+
 public struct CatalogueAutoSubmitResult
 {
     public int specialStructureCount;
     public int inkSupplyCount;
     public int remainingCommonStructureCount;
+}
+
+public struct CatalogueSubmitCommonStructureResult
+{
+    public bool success;
+    public CatalogueBuildingId buildingId;
+    public int rolledPercent;
+    public int requestedProgress;
+    public int appliedProgress;
+    public int previousProgress;
+    public int currentProgress;
+    public BuildingRewardDefinition completionReward;
 }
 
 public static class CatalogueSubmissionService
@@ -50,39 +64,61 @@ public static class CatalogueSubmissionService
         return result;
     }
 
-    public static bool SubmitSingleCommonStructure(
+    public static CatalogueSubmitCommonStructureResult SubmitSingleCommonStructure(
         BackpackMananger backpack,
         int slotIndex,
-        CatalogueBuildingId buildingId,
-        out BuildingRewardDefinition completionReward)
+        CatalogueBuildingId buildingId)
     {
-        completionReward = null;
+        CatalogueSubmitCommonStructureResult result = new CatalogueSubmitCommonStructureResult
+        {
+            buildingId = buildingId
+        };
+
         if (backpack == null)
         {
-            return false;
+            return result;
         }
 
         ArchitecturalCrystal? nullableItem = backpack.GetItem(slotIndex);
         if (!nullableItem.HasValue)
         {
-            return false;
+            return result;
         }
 
         ArchitecturalCrystal crystal = nullableItem.Value;
         if (!crystal.IsCommonStructure)
         {
-            return false;
+            return result;
         }
 
-        bool added = RuntimeProgressState.EnsureInstance()
-            .AddBuildingProgress(buildingId, crystal.expValue, out completionReward);
+        RuntimeProgressState runtimeState = RuntimeProgressState.EnsureInstance();
+        BuildingDefinition definition = BuildingDefinitionLibrary.Get(buildingId);
 
-        if (!added)
+        result.rolledPercent = crystal.buildProgressPercent > 0
+            ? ArchitecturalCrystalFactory.ClampBuildProgressPercent(crystal.buildProgressPercent)
+            : ArchitecturalCrystalFactory.MinimumBuildProgressPercent;
+        result.previousProgress = runtimeState.GetBuildingProgress(buildingId);
+        result.requestedProgress = Mathf.Max(
+            1,
+            Mathf.RoundToInt(definition.requiredProgress * (result.rolledPercent / 100f)));
+
+        bool added = runtimeState.AddBuildingProgress(
+            buildingId,
+            result.requestedProgress,
+            out BuildingRewardDefinition completionReward);
+
+        result.completionReward = completionReward;
+        result.currentProgress = runtimeState.GetBuildingProgress(buildingId);
+        result.appliedProgress = Mathf.Max(0, result.currentProgress - result.previousProgress);
+
+        if (!added || result.appliedProgress <= 0)
         {
-            return false;
+            result.completionReward = null;
+            return result;
         }
 
         backpack.RemoveItem(slotIndex);
-        return true;
+        result.success = true;
+        return result;
     }
 }

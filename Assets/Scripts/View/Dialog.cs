@@ -286,10 +286,10 @@ public class Dialog : MonoBehaviour
     private string BuildSpiritIntro(ArchitecturalCrystal crystal)
     {
         string desc = string.IsNullOrEmpty(crystal.textDescription)
-            ? $"发现了 {crystal.type}。它会带来 {crystal.expValue} 点结构经验。"
+            ? $"发现了 {crystal.DisplayName}。它能推进建筑录修复，并立即提供当前结构效果。"
             : crystal.textDescription;
 
-        return $"精灵：\n{desc}\n\n点击按钮后继续探索。";
+        return $"精灵：\n发现了 {crystal.DisplayName}。\n{desc}\n\n点击按钮后继续探索。";
     }
 
     private void HideOtherUI(bool hide)

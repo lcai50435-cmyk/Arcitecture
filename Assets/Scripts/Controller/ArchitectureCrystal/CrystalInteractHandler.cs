@@ -8,6 +8,7 @@ using UnityEngine;
 public class CrystalInteractHandler : MonoBehaviour, IInteractable
 {
     private const float PickupAmbushProbability = 0.3f;
+    private const int LegacyDefaultCommonExpValue = 30;
 
     [Header("是否为专用材料")]
     public bool isUnlockMaterial = false;
@@ -18,6 +19,8 @@ public class CrystalInteractHandler : MonoBehaviour, IInteractable
     [Header("晶体配置")]
     public ArchitecturalType type;
     public int expValue;
+    [Range(0, ArchitecturalCrystalFactory.MaximumBuildProgressPercent)]
+    public int buildProgressPercent;
     public Sprite icon;
     public Sprite backIcon;
     public AttributeBonusType bonusType;
@@ -38,6 +41,8 @@ public class CrystalInteractHandler : MonoBehaviour, IInteractable
 
     private string runtimeCollectionId;
     private bool collectionIdResolved;
+    private bool hasRuntimeCrystalData;
+    private ArchitecturalCrystal runtimeCrystalData;
 
     private void Awake()
     {
@@ -125,26 +130,42 @@ public class CrystalInteractHandler : MonoBehaviour, IInteractable
 
     private ArchitecturalCrystal BuildRuntimeCrystalData()
     {
+        if (hasRuntimeCrystalData)
+        {
+            return runtimeCrystalData;
+        }
+
         ArchitecturalResourceCategory category = ResolveCategory();
+        ArchitecturalCrystal crystal;
 
         if (category == ArchitecturalResourceCategory.SpecialStructure)
         {
-            ArchitecturalCrystal crystal = ArchitecturalCrystalFactory.CreateSpecialStructureMaterial(icon, backIcon);
+            crystal = ArchitecturalCrystalFactory.CreateSpecialStructureMaterial(icon, backIcon);
             OverrideCrystalPresentation(ref crystal);
-            return crystal;
+            runtimeCrystalData = crystal;
+            hasRuntimeCrystalData = true;
+            return runtimeCrystalData;
         }
 
         if (category == ArchitecturalResourceCategory.InkSupply)
         {
             bool largeBottle = type == ArchitecturalType.LargeInkBottle || inkRestoreValue >= 50;
-            ArchitecturalCrystal crystal = ArchitecturalCrystalFactory.CreateInkSupply(largeBottle, icon, backIcon);
+            crystal = ArchitecturalCrystalFactory.CreateInkSupply(largeBottle, icon, backIcon);
             OverrideCrystalPresentation(ref crystal);
-            return crystal;
+            runtimeCrystalData = crystal;
+            hasRuntimeCrystalData = true;
+            return runtimeCrystalData;
         }
 
-        ArchitecturalCrystal commonCrystal = ArchitecturalCrystalFactory.CreateCommonStructure(type, icon, backIcon);
-        OverrideCrystalPresentation(ref commonCrystal);
-        return commonCrystal;
+        crystal = ArchitecturalCrystalFactory.CreateCommonStructure(
+            type,
+            icon,
+            backIcon,
+            ResolveCommonStructureBuildProgressPercent());
+        OverrideCrystalPresentation(ref crystal);
+        runtimeCrystalData = crystal;
+        hasRuntimeCrystalData = true;
+        return runtimeCrystalData;
     }
 
     private void OverrideCrystalPresentation(ref ArchitecturalCrystal crystal)
@@ -167,6 +188,21 @@ public class CrystalInteractHandler : MonoBehaviour, IInteractable
         {
             crystal.textDescription = textDescription;
         }
+    }
+
+    private int ResolveCommonStructureBuildProgressPercent()
+    {
+        if (buildProgressPercent > 0)
+        {
+            return ArchitecturalCrystalFactory.ClampBuildProgressPercent(buildProgressPercent);
+        }
+
+        if (expValue > 0 && expValue != LegacyDefaultCommonExpValue)
+        {
+            return ArchitecturalCrystalFactory.ClampBuildProgressPercent(expValue);
+        }
+
+        return 0;
     }
 
     private bool ShouldTriggerPickupAmbush()

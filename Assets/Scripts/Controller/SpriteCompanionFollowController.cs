@@ -7,6 +7,8 @@ using UnityEngine;
 [RequireComponent(typeof(SpriteRenderer))]
 public sealed class SpriteCompanionFollowController : MonoBehaviour
 {
+    private const float CompanionMoveSpeedMultiplier = 0.7f;
+
     [Header("跟随")]
     [SerializeField] private float followStartDistance = 1.05f;
     [SerializeField] private float followStopDistance = 0.78f;
@@ -52,7 +54,7 @@ public sealed class SpriteCompanionFollowController : MonoBehaviour
         SyncMoveSpeed(initialDistanceToPlayer);
         if (!hasSpawnedNearPlayer)
         {
-            SpawnNearPlayer();
+            InitializeFollowSlot();
         }
     }
 
@@ -92,8 +94,7 @@ public sealed class SpriteCompanionFollowController : MonoBehaviour
 
         if (!hasSpawnedNearPlayer)
         {
-            SpawnNearPlayer();
-            return;
+            InitializeFollowSlot();
         }
 
         Vector2 playerPosition = playerTransform.position;
@@ -182,7 +183,7 @@ public sealed class SpriteCompanionFollowController : MonoBehaviour
         return true;
     }
 
-    private void SpawnNearPlayer()
+    private void InitializeFollowSlot()
     {
         if (playerTransform == null)
         {
@@ -192,9 +193,7 @@ public sealed class SpriteCompanionFollowController : MonoBehaviour
         Vector3 playerPosition = playerTransform.position;
         currentSlotDirection = ResolveFollowSlot(playerPosition, playerPosition, true);
         Vector3 targetPosition = ResolveSlotWorldPosition(playerPosition, currentSlotDirection);
-        targetPosition.z = playerPosition.z;
 
-        transform.position = targetPosition;
         blockedSince = -1f;
         hasSpawnedNearPlayer = true;
         nextSlotRefreshTime = Time.time + slotRefreshInterval;
@@ -202,6 +201,7 @@ public sealed class SpriteCompanionFollowController : MonoBehaviour
         avoidObstacle?.ResetAvoidance();
         move?.StopMovement();
 
+        // 只初始化目标槽位，不直接改 transform.position，避免精灵运行时瞬移。
         Vector2 faceDirection = ResolveFourWayDirection((Vector2)(playerPosition - targetPosition));
         if (faceDirection != Vector2.zero && companionCore != null)
         {
@@ -347,7 +347,7 @@ public sealed class SpriteCompanionFollowController : MonoBehaviour
             : 4.5f;
         float catchupProgress = Mathf.InverseLerp(followStartDistance, moveCatchupDistance, distanceToPlayer);
         float targetSpeed = Mathf.Lerp(playerSpeed * 0.72f, playerSpeed * 1.02f, catchupProgress);
-        targetSpeed = Mathf.Max(2.6f, targetSpeed);
+        targetSpeed = Mathf.Max(2.6f * CompanionMoveSpeedMultiplier, targetSpeed * CompanionMoveSpeedMultiplier);
 
         companionCore.stats.moveSpeed = targetSpeed;
         if (companionCore.baseStats != null)

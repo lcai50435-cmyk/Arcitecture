@@ -38,6 +38,9 @@ public sealed class RuntimeCameraController : MonoBehaviour
     private const float HighDangerZoomReduction = 0.05f;
     private const float DangerTensionLerpSpeed = 2.5f;
     private const float DamageNoiseFrequency = 32f;
+    private const float PauseFocusZoomMultiplier = 0.82f;
+    private const float PauseFocusEnterDuration = 0.22f;
+    private const float PauseFocusExitDuration = 0.26f;
 
     private static RuntimeCameraController instance;
     private static bool sceneHookRegistered;
@@ -65,6 +68,9 @@ public sealed class RuntimeCameraController : MonoBehaviour
     private float smoothedOrthographicSize;
     private float orthographicSizeVelocity;
     private float focusWeight;
+    private bool pauseFocusActive;
+    private float pauseFocusWeight;
+    private float pauseFocusBaseOrthographicSize;
     private float currentDangerTension;
     private float targetDangerTension;
 
@@ -99,6 +105,8 @@ public sealed class RuntimeCameraController : MonoBehaviour
         instance.EnsureSceneHook();
         return instance;
     }
+
+    public static float PauseFocusEnterDurationSeconds => PauseFocusEnterDuration;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     private static void ResetStatics()
@@ -238,6 +246,27 @@ public sealed class RuntimeCameraController : MonoBehaviour
         targetDangerTension = Mathf.Clamp01(value);
     }
 
+    public void SetPauseFocusActive(bool active, bool immediate = false)
+    {
+        bool shouldActivate = active && IsGameplayScene();
+        if (shouldActivate && !pauseFocusActive)
+        {
+            CapturePauseFocusBaseSize();
+        }
+
+        pauseFocusActive = shouldActivate;
+
+        if (immediate)
+        {
+            pauseFocusWeight = pauseFocusActive ? 1f : 0f;
+            ApplyPausedFocusWhileFrozen();
+            if (!pauseFocusActive)
+            {
+                pauseFocusBaseOrthographicSize = 0f;
+            }
+        }
+    }
+
     public bool AdoptCurrentCameraPose()
     {
         if (!IsSupportedScene())
@@ -344,9 +373,11 @@ public sealed class RuntimeCameraController : MonoBehaviour
             currentDangerTension,
             targetDangerTension,
             deltaTime * DangerTensionLerpSpeed);
+        UpdatePauseFocusWeight(deltaTime);
 
         if (ShouldFreezeGameplayCamera())
         {
+            ApplyPausedFocusWhileFrozen();
             return;
         }
 
@@ -417,6 +448,9 @@ public sealed class RuntimeCameraController : MonoBehaviour
         orthographicSizeVelocity = 0f;
         hubFocusTarget = null;
         focusWeight = 0f;
+        pauseFocusActive = false;
+        pauseFocusWeight = 0f;
+        pauseFocusBaseOrthographicSize = 0f;
         currentDangerTension = 0f;
         targetDangerTension = 0f;
         ClearTransientMotion();
@@ -585,6 +619,7 @@ public sealed class RuntimeCameraController : MonoBehaviour
 
     private void HandlePlayerDeath()
     {
+        SetPauseFocusActive(false, true);
         ClearTransientMotion();
     }
 
@@ -669,6 +704,10 @@ public sealed class RuntimeCameraController : MonoBehaviour
         if (IsGameplayScene())
         {
             desiredSize *= 1f - ResolveDangerZoomReduction(currentDangerTension);
+            if (pauseFocusWeight > 0.001f)
+            {
+                desiredSize *= Mathf.Lerp(1f, PauseFocusZoomMultiplier, pauseFocusWeight);
+            }
         }
 
         return desiredSize;
@@ -697,6 +736,46 @@ public sealed class RuntimeCameraController : MonoBehaviour
         }
 
         return Mathf.Lerp(GameplayFollowSmoothBase, GameplayFollowSmoothHighRisk, currentDangerTension);
+    }
+
+    private void CapturePauseFocusBaseSize()
+    {
+        ResolveCameraIfNeeded();
+        if (controlledCamera == null)
+        {
+            pauseFocusBaseOrthographicSize = 5f;
+            return;
+        }
+
+        pauseFocusBaseOrthographicSize = hasSmoothedSize
+            ? smoothedOrthographicSize
+            : controlledCamera.orthographicSize;
+    }
+
+    private void UpdatePauseFocusWeight(float deltaTime)
+    {
+        float targetWeight = pauseFocusActive ? 1f : 0f;
+        float duration = targetWeight > pauseFocusWeight ? PauseFocusEnterDuration : PauseFocusExitDuration;
+        float step = duration > 0.001f ? deltaTime / duration : 1f;
+        pauseFocusWeight = Mathf.MoveTowards(pauseFocusWeight, targetWeight, step);
+
+        if (!pauseFocusActive && pauseFocusWeight <= 0.001f)
+        {
+            pauseFocusBaseOrthographicSize = 0f;
+        }
+    }
+
+    private void ApplyPausedFocusWhileFrozen()
+    {
+        if (controlledCamera == null || pauseFocusWeight <= 0.001f || pauseFocusBaseOrthographicSize <= 0.001f)
+        {
+            return;
+        }
+
+        float focusedSize = pauseFocusBaseOrthographicSize * Mathf.Lerp(1f, PauseFocusZoomMultiplier, pauseFocusWeight);
+        controlledCamera.orthographicSize = focusedSize;
+        smoothedOrthographicSize = focusedSize;
+        hasSmoothedSize = true;
     }
 
     private bool ConsumeAdoptedExternalPose()

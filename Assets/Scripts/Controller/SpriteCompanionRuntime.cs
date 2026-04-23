@@ -6,7 +6,8 @@ public static class SpriteCompanionRuntime
     private const string CompanionName = "SpriteCompanion";
     private const string CompanionControllerResourcePath = "RuntimeSpriteCompanion";
     private const int DefaultSortingOrder = 4;
-    private const float CompanionScaleMultiplier = 0.54f;
+    private const float BaseCompanionScaleMultiplier = 0.54f;
+    private const float GameplayCompanionScaleMultiplier = BaseCompanionScaleMultiplier * 3f;
     private static readonly Vector2 CompanionColliderSize = new Vector2(0.28f, 0.32f);
     private static readonly Vector2 CompanionColliderOffset = new Vector2(0f, -0.02f);
 
@@ -32,6 +33,7 @@ public static class SpriteCompanionRuntime
             if (activeCompanion.IsBoundTo(playerTransform))
             {
                 activeCompanion.Bind(playerTransform, playerCore);
+                ApplyCompanionScale(activeCompanion.transform, player.scene.name);
                 return activeCompanion;
             }
 
@@ -55,7 +57,7 @@ public static class SpriteCompanionRuntime
         }
 
         companionObject.transform.position = playerTransform.position;
-        companionObject.transform.localScale = Vector3.one * CompanionScaleMultiplier;
+        companionObject.transform.localScale = Vector3.one * ResolveCompanionScale(playerScene.name);
 
         SpriteRenderer playerRenderer = player.GetComponent<SpriteRenderer>();
         SpriteRenderer companionRenderer = companionObject.AddComponent<SpriteRenderer>();
@@ -132,5 +134,22 @@ public static class SpriteCompanionRuntime
         }
 
         return Mathf.Max(4.8f, playerCore.stats.moveSpeed + 0.75f);
+    }
+
+    private static void ApplyCompanionScale(Transform companionTransform, string sceneName)
+    {
+        if (companionTransform == null)
+        {
+            return;
+        }
+
+        companionTransform.localScale = Vector3.one * ResolveCompanionScale(sceneName);
+    }
+
+    private static float ResolveCompanionScale(string sceneName)
+    {
+        return GameplayStageCatalog.IsGameplayScene(sceneName)
+            ? GameplayCompanionScaleMultiplier
+            : BaseCompanionScaleMultiplier;
     }
 }

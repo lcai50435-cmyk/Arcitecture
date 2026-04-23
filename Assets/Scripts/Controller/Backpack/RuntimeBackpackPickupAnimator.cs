@@ -43,7 +43,7 @@ public sealed class RuntimeBackpackPickupAnimator : MonoBehaviour
             return false;
         }
 
-        BackpackUI backpackUi = FindObjectOfType<BackpackUI>(true);
+        BackpackUI backpackUi = BackpackUI.EnsureRuntimeInstance();
         if (backpackUi == null)
         {
             backpack.CancelReservedSlot(slotIndex);

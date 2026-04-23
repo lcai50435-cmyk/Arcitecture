@@ -260,7 +260,8 @@ public class BackpackMananger : MonoBehaviour
             crystal.subBonusValue,
             crystal.isUnlockMaterial,
             crystal.resourceCategory,
-            crystal.inkRestoreValue);
+            crystal.inkRestoreValue,
+            crystal.buildProgressPercent);
         storedItem.runtimePickupOrder = nextRuntimePickupOrder++;
         return storedItem;
     }

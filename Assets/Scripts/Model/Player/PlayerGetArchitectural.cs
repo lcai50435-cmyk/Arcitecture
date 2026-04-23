@@ -70,13 +70,12 @@ public class PlayerGetArchitectural : MonoBehaviour
             return;
         }
 
-        bool submitted = CatalogueSubmissionService.SubmitSingleCommonStructure(
+        CatalogueSubmitCommonStructureResult submitResult = CatalogueSubmissionService.SubmitSingleCommonStructure(
             backpack,
             index,
-            buildingId,
-            out BuildingRewardDefinition completionReward);
+            buildingId);
 
-        if (!submitted)
+        if (!submitResult.success)
         {
             return;
         }
@@ -86,10 +85,21 @@ public class PlayerGetArchitectural : MonoBehaviour
             backpackUI.RefreshUI();
         }
 
-        if (completionReward != null)
+        RuntimeSubtitleFeedHud.PushMessage(BuildSubmitFeedbackMessage(submitResult));
+
+        if (submitResult.completionReward != null)
         {
-            ShowRewardDialog(completionReward);
+            ShowRewardDialog(submitResult.completionReward);
         }
+    }
+
+    private static string BuildSubmitFeedbackMessage(CatalogueSubmitCommonStructureResult submitResult)
+    {
+        BuildingDefinition definition = BuildingDefinitionLibrary.Get(submitResult.buildingId);
+        string progressLabel = submitResult.appliedProgress == submitResult.requestedProgress
+            ? "进度"
+            : "有效进度";
+        return $"提交成功：{definition.displayName} 构建度 {submitResult.rolledPercent}%，{progressLabel} +{submitResult.appliedProgress}";
     }
 
     private bool ResolveRuntimeDependencies()
@@ -108,7 +118,7 @@ public class PlayerGetArchitectural : MonoBehaviour
 
         if (backpackUI == null)
         {
-            backpackUI = FindObjectOfType<BackpackUI>(true);
+            backpackUI = BackpackUI.EnsureRuntimeInstance();
         }
 
         if (backpack == null)

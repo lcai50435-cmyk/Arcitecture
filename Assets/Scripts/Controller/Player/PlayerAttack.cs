@@ -22,6 +22,8 @@ public class PlayerAttack : CharacterAttack
     public float maxInk = 100f;
     public float baseMaxInk = 100f;
 
+    protected override bool ShouldMirrorRootForAttack => false;
+
     protected override void Awake()
     {
         RuntimeMiniMapHud.EnsureInstance();
@@ -48,17 +50,20 @@ public class PlayerAttack : CharacterAttack
 
     private void Update()
     {
-        if (Input.GetKeyDown(GameSettingsStore.GetKeyBinding(GameInputAction.Attack)))
+        KeyCode attackKey = GameSettingsStore.GetKeyBinding(GameInputAction.Attack);
+        if (attackKey == KeyCode.None || !Input.GetKeyDown(attackKey))
         {
-            if (UIRootManager.Instance != null && UIRootManager.Instance.IsAnyGameplayBlockingUIOpen())
-            {
-                return;
-            }
+            return;
+        }
 
-            if (!isAttacking && Time.time >= nextAttackTime)
-            {
-                TriggerAttack();
-            }
+        if (RuntimeUiInputGuard.ShouldBlockGameplayAttack(attackKey))
+        {
+            return;
+        }
+
+        if (!isAttacking && Time.time >= nextAttackTime)
+        {
+            TriggerAttack();
         }
     }
 

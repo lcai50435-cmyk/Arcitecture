@@ -32,6 +32,25 @@ public class GameDebugPageBootstrapper : MonoBehaviour
     private TextMeshProUGUI statusText;
     private float refreshTimer;
 
+    public static bool IsAnyPanelOpen
+    {
+        get
+        {
+            GameDebugPageBootstrapper[] bootstrappers = FindObjectsOfType<GameDebugPageBootstrapper>(true);
+            for (int i = 0; i < bootstrappers.Length; i++)
+            {
+                if (bootstrappers[i] != null &&
+                    bootstrappers[i].panelRoot != null &&
+                    bootstrappers[i].panelRoot.activeInHierarchy)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+    }
+
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void Initialize()
     {

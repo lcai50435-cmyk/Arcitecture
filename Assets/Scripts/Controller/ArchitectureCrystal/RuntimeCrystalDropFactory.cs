@@ -142,6 +142,7 @@ public static class RuntimeCrystalDropFactory
             CrystalInteractHandler handler = dropObject.AddComponent<CrystalInteractHandler>();
             handler.type = crystal.type;
             handler.expValue = crystal.expValue;
+            handler.buildProgressPercent = crystal.buildProgressPercent;
             handler.icon = crystal.icon != null
                 ? RuntimeSpriteDisplaySanitizer.GetDisplaySprite(crystal.icon)
                 : (sanitizedRevealedSprite != null ? sanitizedRevealedSprite : revealedSprite);

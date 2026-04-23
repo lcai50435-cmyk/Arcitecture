@@ -5,6 +5,8 @@ using UnityEngine.UI;
 
 public class BackpackSlot : MonoBehaviour, IPointerDownHandler, IPointerUpHandler, IPointerEnterHandler, IPointerExitHandler
 {
+    private const string RuntimeSlotIconName = "ItemIcon";
+
     [Header("格子编号 0~5")]
     public int slotIndex;
 
@@ -13,8 +15,9 @@ public class BackpackSlot : MonoBehaviour, IPointerDownHandler, IPointerUpHandle
 
     private BackpackMananger backpack;
     private Image slotImage;
+    private Image itemIconImage;
     private BackpackUI backpackUI;
-    private Outline hoverOutline;
+    private Outline legacyHoverOutline;
     private bool isHolding;
     private float holdTimer;
     private bool isHovered;
@@ -28,24 +31,37 @@ public class BackpackSlot : MonoBehaviour, IPointerDownHandler, IPointerUpHandle
             Debug.Log($"自动为格子{slotIndex}添加了Image组件");
         }
 
-        hoverOutline = GetComponent<Outline>();
-        if (hoverOutline == null)
+        if (itemIconImage == null)
         {
-            hoverOutline = gameObject.AddComponent<Outline>();
+            Transform iconTransform = transform.Find(RuntimeSlotIconName);
+            if (iconTransform != null)
+            {
+                itemIconImage = iconTransform.GetComponent<Image>();
+            }
         }
 
-        hoverOutline.effectColor = new Color(0.96f, 0.84f, 0.52f, 0.95f);
-        hoverOutline.effectDistance = new Vector2(2f, -2f);
-        hoverOutline.useGraphicAlpha = false;
-        hoverOutline.enabled = false;
+        legacyHoverOutline = GetComponent<Outline>();
+        if (legacyHoverOutline != null)
+        {
+            legacyHoverOutline.enabled = false;
+        }
 
         backpack = BackpackMananger.Instance;
-        backpackUI = FindObjectOfType<BackpackUI>(true);
+        if (backpackUI == null)
+        {
+            backpackUI = BackpackUI.EnsureRuntimeInstance();
+        }
 
         if (backpack == null)
         {
             Debug.LogError($"BackpackSlot {slotIndex}: 未找到BackpackMananger实例！");
         }
+    }
+
+    public void BindRuntimeVisual(BackpackUI owner, Image runtimeItemIcon)
+    {
+        backpackUI = owner;
+        itemIconImage = runtimeItemIcon;
     }
 
     public bool TryGetScreenCenter(out Vector2 screenCenter, out Vector2 size)
@@ -100,6 +116,12 @@ public class BackpackSlot : MonoBehaviour, IPointerDownHandler, IPointerUpHandle
 
     public void OnPointerDown(PointerEventData eventData)
     {
+        if (eventData.button == PointerEventData.InputButton.Left)
+        {
+            backpackUI?.SelectSlot(slotIndex);
+            return;
+        }
+
         if (eventData.button == PointerEventData.InputButton.Right)
         {
             StartSingleHold();
@@ -117,6 +139,7 @@ public class BackpackSlot : MonoBehaviour, IPointerDownHandler, IPointerUpHandle
     public void OnPointerEnter(PointerEventData eventData)
     {
         isHovered = true;
+        backpackUI?.SetSlotHover(slotIndex, true);
         RefreshHoverState();
     }
 
@@ -160,22 +183,19 @@ public class BackpackSlot : MonoBehaviour, IPointerDownHandler, IPointerUpHandle
 
     private void RefreshHoverState()
     {
+        backpackUI?.SetSlotHover(slotIndex, true);
+
         if (backpack == null || !HasVisibleItem())
         {
-            HideHoverState();
+            HideHoverTooltip();
             return;
         }
 
         ArchitecturalCrystal? item = backpack.GetItem(slotIndex);
         if (!item.HasValue)
         {
-            HideHoverState();
+            HideHoverTooltip();
             return;
-        }
-
-        if (hoverOutline != null)
-        {
-            hoverOutline.enabled = true;
         }
 
         RuntimeBackpackHoverHud.EnsureInstance().ShowOrUpdate(this, item.Value, Input.mousePosition);
@@ -183,11 +203,17 @@ public class BackpackSlot : MonoBehaviour, IPointerDownHandler, IPointerUpHandle
 
     private void HideHoverState()
     {
-        if (hoverOutline != null)
+        backpackUI?.SetSlotHover(slotIndex, false);
+        if (legacyHoverOutline != null)
         {
-            hoverOutline.enabled = false;
+            legacyHoverOutline.enabled = false;
         }
 
+        HideHoverTooltip();
+    }
+
+    private void HideHoverTooltip()
+    {
         if (RuntimeBackpackHoverHud.Instance != null)
         {
             RuntimeBackpackHoverHud.Instance.HideForSlot(this);
@@ -196,7 +222,8 @@ public class BackpackSlot : MonoBehaviour, IPointerDownHandler, IPointerUpHandle
 
     private bool HasVisibleItem()
     {
-        return slotImage != null && slotImage.enabled && slotImage.sprite != null;
+        Image visibleItemImage = itemIconImage != null ? itemIconImage : slotImage;
+        return visibleItemImage != null && visibleItemImage.enabled && visibleItemImage.sprite != null;
     }
 
     private void DropSingleItem()

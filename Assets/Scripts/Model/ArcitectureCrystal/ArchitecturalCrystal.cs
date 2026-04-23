@@ -45,7 +45,9 @@ public enum AttributeBonusType
 public struct ArchitecturalCrystal
 {
     public ArchitecturalType type;
+    // 兼容旧场景与 prefab 序列化，普通结构的构建度已改由 buildProgressPercent 驱动。
     public int expValue;
+    public int buildProgressPercent;
     public Sprite icon;
     public Sprite backIcon;
     public string textDescription;
@@ -106,7 +108,8 @@ public struct ArchitecturalCrystal
         float bonusValue,
         AttributeBonusType subBonusType,
         float subBonusValue,
-        bool isUnlockMaterial = false)
+        bool isUnlockMaterial = false,
+        int buildProgressPercent = 0)
         : this(
             type,
             expValue,
@@ -119,7 +122,8 @@ public struct ArchitecturalCrystal
             subBonusValue,
             isUnlockMaterial,
             isUnlockMaterial ? ArchitecturalResourceCategory.SpecialStructure : ArchitecturalResourceCategory.CommonStructure,
-            0)
+            0,
+            buildProgressPercent)
     {
     }
 
@@ -135,11 +139,13 @@ public struct ArchitecturalCrystal
         float subBonusValue,
         bool isUnlockMaterial,
         ArchitecturalResourceCategory resourceCategory,
-        int inkRestoreValue)
+        int inkRestoreValue,
+        int buildProgressPercent = 0)
         : this()
     {
         this.type = type;
         this.expValue = expValue;
+        this.buildProgressPercent = buildProgressPercent;
         this.icon = icon;
         this.backIcon = backIcon;
         this.textDescription = textDescription;
@@ -156,7 +162,6 @@ public struct ArchitecturalCrystal
 
 public readonly struct CommonStructureCrystalDefinition
 {
-    public readonly int expValue;
     public readonly AttributeBonusType bonusType;
     public readonly float bonusValue;
     public readonly AttributeBonusType subBonusType;
@@ -164,14 +169,12 @@ public readonly struct CommonStructureCrystalDefinition
     public readonly string description;
 
     public CommonStructureCrystalDefinition(
-        int expValue,
         AttributeBonusType bonusType,
         float bonusValue,
         AttributeBonusType subBonusType,
         float subBonusValue,
         string description)
     {
-        this.expValue = expValue;
         this.bonusType = bonusType;
         this.bonusValue = bonusValue;
         this.subBonusType = subBonusType;
@@ -194,6 +197,9 @@ public readonly struct ArchitecturalCrystalVisualSet
 
 public static class ArchitecturalCrystalFactory
 {
+    public const int MinimumBuildProgressPercent = 10;
+    public const int MaximumBuildProgressPercent = 30;
+
     private static Sprite runtimeSpecialStructureSprite;
     private static readonly Dictionary<ArchitecturalType, CommonStructureCrystalDefinition> commonStructureDefinitions =
         new Dictionary<ArchitecturalType, CommonStructureCrystalDefinition>
@@ -201,7 +207,6 @@ public static class ArchitecturalCrystalFactory
             {
                 ArchitecturalType.MortiseAndTenonJoint,
                 new CommonStructureCrystalDefinition(
-                    30,
                     AttributeBonusType.AttackPower,
                     3f,
                     AttributeBonusType.MoveSpeed,
@@ -211,7 +216,6 @@ public static class ArchitecturalCrystalFactory
             {
                 ArchitecturalType.GroundMass,
                 new CommonStructureCrystalDefinition(
-                    30,
                     AttributeBonusType.Defense,
                     5f,
                     AttributeBonusType.MoveSpeed,
@@ -221,7 +225,6 @@ public static class ArchitecturalCrystalFactory
             {
                 ArchitecturalType.BeamFrame,
                 new CommonStructureCrystalDefinition(
-                    30,
                     AttributeBonusType.AttackPower,
                     3f,
                     AttributeBonusType.MoveSpeed,
@@ -231,7 +234,6 @@ public static class ArchitecturalCrystalFactory
             {
                 ArchitecturalType.TampedEarth,
                 new CommonStructureCrystalDefinition(
-                    30,
                     AttributeBonusType.CurrentHealth,
                     10f,
                     AttributeBonusType.Defense,
@@ -241,7 +243,6 @@ public static class ArchitecturalCrystalFactory
             {
                 ArchitecturalType.Tile,
                 new CommonStructureCrystalDefinition(
-                    30,
                     AttributeBonusType.Durability,
                     10f,
                     AttributeBonusType.MoveSpeed,
@@ -251,7 +252,6 @@ public static class ArchitecturalCrystalFactory
             {
                 ArchitecturalType.Brackets,
                 new CommonStructureCrystalDefinition(
-                    30,
                     AttributeBonusType.Defense,
                     5f,
                     AttributeBonusType.CurrentHealth,
@@ -263,7 +263,8 @@ public static class ArchitecturalCrystalFactory
     public static ArchitecturalCrystal CreateCommonStructure(
         ArchitecturalType type,
         Sprite icon = null,
-        Sprite backIcon = null)
+        Sprite backIcon = null,
+        int buildProgressPercent = 0)
     {
         CommonStructureCrystalDefinition definition = GetCommonStructureDefinition(type);
         ArchitecturalCrystalVisualSet visuals = ArchitecturalCrystalVisualResolver.Resolve(
@@ -271,9 +272,10 @@ public static class ArchitecturalCrystalFactory
             ArchitecturalResourceCategory.CommonStructure,
             icon,
             backIcon);
+        int resolvedBuildProgressPercent = ResolveBuildProgressPercent(buildProgressPercent);
         return new ArchitecturalCrystal(
             type,
-            definition.expValue,
+            0,
             visuals.icon,
             visuals.backIcon,
             definition.description,
@@ -283,7 +285,8 @@ public static class ArchitecturalCrystalFactory
             definition.subBonusValue,
             false,
             ArchitecturalResourceCategory.CommonStructure,
-            0);
+            0,
+            resolvedBuildProgressPercent);
     }
 
     public static ArchitecturalCrystal CreateSpecialStructureMaterial(
@@ -463,12 +466,26 @@ public static class ArchitecturalCrystalFactory
         }
 
         return new CommonStructureCrystalDefinition(
-            30,
             AttributeBonusType.None,
             0f,
             AttributeBonusType.None,
             0f,
             GetDefaultDescription(type));
+    }
+
+    public static int ClampBuildProgressPercent(int buildProgressPercent)
+    {
+        return Mathf.Clamp(buildProgressPercent, MinimumBuildProgressPercent, MaximumBuildProgressPercent);
+    }
+
+    private static int ResolveBuildProgressPercent(int buildProgressPercent)
+    {
+        if (buildProgressPercent > 0)
+        {
+            return ClampBuildProgressPercent(buildProgressPercent);
+        }
+
+        return Random.Range(MinimumBuildProgressPercent, MaximumBuildProgressPercent + 1);
     }
 }
 

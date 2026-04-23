@@ -18,6 +18,7 @@ public abstract class CharacterAttack : MonoBehaviour
     // 攻击状态判断
     protected bool isAttacking = false;
     protected CharacterCore core;
+    private Vector3 initialLocalScale;
 
     // 攻击扩展事件（可挂载攻击特效/音效等逻辑）
     public event Action OnAttackStarted;
@@ -28,8 +29,11 @@ public abstract class CharacterAttack : MonoBehaviour
 
     protected PlayerMove playerMove;
 
+    protected virtual bool ShouldMirrorRootForAttack => true;
+
     protected virtual void Awake()
     {
+        initialLocalScale = transform.localScale;
         core = GetComponent<CharacterCore>();
         if (moveScript != null)
         {
@@ -87,12 +91,24 @@ public abstract class CharacterAttack : MonoBehaviour
     {
         // 获取CharacterCore中维护的「最后面朝方向」
         Vector2 lastFacingDir = core.lastFacingDirection;
+        if (lastFacingDir.sqrMagnitude > 0.0001f)
+        {
+            Vector2 normalizedFacingDir = lastFacingDir.normalized;
+            AnimatorParameterUtility.SetFloatIfPresent(anim, "InputX", normalizedFacingDir.x);
+            AnimatorParameterUtility.SetFloatIfPresent(anim, "InputY", normalizedFacingDir.y);
+        }
 
         // 更新角色Transform朝向
-        if (lastFacingDir.x != 0) // 左右朝向
+        if (ShouldMirrorRootForAttack && lastFacingDir.x != 0) // 左右朝向
         {
+            float scaleX = Mathf.Abs(initialLocalScale.x);
+            if (scaleX <= Mathf.Epsilon)
+            {
+                scaleX = Mathf.Abs(transform.localScale.x);
+            }
+
             transform.localScale = new Vector3(
-                Mathf.Sign(lastFacingDir.x),
+                Mathf.Sign(lastFacingDir.x) * scaleX,
                 transform.localScale.y,
                 transform.localScale.z
             );
