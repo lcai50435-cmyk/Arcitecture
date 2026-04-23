@@ -37,8 +37,9 @@ public class BackpackUI : MonoBehaviour
     private const float RuntimeAttackPanelWidth = 94f;
     private const float RuntimeAttackPanelHeight = 91f;
     private const float RuntimeSlotIconSize = 46f;
-    private const float RuntimeSelectionBorderThickness = 5f;
-    private const float RuntimeSelectionFramePadding = 8f;
+    private const float RuntimeSelectionBorderThickness = 3f;
+    private const float RuntimeSelectionFramePadding = 3f;
+    private const float RuntimeSelectionFadeSpeed = 12f;
     private const string TogglePromptId = "backpack_toggle";
     private const float ToggleHotspotY = -168f;
     private const float ToggleHotspotWidth = 138f;
@@ -52,7 +53,8 @@ public class BackpackUI : MonoBehaviour
     private static readonly Color ToggleButtonColor = new Color(0.17f, 0.12f, 0.07f, 0.88f);
     private static readonly Color ToggleButtonColorCollapsed = new Color(0.20f, 0.13f, 0.05f, 0.94f);
     private static readonly Color ToggleTextColor = new Color(0.98f, 0.89f, 0.67f, 1f);
-    private static readonly Color RuntimeSelectionBorderColor = new Color(1f, 0.86f, 0.32f, 0.98f);
+    private static readonly Color RuntimeBackpackSelectionBorderColor = new Color(1f, 0.86f, 0.32f, 0.98f);
+    private static readonly Color RuntimeAttackSelectionBorderColor = new Color(1f, 0.12f, 0.08f, 0.98f);
     private static readonly Color RuntimeHoverShadeColor = new Color(0f, 0f, 0f, 0.12f);
     private static readonly Dictionary<string, Sprite> RuntimeSpriteCache = new Dictionary<string, Sprite>();
 
@@ -78,8 +80,8 @@ public class BackpackUI : MonoBehaviour
     private RectTransform generatedSurfaceRect;
     private RectTransform runtimeAttackSlotRect;
     private RectTransform[] runtimeSlotRects;
-    private GameObject runtimeAttackSelectionObject;
-    private GameObject[] runtimeSelectionObjects;
+    private CanvasGroup runtimeAttackSelectionGroup;
+    private CanvasGroup[] runtimeSelectionGroups;
     private GameObject[] runtimeHoverShadeObjects;
     private readonly List<RaycastResult> pointerRaycastResults = new List<RaycastResult>(16);
     private int selectedSlotIndex;
@@ -237,6 +239,7 @@ public class BackpackUI : MonoBehaviour
         RefreshToggleHintVisual();
         UpdateFollowTogglePrompt();
         HandleSlotSelectionInput();
+        UpdateSelectionFade(Time.unscaledDeltaTime);
     }
 
     public void SelectSlot(int slotIndex)
@@ -253,6 +256,7 @@ public class BackpackUI : MonoBehaviour
 
         selectedSlotIndex = resolvedIndex;
         RefreshSelectionVisuals();
+        MusicManager.PlaySfx(SfxCueId.SlotSwitch);
     }
 
     public void SelectAttackSlot()
@@ -461,15 +465,17 @@ public class BackpackUI : MonoBehaviour
         CenterPanelHorizontally(attackPanel);
         runtimeAttackSlotRect = attackPanel;
         EnsureRuntimeAttackSlotBehaviour(attackPanel);
-        runtimeAttackSelectionObject = EnsureRuntimeSelectionFrame(
+        Vector2 selectionFrameSize = new Vector2(
+            RuntimeSlotSize + RuntimeSelectionFramePadding * 2f,
+            RuntimeSlotSize + RuntimeSelectionFramePadding * 2f);
+        runtimeAttackSelectionGroup = EnsureRuntimeSelectionFrame(
             attackPanel,
-            new Vector2(
-                RuntimeAttackPanelWidth + RuntimeSelectionFramePadding * 2f,
-                RuntimeAttackPanelHeight + RuntimeSelectionFramePadding * 2f));
+            selectionFrameSize,
+            RuntimeAttackSelectionBorderColor);
 
         Image[] runtimeSlotImages = new Image[RuntimeSlotCount];
         runtimeSlotRects = new RectTransform[RuntimeSlotCount];
-        runtimeSelectionObjects = new GameObject[RuntimeSlotCount];
+        runtimeSelectionGroups = new CanvasGroup[RuntimeSlotCount];
         runtimeHoverShadeObjects = new GameObject[RuntimeSlotCount];
 
         for (int i = 0; i < RuntimeSlotCount; i++)
@@ -483,11 +489,10 @@ public class BackpackUI : MonoBehaviour
             runtimeSlotImages[i] = EnsureRuntimeSlotIcon(slot);
             EnsureRuntimeBackpackSlotBehaviour(slot, i, runtimeSlotImages[i]);
             EnsureRuntimeSlotHoverShade(slot, i);
-            runtimeSelectionObjects[i] = EnsureRuntimeSelectionFrame(
+            runtimeSelectionGroups[i] = EnsureRuntimeSelectionFrame(
                 slot,
-                new Vector2(
-                    RuntimeSlotSize + RuntimeSelectionFramePadding * 2f,
-                    RuntimeSlotSize + RuntimeSelectionFramePadding * 2f));
+                selectionFrameSize,
+                RuntimeBackpackSelectionBorderColor);
         }
 
         if (backPackGrid != runtimeSlotImages)
@@ -742,7 +747,7 @@ public class BackpackUI : MonoBehaviour
         button.onClick.AddListener(SelectAttackSlot);
     }
 
-    private GameObject EnsureRuntimeSelectionFrame(RectTransform target, Vector2 frameSize)
+    private CanvasGroup EnsureRuntimeSelectionFrame(RectTransform target, Vector2 frameSize, Color borderColor)
     {
         Transform existing = target.Find(RuntimeSlotSelectionName);
         RectTransform selectionRect;
@@ -765,6 +770,7 @@ public class BackpackUI : MonoBehaviour
         selectionRect.anchoredPosition = Vector2.zero;
         selectionRect.sizeDelta = frameSize;
         selectionRect.SetAsLastSibling();
+        selectionRect.gameObject.SetActive(true);
 
         Image legacyImage = selectionRect.GetComponent<Image>();
         if (legacyImage != null)
@@ -779,12 +785,21 @@ public class BackpackUI : MonoBehaviour
             legacyOutline.enabled = false;
         }
 
-        EnsureSelectionLine(selectionRect, "Top", new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0f, -RuntimeSelectionBorderThickness), Vector2.zero);
-        EnsureSelectionLine(selectionRect, "Bottom", Vector2.zero, new Vector2(1f, 0f), Vector2.zero, new Vector2(0f, RuntimeSelectionBorderThickness));
-        EnsureSelectionLine(selectionRect, "Left", Vector2.zero, new Vector2(0f, 1f), Vector2.zero, new Vector2(RuntimeSelectionBorderThickness, 0f));
-        EnsureSelectionLine(selectionRect, "Right", new Vector2(1f, 0f), Vector2.one, new Vector2(-RuntimeSelectionBorderThickness, 0f), Vector2.zero);
+        EnsureSelectionLine(selectionRect, "Top", new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0f, -RuntimeSelectionBorderThickness), Vector2.zero, borderColor);
+        EnsureSelectionLine(selectionRect, "Bottom", Vector2.zero, new Vector2(1f, 0f), Vector2.zero, new Vector2(0f, RuntimeSelectionBorderThickness), borderColor);
+        EnsureSelectionLine(selectionRect, "Left", Vector2.zero, new Vector2(0f, 1f), Vector2.zero, new Vector2(RuntimeSelectionBorderThickness, 0f), borderColor);
+        EnsureSelectionLine(selectionRect, "Right", new Vector2(1f, 0f), Vector2.one, new Vector2(-RuntimeSelectionBorderThickness, 0f), Vector2.zero, borderColor);
 
-        return selectionRect.gameObject;
+        CanvasGroup selectionGroup = selectionRect.GetComponent<CanvasGroup>();
+        if (selectionGroup == null)
+        {
+            selectionGroup = selectionRect.gameObject.AddComponent<CanvasGroup>();
+            selectionGroup.alpha = 0f;
+        }
+
+        selectionGroup.interactable = false;
+        selectionGroup.blocksRaycasts = false;
+        return selectionGroup;
     }
 
     private void EnsureRuntimeSlotHoverShade(RectTransform slot, int slotIndex)
@@ -832,7 +847,8 @@ public class BackpackUI : MonoBehaviour
         Vector2 anchorMin,
         Vector2 anchorMax,
         Vector2 offsetMin,
-        Vector2 offsetMax)
+        Vector2 offsetMax,
+        Color borderColor)
     {
         Transform existing = parent.Find(lineName);
         RectTransform lineRect;
@@ -863,7 +879,7 @@ public class BackpackUI : MonoBehaviour
         lineRect.offsetMax = offsetMax;
         lineRect.SetAsLastSibling();
 
-        lineImage.color = RuntimeSelectionBorderColor;
+        lineImage.color = borderColor;
         lineImage.raycastTarget = false;
     }
 
@@ -1065,14 +1081,9 @@ public class BackpackUI : MonoBehaviour
 
     private void RefreshSelectionVisuals()
     {
-        if (runtimeSelectionObjects == null)
+        if (runtimeSelectionGroups == null)
         {
             return;
-        }
-
-        if (runtimeAttackSelectionObject != null)
-        {
-            runtimeAttackSelectionObject.SetActive(selectedSlotIndex == RuntimeAttackSelectionIndex);
         }
 
         if (runtimeAttackSlotRect != null)
@@ -1083,16 +1094,38 @@ public class BackpackUI : MonoBehaviour
         for (int i = 0; i < RuntimeSlotCount; i++)
         {
             bool selected = i == selectedSlotIndex;
-            if (runtimeSelectionObjects[i] != null)
-            {
-                runtimeSelectionObjects[i].SetActive(selected);
-            }
-
             if (runtimeSlotRects != null && i < runtimeSlotRects.Length && runtimeSlotRects[i] != null)
             {
                 runtimeSlotRects[i].localScale = Vector3.one;
             }
         }
+    }
+
+    private void UpdateSelectionFade(float deltaTime)
+    {
+        float step = Mathf.Max(0.001f, RuntimeSelectionFadeSpeed * deltaTime);
+        UpdateSelectionGroupFade(runtimeAttackSelectionGroup, selectedSlotIndex == RuntimeAttackSelectionIndex, step);
+
+        if (runtimeSelectionGroups == null)
+        {
+            return;
+        }
+
+        for (int i = 0; i < RuntimeSlotCount; i++)
+        {
+            UpdateSelectionGroupFade(runtimeSelectionGroups[i], i == selectedSlotIndex, step);
+        }
+    }
+
+    private static void UpdateSelectionGroupFade(CanvasGroup selectionGroup, bool selected, float step)
+    {
+        if (selectionGroup == null)
+        {
+            return;
+        }
+
+        float targetAlpha = selected ? 1f : 0f;
+        selectionGroup.alpha = Mathf.MoveTowards(selectionGroup.alpha, targetAlpha, step);
     }
 
     public void SetSlotHover(int slotIndex, bool hovered)

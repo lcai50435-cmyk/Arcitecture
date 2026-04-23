@@ -15,7 +15,8 @@ public enum SfxCueId
     None = 0,
     PlayerAttack = 1,
     FireMonsterCast = 2,
-    HandbookBookmark = 3
+    HandbookBookmark = 3,
+    SlotSwitch = 4
 }
 
 [Serializable]
