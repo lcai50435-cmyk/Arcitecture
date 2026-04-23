@@ -136,21 +136,12 @@ public class BaseHubUIController : MonoBehaviour
 
     public void OpenIllustratedHandbook(RuntimeModalOpenSource source = RuntimeModalOpenSource.None)
     {
-        ApplyCameraFocus(RuntimeModalType.Handbook, source);
-        if (UIManager.Instance != null)
-        {
-            UIManager.Instance.OpenIllustratedHandbook(source);
-            return;
-        }
-
-        OpenModal(illustratedHandbookPanel, RuntimeModalType.Handbook, source);
+        OpenHandbookPage(IllustratedHandbookPage.IllustratedHandbook, RuntimeModalType.Handbook, source);
     }
 
     public void OpenSpiritPanel(RuntimeModalOpenSource source = RuntimeModalOpenSource.None)
     {
-        ApplyCameraFocus(RuntimeModalType.Spirit, source);
-        OpenModal(spiritPanel != null ? spiritPanel.gameObject : null, RuntimeModalType.Spirit, source);
-        spiritPanel?.Open();
+        OpenHandbookPage(IllustratedHandbookPage.PersonalInformation, RuntimeModalType.Spirit, source);
     }
 
     public void OpenStageSelectionPanel(RuntimeModalOpenSource source = RuntimeModalOpenSource.None)
@@ -162,9 +153,7 @@ public class BaseHubUIController : MonoBehaviour
 
     public void OpenAlbumPanel(RuntimeModalOpenSource source = RuntimeModalOpenSource.None)
     {
-        ApplyCameraFocus(RuntimeModalType.Album, source);
-        OpenModal(albumPanel != null ? albumPanel.gameObject : null, RuntimeModalType.Album, source);
-        albumPanel?.Open();
+        OpenHandbookPage(IllustratedHandbookPage.PhotoAlbum, RuntimeModalType.Album, source);
     }
 
     public void CloseAll()
@@ -186,17 +175,7 @@ public class BaseHubUIController : MonoBehaviour
 
     public void OpenSettingsPanel()
     {
-        EnsureSettingsPanel();
-        if (settingsPanel == null || settingsPanel.IsShown)
-        {
-            return;
-        }
-
-        LockPlayer();
-        SetInteractTipVisible(false);
-        RuntimeCameraController.EnsureInstance().ClearHubFocus();
-        UIRootManager.Instance?.HideBackpack();
-        settingsPanel.Show(SettingsPanelContext.BaseHub);
+        OpenHandbookPage(IllustratedHandbookPage.Setting, RuntimeModalType.Handbook, RuntimeModalOpenSource.None);
     }
 
     private void OpenModal(GameObject panel, RuntimeModalType modalType, RuntimeModalOpenSource source)
@@ -213,6 +192,25 @@ public class BaseHubUIController : MonoBehaviour
         {
             UIRootManager.Instance.OpenModal(modalType, source);
         }
+    }
+
+    private void OpenHandbookPage(
+        IllustratedHandbookPage page,
+        RuntimeModalType focusType,
+        RuntimeModalOpenSource source)
+    {
+        ApplyCameraFocus(focusType, source);
+        if (UIManager.Instance != null)
+        {
+            UIManager.Instance.OpenIllustratedHandbook(source, page);
+            return;
+        }
+
+        IllustratedHandbookTabsController tabsController = illustratedHandbookPanel != null
+            ? illustratedHandbookPanel.GetComponent<IllustratedHandbookTabsController>()
+            : null;
+        tabsController?.OpenPage(page);
+        OpenModal(illustratedHandbookPanel, RuntimeModalType.Handbook, source);
     }
 
     private void ClosePanelsOnly()

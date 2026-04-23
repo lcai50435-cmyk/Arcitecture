@@ -77,12 +77,12 @@ public class GameSceneBaseReturnBootstrapper : MonoBehaviour
             return;
         }
 
-        if (spiritPanel == null || playerCore == null || playerProfile == null)
+        if (playerCore == null || playerProfile == null)
         {
             ResolveRuntimePlayerPanel();
         }
 
-        if (spiritPanel == null || playerCore == null || playerProfile == null)
+        if (playerCore == null || playerProfile == null)
         {
             return;
         }
@@ -94,7 +94,19 @@ public class GameSceneBaseReturnBootstrapper : MonoBehaviour
 
         if (rootManager.IsAnyGameplayBlockingUIOpen())
         {
-            if (rootManager.ActiveModalType == RuntimeModalType.Spirit)
+            if (rootManager.ActiveModalType == RuntimeModalType.Handbook)
+            {
+                UIManager handbookManager = UIManager.Instance ?? FindObjectOfType<UIManager>(true);
+                if (handbookManager != null)
+                {
+                    handbookManager.CloseIllustratedHandbook();
+                }
+                else
+                {
+                    rootManager.CloseModalFlow();
+                }
+            }
+            else if (rootManager.ActiveModalType == RuntimeModalType.Spirit)
             {
                 rootManager.CloseModalFlow();
             }
@@ -224,7 +236,25 @@ public class GameSceneBaseReturnBootstrapper : MonoBehaviour
 
     private void OpenSpiritPanel(UIRootManager rootManager)
     {
-        if (spiritPanel == null || playerCore == null || playerProfile == null)
+        if (playerCore == null || playerProfile == null)
+        {
+            return;
+        }
+
+        UIManager handbookManager = UIManager.Instance ?? FindObjectOfType<UIManager>(true);
+        if (handbookManager != null && handbookManager.illustratedHandbook != null)
+        {
+            playerProfile.SyncRuntimeState(
+                playerCore,
+                playerAttack,
+                playerObject != null && playerObject.TryGetComponent(out SpriteRenderer spriteRenderer)
+                    ? spriteRenderer.sprite
+                    : null);
+            handbookManager.OpenIllustratedHandbook(RuntimeModalOpenSource.None, IllustratedHandbookPage.PersonalInformation);
+            return;
+        }
+
+        if (spiritPanel == null)
         {
             return;
         }

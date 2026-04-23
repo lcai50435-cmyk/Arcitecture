@@ -62,8 +62,13 @@ public static class RuntimeGameplayPauseController
             resumeTimeScale = Time.timeScale;
         }
 
-        PauseReasons.Add(reason);
+        bool wasPaused = PauseReasons.Count > 0;
+        bool addedReason = PauseReasons.Add(reason);
         Time.timeScale = 0f;
+        if (!wasPaused && addedReason)
+        {
+            MusicManager.SetGameplayMusicPaused(true);
+        }
     }
 
     public static void ReleasePause(string reason)
@@ -81,6 +86,10 @@ public static class RuntimeGameplayPauseController
         }
 
         RestoreTimeScaleIfNeeded();
+        if (Time.timeScale > 0.0001f || !GameplayStageCatalog.IsGameplayScene(SceneManager.GetActiveScene().name))
+        {
+            MusicManager.SetGameplayMusicPaused(false);
+        }
     }
 
     private static void EnsureSceneHook()
@@ -98,6 +107,7 @@ public static class RuntimeGameplayPauseController
     {
         PauseReasons.Clear();
         resumeTimeScale = 1f;
+        MusicManager.SetGameplayMusicPaused(false);
 
         if (!GameplayStageCatalog.IsGameplayScene(scene.name))
         {
@@ -127,6 +137,7 @@ public static class RuntimeGameplayPauseController
 public class UIRootManager : MonoBehaviour
 {
     private const string ModalPauseReason = "RuntimeModalFlow";
+    private const float BindingRefreshRetryInterval = 0.5f;
 
     private enum RuntimeModalFlowGroup
     {
@@ -187,6 +198,7 @@ public class UIRootManager : MonoBehaviour
     private RuntimeModalFlowGroup activeFlowGroup = RuntimeModalFlowGroup.None;
     private RuntimeModalOpenSource activeFlowSource = RuntimeModalOpenSource.None;
     private bool isFlowClosing;
+    private float nextBindingRefreshTime;
     private int suppressInteractUntilFrame = -1;
     private int suppressCloseUntilFrame = -1;
 
@@ -245,11 +257,15 @@ public class UIRootManager : MonoBehaviour
 
     public void RefreshRuntimeBindings()
     {
+        string activeSceneName = SceneManager.GetActiveScene().name;
+        bool isGameplayScene = GameplayStageCatalog.IsGameplayScene(activeSceneName);
+        bool isBaseScene = string.Equals(activeSceneName, "NewBase", StringComparison.Ordinal);
+
         handbookManager = FindObjectOfType<UIManager>(true);
         baseHubUiController = FindObjectOfType<BaseHubUIController>(true);
         dialogController = FindObjectOfType<Dialog>(true);
-        detailedInformationController = FindObjectOfType<DetailedInformationUI>(true);
-        submitPanelControllers = FindObjectsOfType<SubmitSelectionPanelUI>(true);
+        detailedInformationController = isGameplayScene ? FindObjectOfType<DetailedInformationUI>(true) : null;
+        submitPanelControllers = isGameplayScene ? FindObjectsOfType<SubmitSelectionPanelUI>(true) : Array.Empty<SubmitSelectionPanelUI>();
 
         if (handbookManager != null && handbookManager.illustratedHandbook != null)
         {
@@ -270,6 +286,11 @@ public class UIRootManager : MonoBehaviour
             detailUIPage1 = detailRoot;
             detailUIPage2 = detailRoot;
         }
+        else if (!isGameplayScene)
+        {
+            detailUIPage1 = null;
+            detailUIPage2 = null;
+        }
 
         if (submitPanelControllers != null && submitPanelControllers.Length > 0)
         {
@@ -277,8 +298,14 @@ public class UIRootManager : MonoBehaviour
             submitSelectionUI2 = ResolveSubmitCanvasGroup(1);
             submitSelectionUI3 = ResolveSubmitCanvasGroup(2);
         }
+        else if (!isGameplayScene)
+        {
+            submitSelectionUI1 = null;
+            submitSelectionUI2 = null;
+            submitSelectionUI3 = null;
+        }
 
-        if (spiritPanelUI == null)
+        if (isBaseScene && spiritPanelUI == null)
         {
             SpiritPanelUI spiritPanel = FindObjectOfType<SpiritPanelUI>(true);
             if (spiritPanel != null)
@@ -286,8 +313,12 @@ public class UIRootManager : MonoBehaviour
                 spiritPanelUI = EnsureCanvasGroup(spiritPanel.gameObject);
             }
         }
+        else if (!isBaseScene)
+        {
+            spiritPanelUI = null;
+        }
 
-        if (stageSelectionPanelUI == null)
+        if (isBaseScene && stageSelectionPanelUI == null)
         {
             StageSelectionPanelUI stageSelectionPanel = FindObjectOfType<StageSelectionPanelUI>(true);
             if (stageSelectionPanel != null)
@@ -295,14 +326,22 @@ public class UIRootManager : MonoBehaviour
                 stageSelectionPanelUI = EnsureCanvasGroup(stageSelectionPanel.gameObject);
             }
         }
+        else if (!isBaseScene)
+        {
+            stageSelectionPanelUI = null;
+        }
 
-        if (albumPanelUI == null)
+        if (isBaseScene && albumPanelUI == null)
         {
             BaseHubAlbumPanel albumPanel = FindObjectOfType<BaseHubAlbumPanel>(true);
             if (albumPanel != null)
             {
                 albumPanelUI = EnsureCanvasGroup(albumPanel.gameObject);
             }
+        }
+        else if (!isBaseScene)
+        {
+            albumPanelUI = null;
         }
 
         BackpackUI backpackView = BackpackUI.EnsureRuntimeInstance();
@@ -311,6 +350,7 @@ public class UIRootManager : MonoBehaviour
             backpackUI = EnsureCanvasGroup(backpackView.gameObject);
         }
 
+        nextBindingRefreshTime = Time.unscaledTime + BindingRefreshRetryInterval;
         RefreshModalRegistry();
     }
 
@@ -667,17 +707,44 @@ public class UIRootManager : MonoBehaviour
 
     private void RefreshRuntimeBindingsIfNeeded()
     {
-        if (handbookManager == null ||
-            dialogController == null ||
-            detailedInformationController == null ||
-            submitPanelControllers == null ||
-            submitPanelControllers.Length == 0 ||
-            (spiritPanelUI == null && SceneManager.GetActiveScene().name == "NewBase") ||
-            (stageSelectionPanelUI == null && SceneManager.GetActiveScene().name == "NewBase") ||
-            (albumPanelUI == null && SceneManager.GetActiveScene().name == "NewBase"))
+        if (!NeedsBindingRefresh() || Time.unscaledTime < nextBindingRefreshTime)
         {
-            RefreshRuntimeBindings();
+            return;
         }
+
+        RefreshRuntimeBindings();
+    }
+
+    private bool NeedsBindingRefresh()
+    {
+        string activeSceneName = SceneManager.GetActiveScene().name;
+        bool isGameplayScene = GameplayStageCatalog.IsGameplayScene(activeSceneName);
+        bool isBaseScene = string.Equals(activeSceneName, "NewBase", StringComparison.Ordinal);
+
+        if (handbookManager == null || handbookUI == null || dialogController == null || dialogUI == null)
+        {
+            return true;
+        }
+
+        if (isGameplayScene &&
+            (detailedInformationController == null ||
+             detailUIPage1 == null ||
+             detailUIPage2 == null ||
+             submitPanelControllers == null ||
+             submitPanelControllers.Length == 0 ||
+             submitSelectionUI1 == null ||
+             submitSelectionUI2 == null ||
+             submitSelectionUI3 == null))
+        {
+            return true;
+        }
+
+        if (isBaseScene && (spiritPanelUI == null || stageSelectionPanelUI == null || albumPanelUI == null))
+        {
+            return true;
+        }
+
+        return false;
     }
 
     private void RefreshModalRegistry()

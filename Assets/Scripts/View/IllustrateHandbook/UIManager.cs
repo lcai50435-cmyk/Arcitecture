@@ -98,10 +98,18 @@ public class UIManager : MonoBehaviour
 
     public void OpenIllustratedHandbook(RuntimeModalOpenSource source = RuntimeModalOpenSource.None)
     {
+        OpenIllustratedHandbook(source, IllustratedHandbookPage.IllustratedHandbook);
+    }
+
+    public void OpenIllustratedHandbook(
+        RuntimeModalOpenSource source,
+        IllustratedHandbookPage initialPage)
+    {
         EnsureTabsController();
 
         if (isHandbookOpen || isClosingHandbook)
         {
+            tabsController?.OpenPage(initialPage);
             Debug.Log("图鉴已打开，忽略重复打开");
             return;
         }
@@ -128,7 +136,7 @@ public class UIManager : MonoBehaviour
             dialogUI.canShow = false;
         }
 
-        tabsController?.ResetToDefaultPage();
+        tabsController?.OpenPage(initialPage);
 
         if (UIRootManager.Instance != null)
         {
@@ -298,11 +306,21 @@ public class UIManager : MonoBehaviour
             return;
         }
 
+        if (tabsController != null && tabsController.gameObject == illustratedHandbook)
+        {
+            return;
+        }
+
+        IllustratedHandbookTabsController previousController = tabsController;
         tabsController = IllustratedHandbookTabsController.EnsureInstalled(this);
         if (tabsController != null)
         {
             illustratedHandbook = tabsController.gameObject;
-            tabsController.ResetToDefaultPage();
+            if (tabsController != previousController)
+            {
+                tabsController.ResetToDefaultPage();
+            }
+
             UIRootManager.Instance?.RefreshRuntimeBindings();
         }
     }

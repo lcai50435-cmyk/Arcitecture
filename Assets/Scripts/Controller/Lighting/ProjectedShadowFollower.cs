@@ -4,14 +4,23 @@ using UnityEngine;
 public sealed class ProjectedShadowFollower : MonoBehaviour
 {
     private const string ShadowObjectName = "ProjectedShadow";
-    private const float GroundContactLift = 0.02f;
-    private const float HorizontalOffsetFactor = 0.65f;
-    private const float VerticalOffsetFactor = 0.12f;
+    private const int ShadowTextureWidth = 64;
+    private const int ShadowTextureHeight = 32;
+    private const float ShadowPixelsPerUnit = 64f;
+    private const float GroundContactLift = 0.012f;
+    private const float HorizontalOffsetFactor = 0.30f;
+    private const float VerticalOffsetFactor = 0.10f;
+    private const float EllipseWidthFactor = 0.96f;
+    private const float EllipseHeightFactor = 0.68f;
+    private const float MinimumShadowWidth = 0.20f;
+    private const float MinimumShadowHeight = 0.08f;
 
     [SerializeField] private Vector3 localOffset = new Vector3(0.18f, -0.28f, 0f);
     [SerializeField] private Vector3 scaleMultiplier = new Vector3(1.1f, 0.42f, 1f);
     [SerializeField] private Color shadowColor = new Color(0.04f, 0.05f, 0.08f, 0.42f);
     [SerializeField] private int sortingOrderOffset = -1;
+
+    private static Sprite sharedEllipseShadowSprite;
 
     private SpriteRenderer sourceRenderer;
     private SpriteRenderer shadowRenderer;
@@ -138,8 +147,8 @@ public sealed class ProjectedShadowFollower : MonoBehaviour
             return;
         }
 
-        shadowRenderer.sprite = sourceRenderer.sprite;
-        shadowRenderer.flipX = sourceRenderer.flipX;
+        shadowRenderer.sprite = GetOrCreateEllipseShadowSprite();
+        shadowRenderer.flipX = false;
         shadowRenderer.flipY = false;
         shadowRenderer.color = shadowColor;
         shadowRenderer.sortingLayerID = sourceRenderer.sortingLayerID;
@@ -147,7 +156,7 @@ public sealed class ProjectedShadowFollower : MonoBehaviour
 
         shadowRenderer.transform.localPosition = ResolveShadowLocalPosition();
         shadowRenderer.transform.localRotation = Quaternion.identity;
-        shadowRenderer.transform.localScale = scaleMultiplier;
+        shadowRenderer.transform.localScale = ResolveShadowLocalScale();
     }
 
     private Vector3 ResolveShadowLocalPosition()
@@ -163,6 +172,61 @@ public sealed class ProjectedShadowFollower : MonoBehaviour
             spriteBounds.center.x + localOffset.x * HorizontalOffsetFactor,
             spriteBounds.min.y + GroundContactLift + localOffset.y * VerticalOffsetFactor,
             0f);
+    }
+
+    private Vector3 ResolveShadowLocalScale()
+    {
+        Sprite sprite = sourceRenderer != null ? sourceRenderer.sprite : null;
+        if (sprite == null)
+        {
+            return scaleMultiplier;
+        }
+
+        Bounds spriteBounds = sprite.bounds;
+        float width = Mathf.Max(MinimumShadowWidth, spriteBounds.size.x * scaleMultiplier.x * EllipseWidthFactor);
+        float height = Mathf.Max(MinimumShadowHeight, spriteBounds.size.y * scaleMultiplier.y * EllipseHeightFactor);
+        return new Vector3(width, height, 1f);
+    }
+
+    private static Sprite GetOrCreateEllipseShadowSprite()
+    {
+        if (sharedEllipseShadowSprite != null)
+        {
+            return sharedEllipseShadowSprite;
+        }
+
+        Texture2D texture = new Texture2D(ShadowTextureWidth, ShadowTextureHeight, TextureFormat.ARGB32, false)
+        {
+            name = "RuntimeProjectedEllipseShadow",
+            filterMode = FilterMode.Bilinear,
+            wrapMode = TextureWrapMode.Clamp,
+            hideFlags = HideFlags.HideAndDontSave
+        };
+
+        Color32[] pixels = new Color32[ShadowTextureWidth * ShadowTextureHeight];
+        for (int y = 0; y < ShadowTextureHeight; y++)
+        {
+            float normalizedY = (y + 0.5f) / ShadowTextureHeight * 2f - 1f;
+            for (int x = 0; x < ShadowTextureWidth; x++)
+            {
+                float normalizedX = (x + 0.5f) / ShadowTextureWidth * 2f - 1f;
+                float distance = normalizedX * normalizedX + normalizedY * normalizedY;
+                float alpha = Mathf.Pow(Mathf.Clamp01(1f - distance), 0.75f) * 0.96f;
+                pixels[y * ShadowTextureWidth + x] = new Color(1f, 1f, 1f, alpha);
+            }
+        }
+
+        texture.SetPixels32(pixels);
+        texture.Apply(false, true);
+
+        sharedEllipseShadowSprite = Sprite.Create(
+            texture,
+            new Rect(0f, 0f, ShadowTextureWidth, ShadowTextureHeight),
+            new Vector2(0.5f, 0.5f),
+            ShadowPixelsPerUnit);
+        sharedEllipseShadowSprite.name = "RuntimeProjectedEllipseShadow";
+        sharedEllipseShadowSprite.hideFlags = HideFlags.HideAndDontSave;
+        return sharedEllipseShadowSprite;
     }
 }
 

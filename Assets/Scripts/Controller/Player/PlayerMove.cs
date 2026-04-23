@@ -8,6 +8,13 @@ using UnityEngine.Tilemaps;
 /// </summary>
 public class PlayerMove : MonoBehaviour
 {
+    private const float PlayerBoxColliderWidthFactor = 0.82f;
+    private const float PlayerBoxColliderHeightFactor = 0.56f;
+    private const float PlayerCircleColliderFactor = 0.34f;
+    private const float PlayerColliderLiftFactor = 0.05f;
+    private const float MinimumBodyColliderWidth = 0.18f;
+    private const float MinimumBodyColliderHeight = 0.16f;
+    private const float MinimumBodyColliderRadius = 0.08f;
     
     public Rigidbody2D rb;
     public Animator animator;
@@ -25,6 +32,9 @@ public class PlayerMove : MonoBehaviour
 
     // 挂载朝向跟踪组件
     private DirectionTracker directionTracker;
+    private SpriteRenderer playerRenderer;
+    private Collider2D bodyCollider;
+    private Sprite colliderSourceSprite;
 
     private void Awake()
     {
@@ -37,10 +47,14 @@ public class PlayerMove : MonoBehaviour
         if (rb != null)
         {
             rb.interpolation = RigidbodyInterpolation2D.Interpolate;
+            rb.collisionDetectionMode = CollisionDetectionMode2D.Continuous;
         }
 
         // 获取朝向跟踪组件
         directionTracker = GetComponent<DirectionTracker>();
+        playerRenderer = GetComponent<SpriteRenderer>();
+        bodyCollider = ResolveBodyCollider();
+        SyncBodyCollision();
 
         if (GetComponent<PlayerTreeOcclusionFader>() == null)
         {
@@ -55,6 +69,7 @@ public class PlayerMove : MonoBehaviour
     {
         if (core == null || core.stats == null) return;
 
+        SyncBodyCollision();
         moveSpeed = core.stats.moveSpeed * Mathf.Max(0f, externalMoveSpeedMultiplier);
 
         if (UIRootManager.Instance != null && UIRootManager.Instance.IsAnyGameplayBlockingUIOpen())
@@ -117,6 +132,81 @@ public class PlayerMove : MonoBehaviour
     public void SetExternalMoveSpeedMultiplier(float multiplier)
     {
         externalMoveSpeedMultiplier = Mathf.Max(0f, multiplier);
+    }
+
+    private Collider2D ResolveBodyCollider()
+    {
+        Collider2D[] colliders = GetComponents<Collider2D>();
+        for (int i = 0; i < colliders.Length; i++)
+        {
+            Collider2D candidate = colliders[i];
+            if (candidate != null && !candidate.isTrigger)
+            {
+                return candidate;
+            }
+        }
+
+        return gameObject.AddComponent<BoxCollider2D>();
+    }
+
+    private void SyncBodyCollision()
+    {
+        bodyCollider ??= ResolveBodyCollider();
+        playerRenderer ??= GetComponent<SpriteRenderer>();
+        if (bodyCollider == null)
+        {
+            return;
+        }
+
+        bodyCollider.isTrigger = false;
+        bodyCollider.enabled = true;
+
+        Sprite currentSprite = playerRenderer != null ? playerRenderer.sprite : null;
+        if (currentSprite == colliderSourceSprite && bodyCollider != null)
+        {
+            return;
+        }
+
+        ConfigureBodyCollider(bodyCollider, playerRenderer);
+        colliderSourceSprite = currentSprite;
+    }
+
+    private static void ConfigureBodyCollider(Collider2D collider, SpriteRenderer renderer)
+    {
+        if (collider == null)
+        {
+            return;
+        }
+
+        if (renderer == null || renderer.sprite == null)
+        {
+            return;
+        }
+
+        Bounds bounds = renderer.sprite.bounds;
+        float width = Mathf.Max(MinimumBodyColliderWidth, bounds.size.x * PlayerBoxColliderWidthFactor);
+        float height = Mathf.Max(MinimumBodyColliderHeight, bounds.size.y * PlayerBoxColliderHeightFactor);
+        float centerX = bounds.center.x;
+        float centerY = bounds.min.y + height * 0.5f + bounds.size.y * PlayerColliderLiftFactor;
+
+        switch (collider)
+        {
+            case BoxCollider2D box:
+                box.size = new Vector2(width, height);
+                box.offset = new Vector2(centerX, centerY);
+                break;
+            case CapsuleCollider2D capsule:
+                capsule.size = new Vector2(width, height);
+                capsule.offset = new Vector2(centerX, centerY);
+                capsule.direction = CapsuleDirection2D.Vertical;
+                break;
+            case CircleCollider2D circle:
+                circle.radius = Mathf.Max(
+                    MinimumBodyColliderRadius,
+                    Mathf.Min(bounds.size.x * PlayerCircleColliderFactor, bounds.size.y * PlayerCircleColliderFactor));
+                circle.offset = new Vector2(centerX, bounds.min.y + circle.radius + bounds.size.y * PlayerColliderLiftFactor);
+                break;
+        }
     }
 }
 
