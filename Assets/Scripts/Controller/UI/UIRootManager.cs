@@ -229,6 +229,7 @@ public class UIRootManager : MonoBehaviour
     private void Update()
     {
         RefreshRuntimeBindingsIfNeeded();
+        TryHandleHandbookOpenHotkey();
         TryHandleModalCloseHotkeys();
     }
 
@@ -304,13 +305,10 @@ public class UIRootManager : MonoBehaviour
             }
         }
 
-        if (backpackUI == null)
+        BackpackUI backpackView = BackpackUI.EnsureRuntimeInstance();
+        if (backpackView != null && (backpackUI == null || backpackUI.gameObject != backpackView.gameObject))
         {
-            BackpackUI backpackView = FindObjectOfType<BackpackUI>(true);
-            if (backpackView != null)
-            {
-                backpackUI = EnsureCanvasGroup(backpackView.gameObject);
-            }
+            backpackUI = EnsureCanvasGroup(backpackView.gameObject);
         }
 
         RefreshModalRegistry();
@@ -597,7 +595,9 @@ public class UIRootManager : MonoBehaviour
                IsCanvasGroupOpen(spiritPanelUI) ||
                IsCanvasGroupOpen(albumPanelUI) ||
                IsCanvasGroupOpen(stageSelectionPanelUI) ||
-               RuntimePauseMenu.IsPauseOpen;
+               (UIManager.Instance != null && UIManager.Instance.IsHandbookOpen) ||
+               RuntimePauseMenu.IsPauseOpen ||
+               RuntimePhotoCaptureManager.IsCaptureInProgress;
     }
 
     private void CloseModalFlowInternal(Action afterClosed, bool immediate)
@@ -839,6 +839,41 @@ public class UIRootManager : MonoBehaviour
         }
     }
 
+    private void TryHandleHandbookOpenHotkey()
+    {
+        if (!Input.GetKeyDown(KeyCode.B))
+        {
+            return;
+        }
+
+        if (RuntimePauseMenu.IsPauseOpen)
+        {
+            return;
+        }
+
+        if (RuntimeMiniMapHud.Instance != null && RuntimeMiniMapHud.Instance.IsExpandedViewVisible)
+        {
+            return;
+        }
+
+        if (IsAnyGameplayBlockingUIOpen())
+        {
+            return;
+        }
+
+        if (handbookManager == null || handbookManager.illustratedHandbook == null)
+        {
+            RefreshRuntimeBindings();
+        }
+
+        if (handbookManager == null || handbookManager.IsHandbookOpen)
+        {
+            return;
+        }
+
+        handbookManager.OpenIllustratedHandbook();
+    }
+
     private SubmitSelectionPanelUI FindSubmitPanel(RuntimeModalType type)
     {
         if (submitPanelControllers == null || submitPanelControllers.Length == 0)
@@ -984,324 +1019,6 @@ public class UIRootManager : MonoBehaviour
         }
 
         return canvasGroup.alpha > 0.01f && canvasGroup.blocksRaycasts;
-    }
-}
-
-public class RuntimePauseMenu : MonoBehaviour
-{
-    private const string CanvasName = "RuntimePauseMenuCanvas";
-    private const int SortingOrder = 280;
-    private const string PauseReason = "RuntimePauseMenu";
-
-    private static readonly Color OverlayColor = new Color(0.02f, 0.03f, 0.05f, 0.76f);
-    private static readonly Color PanelColor = new Color(0.10f, 0.12f, 0.16f, 0.96f);
-    private static readonly Color BorderColor = new Color(0.33f, 0.45f, 0.55f, 1f);
-    private static readonly Color ButtonColor = new Color(0.86f, 0.67f, 0.34f, 1f);
-    private static readonly Color ButtonTextColor = new Color(0.14f, 0.09f, 0.05f, 1f);
-    private static readonly Color TitleColor = new Color(0.95f, 0.97f, 1f, 1f);
-    private static readonly Color HintColor = new Color(0.78f, 0.83f, 0.90f, 1f);
-
-    public static RuntimePauseMenu Instance { get; private set; }
-    public static bool IsPauseOpen => Instance != null && Instance.isOpen;
-
-    private static int suppressOpenUntilFrame = -1;
-
-    private RuntimeSettingsPanel settingsPanel;
-    private bool isOpen;
-    private bool visible;
-
-    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
-    private static void Bootstrap()
-    {
-        SceneManager.sceneLoaded -= HandleSceneLoaded;
-        SceneManager.sceneLoaded += HandleSceneLoaded;
-        suppressOpenUntilFrame = -1;
-        EnsureInstance();
-    }
-
-    private static void HandleSceneLoaded(Scene scene, LoadSceneMode mode)
-    {
-        suppressOpenUntilFrame = -1;
-        EnsureInstance();
-        if (Instance != null && !Instance.visible)
-        {
-            Instance.HideImmediate();
-        }
-    }
-
-    public static void ConsumeOpenHotkey()
-    {
-        suppressOpenUntilFrame = Time.frameCount + 1;
-    }
-
-    public static RuntimePauseMenu EnsureInstance()
-    {
-        bool supportedScene = GameplayStageCatalog.IsGameplayScene(SceneManager.GetActiveScene().name);
-
-        if (Instance != null)
-        {
-            Instance.SetVisible(supportedScene);
-            return Instance;
-        }
-
-        RuntimePauseMenu existing = FindObjectOfType<RuntimePauseMenu>(true);
-        if (existing != null)
-        {
-            Instance = existing;
-            Instance.SetVisible(supportedScene);
-            return existing;
-        }
-
-        GameObject runtimeObject = new GameObject("RuntimePauseMenu");
-        Instance = runtimeObject.AddComponent<RuntimePauseMenu>();
-        Instance.SetVisible(supportedScene);
-        return Instance;
-    }
-
-    private void Awake()
-    {
-        if (Instance != null && Instance != this)
-        {
-            Destroy(gameObject);
-            return;
-        }
-
-        Instance = this;
-        DontDestroyOnLoad(gameObject);
-        EnsureUi();
-        SetVisible(GameplayStageCatalog.IsGameplayScene(SceneManager.GetActiveScene().name));
-        HideImmediate();
-    }
-
-    private void Update()
-    {
-        if (!visible)
-        {
-            return;
-        }
-
-        if (GameplayStageIntroDirector.IsIntroActive)
-        {
-            return;
-        }
-
-        KeyCode pauseKey = GameSettingsStore.GetKeyBinding(GameInputAction.Pause);
-        if (!Input.GetKeyDown(pauseKey))
-        {
-            return;
-        }
-
-        if (RuntimeMiniMapHud.Instance != null && RuntimeMiniMapHud.Instance.IsExpandedViewVisible)
-        {
-            return;
-        }
-
-        if (isOpen && settingsPanel != null && settingsPanel.IsCapturingBinding)
-        {
-            return;
-        }
-
-        if (!isOpen && Time.frameCount <= suppressOpenUntilFrame)
-        {
-            return;
-        }
-
-        if (isOpen)
-        {
-            ConsumeOpenHotkey();
-            if (settingsPanel != null)
-            {
-                settingsPanel.RequestContinueGame();
-            }
-            else
-            {
-                ResumeGame();
-            }
-
-            return;
-        }
-
-        if (UIRootManager.Instance != null && UIRootManager.Instance.IsAnyGameplayBlockingUIOpen())
-        {
-            return;
-        }
-
-        PauseGame();
-    }
-
-    private void OnDestroy()
-    {
-        if (settingsPanel != null)
-        {
-            settingsPanel.ContinueRequested -= ResumeGame;
-        }
-
-        RuntimeGameplayPauseController.ReleasePause(PauseReason);
-
-        if (Instance == this)
-        {
-            Instance = null;
-        }
-    }
-
-    private void PauseGame()
-    {
-        if (isOpen)
-        {
-            return;
-        }
-
-        isOpen = true;
-        RuntimeGameplayPauseController.RequestPause(PauseReason);
-        ApplyVisibility(true);
-    }
-
-    private void ResumeGame()
-    {
-        if (!isOpen)
-        {
-            return;
-        }
-
-        isOpen = false;
-        RuntimeGameplayPauseController.ReleasePause(PauseReason);
-
-        if (settingsPanel != null && settingsPanel.IsShown)
-        {
-            settingsPanel.HideImmediate();
-        }
-    }
-
-    private void HideImmediate()
-    {
-        isOpen = false;
-        RuntimeGameplayPauseController.ReleasePause(PauseReason);
-        ApplyVisibility(false);
-    }
-
-    private void SetVisible(bool shouldShow)
-    {
-        visible = shouldShow;
-
-        if (settingsPanel != null)
-        {
-            settingsPanel.SetVisible(shouldShow);
-        }
-
-        if (!shouldShow)
-        {
-            HideImmediate();
-        }
-    }
-
-    private void EnsureUi()
-    {
-        if (settingsPanel != null)
-        {
-            return;
-        }
-
-        settingsPanel = RuntimeSettingsPanel.EnsureInstance();
-        settingsPanel.ContinueRequested -= ResumeGame;
-        settingsPanel.ContinueRequested += ResumeGame;
-        settingsPanel.SetVisible(visible);
-        settingsPanel.HideImmediate();
-    }
-
-    private void ApplyVisibility(bool show)
-    {
-        if (settingsPanel == null)
-        {
-            return;
-        }
-
-        if (show)
-        {
-            settingsPanel.Show(SettingsPanelContext.Gameplay);
-            return;
-        }
-
-        settingsPanel.HideImmediate();
-    }
-
-    private static Image CreateImage(string name, Transform parent, Color color, int radius, int border)
-    {
-        GameObject obj = new GameObject(name, typeof(RectTransform), typeof(Image));
-        obj.transform.SetParent(parent, false);
-        Image image = obj.GetComponent<Image>();
-        RuntimeUiSpriteFactory.ApplyRoundedSprite(image, color, radius, border);
-        return image;
-    }
-
-    private static Button CreateButton(
-        string name,
-        Transform parent,
-        string label,
-        Color backgroundColor,
-        Color textColor,
-        Vector2 size)
-    {
-        GameObject buttonObject = new GameObject(name, typeof(RectTransform), typeof(Image), typeof(Button));
-        buttonObject.transform.SetParent(parent, false);
-
-        Image buttonImage = buttonObject.GetComponent<Image>();
-        RuntimeUiSpriteFactory.ApplyRoundedSprite(buttonImage, backgroundColor, 14, 14);
-
-        RectTransform rect = buttonObject.GetComponent<RectTransform>();
-        rect.anchorMin = new Vector2(0.5f, 0.5f);
-        rect.anchorMax = new Vector2(0.5f, 0.5f);
-        rect.pivot = new Vector2(0.5f, 0.5f);
-        rect.sizeDelta = size;
-
-        Button button = buttonObject.GetComponent<Button>();
-
-        GameObject textObject = new GameObject("Label", typeof(RectTransform), typeof(TextMeshProUGUI));
-        textObject.transform.SetParent(buttonObject.transform, false);
-        TextMeshProUGUI text = textObject.GetComponent<TextMeshProUGUI>();
-        text.font = TmpRuntimeFontFallback.EnsureChineseFallback() ?? TMP_Settings.defaultFontAsset;
-        text.text = label;
-        text.fontSize = 28f;
-        text.color = textColor;
-        text.alignment = TextAlignmentOptions.Center;
-
-        RectTransform textRect = text.GetComponent<RectTransform>();
-        StretchRect(textRect);
-
-        return button;
-    }
-
-    private static TextMeshProUGUI CreateText(
-        string name,
-        Transform parent,
-        string value,
-        float fontSize,
-        Color color,
-        TextAlignmentOptions alignment)
-    {
-        GameObject textObject = new GameObject(name, typeof(RectTransform), typeof(TextMeshProUGUI));
-        textObject.transform.SetParent(parent, false);
-
-        TextMeshProUGUI text = textObject.GetComponent<TextMeshProUGUI>();
-        text.font = TmpRuntimeFontFallback.EnsureChineseFallback() ?? TMP_Settings.defaultFontAsset;
-        text.text = value;
-        text.fontSize = fontSize;
-        text.color = color;
-        text.alignment = alignment;
-
-        RectTransform rect = text.GetComponent<RectTransform>();
-        rect.anchorMin = new Vector2(0.5f, 0.5f);
-        rect.anchorMax = new Vector2(0.5f, 0.5f);
-        rect.pivot = new Vector2(0.5f, 0.5f);
-
-        return text;
-    }
-
-    private static void StretchRect(RectTransform rectTransform)
-    {
-        rectTransform.anchorMin = Vector2.zero;
-        rectTransform.anchorMax = Vector2.one;
-        rectTransform.offsetMin = Vector2.zero;
-        rectTransform.offsetMax = Vector2.zero;
     }
 }
 

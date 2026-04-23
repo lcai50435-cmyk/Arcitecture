@@ -12,7 +12,8 @@ public enum SettingsPanelContext
 {
     MainMenu = 0,
     BaseHub = 1,
-    Gameplay = 2
+    Gameplay = 2,
+    PauseMenu = 3
 }
 
 public sealed class RuntimeSettingsPanel : MonoBehaviour
@@ -26,7 +27,7 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
     }
 
     private const string CanvasName = "RuntimeSettingsPanelCanvas";
-    private const int SortingOrder = 282;
+    private const int SortingOrder = 940;
     private const float PanelWidth = 1440f;
     private const float PanelHeight = 840f;
     private const float CardWidth = 1220f;
@@ -34,9 +35,11 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
     private const float FooterButtonHeight = 56f;
     private const float ShowAnimationDuration = RuntimeModalStyle.TransitionDuration;
     private const int DisplayRefreshFrameBudget = 12;
+    private const float PageBottomPadding = 36f;
+    private const float ManualScrollStep = 0.12f;
 
     private const string RequiredCharacters =
-        "设置游戏已暂停当前没有未应用更改存在未应用更改继续游戏会自动应用关闭时会自动应用关闭设置会自动应用声音画面按键存档恢复默认取消应用总音量音乐音量音效音量控制全部游戏声音背景音乐攻击与发射声音单独强度实时预览屏幕大小显示模式视野缩放影响游戏相机可见范围待应用窗口尺寸窗口模式与全屏切换当前生效信息以下内容来自当前运行中的实际状态攻击交互地图暂停拍照留念纪念截图点击右侧按钮后按任意键或鼠标键进行绑定等待输入正在为当前暂停键重置存档清空本地建筑进度关卡选择武器状态和留念相册设置项会保留没有可重置的数据再次点击将立即清空本地进度与相册截图，并返回主菜单此操作不可恢复完成后重置结束后会返回主菜单便于从干净状态重新开始重置结束后会留在主菜单返回主菜单图形音量键位等设置不会被重置保留设置确认重置关闭应用并继续继续游戏应用并关闭关闭返回主界面应用并返回不保存返回确认返回当前战斗会直接结束并回到主界面未应用改动会先写入设置不会重置存档或相册会放弃当前未应用改动并回到主界面返回取消留在当前页面，。“”0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-+/():.% ";
+        "设置游戏已暂停暂停页返回暂停页当前没有未应用更改存在未应用更改继续游戏会自动应用关闭时会自动应用关闭设置会自动应用声音画面按键存档恢复默认取消应用总音量音乐音量音效音量控制全部游戏声音背景音乐攻击与发射声音单独强度实时预览屏幕大小显示模式视野缩放影响游戏相机可见范围待应用窗口尺寸窗口模式与全屏切换当前生效信息以下内容来自当前运行中的实际状态攻击交互地图暂停拍照留念纪念截图点击右侧按钮后按任意键或鼠标键进行绑定等待输入正在为当前暂停键重置存档清空本地建筑进度关卡选择武器状态和留念相册设置项会保留没有可重置的数据再次点击将立即清空本地进度与相册截图，并返回主菜单此操作不可恢复完成后重置结束后会返回主菜单便于从干净状态重新开始重置结束后会留在主菜单返回主菜单图形音量键位等设置不会被重置保留设置确认重置关闭应用并继续继续游戏应用并关闭关闭返回主界面应用并返回不保存返回确认返回当前战斗会直接结束并回到主界面未应用改动会先写入设置不会重置存档或相册会放弃当前未应用改动并回到主界面返回取消留在当前页面，。“”0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-+/():.% ";
 
     private static readonly string[] RuntimeFontNames =
     {
@@ -92,6 +95,7 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
     public bool IsShown => IsPanelShown();
 
     private readonly Dictionary<SettingsTab, RectTransform> pageRoots = new Dictionary<SettingsTab, RectTransform>();
+    private readonly Dictionary<SettingsTab, ScrollRect> pageScrollRects = new Dictionary<SettingsTab, ScrollRect>();
     private readonly Dictionary<SettingsTab, Image> tabImages = new Dictionary<SettingsTab, Image>();
     private readonly Dictionary<SettingsTab, TextMeshProUGUI> tabLabels = new Dictionary<SettingsTab, TextMeshProUGUI>();
     private readonly Dictionary<GameInputAction, TextMeshProUGUI> bindingValueTexts = new Dictionary<GameInputAction, TextMeshProUGUI>();
@@ -108,6 +112,7 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
     private Coroutine hideAnimationCoroutine;
     private Coroutine showSequenceCoroutine;
     private Coroutine backdropRefreshCoroutine;
+    private Coroutine liveBackdropCoroutine;
     private Vector2 panelVisibleAnchoredPosition;
     private SettingsTab currentTab = SettingsTab.Audio;
     private SettingsPanelContext currentContext = SettingsPanelContext.Gameplay;
@@ -197,6 +202,8 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
 
     private void Update()
     {
+        HandlePageScrollInput();
+
         if (!IsPanelShown() || !pendingBindingAction.HasValue || Time.unscaledTime < captureReadyAt || draftSettings == null)
         {
             return;
@@ -213,12 +220,48 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
         RefreshFooterState();
     }
 
+    private void HandlePageScrollInput()
+    {
+        if (!IsPanelShown() || returnToMenuConfirmOpen || panelRectTransform == null)
+        {
+            return;
+        }
+
+        float scrollDelta = Input.mouseScrollDelta.y;
+        if (Mathf.Approximately(scrollDelta, 0f))
+        {
+            return;
+        }
+
+        if (!RectTransformUtility.RectangleContainsScreenPoint(panelRectTransform, Input.mousePosition, null))
+        {
+            return;
+        }
+
+        if (!pageScrollRects.TryGetValue(currentTab, out ScrollRect scrollRect) || !CanScroll(scrollRect))
+        {
+            return;
+        }
+
+        scrollRect.verticalNormalizedPosition = Mathf.Clamp01(
+            scrollRect.verticalNormalizedPosition + scrollDelta * ManualScrollStep);
+    }
+
+    private static bool CanScroll(ScrollRect scrollRect)
+    {
+        return scrollRect != null &&
+               scrollRect.content != null &&
+               scrollRect.viewport != null &&
+               scrollRect.content.rect.height > scrollRect.viewport.rect.height + 1f;
+    }
+
     private void OnDestroy()
     {
         StopShowSequence();
         StopShowAnimation();
         StopHideAnimation();
         StopBackdropRefresh();
+        StopLiveBackdropRefresh();
         ReleaseBlurBackdrop();
     }
 
@@ -247,6 +290,8 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
             canvas.gameObject.SetActive(true);
         }
 
+        StartLiveBackdropRefresh();
+        ResetPageScrollPosition(currentTab);
         SetPanelVisibility(true);
         ApplyAnimationState(0f);
         StartShowSequence();
@@ -267,6 +312,7 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
         }
 
         StopBackdropRefresh();
+        StopLiveBackdropRefresh();
         pendingBindingAction = null;
         if (clearPendingHideCallback)
         {
@@ -606,7 +652,7 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
 
     private void CreateAudioPage(Transform parent)
     {
-        RectTransform pageRoot = CreatePageRoot("AudioPage", parent, SettingsTab.Audio);
+        RectTransform pageRoot = CreatePageRoot("AudioPage", parent, SettingsTab.Audio, 392f);
         masterVolumeValueText = CreateStepperCard(
             pageRoot,
             "总音量",
@@ -632,7 +678,7 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
 
     private void CreateDisplayPage(Transform parent)
     {
-        RectTransform pageRoot = CreatePageRoot("DisplayPage", parent, SettingsTab.Display);
+        RectTransform pageRoot = CreatePageRoot("DisplayPage", parent, SettingsTab.Display, 512f);
         resolutionValueText = CreateStepperCard(
             pageRoot,
             "屏幕大小",
@@ -659,7 +705,7 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
 
     private void CreateControlsPage(Transform parent)
     {
-        RectTransform pageRoot = CreatePageRoot("ControlsPage", parent, SettingsTab.Controls);
+        RectTransform pageRoot = CreatePageRoot("ControlsPage", parent, SettingsTab.Controls, 620f);
 
         captureHintText = CreateText(
             "CaptureHint",
@@ -678,13 +724,13 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
         CreateBindingCard(pageRoot, GameInputAction.Attack, "攻击", "战斗中发射墨球", 44f);
         CreateBindingCard(pageRoot, GameInputAction.Interact, "交互", "靠近对象时触发交互", 164f);
         CreateBindingCard(pageRoot, GameInputAction.OpenMap, "地图", "查看和展开地图", 284f);
-        CreateBindingCard(pageRoot, GameInputAction.Pause, "暂停", "打开或关闭设置菜单", 404f);
+        CreateBindingCard(pageRoot, GameInputAction.Pause, "暂停", "打开或关闭暂停菜单", 404f);
         CreateBindingCard(pageRoot, GameInputAction.PhotoCapture, "拍照", "定格当前战斗画面并保存留念", 524f);
     }
 
     private void CreateDataPage(Transform parent)
     {
-        RectTransform pageRoot = CreatePageRoot("DataPage", parent, SettingsTab.Data);
+        RectTransform pageRoot = CreatePageRoot("DataPage", parent, SettingsTab.Data, 456f);
 
         Image card = CreateImage("SaveResetCard", pageRoot, SectionColor, 20, 16);
         RectTransform cardRect = card.rectTransform;
@@ -751,12 +797,35 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
         CreateStaticInfoCard(pageRoot, "保留项", "图形、音量、键位等设置不会被重置", 360f, "保留设置");
     }
 
-    private RectTransform CreatePageRoot(string name, Transform parent, SettingsTab tab)
+    private RectTransform CreatePageRoot(string name, Transform parent, SettingsTab tab, float contentHeight)
     {
-        RectTransform pageRoot = CreateContainer(name, parent, Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f));
-        StretchRect(pageRoot);
-        pageRoots[tab] = pageRoot;
-        return pageRoot;
+        RectTransform scrollRoot = CreateContainer(name, parent, Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f));
+        StretchRect(scrollRoot);
+
+        ScrollRect scrollRect = scrollRoot.gameObject.AddComponent<ScrollRect>();
+        scrollRect.horizontal = false;
+        scrollRect.vertical = true;
+        scrollRect.movementType = ScrollRect.MovementType.Clamped;
+        scrollRect.inertia = true;
+        scrollRect.scrollSensitivity = 0f;
+
+        Image viewportImage = CreateImage("Viewport", scrollRoot, Color.clear, 0, 0);
+        viewportImage.raycastTarget = true;
+        RectTransform viewport = viewportImage.rectTransform;
+        StretchRect(viewport);
+        viewport.gameObject.AddComponent<RectMask2D>();
+
+        RectTransform content = CreateContainer("Content", viewport, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f));
+        float paddedContentHeight = Mathf.Max(0f, contentHeight + PageBottomPadding);
+        content.offsetMin = new Vector2(0f, -paddedContentHeight);
+        content.offsetMax = Vector2.zero;
+
+        scrollRect.viewport = viewport;
+        scrollRect.content = content;
+
+        pageRoots[tab] = scrollRoot;
+        pageScrollRects[tab] = scrollRect;
+        return content;
     }
 
     private TextMeshProUGUI CreateStepperCard(
@@ -966,6 +1035,7 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
 
         currentTab = tab;
         RefreshTabState();
+        ResetPageScrollPosition(tab);
     }
 
     private void BeginBindingCapture(GameInputAction action)
@@ -1059,6 +1129,8 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
     private void ExecuteReturnToMainMenu(bool applyPendingChanges)
     {
         bool isDirty = GameSettingsStore.IsDirty(savedSettings, draftSettings);
+        bool isGameplayContext = currentContext == SettingsPanelContext.Gameplay || currentContext == SettingsPanelContext.PauseMenu;
+        bool isPauseMenuContext = currentContext == SettingsPanelContext.PauseMenu;
         returnToMenuConfirmOpen = false;
 
         if (applyPendingChanges)
@@ -1076,8 +1148,16 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
 
         Hide(() =>
         {
-            ContinueRequested?.Invoke();
-            if (currentContext == SettingsPanelContext.Gameplay)
+            if (isPauseMenuContext)
+            {
+                RuntimePauseMenu.CloseForSceneTransition();
+            }
+            else
+            {
+                ContinueRequested?.Invoke();
+            }
+
+            if (isGameplayContext)
             {
                 RuntimeSessionResetService.ResetGameplayTransientState();
             }
@@ -1107,8 +1187,17 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
 
         resetSaveArmed = false;
         GameSaveResetService.ResetAllSaveData();
+        bool isPauseMenuContext = currentContext == SettingsPanelContext.PauseMenu;
         HideImmediate();
-        ContinueRequested?.Invoke();
+        if (isPauseMenuContext)
+        {
+            RuntimePauseMenu.CloseForSceneTransition();
+        }
+        else
+        {
+            ContinueRequested?.Invoke();
+        }
+
         NavigateToMainMenu();
     }
 
@@ -1239,6 +1328,15 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
                 string pauseKey = GameSettingsStore.GetKeyDisplayName(source.GetBinding(GameInputAction.Pause));
                 subtitleText.text = isDirty
                     ? $"存在未应用更改，关闭设置会自动应用。当前暂停键：{pauseKey}"
+                    : $"当前没有未应用更改。当前暂停键：{pauseKey}";
+                break;
+            }
+            case SettingsPanelContext.PauseMenu:
+            {
+                GameSettingsDraft source = draftSettings ?? savedSettings ?? GameSettingsStore.LoadSavedSettings();
+                string pauseKey = GameSettingsStore.GetKeyDisplayName(source.GetBinding(GameInputAction.Pause));
+                subtitleText.text = isDirty
+                    ? $"存在未应用更改，返回暂停页前会自动应用。当前暂停键：{pauseKey}"
                     : $"当前没有未应用更改。当前暂停键：{pauseKey}";
                 break;
             }
@@ -1439,6 +1537,17 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
         }
     }
 
+    private void ResetPageScrollPosition(SettingsTab tab)
+    {
+        if (!pageScrollRects.TryGetValue(tab, out ScrollRect scrollRect) || scrollRect == null)
+        {
+            return;
+        }
+
+        Canvas.ForceUpdateCanvases();
+        scrollRect.verticalNormalizedPosition = 1f;
+    }
+
     private void RefreshFooterState()
     {
         bool isDirty = GameSettingsStore.IsDirty(savedSettings, draftSettings);
@@ -1495,7 +1604,7 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
             return;
         }
 
-        if (currentContext == SettingsPanelContext.Gameplay)
+        if (currentContext == SettingsPanelContext.Gameplay || currentContext == SettingsPanelContext.PauseMenu)
         {
             returnToMenuConfirmTitleText.text = "确认返回主界面";
             returnToMenuConfirmBodyText.text = isDirty
@@ -1555,6 +1664,8 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
                 return "关闭";
             case SettingsPanelContext.BaseHub:
                 return isDirty ? "应用并关闭" : "关闭设置";
+            case SettingsPanelContext.PauseMenu:
+                return isDirty ? "应用并返回" : "返回暂停页";
             default:
                 return isDirty ? "应用并继续" : "继续游戏";
         }
@@ -1720,6 +1831,12 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
         backdropRefreshCoroutine = StartCoroutine(RefreshBackdropRoutine());
     }
 
+    private void StartLiveBackdropRefresh()
+    {
+        StopLiveBackdropRefresh();
+        liveBackdropCoroutine = StartCoroutine(LiveBackdropRoutine());
+    }
+
     private void StopBackdropRefresh()
     {
         if (backdropRefreshCoroutine == null)
@@ -1729,6 +1846,17 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
 
         StopCoroutine(backdropRefreshCoroutine);
         backdropRefreshCoroutine = null;
+    }
+
+    private void StopLiveBackdropRefresh()
+    {
+        if (liveBackdropCoroutine == null)
+        {
+            return;
+        }
+
+        StopCoroutine(liveBackdropCoroutine);
+        liveBackdropCoroutine = null;
     }
 
     private IEnumerator ShowSequenceRoutine()
@@ -1758,6 +1886,17 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
         RefreshDisplayPage();
         ApplyAnimationState(1f);
         backdropRefreshCoroutine = null;
+    }
+
+    private IEnumerator LiveBackdropRoutine()
+    {
+        while (IsPanelShown())
+        {
+            yield return new WaitForEndOfFrame();
+            CaptureBlurBackdrop();
+        }
+
+        liveBackdropCoroutine = null;
     }
 
     private static bool MatchesCurrentRuntimeDisplay(GameSettingsDraft appliedSettings)
@@ -1863,20 +2002,11 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
             return;
         }
 
-        ReleaseBlurBackdrop();
-
-        Texture2D screenshot = CaptureBackdropTexture();
-        if (screenshot == null)
+        blurredBackdropTexture = RuntimeModalStyle.RefreshRealtimeBlurBackdrop(blurredBackdropTexture);
+        if (blurBackdropImage.texture != blurredBackdropTexture)
         {
-            blurBackdropImage.texture = null;
-            return;
+            blurBackdropImage.texture = blurredBackdropTexture;
         }
-
-        screenshot.filterMode = FilterMode.Bilinear;
-        screenshot.wrapMode = TextureWrapMode.Clamp;
-        capturedBackdropTexture = screenshot;
-        blurredBackdropTexture = RuntimeModalStyle.BuildBlurBackdrop(capturedBackdropTexture);
-        blurBackdropImage.texture = blurredBackdropTexture;
     }
 
     private Texture2D CaptureBackdropTexture()

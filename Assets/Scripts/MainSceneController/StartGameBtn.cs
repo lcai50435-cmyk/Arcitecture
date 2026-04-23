@@ -176,10 +176,12 @@ public sealed class MainMenuController : MonoBehaviour
         }
 
         bool settingsOpen = RuntimeSettingsPanel.Instance != null && RuntimeSettingsPanel.Instance.IsShown;
+        bool handbookOpen = MainSceneHandbookLauncher.IsAnyHandbookOpen();
+        bool shouldShowMenu = !settingsOpen && !handbookOpen;
 
-        if (menuRootRect.gameObject.activeSelf == settingsOpen)
+        if (menuRootRect.gameObject.activeSelf != shouldShowMenu)
         {
-            menuRootRect.gameObject.SetActive(!settingsOpen);
+            menuRootRect.gameObject.SetActive(shouldShowMenu);
         }
     }
 
@@ -275,8 +277,8 @@ public sealed class MainMenuController : MonoBehaviour
         menuRootRect.anchorMin = new Vector2(0.5f, 0.5f);
         menuRootRect.anchorMax = new Vector2(0.5f, 0.5f);
         menuRootRect.pivot = new Vector2(0.5f, 0.5f);
-        menuRootRect.sizeDelta = new Vector2(560f, 620f);
-        menuRootRect.anchoredPosition = new Vector2(0f, -120f);
+        menuRootRect.sizeDelta = new Vector2(560f, 760f);
+        menuRootRect.anchoredPosition = new Vector2(0f, -90f);
 
         VerticalLayoutGroup layoutGroup = menuRoot.AddComponent<VerticalLayoutGroup>();
         layoutGroup.spacing = 28f;
@@ -293,6 +295,7 @@ public sealed class MainMenuController : MonoBehaviour
 
         CreateMenuButton(menuRootRect, "NewGameButton", "新游戏", OpenNewGamePanel);
         continueButton = CreateMenuButton(menuRootRect, "ContinueButton", "继续游戏", OpenContinuePanel);
+        CreateMenuButton(menuRootRect, "HandbookButton", "图鉴/手册", OpenHandbookPanel);
         CreateMenuButton(menuRootRect, "SettingsButton", "设置", OpenSettingsPanel);
         CreateMenuButton(menuRootRect, "ExitButton", "退出", ExitGame);
     }
@@ -503,6 +506,22 @@ public sealed class MainMenuController : MonoBehaviour
     {
         CloseSlotPanel();
         RuntimeSettingsPanel.EnsureInstance().Show(SettingsPanelContext.MainMenu);
+    }
+
+    private void OpenHandbookPanel()
+    {
+        CloseSlotPanel();
+
+        MainSceneHandbookLauncher launcher = MainSceneHandbookLauncher.Instance != null
+            ? MainSceneHandbookLauncher.Instance
+            : FindObjectOfType<MainSceneHandbookLauncher>(true);
+        if (launcher == null)
+        {
+            Debug.LogWarning("MainScene 缺少 MainSceneHandbookLauncher，无法打开图鉴。");
+            return;
+        }
+
+        launcher.TryOpen(menuRootRect != null ? menuRootRect.gameObject : null);
     }
 
     private void OpenSlotPanel(MainMenuSlotPanelMode mode)

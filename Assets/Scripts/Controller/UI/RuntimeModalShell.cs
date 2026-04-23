@@ -8,11 +8,11 @@ public static class RuntimeModalStyle
     public const float TransitionDuration = 0.24f;
     public const float PanelStartScale = 0.965f;
     public const float PanelStartYOffset = -18f;
-    public const int BackdropSortingOrder = 252;
-    public const int ModalSortingOrder = 264;
+    public const int BackdropSortingOrder = 900;
+    public const int ModalSortingOrder = 920;
 
-    public static readonly Color BlurTintColor = new Color(0.04f, 0.05f, 0.08f, 0.46f);
-    public static readonly Color OverlayColor = new Color(0.02f, 0.03f, 0.05f, 0.22f);
+    public static readonly Color BlurTintColor = new Color(0.04f, 0.05f, 0.08f, 0.62f);
+    public static readonly Color OverlayColor = new Color(0.02f, 0.03f, 0.05f, 0.36f);
 
     public static void ApplyBackdropState(RawImage blurBackdropImage, Image blurTintImage, Image overlayImage, float progress)
     {
@@ -140,6 +140,50 @@ public static class RuntimeModalStyle
         return blurredBackdropTexture;
     }
 
+    public static RenderTexture RefreshRealtimeBlurBackdrop(RenderTexture blurredBackdropTexture)
+    {
+        ResolveBlurDimensions(out int halfWidth, out int halfHeight, out int quarterWidth, out int quarterHeight, out int finalWidth, out int finalHeight);
+        if (!IsBlurBackdropValid(blurredBackdropTexture, finalWidth, finalHeight))
+        {
+            ReleaseRenderTexture(blurredBackdropTexture);
+            blurredBackdropTexture = CreateBlurBackdropTexture(finalWidth, finalHeight);
+        }
+
+        Camera captureCamera = ResolveBackdropCamera();
+        if (captureCamera == null)
+        {
+            return RefreshFallbackScreenshotBlur(blurredBackdropTexture);
+        }
+
+        RenderTexture previousActive = RenderTexture.active;
+        RenderTexture previousTarget = captureCamera.targetTexture;
+        RenderTexture halfTexture = RenderTexture.GetTemporary(halfWidth, halfHeight, 24, RenderTextureFormat.ARGB32);
+        RenderTexture quarterTexture = RenderTexture.GetTemporary(quarterWidth, quarterHeight, 0, RenderTextureFormat.ARGB32);
+        RenderTexture tempTexture = RenderTexture.GetTemporary(finalWidth, finalHeight, 0, RenderTextureFormat.ARGB32);
+        halfTexture.filterMode = FilterMode.Bilinear;
+        quarterTexture.filterMode = FilterMode.Bilinear;
+        tempTexture.filterMode = FilterMode.Bilinear;
+
+        try
+        {
+            captureCamera.targetTexture = halfTexture;
+            captureCamera.Render();
+            Graphics.Blit(halfTexture, quarterTexture);
+            Graphics.Blit(quarterTexture, tempTexture);
+            Graphics.Blit(tempTexture, quarterTexture);
+            Graphics.Blit(quarterTexture, blurredBackdropTexture);
+            return blurredBackdropTexture;
+        }
+        finally
+        {
+            captureCamera.targetTexture = previousTarget;
+            RenderTexture.active = previousActive;
+            RenderTexture.ReleaseTemporary(halfTexture);
+            RenderTexture.ReleaseTemporary(quarterTexture);
+            RenderTexture.ReleaseTemporary(tempTexture);
+        }
+    }
+
     public static void ReleaseBlurBackdrop(RawImage blurBackdropImage, ref Texture2D capturedBackdropTexture, ref RenderTexture blurredBackdropTexture)
     {
         if (blurBackdropImage != null)
@@ -147,16 +191,8 @@ public static class RuntimeModalStyle
             blurBackdropImage.texture = null;
         }
 
-        if (blurredBackdropTexture != null)
-        {
-            if (blurredBackdropTexture.IsCreated())
-            {
-                blurredBackdropTexture.Release();
-            }
-
-            UnityEngine.Object.Destroy(blurredBackdropTexture);
-            blurredBackdropTexture = null;
-        }
+        ReleaseRenderTexture(blurredBackdropTexture);
+        blurredBackdropTexture = null;
 
         if (capturedBackdropTexture != null)
         {
@@ -207,6 +243,76 @@ public static class RuntimeModalStyle
 
         return fallback;
     }
+
+    private static void ResolveBlurDimensions(
+        out int halfWidth,
+        out int halfHeight,
+        out int quarterWidth,
+        out int quarterHeight,
+        out int finalWidth,
+        out int finalHeight)
+    {
+        halfWidth = Mathf.Max(640, Screen.width / 2);
+        halfHeight = Mathf.Max(360, Screen.height / 2);
+        quarterWidth = Mathf.Max(480, Screen.width / 4);
+        quarterHeight = Mathf.Max(270, Screen.height / 4);
+        finalWidth = Mathf.Max(320, Screen.width / 8);
+        finalHeight = Mathf.Max(180, Screen.height / 8);
+    }
+
+    private static RenderTexture CreateBlurBackdropTexture(int width, int height)
+    {
+        RenderTexture texture = new RenderTexture(width, height, 0, RenderTextureFormat.ARGB32)
+        {
+            name = "RuntimeModalBlurBackdrop",
+            filterMode = FilterMode.Bilinear,
+            wrapMode = TextureWrapMode.Clamp
+        };
+        texture.Create();
+        return texture;
+    }
+
+    private static bool IsBlurBackdropValid(RenderTexture texture, int width, int height)
+    {
+        return texture != null &&
+               texture.width == width &&
+               texture.height == height &&
+               texture.IsCreated();
+    }
+
+    private static RenderTexture RefreshFallbackScreenshotBlur(RenderTexture blurredBackdropTexture)
+    {
+        Texture2D screenshot = CaptureBackdropTexture();
+        if (screenshot == null)
+        {
+            return blurredBackdropTexture;
+        }
+
+        RenderTexture rebuiltTexture = BuildBlurBackdrop(screenshot);
+        UnityEngine.Object.Destroy(screenshot);
+        if (rebuiltTexture == null)
+        {
+            return blurredBackdropTexture;
+        }
+
+        ReleaseRenderTexture(blurredBackdropTexture);
+        return rebuiltTexture;
+    }
+
+    private static void ReleaseRenderTexture(RenderTexture texture)
+    {
+        if (texture == null)
+        {
+            return;
+        }
+
+        if (texture.IsCreated())
+        {
+            texture.Release();
+        }
+
+        UnityEngine.Object.Destroy(texture);
+    }
 }
 
 public sealed class RuntimeModalShell : MonoBehaviour
@@ -219,6 +325,7 @@ public sealed class RuntimeModalShell : MonoBehaviour
     private Image blurTintImage;
     private Image overlayImage;
     private Coroutine transitionCoroutine;
+    private Coroutine backdropRefreshCoroutine;
     private Texture2D capturedBackdropTexture;
     private RenderTexture blurredBackdropTexture;
     private CanvasGroup activeCanvasGroup;
@@ -241,6 +348,7 @@ public sealed class RuntimeModalShell : MonoBehaviour
         IsVisible = true;
 
         StopTransition();
+        StartRealtimeBackdropRefresh();
         transitionCoroutine = StartCoroutine(ShowRoutine(onShown));
     }
 
@@ -263,6 +371,7 @@ public sealed class RuntimeModalShell : MonoBehaviour
         }
 
         IsVisible = true;
+        StartRealtimeBackdropRefresh();
     }
 
     public void Hide(bool immediate, Action onHidden = null)
@@ -289,13 +398,7 @@ public sealed class RuntimeModalShell : MonoBehaviour
     {
         yield return new WaitForEndOfFrame();
 
-        RuntimeModalStyle.ReleaseBlurBackdrop(blurBackdropImage, ref capturedBackdropTexture, ref blurredBackdropTexture);
-        capturedBackdropTexture = RuntimeModalStyle.CaptureBackdropTexture();
-        blurredBackdropTexture = RuntimeModalStyle.BuildBlurBackdrop(capturedBackdropTexture);
-        if (blurBackdropImage != null)
-        {
-            blurBackdropImage.texture = blurredBackdropTexture;
-        }
+        RefreshRealtimeBackdrop();
 
         float elapsed = 0f;
         while (elapsed < RuntimeModalStyle.TransitionDuration)
@@ -329,6 +432,7 @@ public sealed class RuntimeModalShell : MonoBehaviour
 
     private void Cleanup()
     {
+        StopRealtimeBackdropRefresh();
         RuntimeModalStyle.ReleaseBlurBackdrop(blurBackdropImage, ref capturedBackdropTexture, ref blurredBackdropTexture);
         if (canvas != null)
         {
@@ -347,6 +451,48 @@ public sealed class RuntimeModalShell : MonoBehaviour
 
         StopCoroutine(transitionCoroutine);
         transitionCoroutine = null;
+    }
+
+    private void StartRealtimeBackdropRefresh()
+    {
+        StopRealtimeBackdropRefresh();
+        backdropRefreshCoroutine = StartCoroutine(RefreshBackdropRoutine());
+    }
+
+    private void StopRealtimeBackdropRefresh()
+    {
+        if (backdropRefreshCoroutine == null)
+        {
+            return;
+        }
+
+        StopCoroutine(backdropRefreshCoroutine);
+        backdropRefreshCoroutine = null;
+    }
+
+    private IEnumerator RefreshBackdropRoutine()
+    {
+        while (IsVisible)
+        {
+            yield return new WaitForEndOfFrame();
+            RefreshRealtimeBackdrop();
+        }
+
+        backdropRefreshCoroutine = null;
+    }
+
+    private void RefreshRealtimeBackdrop()
+    {
+        if (blurBackdropImage == null)
+        {
+            return;
+        }
+
+        blurredBackdropTexture = RuntimeModalStyle.RefreshRealtimeBlurBackdrop(blurredBackdropTexture);
+        if (blurBackdropImage.texture != blurredBackdropTexture)
+        {
+            blurBackdropImage.texture = blurredBackdropTexture;
+        }
     }
 
     private void ApplyState(float progress)
