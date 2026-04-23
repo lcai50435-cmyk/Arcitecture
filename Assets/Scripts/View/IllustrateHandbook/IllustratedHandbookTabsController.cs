@@ -23,6 +23,12 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
 {
     public const string RootObjectName = "IllustratedHandbookCanvasUI";
     public const string IllustratedHandbookCanvasName = "IllustratedHandbookCanvas";
+    public const string PersonalInformationCanvasName = "PersonalInformationCanvas";
+    public const string PhotoAlbumCanvasName = "PhotoAlbumCanvas";
+    public const string MissionCanvasName = "MissionCanvas";
+    public const string SettingCanvasName = "SettingCanvas";
+
+    private static readonly string LegacyPersonalInformationCanvasName = string.Concat("Personal", "nformationCanvas");
 
     private const string BackgroundName = "BackGround";
     private const string TabsRailName = "TabsRail";
@@ -58,24 +64,35 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
     private const float CloseButtonX = 840f;
     private const float CloseButtonY = -330f;
 
-    private const float BookSafeLeft = 190f;
-    private const float BookSafeRight = 900f;
-    private const float BookSafeTop = 118f;
-    private const float BookSafeBottom = 118f;
+    private const float BookSafeLeft = 96f;
+    private const float BookSafeRight = 760f;
+    private const float BookSafeTop = 92f;
+    private const float BookSafeBottom = 112f;
     private const float BookContentHeight = 920f;
     private const float BookScrollSensitivity = 34f;
+    private const string LegacyHandbookCardsContainerName = "LegacyHandbookCards";
+    private const float HandbookCardCenterX = 168f;
+    private const float HandbookCardStartY = 170f;
+    private const float HandbookCardVerticalSpacing = 224f;
 
     [SerializeField] private UIManager owner;
 
     [Header("书本根")]
     [SerializeField] private GameObject illustratedHandbookCanvas;
+    [SerializeField] private GameObject personalInformationCanvas;
+    [SerializeField] private GameObject photoAlbumCanvas;
+    [SerializeField] private GameObject missionCanvas;
+    [SerializeField] private GameObject settingCanvas;
 
     [Header("配置")]
     [SerializeField] private IllustratedHandbookPage defaultPage = IllustratedHandbookPage.IllustratedHandbook;
     [SerializeField] private Button closeButton;
+    [SerializeField] private RectTransform bookContentPanel;
 
     private readonly Dictionary<IllustratedHandbookPage, RectTransform> pageContentRoots =
         new Dictionary<IllustratedHandbookPage, RectTransform>();
+    private readonly Dictionary<IllustratedHandbookPage, GameObject> scenePageRoots =
+        new Dictionary<IllustratedHandbookPage, GameObject>();
 
     private readonly Dictionary<IllustratedHandbookPage, List<Button>> tabButtons =
         new Dictionary<IllustratedHandbookPage, List<Button>>();
@@ -85,6 +102,8 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
 
     private readonly Dictionary<Button, Coroutine> buttonMoveAnimations =
         new Dictionary<Button, Coroutine>();
+    private readonly List<GameObject> legacyHandbookContentObjects =
+        new List<GameObject>();
 
     private static readonly Dictionary<IllustratedHandbookPage, Sprite> BookmarkSpriteCache =
         new Dictionary<IllustratedHandbookPage, Sprite>();
@@ -94,6 +113,7 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
     private ScrollRect sharedBookScrollRect;
     private RectTransform sharedBookContentRoot;
     private bool initialized;
+    private bool usesSceneAuthoredPages;
 
     public static IllustratedHandbookTabsController EnsureInstalled(UIManager manager)
     {
@@ -103,6 +123,26 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         }
 
         GameObject handbookObject = manager.illustratedHandbook;
+        GameObject sceneRoot = ResolveSceneAuthoredRoot(handbookObject);
+        if (sceneRoot != null)
+        {
+            IllustratedHandbookTabsController sceneController = sceneRoot.GetComponent<IllustratedHandbookTabsController>();
+            if (sceneController == null)
+            {
+                sceneController = sceneRoot.AddComponent<IllustratedHandbookTabsController>();
+            }
+
+            sceneController.owner = manager;
+            sceneController.illustratedHandbookCanvas = ResolveScenePageRoot(sceneRoot.transform, IllustratedHandbookPage.IllustratedHandbook);
+            sceneController.personalInformationCanvas = ResolveScenePageRoot(sceneRoot.transform, IllustratedHandbookPage.PersonalInformation);
+            sceneController.photoAlbumCanvas = ResolveScenePageRoot(sceneRoot.transform, IllustratedHandbookPage.PhotoAlbum);
+            sceneController.missionCanvas = ResolveScenePageRoot(sceneRoot.transform, IllustratedHandbookPage.Mission);
+            sceneController.settingCanvas = ResolveScenePageRoot(sceneRoot.transform, IllustratedHandbookPage.Setting);
+            sceneController.EnsureInitialized();
+            manager.illustratedHandbook = sceneRoot;
+            return sceneController;
+        }
+
         GameObject chromeObject = ResolveChromeObject(handbookObject);
         if (chromeObject == null)
         {
@@ -128,6 +168,20 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         if (!initialized)
         {
             EnsureInitialized();
+        }
+
+        if (usesSceneAuthoredPages)
+        {
+            ActivateChromeRoot();
+            foreach (KeyValuePair<IllustratedHandbookPage, GameObject> entry in scenePageRoots)
+            {
+                if (entry.Value != null)
+                {
+                    entry.Value.SetActive(entry.Key == page);
+                }
+            }
+
+            return;
         }
 
         RefreshGeneratedPageContent();
@@ -162,6 +216,20 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
 
     private void EnsureInitialized()
     {
+        if (TryUseSceneAuthoredPages())
+        {
+            if (initialized)
+            {
+                return;
+            }
+
+            BindPageButtons();
+            BindCloseButtons();
+            initialized = true;
+            ResetToDefaultPage();
+            return;
+        }
+
         EnsureRootCanvas();
         NormalizePageRoot(illustratedHandbookCanvas);
 
@@ -177,6 +245,94 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         RefreshGeneratedPageContent();
         initialized = true;
         ResetToDefaultPage();
+    }
+
+    private bool TryUseSceneAuthoredPages()
+    {
+        usesSceneAuthoredPages = illustratedHandbookCanvas != null &&
+                                personalInformationCanvas != null &&
+                                photoAlbumCanvas != null &&
+                                settingCanvas != null;
+        if (!usesSceneAuthoredPages)
+        {
+            scenePageRoots.Clear();
+            return false;
+        }
+
+        scenePageRoots.Clear();
+        scenePageRoots[IllustratedHandbookPage.IllustratedHandbook] = illustratedHandbookCanvas;
+        scenePageRoots[IllustratedHandbookPage.PersonalInformation] = personalInformationCanvas;
+        scenePageRoots[IllustratedHandbookPage.PhotoAlbum] = photoAlbumCanvas;
+        scenePageRoots[IllustratedHandbookPage.Mission] = missionCanvas;
+        scenePageRoots[IllustratedHandbookPage.Setting] = settingCanvas;
+
+        foreach (KeyValuePair<IllustratedHandbookPage, GameObject> entry in scenePageRoots)
+        {
+            NormalizePageRoot(entry.Value);
+        }
+
+        return true;
+    }
+
+    private static GameObject ResolveSceneAuthoredRoot(GameObject handbookObject)
+    {
+        if (handbookObject == null)
+        {
+            return null;
+        }
+
+        if (string.Equals(handbookObject.name, RootObjectName, StringComparison.Ordinal) &&
+            HasSceneAuthoredPages(handbookObject.transform))
+        {
+            return handbookObject;
+        }
+
+        Transform current = handbookObject.transform.parent;
+        while (current != null)
+        {
+            if (string.Equals(current.name, RootObjectName, StringComparison.Ordinal) &&
+                HasSceneAuthoredPages(current))
+            {
+                return current.gameObject;
+            }
+
+            current = current.parent;
+        }
+
+        return null;
+    }
+
+    private static bool HasSceneAuthoredPages(Transform root)
+    {
+        return ResolveScenePageRoot(root, IllustratedHandbookPage.IllustratedHandbook) != null &&
+               ResolveScenePageRoot(root, IllustratedHandbookPage.PersonalInformation) != null &&
+               ResolveScenePageRoot(root, IllustratedHandbookPage.PhotoAlbum) != null &&
+               ResolveScenePageRoot(root, IllustratedHandbookPage.Setting) != null;
+    }
+
+    private static GameObject ResolveScenePageRoot(Transform root, IllustratedHandbookPage page)
+    {
+        if (root == null)
+        {
+            return null;
+        }
+
+        switch (page)
+        {
+            case IllustratedHandbookPage.IllustratedHandbook:
+                return FindDirectChild(root, IllustratedHandbookCanvasName)?.gameObject;
+            case IllustratedHandbookPage.PersonalInformation:
+                return (FindDirectChild(root, PersonalInformationCanvasName) ??
+                        FindDirectChild(root, LegacyPersonalInformationCanvasName))?.gameObject;
+            case IllustratedHandbookPage.PhotoAlbum:
+                return FindDirectChild(root, PhotoAlbumCanvasName)?.gameObject;
+            case IllustratedHandbookPage.Mission:
+                return FindDirectChild(root, MissionCanvasName)?.gameObject;
+            case IllustratedHandbookPage.Setting:
+                return FindDirectChild(root, SettingCanvasName)?.gameObject;
+            default:
+                return null;
+        }
     }
 
     private static GameObject ResolveChromeObject(GameObject handbookObject)
@@ -225,6 +381,7 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         EnsureGeneratedPage(IllustratedHandbookPage.PersonalInformation, "角色", "当前角色、装备与图鉴进度摘要。");
         EnsureGeneratedPage(IllustratedHandbookPage.PhotoAlbum, "相册留念", "本地照片数量与最近留念记录。");
         EnsureGeneratedPage(IllustratedHandbookPage.Setting, "设置", "当前配置摘要，保持在书页区域内显示。");
+        EnsureHandbookLegacyCardsLayout();
 
         EnsureTabsRail(chromeRoot.transform, background as RectTransform);
     }
@@ -244,10 +401,9 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
             if (!usesPrefabBackground)
             {
                 SetStretch(backgroundRect, 48f, 48f, 48f, 48f);
+                backgroundRect.localScale = Vector3.one;
+                backgroundRect.anchoredPosition = Vector2.zero;
             }
-
-            backgroundRect.localScale = Vector3.one;
-            backgroundRect.anchoredPosition = Vector2.zero;
         }
 
         Image backgroundImage = background.GetComponent<Image>();
@@ -262,16 +418,18 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         }
 
         backgroundImage.raycastTarget = false;
-        HideLegacyBackgroundChildren(background);
+        CacheLegacyBackgroundChildren(background);
         return background;
     }
 
-    private static void HideLegacyBackgroundChildren(Transform background)
+    private void CacheLegacyBackgroundChildren(Transform background)
     {
         if (background == null)
         {
             return;
         }
+
+        legacyHandbookContentObjects.Clear();
 
         for (int i = 0; i < background.childCount; i++)
         {
@@ -285,11 +443,14 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
                 string.Equals(child.name, TabsRailName, StringComparison.Ordinal) ||
                 string.Equals(child.name, SelectedTabsRailName, StringComparison.Ordinal))
             {
-                child.gameObject.SetActive(true);
                 continue;
             }
 
-            child.gameObject.SetActive(false);
+            if (string.Equals(child.name, "CloseButton", StringComparison.Ordinal) ||
+                child.name.StartsWith("ArcitectureImage_", StringComparison.Ordinal))
+            {
+                legacyHandbookContentObjects.Add(child.gameObject);
+            }
         }
     }
 
@@ -307,6 +468,7 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         if (contentRect != null)
         {
             SetStretch(contentRect, BookSafeLeft, BookSafeRight, BookSafeTop, BookSafeBottom);
+            bookContentPanel = contentRect;
         }
 
         Image image = contentPanel.GetComponent<Image>();
@@ -415,23 +577,136 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
             Vector2.zero,
             new Vector2(0.5f, 1f));
 
-        TMP_Text pageTag = EnsureContentText(pageTransform, PageTagName, "统一多页签图鉴书", 18f, FooterColor, TextAlignmentOptions.Left);
-        ConfigureTopStretchRect(pageTag.rectTransform, 0f, 0f, 8f, 28f);
+        TMP_Text pageTag = EnsureContentText(pageTransform, PageTagName, "统一多页签图鉴书", 20f, SubtitleColor, TextAlignmentOptions.Left);
+        ConfigureAnchoredRect(
+            pageTag.rectTransform,
+            new Vector2(0f, 1f),
+            new Vector2(0f, 1f),
+            new Vector2(420f, 34f),
+            new Vector2(0f, -8f),
+            new Vector2(0f, 1f));
 
-        TMP_Text titleText = EnsureContentText(pageTransform, TitleName, title, 36f, TitleColor, TextAlignmentOptions.Left, FontStyles.Bold);
-        ConfigureTopStretchRect(titleText.rectTransform, 0f, 0f, 44f, 52f);
+        TMP_Text titleText = EnsureContentText(pageTransform, TitleName, title, 42f, TitleColor, TextAlignmentOptions.Left, FontStyles.Bold);
+        ConfigureAnchoredRect(
+            titleText.rectTransform,
+            new Vector2(0f, 1f),
+            new Vector2(0f, 1f),
+            new Vector2(620f, 56f),
+            new Vector2(0f, -56f),
+            new Vector2(0f, 1f));
 
-        TMP_Text subtitleText = EnsureContentText(pageTransform, SubtitleName, subtitle, 21f, SubtitleColor, TextAlignmentOptions.Left);
-        ConfigureTopStretchRect(subtitleText.rectTransform, 0f, 0f, 98f, 38f);
+        TMP_Text subtitleText = EnsureContentText(pageTransform, SubtitleName, subtitle, 24f, SubtitleColor, TextAlignmentOptions.Left);
+        ConfigureAnchoredRect(
+            subtitleText.rectTransform,
+            new Vector2(0f, 1f),
+            new Vector2(0f, 1f),
+            new Vector2(880f, 72f),
+            new Vector2(0f, -114f),
+            new Vector2(0f, 1f));
 
-        TMP_Text bodyText = EnsureContentText(pageTransform, BodyName, string.Empty, 23f, BodyColor, TextAlignmentOptions.TopLeft);
-        ConfigureTopStretchRect(bodyText.rectTransform, 0f, 0f, 154f, 520f);
+        TMP_Text bodyText = EnsureContentText(pageTransform, BodyName, string.Empty, 28f, BodyColor, TextAlignmentOptions.TopLeft);
+        SetStretch(bodyText.rectTransform, 24f, 24f, 180f, 92f);
+        bodyText.rectTransform.pivot = new Vector2(0f, 1f);
         bodyText.lineSpacing = 10f;
 
-        TMP_Text footerText = EnsureContentText(pageTransform, FooterName, string.Empty, 18f, FooterColor, TextAlignmentOptions.TopLeft);
-        ConfigureTopStretchRect(footerText.rectTransform, 0f, 0f, 710f, 84f);
+        TMP_Text footerText = EnsureContentText(pageTransform, FooterName, string.Empty, 21f, FooterColor, TextAlignmentOptions.BottomLeft);
+        ConfigureAnchoredRect(
+            footerText.rectTransform,
+            new Vector2(0f, 0f),
+            new Vector2(1f, 0f),
+            new Vector2(0f, 52f),
+            new Vector2(0f, 16f),
+            new Vector2(0f, 0f));
 
         pageContentRoots[page] = pageRect;
+    }
+
+    private void EnsureHandbookLegacyCardsLayout()
+    {
+        if (!pageContentRoots.TryGetValue(IllustratedHandbookPage.IllustratedHandbook, out RectTransform handbookPage) ||
+            handbookPage == null)
+        {
+            return;
+        }
+
+        SetGeneratedTextVisibility(handbookPage, false);
+
+        Transform container = FindDirectChild(handbookPage, LegacyHandbookCardsContainerName);
+        if (container == null)
+        {
+            container = CreateUiObject(LegacyHandbookCardsContainerName, handbookPage).transform;
+        }
+
+        RectTransform containerRect = container as RectTransform;
+        SetStretch(containerRect, 0f, 0f, 0f, 0f);
+
+        List<RectTransform> cardRects = new List<RectTransform>();
+        for (int i = 0; i < legacyHandbookContentObjects.Count; i++)
+        {
+            GameObject contentObject = legacyHandbookContentObjects[i];
+            if (contentObject == null ||
+                !contentObject.name.StartsWith("ArcitectureImage_", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            RectTransform cardRect = contentObject.transform as RectTransform;
+            if (cardRect == null)
+            {
+                continue;
+            }
+
+            if (cardRect.parent != container)
+            {
+                cardRect.SetParent(container, false);
+            }
+
+            cardRect.localScale = Vector3.one;
+            cardRect.localRotation = Quaternion.identity;
+            cardRects.Add(cardRect);
+        }
+
+        cardRects.Sort((left, right) => string.CompareOrdinal(left.name, right.name));
+        for (int i = 0; i < cardRects.Count; i++)
+        {
+            RectTransform cardRect = cardRects[i];
+            ConfigureAnchoredRect(
+                cardRect,
+                new Vector2(0f, 1f),
+                new Vector2(0f, 1f),
+                cardRect.sizeDelta,
+                new Vector2(HandbookCardCenterX, -(HandbookCardStartY + i * HandbookCardVerticalSpacing)),
+                new Vector2(0.5f, 0.5f));
+            cardRect.gameObject.SetActive(true);
+        }
+
+        legacyHandbookContentObjects.RemoveAll(item =>
+            item != null &&
+            item.transform.parent == container &&
+            item.name.StartsWith("ArcitectureImage_", StringComparison.Ordinal));
+    }
+
+    private static void SetGeneratedTextVisibility(RectTransform pageRoot, bool visible)
+    {
+        if (pageRoot == null)
+        {
+            return;
+        }
+
+        SetChildActive(pageRoot, PageTagName, visible);
+        SetChildActive(pageRoot, TitleName, visible);
+        SetChildActive(pageRoot, SubtitleName, visible);
+        SetChildActive(pageRoot, BodyName, visible);
+        SetChildActive(pageRoot, FooterName, visible);
+    }
+
+    private static void SetChildActive(Transform parent, string childName, bool active)
+    {
+        Transform child = FindDirectChild(parent, childName);
+        if (child != null)
+        {
+            child.gameObject.SetActive(active);
+        }
     }
 
     private void EnsureTabsRail(Transform chromeRoot, RectTransform backgroundRect)
@@ -480,7 +755,11 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         CreateTabButton(rail, IllustratedHandbookPage.PersonalInformation, "角色");
         CreateTabButton(rail, IllustratedHandbookPage.PhotoAlbum, "相册");
         CreateTabButton(rail, IllustratedHandbookPage.Setting, "设置");
-        CreateCloseButton(rail);
+
+        if (FindButtonByName(chromeRoot, "CloseButton") == null)
+        {
+            CreateCloseButton(rail);
+        }
     }
 
     private void CreateTabButton(Transform parent, IllustratedHandbookPage targetPage, string label)
@@ -514,7 +793,6 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
 
         button.targetGraphic = background;
         button.transition = Selectable.Transition.None;
-        button.onClick.RemoveAllListeners();
         button.onClick.AddListener(() => HandleBookmarkClicked(targetPage));
 
         TMP_Text text = EnsureButtonLabel(buttonObject.transform, label);
@@ -551,7 +829,6 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
 
         button.targetGraphic = background;
         button.transition = Selectable.Transition.None;
-        button.onClick.RemoveAllListeners();
         button.onClick.AddListener(HandleCloseRequested);
 
         TMP_Text text = EnsureButtonLabel(buttonObject.transform, "关闭");
@@ -586,6 +863,16 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         tabButtons.Clear();
         buttonTexts.Clear();
 
+        if (usesSceneAuthoredPages)
+        {
+            RegisterScenePageButtons(IllustratedHandbookPage.IllustratedHandbook);
+            RegisterScenePageButtons(IllustratedHandbookPage.PersonalInformation);
+            RegisterScenePageButtons(IllustratedHandbookPage.PhotoAlbum);
+            RegisterScenePageButtons(IllustratedHandbookPage.Mission);
+            RegisterScenePageButtons(IllustratedHandbookPage.Setting);
+            return;
+        }
+
         Transform chromeRoot = GetChromePageRoot() != null ? GetChromePageRoot().transform : null;
         if (chromeRoot == null)
         {
@@ -617,6 +904,33 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
     private void BindCloseButtons()
     {
         closeButton = null;
+
+        if (usesSceneAuthoredPages)
+        {
+            foreach (KeyValuePair<IllustratedHandbookPage, GameObject> entry in scenePageRoots)
+            {
+                if (entry.Value == null)
+                {
+                    continue;
+                }
+
+                Button pageCloseButton = FindButtonByName(entry.Value.transform, "CloseButton");
+                if (pageCloseButton == null)
+                {
+                    continue;
+                }
+
+                pageCloseButton.onClick.RemoveListener(HandleCloseRequested);
+                pageCloseButton.onClick.AddListener(HandleCloseRequested);
+                if (closeButton == null)
+                {
+                    closeButton = pageCloseButton;
+                }
+            }
+
+            return;
+        }
+
         Transform chromeRoot = GetChromePageRoot() != null ? GetChromePageRoot().transform : null;
         if (chromeRoot == null)
         {
@@ -624,6 +938,62 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         }
 
         closeButton = FindButtonByName(chromeRoot, "CloseButton");
+    }
+
+    private void RegisterScenePageButtons(IllustratedHandbookPage hostPage)
+    {
+        if (!scenePageRoots.TryGetValue(hostPage, out GameObject pageRoot) || pageRoot == null)
+        {
+            return;
+        }
+
+        foreach (IllustratedHandbookPage targetPage in Enum.GetValues(typeof(IllustratedHandbookPage)))
+        {
+            if (targetPage == IllustratedHandbookPage.Mission)
+            {
+                continue;
+            }
+
+            Button button = FindButtonByName(pageRoot.transform, GetSceneTabButtonName(targetPage));
+            if (button == null)
+            {
+                continue;
+            }
+
+            button.onClick.AddListener(() => HandleBookmarkClicked(targetPage));
+
+            if (!tabButtons.TryGetValue(targetPage, out List<Button> buttons))
+            {
+                buttons = new List<Button>();
+                tabButtons[targetPage] = buttons;
+            }
+
+            buttons.Add(button);
+            TMP_Text label = button.GetComponentInChildren<TMP_Text>(true);
+            if (label != null)
+            {
+                buttonTexts[button] = label;
+            }
+        }
+    }
+
+    private static string GetSceneTabButtonName(IllustratedHandbookPage page)
+    {
+        switch (page)
+        {
+            case IllustratedHandbookPage.IllustratedHandbook:
+                return "HandBook";
+            case IllustratedHandbookPage.PersonalInformation:
+                return "PersonalInformation";
+            case IllustratedHandbookPage.PhotoAlbum:
+                return "PhotoAlbum";
+            case IllustratedHandbookPage.Mission:
+                return "Mission";
+            case IllustratedHandbookPage.Setting:
+                return "Setting";
+            default:
+                return string.Empty;
+        }
     }
 
     private void HandleBookmarkClicked(IllustratedHandbookPage targetPage)
@@ -634,7 +1004,15 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
 
     private void HandleCloseRequested()
     {
-        UIManager targetManager = owner != null ? owner : FindObjectOfType<UIManager>(true);
+        UIManager targetManager = owner;
+        if (targetManager == null)
+        {
+            if (!IllustratedUISceneLoader.TryGetUIManager(out targetManager))
+            {
+                targetManager = FindObjectOfType<UIManager>(true);
+            }
+        }
+
         if (targetManager != null)
         {
             targetManager.CloseIllustratedHandbook();
@@ -646,7 +1024,7 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
 
     private void ActivateChromeRoot()
     {
-        GameObject chromeRoot = GetChromePageRoot();
+        GameObject chromeRoot = usesSceneAuthoredPages ? gameObject : GetChromePageRoot();
         if (chromeRoot != null && !chromeRoot.activeSelf)
         {
             chromeRoot.SetActive(true);
@@ -655,17 +1033,50 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
 
     private void SetActiveGeneratedPage(IllustratedHandbookPage activePage)
     {
+        bool showGeneratedContent = true;
+        if (bookContentPanel != null)
+        {
+            bookContentPanel.gameObject.SetActive(showGeneratedContent);
+        }
+
         foreach (KeyValuePair<IllustratedHandbookPage, RectTransform> entry in pageContentRoots)
         {
             if (entry.Value != null)
             {
-                entry.Value.gameObject.SetActive(entry.Key == activePage);
+                entry.Value.gameObject.SetActive(showGeneratedContent && entry.Key == activePage);
             }
+        }
+
+        UpdateLegacyHandbookContentVisibility(activePage);
+    }
+
+    private void UpdateLegacyHandbookContentVisibility(IllustratedHandbookPage activePage)
+    {
+        for (int i = 0; i < legacyHandbookContentObjects.Count; i++)
+        {
+            GameObject contentObject = legacyHandbookContentObjects[i];
+            if (contentObject == null)
+            {
+                continue;
+            }
+
+            if (string.Equals(contentObject.name, "CloseButton", StringComparison.Ordinal))
+            {
+                contentObject.SetActive(true);
+                continue;
+            }
+
+            contentObject.SetActive(false);
         }
     }
 
     private void ResetScrollPosition()
     {
+        if (usesSceneAuthoredPages)
+        {
+            return;
+        }
+
         if (sharedBookScrollRect == null)
         {
             return;
@@ -677,6 +1088,11 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
 
     private void UpdateButtonState(IllustratedHandbookPage activePage)
     {
+        if (usesSceneAuthoredPages)
+        {
+            return;
+        }
+
         foreach (KeyValuePair<IllustratedHandbookPage, List<Button>> entry in tabButtons)
         {
             bool selected = entry.Key == activePage;
@@ -970,7 +1386,7 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
         scaler.referenceResolution = new Vector2(1920f, 1080f);
         scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
-        scaler.matchWidthOrHeight = 0f;
+        scaler.matchWidthOrHeight = 0.5f;
 
         if (rootObject.GetComponent<GraphicRaycaster>() == null)
         {
@@ -1005,6 +1421,12 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         if (pageRoot == null)
         {
             return;
+        }
+
+        RectTransform rectTransform = pageRoot.GetComponent<RectTransform>();
+        if (rectTransform != null && rectTransform.localScale == Vector3.zero)
+        {
+            rectTransform.localScale = Vector3.one;
         }
 
         Canvas canvas = pageRoot.GetComponent<Canvas>();

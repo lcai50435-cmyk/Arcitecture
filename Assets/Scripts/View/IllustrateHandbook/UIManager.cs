@@ -32,13 +32,13 @@ public class UIManager : MonoBehaviour
 
     private void Awake()
     {
-        if (Instance == null)
+        bool sceneOwnsIllustratedUi = IllustratedUISceneLoader.IsIllustratedUiScene(gameObject.scene);
+        bool currentOwnsIllustratedUi = Instance != null &&
+                                        IllustratedUISceneLoader.IsIllustratedUiScene(Instance.gameObject.scene);
+
+        if (Instance == null || (sceneOwnsIllustratedUi && !currentOwnsIllustratedUi))
         {
             Instance = this;
-        }
-        else
-        {
-            Destroy(gameObject);
         }
     }
 
@@ -47,12 +47,37 @@ public class UIManager : MonoBehaviour
         if (Instance == this)
         {
             Instance = null;
+            UIManager[] managers = FindObjectsOfType<UIManager>(true);
+            for (int i = 0; i < managers.Length; i++)
+            {
+                UIManager manager = managers[i];
+                if (manager == null || manager == this)
+                {
+                    continue;
+                }
+
+                if (Instance == null ||
+                    IllustratedUISceneLoader.IsIllustratedUiScene(manager.gameObject.scene))
+                {
+                    Instance = manager;
+                    if (IllustratedUISceneLoader.IsIllustratedUiScene(manager.gameObject.scene))
+                    {
+                        break;
+                    }
+                }
+            }
         }
     }
 
     private void Start()
     {
         EnsureTabsController();
+
+        if (IllustratedUISceneLoader.IsIllustratedUiScene(gameObject.scene))
+        {
+            RefreshRuntimeBindings();
+            return;
+        }
 
         if (illustratedHandbook != null)
             illustratedHandbook.SetActive(false);
