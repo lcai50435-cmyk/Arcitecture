@@ -151,8 +151,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 0d0b652f32a2cc243917e4028fa0f046, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
+  m_Name:
+  m_EditorClassIdentifier:
   m_Navigation:
     m_Mode: 3
     m_WrapAround: 0
@@ -248,8 +248,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
+  m_Name:
+  m_EditorClassIdentifier:
   m_Material: {fileID: 0}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_RaycastTarget: 1
@@ -1240,6 +1240,7 @@ GameObject:
   m_Component:
   - component: {fileID: 365816318}
   - component: {fileID: 365816317}
+  - component: {fileID: 365816319}
   m_Layer: 0
   m_Name: SettingsManager
   m_TagString: Untagged
@@ -1279,6 +1280,19 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &365816319
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 365816316}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 884cf9317307434f9c8a6f4217f6b4af, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  handbookPrefab: {fileID: 100100000, guid: 22b88ab0514320d448b19bb7f925f60d, type: 3}
 --- !u!1 &388730816
 GameObject:
   m_ObjectHideFlags: 0
