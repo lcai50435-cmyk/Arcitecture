@@ -40,10 +40,10 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
 
     private static readonly Color PageBackgroundColor = new Color(0.20f, 0.15f, 0.10f, 0.76f);
     private static readonly Color SelectedButtonColor = new Color(0.78f, 0.62f, 0.33f, 0.98f);
-    private static readonly Color TitleColor = new Color(0.98f, 0.95f, 0.87f, 1f);
-    private static readonly Color SubtitleColor = new Color(0.84f, 0.81f, 0.73f, 1f);
-    private static readonly Color BodyColor = new Color(0.92f, 0.90f, 0.86f, 1f);
-    private static readonly Color FooterColor = new Color(0.76f, 0.73f, 0.68f, 1f);
+    private static readonly Color TitleColor = new Color(0.27f, 0.18f, 0.09f, 1f);
+    private static readonly Color SubtitleColor = new Color(0.40f, 0.28f, 0.16f, 1f);
+    private static readonly Color BodyColor = new Color(0.24f, 0.18f, 0.12f, 1f);
+    private static readonly Color FooterColor = new Color(0.48f, 0.38f, 0.25f, 1f);
     private static readonly Color CloseButtonColor = new Color(0.48f, 0.16f, 0.14f, 0.96f);
     private static readonly Color SelectedBookmarkTint = new Color(0.92f, 0.92f, 0.90f, 1f);
     private static readonly Color InactiveBookmarkTint = new Color(0.72f, 0.72f, 0.70f, 0.96f);
@@ -58,12 +58,11 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
     private const float CloseButtonX = 840f;
     private const float CloseButtonY = -330f;
 
-    private const float BookSafeLeft = 116f;
-    private const float BookSafeRight = 372f;
-    private const float BookSafeTop = 96f;
-    private const float BookSafeBottom = 104f;
-    private const float BookContentWidth = 1432f;
-    private const float BookContentHeight = 980f;
+    private const float BookSafeLeft = 190f;
+    private const float BookSafeRight = 900f;
+    private const float BookSafeTop = 118f;
+    private const float BookSafeBottom = 118f;
+    private const float BookContentHeight = 920f;
     private const float BookScrollSensitivity = 34f;
 
     [SerializeField] private UIManager owner;
@@ -387,10 +386,10 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         ConfigureAnchoredRect(
             contentRect,
             new Vector2(0f, 1f),
-            new Vector2(0f, 1f),
-            new Vector2(BookContentWidth, BookContentHeight),
+            new Vector2(1f, 1f),
+            new Vector2(0f, BookContentHeight),
             Vector2.zero,
-            new Vector2(0f, 1f));
+            new Vector2(0.5f, 1f));
 
         scrollRect.viewport = viewportRect;
         scrollRect.content = contentRect;
@@ -411,26 +410,26 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         ConfigureAnchoredRect(
             pageRect,
             new Vector2(0f, 1f),
-            new Vector2(0f, 1f),
-            new Vector2(BookContentWidth, BookContentHeight),
+            new Vector2(1f, 1f),
+            new Vector2(0f, BookContentHeight),
             Vector2.zero,
-            new Vector2(0f, 1f));
+            new Vector2(0.5f, 1f));
 
-        TMP_Text pageTag = EnsureContentText(pageTransform, PageTagName, "统一多页签图鉴书", 20f, SubtitleColor, TextAlignmentOptions.Left);
-        ConfigureTopLeftRect(pageTag.rectTransform, 0f, 4f, 420f, 34f);
+        TMP_Text pageTag = EnsureContentText(pageTransform, PageTagName, "统一多页签图鉴书", 18f, FooterColor, TextAlignmentOptions.Left);
+        ConfigureTopStretchRect(pageTag.rectTransform, 0f, 0f, 8f, 28f);
 
-        TMP_Text titleText = EnsureContentText(pageTransform, TitleName, title, 42f, TitleColor, TextAlignmentOptions.Left, FontStyles.Bold);
-        ConfigureTopLeftRect(titleText.rectTransform, 0f, 48f, 620f, 56f);
+        TMP_Text titleText = EnsureContentText(pageTransform, TitleName, title, 36f, TitleColor, TextAlignmentOptions.Left, FontStyles.Bold);
+        ConfigureTopStretchRect(titleText.rectTransform, 0f, 0f, 44f, 52f);
 
-        TMP_Text subtitleText = EnsureContentText(pageTransform, SubtitleName, subtitle, 24f, SubtitleColor, TextAlignmentOptions.Left);
-        ConfigureTopLeftRect(subtitleText.rectTransform, 0f, 108f, 920f, 42f);
+        TMP_Text subtitleText = EnsureContentText(pageTransform, SubtitleName, subtitle, 21f, SubtitleColor, TextAlignmentOptions.Left);
+        ConfigureTopStretchRect(subtitleText.rectTransform, 0f, 0f, 98f, 38f);
 
-        TMP_Text bodyText = EnsureContentText(pageTransform, BodyName, string.Empty, 27f, BodyColor, TextAlignmentOptions.TopLeft);
-        ConfigureTopLeftRect(bodyText.rectTransform, 0f, 170f, 980f, 540f);
-        bodyText.lineSpacing = 8f;
+        TMP_Text bodyText = EnsureContentText(pageTransform, BodyName, string.Empty, 23f, BodyColor, TextAlignmentOptions.TopLeft);
+        ConfigureTopStretchRect(bodyText.rectTransform, 0f, 0f, 154f, 520f);
+        bodyText.lineSpacing = 10f;
 
-        TMP_Text footerText = EnsureContentText(pageTransform, FooterName, string.Empty, 20f, FooterColor, TextAlignmentOptions.TopLeft);
-        ConfigureTopLeftRect(footerText.rectTransform, 0f, 760f, 1240f, 72f);
+        TMP_Text footerText = EnsureContentText(pageTransform, FooterName, string.Empty, 18f, FooterColor, TextAlignmentOptions.TopLeft);
+        ConfigureTopStretchRect(footerText.rectTransform, 0f, 0f, 710f, 84f);
 
         pageContentRoots[page] = pageRect;
     }
@@ -1472,6 +1471,20 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
             new Vector2(width, height),
             new Vector2(x, -y),
             new Vector2(0f, 1f));
+    }
+
+    private static void ConfigureTopStretchRect(RectTransform rectTransform, float left, float right, float top, float height)
+    {
+        if (rectTransform == null)
+        {
+            return;
+        }
+
+        rectTransform.anchorMin = new Vector2(0f, 1f);
+        rectTransform.anchorMax = new Vector2(1f, 1f);
+        rectTransform.offsetMin = new Vector2(left, -(top + height));
+        rectTransform.offsetMax = new Vector2(-right, -top);
+        rectTransform.pivot = new Vector2(0.5f, 1f);
     }
 
     private static string FormatSavedTime(string savedAtUtc)
