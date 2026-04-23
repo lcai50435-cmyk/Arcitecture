@@ -58,7 +58,7 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
     private const float BookmarkInactiveLabelX = 10f;
     private const float BookmarkSelectedLabelX = 20f;
     private const float CloseButtonX = 840f;
-    private const float CloseButtonY = -390f;
+    private const float CloseButtonY = -330f;
 
     [SerializeField] private UIManager owner;
 
@@ -935,17 +935,17 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         switch (page)
         {
             case IllustratedHandbookPage.IllustratedHandbook:
-                return 250f;
+                return 310f;
             case IllustratedHandbookPage.PersonalInformation:
-                return 125f;
+                return 185f;
             case IllustratedHandbookPage.PhotoAlbum:
-                return 0f;
+                return 60f;
             case IllustratedHandbookPage.Setting:
-                return -125f;
+                return -65f;
             case IllustratedHandbookPage.Mission:
-                return -125f;
+                return -65f;
             default:
-                return 250f;
+                return 310f;
         }
     }
 
