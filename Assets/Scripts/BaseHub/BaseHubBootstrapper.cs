@@ -481,7 +481,12 @@ public class BaseHubBootstrapper : MonoBehaviour
 
         handbookRoot.name = "BaseHandbookUI";
 
-        GameObject illustratedHandbook = FindChildByName(handbookRoot.transform, "IllustratedHandbookCanvas");
+        UIManager uiManager = handbookRoot.GetComponentInChildren<UIManager>(true);
+        IllustratedHandbookTabsController.EnsureInstalled(uiManager);
+
+        GameObject illustratedHandbook = uiManager != null && uiManager.illustratedHandbook != null
+            ? uiManager.illustratedHandbook
+            : FindChildByName(handbookRoot.transform, "IllustratedHandbookCanvas");
         GameObject detailedInformation = FindChildByName(handbookRoot.transform, "DetailedInformationCanvas");
         GameObject dialogCanvas = FindChildByName(handbookRoot.transform, "DialogCanvas");
         GameObject packBagCanvas = FindChildByName(handbookRoot.transform, "PackBagCanvas");
@@ -504,10 +509,9 @@ public class BaseHubBootstrapper : MonoBehaviour
         RuntimeProgressState.EnsureInstance();
         CatalogueUnlockSelectionManager.EnsureInstance();
 
-        UIManager uiManager = UIManager.Instance;
         if (uiManager == null)
         {
-            uiManager = handbookRoot.GetComponentInChildren<UIManager>(true);
+            uiManager = UIManager.Instance;
         }
 
         uiManager?.ConfigureForRuntime(
@@ -517,10 +521,15 @@ public class BaseHubBootstrapper : MonoBehaviour
             interactPrompt,
             playerObject);
 
-        BackpackUI backpackUI = handbookRoot.GetComponentInChildren<BackpackUI>(true);
+        UIRootManager runtimeRootManager = handbookRoot.GetComponentInChildren<UIRootManager>(true);
+        runtimeRootManager?.RefreshRuntimeBindings();
+
+        BackpackUI backpackUI = BackpackUI.EnsureRuntimeInstance();
         backpackUI?.RefreshUI();
 
-        return illustratedHandbook;
+        return uiManager != null && uiManager.illustratedHandbook != null
+            ? uiManager.illustratedHandbook
+            : illustratedHandbook;
     }
 
     private static void ConfigureRuntimeUiRootManager(
@@ -542,7 +551,7 @@ public class BaseHubBootstrapper : MonoBehaviour
             rootManager = handbookRoot.AddComponent<UIRootManager>();
         }
 
-        BackpackUI backpackView = handbookRoot.GetComponentInChildren<BackpackUI>(true);
+        BackpackUI backpackView = BackpackUI.EnsureRuntimeInstance();
 
         rootManager.handbookUI = EnsureCanvasGroup(illustratedHandbook);
         rootManager.dialogUI = EnsureCanvasGroup(dialogCanvas);

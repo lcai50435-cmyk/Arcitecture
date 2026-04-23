@@ -26,6 +26,7 @@ public class UIManager : MonoBehaviour
     private MonoBehaviour playerMovementScript;
     private bool wasPlayerEnabled = true;
     private Dialog dialogUI;
+    private IllustratedHandbookTabsController tabsController;
 
     public bool IsHandbookOpen => isHandbookOpen;
 
@@ -51,6 +52,8 @@ public class UIManager : MonoBehaviour
 
     private void Start()
     {
+        EnsureTabsController();
+
         if (illustratedHandbook != null)
             illustratedHandbook.SetActive(false);
 
@@ -80,6 +83,8 @@ public class UIManager : MonoBehaviour
         interactTipUI = interactTip;
         player = playerObject;
 
+        EnsureTabsController();
+
         if (illustratedHandbook != null)
             illustratedHandbook.SetActive(false);
 
@@ -93,6 +98,8 @@ public class UIManager : MonoBehaviour
 
     public void OpenIllustratedHandbook(RuntimeModalOpenSource source = RuntimeModalOpenSource.None)
     {
+        EnsureTabsController();
+
         if (isHandbookOpen || isClosingHandbook)
         {
             Debug.Log("图鉴已打开，忽略重复打开");
@@ -120,6 +127,8 @@ public class UIManager : MonoBehaviour
             dialogUI.ForceHideImmediately();
             dialogUI.canShow = false;
         }
+
+        tabsController?.ResetToDefaultPage();
 
         if (UIRootManager.Instance != null)
         {
@@ -182,6 +191,8 @@ public class UIManager : MonoBehaviour
 
         if (detailedInformation != null)
             detailedInformation.SetActive(false);
+
+        tabsController?.ResetToDefaultPage();
 
         HideOtherUI(false);
         EnablePlayerMovement();
@@ -277,7 +288,22 @@ public class UIManager : MonoBehaviour
         else
         {
             playerMovementScript = null;
-            Debug.LogWarning("UIManager 未绑定玩家对象，无法锁定移动。");
+        }
+    }
+
+    private void EnsureTabsController()
+    {
+        if (illustratedHandbook == null)
+        {
+            return;
+        }
+
+        tabsController = IllustratedHandbookTabsController.EnsureInstalled(this);
+        if (tabsController != null)
+        {
+            illustratedHandbook = tabsController.gameObject;
+            tabsController.ResetToDefaultPage();
+            UIRootManager.Instance?.RefreshRuntimeBindings();
         }
     }
 }
