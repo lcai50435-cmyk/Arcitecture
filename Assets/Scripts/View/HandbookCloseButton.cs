@@ -7,6 +7,9 @@ public class HandbookCloseButton : MonoBehaviour
         if (UIManager.Instance != null)
         {
             UIManager.Instance.CloseIllustratedHandbook();
+            return;
         }
+
+        IllustratedUISceneLoader.Close();
     }
 }
