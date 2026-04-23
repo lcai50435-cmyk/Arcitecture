@@ -23,6 +23,7 @@ public class BackpackUI : MonoBehaviour
     private const string RuntimeBackpackSlotsAssetPath = "Assets/File/UIResources/BackpackSlots.png";
     private const string RuntimeAttackSlotAssetPath = "Assets/File/UIResources/AttackSlot.png";
     private const string RuntimeUiResourcesPath = "UI/";
+    private const int RuntimeAttackSelectionIndex = -1;
     private const int RuntimeSlotCount = 6;
     private const int RuntimeCanvasSortingOrder = 1;
     private const float RuntimePanelX = 47f;
@@ -36,7 +37,8 @@ public class BackpackUI : MonoBehaviour
     private const float RuntimeAttackPanelWidth = 94f;
     private const float RuntimeAttackPanelHeight = 91f;
     private const float RuntimeSlotIconSize = 46f;
-    private const float RuntimeSelectionBorderThickness = 3f;
+    private const float RuntimeSelectionBorderThickness = 5f;
+    private const float RuntimeSelectionFramePadding = 8f;
     private const string TogglePromptId = "backpack_toggle";
     private const float ToggleHotspotY = -168f;
     private const float ToggleHotspotWidth = 138f;
@@ -74,13 +76,16 @@ public class BackpackUI : MonoBehaviour
     private float pickupToggleSuppressUntilTime;
     private bool shouldRestoreCollapsedAfterPickupPresentation;
     private RectTransform generatedSurfaceRect;
+    private RectTransform runtimeAttackSlotRect;
     private RectTransform[] runtimeSlotRects;
+    private GameObject runtimeAttackSelectionObject;
     private GameObject[] runtimeSelectionObjects;
     private GameObject[] runtimeHoverShadeObjects;
     private readonly List<RaycastResult> pointerRaycastResults = new List<RaycastResult>(16);
     private int selectedSlotIndex;
 
     public int SelectedSlotIndex => selectedSlotIndex;
+    public bool IsAttackSlotSelected => selectedSlotIndex == RuntimeAttackSelectionIndex;
 
     public static BackpackUI EnsureRuntimeInstance(bool refreshLayout = true)
     {
@@ -236,15 +241,23 @@ public class BackpackUI : MonoBehaviour
 
     public void SelectSlot(int slotIndex)
     {
-        int clampedIndex = Mathf.Clamp(slotIndex, 0, RuntimeSlotCount - 1);
-        if (selectedSlotIndex == clampedIndex)
+        int resolvedIndex = slotIndex == RuntimeAttackSelectionIndex
+            ? RuntimeAttackSelectionIndex
+            : Mathf.Clamp(slotIndex, 0, RuntimeSlotCount - 1);
+
+        if (selectedSlotIndex == resolvedIndex)
         {
             RefreshSelectionVisuals();
             return;
         }
 
-        selectedSlotIndex = clampedIndex;
+        selectedSlotIndex = resolvedIndex;
         RefreshSelectionVisuals();
+    }
+
+    public void SelectAttackSlot()
+    {
+        SelectSlot(RuntimeAttackSelectionIndex);
     }
 
     public void SetRuntimeVisible(bool visible, bool immediate = false)
@@ -446,6 +459,13 @@ public class BackpackUI : MonoBehaviour
             new Vector2(RuntimeAttackPanelWidth, RuntimeAttackPanelHeight),
             new Color(0.25f, 0.19f, 0.13f, 0.96f));
         CenterPanelHorizontally(attackPanel);
+        runtimeAttackSlotRect = attackPanel;
+        EnsureRuntimeAttackSlotBehaviour(attackPanel);
+        runtimeAttackSelectionObject = EnsureRuntimeSelectionFrame(
+            attackPanel,
+            new Vector2(
+                RuntimeAttackPanelWidth + RuntimeSelectionFramePadding * 2f,
+                RuntimeAttackPanelHeight + RuntimeSelectionFramePadding * 2f));
 
         Image[] runtimeSlotImages = new Image[RuntimeSlotCount];
         runtimeSlotRects = new RectTransform[RuntimeSlotCount];
@@ -463,7 +483,11 @@ public class BackpackUI : MonoBehaviour
             runtimeSlotImages[i] = EnsureRuntimeSlotIcon(slot);
             EnsureRuntimeBackpackSlotBehaviour(slot, i, runtimeSlotImages[i]);
             EnsureRuntimeSlotHoverShade(slot, i);
-            EnsureRuntimeSlotSelection(slot, i);
+            runtimeSelectionObjects[i] = EnsureRuntimeSelectionFrame(
+                slot,
+                new Vector2(
+                    RuntimeSlotSize + RuntimeSelectionFramePadding * 2f,
+                    RuntimeSlotSize + RuntimeSelectionFramePadding * 2f));
         }
 
         if (backPackGrid != runtimeSlotImages)
@@ -694,9 +718,33 @@ public class BackpackUI : MonoBehaviour
         slotBehaviour.BindRuntimeVisual(this, iconImage);
     }
 
-    private void EnsureRuntimeSlotSelection(RectTransform slot, int slotIndex)
+    private void EnsureRuntimeAttackSlotBehaviour(RectTransform attackPanel)
     {
-        Transform existing = slot.Find(RuntimeSlotSelectionName);
+        if (attackPanel == null)
+        {
+            return;
+        }
+
+        Image image = attackPanel.GetComponent<Image>();
+        if (image != null)
+        {
+            image.raycastTarget = true;
+        }
+
+        Button button = attackPanel.GetComponent<Button>();
+        if (button == null)
+        {
+            button = attackPanel.gameObject.AddComponent<Button>();
+        }
+
+        button.transition = Selectable.Transition.None;
+        button.onClick.RemoveListener(SelectAttackSlot);
+        button.onClick.AddListener(SelectAttackSlot);
+    }
+
+    private GameObject EnsureRuntimeSelectionFrame(RectTransform target, Vector2 frameSize)
+    {
+        Transform existing = target.Find(RuntimeSlotSelectionName);
         RectTransform selectionRect;
 
         if (existing != null)
@@ -706,16 +754,16 @@ public class BackpackUI : MonoBehaviour
         else
         {
             GameObject selectionObject = new GameObject(RuntimeSlotSelectionName, typeof(RectTransform));
-            selectionObject.layer = slot.gameObject.layer;
+            selectionObject.layer = target.gameObject.layer;
             selectionRect = selectionObject.GetComponent<RectTransform>();
-            selectionRect.SetParent(slot, false);
+            selectionRect.SetParent(target, false);
         }
 
         selectionRect.anchorMin = new Vector2(0.5f, 0.5f);
         selectionRect.anchorMax = new Vector2(0.5f, 0.5f);
         selectionRect.pivot = new Vector2(0.5f, 0.5f);
         selectionRect.anchoredPosition = Vector2.zero;
-        selectionRect.sizeDelta = new Vector2(RuntimeSlotSize + 6f, RuntimeSlotSize + 6f);
+        selectionRect.sizeDelta = frameSize;
         selectionRect.SetAsLastSibling();
 
         Image legacyImage = selectionRect.GetComponent<Image>();
@@ -736,7 +784,7 @@ public class BackpackUI : MonoBehaviour
         EnsureSelectionLine(selectionRect, "Left", Vector2.zero, new Vector2(0f, 1f), Vector2.zero, new Vector2(RuntimeSelectionBorderThickness, 0f));
         EnsureSelectionLine(selectionRect, "Right", new Vector2(1f, 0f), Vector2.one, new Vector2(-RuntimeSelectionBorderThickness, 0f), Vector2.zero);
 
-        runtimeSelectionObjects[slotIndex] = selectionRect.gameObject;
+        return selectionRect.gameObject;
     }
 
     private void EnsureRuntimeSlotHoverShade(RectTransform slot, int slotIndex)
@@ -956,6 +1004,17 @@ public class BackpackUI : MonoBehaviour
             return;
         }
 
+        if (Input.GetKeyDown(KeyCode.Alpha0) || Input.GetKeyDown(KeyCode.Keypad0))
+        {
+            if (IsExternalUiReceivingInput())
+            {
+                return;
+            }
+
+            SelectAttackSlot();
+            return;
+        }
+
         for (int i = 0; i < RuntimeSlotCount; i++)
         {
             if (Input.GetKeyDown((KeyCode)((int)KeyCode.Alpha1 + i)) ||
@@ -983,7 +1042,10 @@ public class BackpackUI : MonoBehaviour
             return;
         }
 
-        SelectSlot((selectedSlotIndex + direction + RuntimeSlotCount) % RuntimeSlotCount);
+        int nextSlotIndex = selectedSlotIndex == RuntimeAttackSelectionIndex
+            ? (direction > 0 ? 0 : RuntimeSlotCount - 1)
+            : (selectedSlotIndex + direction + RuntimeSlotCount) % RuntimeSlotCount;
+        SelectSlot(nextSlotIndex);
     }
 
     private bool CanAcceptSlotSelectionInput()
@@ -1006,6 +1068,16 @@ public class BackpackUI : MonoBehaviour
         if (runtimeSelectionObjects == null)
         {
             return;
+        }
+
+        if (runtimeAttackSelectionObject != null)
+        {
+            runtimeAttackSelectionObject.SetActive(selectedSlotIndex == RuntimeAttackSelectionIndex);
+        }
+
+        if (runtimeAttackSlotRect != null)
+        {
+            runtimeAttackSlotRect.localScale = Vector3.one;
         }
 
         for (int i = 0; i < RuntimeSlotCount; i++)
