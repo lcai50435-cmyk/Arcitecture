@@ -189,6 +189,7 @@ public sealed class IllustratedUISceneLoader : MonoBehaviour
             resolvedInteractTip,
             resolvedPlayerObject);
 
+        DisableLegacyHandbookRoots(manager);
         UIRootManager.Instance?.RefreshRuntimeBindings();
     }
 
@@ -253,6 +254,56 @@ public sealed class IllustratedUISceneLoader : MonoBehaviour
         }
 
         return null;
+    }
+
+    private static void DisableLegacyHandbookRoots(UIManager authoritativeManager)
+    {
+        for (int sceneIndex = 0; sceneIndex < SceneManager.sceneCount; sceneIndex++)
+        {
+            Scene scene = SceneManager.GetSceneAt(sceneIndex);
+            if (!scene.IsValid() || !scene.isLoaded || IsIllustratedUiScene(scene))
+            {
+                continue;
+            }
+
+            GameObject[] roots = scene.GetRootGameObjects();
+            for (int rootIndex = 0; rootIndex < roots.Length; rootIndex++)
+            {
+                DisableLegacyHandbookRootsRecursive(roots[rootIndex].transform, authoritativeManager);
+            }
+        }
+    }
+
+    private static void DisableLegacyHandbookRootsRecursive(Transform current, UIManager authoritativeManager)
+    {
+        if (current == null)
+        {
+            return;
+        }
+
+        bool isAuthoritativeRoot = authoritativeManager != null &&
+                                   authoritativeManager.illustratedHandbook != null &&
+                                   ReferenceEquals(current.gameObject, authoritativeManager.illustratedHandbook);
+
+        if (!isAuthoritativeRoot &&
+            string.Equals(current.name, IllustratedHandbookTabsController.RootObjectName, StringComparison.Ordinal))
+        {
+            CanvasGroup canvasGroup = current.GetComponent<CanvasGroup>();
+            if (canvasGroup != null)
+            {
+                canvasGroup.alpha = 0f;
+                canvasGroup.interactable = false;
+                canvasGroup.blocksRaycasts = false;
+            }
+
+            current.gameObject.SetActive(false);
+            return;
+        }
+
+        for (int childIndex = 0; childIndex < current.childCount; childIndex++)
+        {
+            DisableLegacyHandbookRootsRecursive(current.GetChild(childIndex), authoritativeManager);
+        }
     }
 
     private void Awake()

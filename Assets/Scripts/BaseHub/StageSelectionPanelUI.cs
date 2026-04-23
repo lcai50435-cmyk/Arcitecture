@@ -38,6 +38,11 @@ public class StageSelectionPanelUI : MonoBehaviour, IBeginDragHandler, IEndDragH
     private bool isSnapping;
     private float snapVelocity;
 
+    private void Awake()
+    {
+        EnsureInitialized();
+    }
+
     public void Configure(
         BaseHubUIController controller,
         ScrollRect stageScrollRect,
@@ -57,14 +62,7 @@ public class StageSelectionPanelUI : MonoBehaviour, IBeginDragHandler, IEndDragH
         headerStatusText = status;
         pageIndicatorText = pageIndicator;
 
-        closeButton?.onClick.RemoveAllListeners();
-        closeButton?.onClick.AddListener(() => uiController?.CloseAll());
-
-        previousButton?.onClick.RemoveAllListeners();
-        previousButton?.onClick.AddListener(SelectPreviousStage);
-
-        nextButton?.onClick.RemoveAllListeners();
-        nextButton?.onClick.AddListener(SelectNextStage);
+        EnsureInitialized();
     }
 
     public void RegisterCard(StageCardView view)
@@ -75,21 +73,12 @@ public class StageSelectionPanelUI : MonoBehaviour, IBeginDragHandler, IEndDragH
         }
 
         cardViews.Add(view);
-
-        if (view.selectButton != null)
-        {
-            int cardIndex = cardViews.Count - 1;
-            view.selectButton.onClick.AddListener(() => SelectStage(cardIndex, false));
-        }
-
-        if (view.enterButton != null)
-        {
-            view.enterButton.onClick.AddListener(() => EnterSelectedStage(view.definition));
-        }
+        BindCardListeners(cardViews.Count - 1);
     }
 
     private void OnEnable()
     {
+        EnsureInitialized();
         Open();
     }
 
@@ -148,6 +137,7 @@ public class StageSelectionPanelUI : MonoBehaviour, IBeginDragHandler, IEndDragH
 
     public void Open()
     {
+        EnsureInitialized();
         GameplayStageRuntime.EnsureSelectedStageUnlocked();
 
         int runtimeIndex = GameplayStageCatalog.GetStageIndex(GameplayStageRuntime.SelectedStageId);
@@ -322,5 +312,195 @@ public class StageSelectionPanelUI : MonoBehaviour, IBeginDragHandler, IEndDragH
         }
 
         return Mathf.Clamp01(index / (float)(cardViews.Count - 1));
+    }
+
+    public void BindController(BaseHubUIController controller)
+    {
+        if (controller != null)
+        {
+            uiController = controller;
+        }
+
+        EnsureInitialized();
+    }
+
+    private void EnsureInitialized()
+    {
+        if (uiController == null)
+        {
+            uiController = GetComponentInParent<BaseHubUIController>();
+            if (uiController == null)
+            {
+                uiController = FindObjectOfType<BaseHubUIController>(true);
+            }
+        }
+
+        if (cardViews.Count == 0)
+        {
+            DiscoverCardsFromScene();
+        }
+
+        BindNavigationButtons();
+    }
+
+    private void BindNavigationButtons()
+    {
+        closeButton?.onClick.RemoveAllListeners();
+        closeButton?.onClick.AddListener(() => uiController?.CloseAll());
+
+        previousButton?.onClick.RemoveAllListeners();
+        previousButton?.onClick.AddListener(SelectPreviousStage);
+
+        nextButton?.onClick.RemoveAllListeners();
+        nextButton?.onClick.AddListener(SelectNextStage);
+
+        for (int i = 0; i < cardViews.Count; i++)
+        {
+            BindCardListeners(i);
+        }
+    }
+
+    private void BindCardListeners(int cardIndex)
+    {
+        if (cardIndex < 0 || cardIndex >= cardViews.Count)
+        {
+            return;
+        }
+
+        StageCardView view = cardViews[cardIndex];
+        if (view == null || view.definition == null)
+        {
+            return;
+        }
+
+        if (view.selectButton != null)
+        {
+            view.selectButton.onClick.RemoveAllListeners();
+            view.selectButton.onClick.AddListener(() => SelectStage(cardIndex, false));
+        }
+
+        if (view.enterButton != null)
+        {
+            view.enterButton.onClick.RemoveAllListeners();
+            view.enterButton.onClick.AddListener(() => EnterSelectedStage(view.definition));
+        }
+    }
+
+    private void DiscoverCardsFromScene()
+    {
+        if (scrollRect == null || scrollRect.content == null)
+        {
+            return;
+        }
+
+        IReadOnlyList<GameplayStageDefinition> stageDefinitions = GameplayStageCatalog.GetAll();
+        for (int i = 0; i < scrollRect.content.childCount; i++)
+        {
+            RectTransform cardRoot = scrollRect.content.GetChild(i) as RectTransform;
+            if (cardRoot == null)
+            {
+                continue;
+            }
+
+            Button selectButtonView = FindNamedComponent<Button>(cardRoot, "SelectButton");
+            if (selectButtonView == null)
+            {
+                continue;
+            }
+
+            TextMeshProUGUI titleTextView = FindNamedComponent<TextMeshProUGUI>(cardRoot, "Title");
+            TextMeshProUGUI sceneTextView = FindNamedComponent<TextMeshProUGUI>(cardRoot, "Scene");
+            GameplayStageDefinition definition = ResolveDefinition(i, stageDefinitions, titleTextView, sceneTextView);
+            if (definition == null)
+            {
+                continue;
+            }
+
+            RegisterCard(new StageCardView
+            {
+                definition = definition,
+                root = cardRoot,
+                background = cardRoot.GetComponent<Image>(),
+                selectButton = selectButtonView,
+                enterButton = FindStageEnterButton(cardRoot),
+                titleText = titleTextView,
+                sceneNameText = sceneTextView,
+                statusText = FindNamedComponent<TextMeshProUGUI>(cardRoot, "Status"),
+                lockHintText = FindNamedComponent<TextMeshProUGUI>(cardRoot, "LockHint")
+            });
+        }
+    }
+
+    private GameplayStageDefinition ResolveDefinition(
+        int fallbackIndex,
+        IReadOnlyList<GameplayStageDefinition> stageDefinitions,
+        TextMeshProUGUI titleTextView,
+        TextMeshProUGUI sceneTextView)
+    {
+        string sceneName = ExtractSceneName(sceneTextView != null ? sceneTextView.text : string.Empty);
+        if (!string.IsNullOrEmpty(sceneName))
+        {
+            GameplayStageDefinition definition = GameplayStageCatalog.GetStageByScene(sceneName);
+            if (definition != null)
+            {
+                return definition;
+            }
+        }
+
+        string displayName = titleTextView != null ? titleTextView.text.Trim() : string.Empty;
+        if (!string.IsNullOrEmpty(displayName))
+        {
+            for (int i = 0; i < stageDefinitions.Count; i++)
+            {
+                GameplayStageDefinition definition = stageDefinitions[i];
+                if (definition != null && string.Equals(definition.displayName, displayName, StringComparison.Ordinal))
+                {
+                    return definition;
+                }
+            }
+        }
+
+        return fallbackIndex >= 0 && fallbackIndex < stageDefinitions.Count
+            ? stageDefinitions[fallbackIndex]
+            : null;
+    }
+
+    private static string ExtractSceneName(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return string.Empty;
+        }
+
+        int separatorIndex = Mathf.Max(text.LastIndexOf('：'), text.LastIndexOf(':'));
+        return separatorIndex >= 0 && separatorIndex + 1 < text.Length
+            ? text.Substring(separatorIndex + 1).Trim()
+            : text.Trim();
+    }
+
+    private static Button FindStageEnterButton(Transform root)
+    {
+        Button enterButton = FindNamedComponent<Button>(root, "EnterButton");
+        return enterButton != null ? enterButton : FindNamedComponent<Button>(root, "GotoButton");
+    }
+
+    private static T FindNamedComponent<T>(Transform root, string objectName) where T : Component
+    {
+        if (root == null || string.IsNullOrEmpty(objectName))
+        {
+            return null;
+        }
+
+        T[] components = root.GetComponentsInChildren<T>(true);
+        for (int i = 0; i < components.Length; i++)
+        {
+            T component = components[i];
+            if (component != null && string.Equals(component.gameObject.name, objectName, StringComparison.Ordinal))
+            {
+                return component;
+            }
+        }
+
+        return null;
     }
 }

@@ -29,6 +29,11 @@ public class BaseHubUIController : MonoBehaviour
     private bool wasInkAttackEnabled;
     private RuntimeSettingsPanel settingsPanel;
 
+    private void Awake()
+    {
+        EnsureRuntimeBindings();
+    }
+
     public void Configure(
         GameObject playerObject,
         GameObject handbookPanel,
@@ -44,11 +49,7 @@ public class BaseHubUIController : MonoBehaviour
         albumPanel = photoAlbumPanel;
         interactTipUI = interactTip;
 
-        playerMove = player != null ? player.GetComponent<PlayerMove>() : null;
-        playerBody = player != null ? player.GetComponent<Rigidbody2D>() : null;
-        playerInteraction = player != null ? player.GetComponent<PlayerInteraction>() : null;
-        playerInkAttack = player != null ? player.GetComponent<BaseHubInkAttack>() : null;
-
+        EnsureRuntimeBindings();
         isClosingModal = false;
         ClosePanelsOnly();
         EnsureSettingsPanel();
@@ -147,6 +148,7 @@ public class BaseHubUIController : MonoBehaviour
 
     public void OpenStageSelectionPanel(RuntimeModalOpenSource source = RuntimeModalOpenSource.None)
     {
+        EnsureRuntimeBindings();
         ApplyCameraFocus(RuntimeModalType.Stage, source);
         OpenModal(stageSelectionPanel != null ? stageSelectionPanel.gameObject : null, RuntimeModalType.Stage, source);
         stageSelectionPanel?.Open();
@@ -183,6 +185,7 @@ public class BaseHubUIController : MonoBehaviour
     {
         if (panel == null) return;
 
+        EnsureRuntimeBindings();
         ClosePanelsOnly();
         LockPlayer();
         SetInteractTipVisible(false);
@@ -384,5 +387,23 @@ public class BaseHubUIController : MonoBehaviour
 
         T component = resolver != null ? resolver() : null;
         return component != null ? component.transform : null;
+    }
+
+    private void EnsureRuntimeBindings()
+    {
+        if (player == null)
+        {
+            player = GameObject.FindGameObjectWithTag("Player");
+        }
+
+        playerMove = player != null ? player.GetComponent<PlayerMove>() : null;
+        playerBody = player != null ? player.GetComponent<Rigidbody2D>() : null;
+        playerInteraction = player != null ? player.GetComponent<PlayerInteraction>() : null;
+        playerInkAttack = player != null ? player.GetComponent<BaseHubInkAttack>() : null;
+
+        if (stageSelectionPanel != null)
+        {
+            stageSelectionPanel.BindController(this);
+        }
     }
 }
