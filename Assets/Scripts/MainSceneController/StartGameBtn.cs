@@ -297,7 +297,9 @@ public sealed class MainMenuController : MonoBehaviour
         continueButton = CreateMenuButton(menuRootRect, "ContinueButton", "继续游戏", OpenContinuePanel);
         CreateMenuButton(menuRootRect, "HandbookButton", "图鉴/手册", OpenHandbookPanel);
         CreateMenuButton(menuRootRect, "SettingsButton", "设置", OpenSettingsPanel);
+#if !(UNITY_WEBGL && !UNITY_EDITOR)
         CreateMenuButton(menuRootRect, "ExitButton", "退出", ExitGame);
+#endif
     }
 
     private void BuildSlotOverlay()
@@ -897,7 +899,9 @@ public sealed class MainMenuController : MonoBehaviour
 
     private void ExitGame()
     {
-#if UNITY_EDITOR
+#if UNITY_WEBGL && !UNITY_EDITOR
+        return;
+#elif UNITY_EDITOR
         UnityEditor.EditorApplication.isPlaying = false;
 #else
         Application.Quit();

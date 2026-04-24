@@ -77,9 +77,13 @@ public sealed class RuntimePhotoCaptureManager : MonoBehaviour
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void Bootstrap()
     {
+#if UNITY_WEBGL && !UNITY_EDITOR
+        return;
+#else
         SceneManager.sceneLoaded -= HandleSceneLoaded;
         SceneManager.sceneLoaded += HandleSceneLoaded;
         EnsureInstance();
+#endif
     }
 
     private static void HandleSceneLoaded(Scene scene, LoadSceneMode mode)
@@ -166,6 +170,9 @@ public sealed class RuntimePhotoCaptureManager : MonoBehaviour
 
     private bool ShouldAllowCapture()
     {
+#if UNITY_WEBGL && !UNITY_EDITOR
+        return false;
+#else
         if (!GameplayStageCatalog.IsGameplayScene(SceneManager.GetActiveScene().name))
         {
             return false;
@@ -192,6 +199,7 @@ public sealed class RuntimePhotoCaptureManager : MonoBehaviour
         }
 
         return true;
+#endif
     }
 
     private IEnumerator CaptureRoutine()

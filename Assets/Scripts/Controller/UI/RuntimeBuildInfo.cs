@@ -77,6 +77,7 @@ public sealed class RuntimeBuildInfoData
 public static class RuntimeBuildInfo
 {
     private const string SnapshotFileName = "runtime-build-info.json";
+    private const string SnapshotResourcePath = "RuntimeBuildInfo/runtime-build-info";
 
     private static RuntimeBuildInfoData current;
 
@@ -116,6 +117,15 @@ public static class RuntimeBuildInfo
 
     private static RuntimeBuildInfoSnapshot LoadSnapshot()
     {
+        RuntimeBuildInfoSnapshot resourceSnapshot = LoadResourceSnapshot();
+        if (resourceSnapshot != null)
+        {
+            return resourceSnapshot;
+        }
+
+#if UNITY_WEBGL && !UNITY_EDITOR
+        return null;
+#else
         string snapshotPath = Path.Combine(Application.streamingAssetsPath, SnapshotFileName);
         if (!File.Exists(snapshotPath))
         {
@@ -135,6 +145,26 @@ public static class RuntimeBuildInfo
         catch (Exception exception)
         {
             Debug.LogWarning($"读取运行时版本快照失败：{exception.Message}");
+            return null;
+        }
+#endif
+    }
+
+    private static RuntimeBuildInfoSnapshot LoadResourceSnapshot()
+    {
+        TextAsset snapshotAsset = Resources.Load<TextAsset>(SnapshotResourcePath);
+        if (snapshotAsset == null || string.IsNullOrWhiteSpace(snapshotAsset.text))
+        {
+            return null;
+        }
+
+        try
+        {
+            return JsonUtility.FromJson<RuntimeBuildInfoSnapshot>(snapshotAsset.text);
+        }
+        catch (Exception exception)
+        {
+            Debug.LogWarning($"读取运行时版本资源失败：{exception.Message}");
             return null;
         }
     }

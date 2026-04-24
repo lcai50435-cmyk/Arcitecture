@@ -88,6 +88,8 @@ InitTestScene*.unity*
 /Assets/StreamingAssets/runtime-build-info.json
 /Assets/StreamingAssets/runtime-build-info.json.meta
 /Assets/StreamingAssets.meta
+/[Aa]ssets/Resources/RuntimeBuildInfo/
+/[Aa]ssets/Resources/RuntimeBuildInfo.meta
 /[Aa]ssets/AddressableAssetsData/link.xml*
 /[Aa]ssets/Addressables_Temp*
 # By default, Addressables content builds will generate addressables_content_state.bin

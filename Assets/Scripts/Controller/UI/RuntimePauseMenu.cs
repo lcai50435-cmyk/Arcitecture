@@ -387,17 +387,23 @@ public sealed class RuntimePauseMenu : MonoBehaviour
 
     private void RequestQuitGame()
     {
+#if UNITY_WEBGL && !UNITY_EDITOR
+        ShowMenuPage();
+#else
         ShowConfirmPage(
             PausePage.QuitConfirm,
             "退出游戏？",
             "将关闭当前游戏进程，未保存的战斗状态不会保留。",
             "确认退出");
+#endif
     }
 
     private void ConfirmQuitGame()
     {
         HideImmediate();
-#if UNITY_EDITOR
+#if UNITY_WEBGL && !UNITY_EDITOR
+        return;
+#elif UNITY_EDITOR
         EditorApplication.isPlaying = false;
 #else
         Application.Quit();
@@ -717,7 +723,9 @@ public sealed class RuntimePauseMenu : MonoBehaviour
         CreateMenuButton(buttonRoot, "回到主界面", 84f, SecondaryButtonColor, SecondaryButtonTextColor, RequestReturnToMenu, true);
         CreateMenuButton(buttonRoot, "游戏设置", 0f, SecondaryButtonColor, SecondaryButtonTextColor, OpenSettings, true);
         CreateMenuButton(buttonRoot, "关于我们", -84f, SecondaryButtonColor, SecondaryButtonTextColor, ShowAboutPage, true);
+#if !(UNITY_WEBGL && !UNITY_EDITOR)
         CreateMenuButton(buttonRoot, "退出游戏", -168f, DangerButtonColor, DangerButtonTextColor, RequestQuitGame, true);
+#endif
     }
 
     private void BuildAboutPage(RectTransform parent)

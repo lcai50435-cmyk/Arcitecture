@@ -156,7 +156,11 @@ public class BaseHubUIController : MonoBehaviour
 
     public void OpenAlbumPanel(RuntimeModalOpenSource source = RuntimeModalOpenSource.None)
     {
+#if UNITY_WEBGL && !UNITY_EDITOR
+        OpenIllustratedHandbook(source);
+#else
         OpenHandbookPage(IllustratedHandbookPage.PhotoAlbum, RuntimeModalType.Album, source);
+#endif
     }
 
     public void CloseAll()
