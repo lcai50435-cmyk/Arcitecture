@@ -227,9 +227,9 @@ jobs:
         shell: bash
         run: |
           ASSET="arcitecture-webgl-${VERSION}.zip"
-          if gh release view "${RELEASE_TAG}" >/dev/null 2>&1; then
-            gh release upload "${RELEASE_TAG}" "${ASSET}" --clobber
-            gh release edit "${RELEASE_TAG}" --title "Arcitecture ${RELEASE_TAG}" --notes-file release-notes.md
+          if gh release view "${RELEASE_TAG}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+            gh release upload "${RELEASE_TAG}" "${ASSET}" --repo "${GITHUB_REPOSITORY}" --clobber
+            gh release edit "${RELEASE_TAG}" --repo "${GITHUB_REPOSITORY}" --title "Arcitecture ${RELEASE_TAG}" --notes-file release-notes.md
           else
-            gh release create "${RELEASE_TAG}" "${ASSET}" --title "Arcitecture ${RELEASE_TAG}" --notes-file release-notes.md --verify-tag
+            gh release create "${RELEASE_TAG}" "${ASSET}" --repo "${GITHUB_REPOSITORY}" --title "Arcitecture ${RELEASE_TAG}" --notes-file release-notes.md --verify-tag
           fi
