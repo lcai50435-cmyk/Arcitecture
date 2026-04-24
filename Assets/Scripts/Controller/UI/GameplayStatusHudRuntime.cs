@@ -8,6 +8,15 @@ public static class GameplayStatusHudRuntime
     private const string HudFontResourcePath = "Fonts & Materials/LiberationSans SDF";
     private const string CanvasName = "GameplayStatusHudCanvas";
     private const string RootName = "GameplayStatusHudRoot";
+    private const float RootWidth = 420f;
+    private const float RootHeight = 112f;
+    private const float RowWidth = 388f;
+    private const float RowHeight = 42f;
+    private const int PixelFrameWidth = 96;
+    private const int PixelFrameHeight = 36;
+    private const int PixelFrameBorder = 6;
+    private const int PixelFillWidth = 64;
+    private const int PixelFillHeight = 12;
 
     private static Canvas hudCanvas;
     private static CanvasGroup hudCanvasGroup;
@@ -20,26 +29,29 @@ public static class GameplayStatusHudRuntime
     private static TextMeshProUGUI weaponValueText;
     private static TextMeshProUGUI countdownText;
     private static bool externallyHidden;
+    private static readonly Dictionary<string, Sprite> HudSpriteCache = new Dictionary<string, Sprite>();
+    private static readonly Color RootPanelColor = new Color(0.15f, 0.10f, 0.06f, 0.84f);
+    private static readonly Color RowPanelColor = new Color(0.24f, 0.15f, 0.08f, 0.94f);
+    private static readonly Color GaugeTrackColor = new Color(0.10f, 0.10f, 0.11f, 0.96f);
+    private static readonly Color GoldBorderColor = new Color(0.78f, 0.53f, 0.22f, 1f);
+    private static readonly Color GoldHighlightColor = new Color(1f, 0.83f, 0.46f, 1f);
+    private static readonly Color DarkOutlineColor = new Color(0.14f, 0.08f, 0.04f, 1f);
+    private static readonly Color HealthFillColor = new Color(0.82f, 0.19f, 0.16f, 1f);
+    private static readonly Color InkFillColor = new Color(0.20f, 0.58f, 0.86f, 1f);
 
     public static ValueTrans EnsureHealthGauge(ValueTrans currentGauge)
     {
-        if (currentGauge != null && IsRuntimeGauge(currentGauge))
-        {
-            EnsureRoot();
-            return currentGauge;
-        }
-
         EnsureRoot();
 
-        if (IsRuntimeGauge(healthGauge))
+        if (currentGauge != null && IsRuntimeGauge(currentGauge))
         {
-            return healthGauge;
+            return currentGauge;
         }
 
-        if (currentGauge != null)
+        HideLegacyGauge(currentGauge);
+        if (healthGauge != null)
         {
-            UseLegacyHealthGauge(currentGauge);
-            return currentGauge;
+            return healthGauge;
         }
 
         return healthGauge;
@@ -47,23 +59,17 @@ public static class GameplayStatusHudRuntime
 
     public static ValueTrans EnsureWeaponGauge(ValueTrans currentGauge)
     {
-        if (currentGauge != null && IsRuntimeGauge(currentGauge))
-        {
-            EnsureRoot();
-            return currentGauge;
-        }
-
         EnsureRoot();
 
-        if (IsRuntimeGauge(weaponGauge))
+        if (currentGauge != null && IsRuntimeGauge(currentGauge))
         {
-            return weaponGauge;
+            return currentGauge;
         }
 
-        if (currentGauge != null)
+        HideLegacyGauge(currentGauge);
+        if (weaponGauge != null)
         {
-            UseLegacyWeaponGauge(currentGauge);
-            return currentGauge;
+            return weaponGauge;
         }
 
         return weaponGauge;
@@ -194,13 +200,10 @@ public static class GameplayStatusHudRuntime
             rootBackground = rootObject.AddComponent<Image>();
         }
 
-        RuntimeUiSpriteFactory.ApplyRoundedSprite(
-            rootBackground,
-            new Color(0.08f, 0.06f, 0.04f, 0.74f),
-            10,
-            12);
+        ApplyPixelFrame(rootBackground, "root", RootPanelColor);
         ReattachToHudCanvas();
         rootRect.gameObject.SetActive(!externallyHidden);
+        HideLegacyStatusPanels();
 
         // 旧场景里仍可能保留 legacy ValueTrans 引用；这里统一回收到运行时 HUD，
         // 避免只创建了外层底板、却没有真正生成血量/Ink 两行内容。
@@ -208,19 +211,6 @@ public static class GameplayStatusHudRuntime
         {
             CreateRows(rootObject.transform);
         }
-    }
-
-    private static void UseLegacyHealthGauge(ValueTrans gauge)
-    {
-        healthGauge = gauge;
-        HideRuntimeHudIfPresent();
-    }
-
-    private static void UseLegacyWeaponGauge(ValueTrans gauge)
-    {
-        weaponGauge = gauge;
-        weaponFillGraphic = ResolveGaugeFillGraphic(gauge);
-        HideRuntimeHudIfPresent();
     }
 
     private static bool IsRuntimeGauge(ValueTrans gauge)
@@ -231,19 +221,76 @@ public static class GameplayStatusHudRuntime
             && gauge.transform.IsChildOf(rootRect);
     }
 
+    private static void HideLegacyGauge(ValueTrans gauge)
+    {
+        if (gauge == null || IsRuntimeGauge(gauge))
+        {
+            return;
+        }
+
+        Transform legacyRoot = FindAncestorByName(gauge.transform, "ShowPanel");
+        if (legacyRoot != null)
+        {
+            legacyRoot.gameObject.SetActive(false);
+            return;
+        }
+
+        gauge.gameObject.SetActive(false);
+    }
+
+    private static void HideLegacyStatusPanels()
+    {
+        RectTransform[] rectTransforms = Object.FindObjectsOfType<RectTransform>(true);
+        foreach (RectTransform rectTransform in rectTransforms)
+        {
+            if (rectTransform == null || !string.Equals(rectTransform.name, "ShowPanel", System.StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            if (rootRect != null && rectTransform.IsChildOf(rootRect))
+            {
+                continue;
+            }
+
+            if (rectTransform.Find("HealthSlider") == null
+                || rectTransform.Find("InkSlider") == null
+                || rectTransform.Find("StructureSlider") == null)
+            {
+                continue;
+            }
+
+            rectTransform.gameObject.SetActive(false);
+        }
+    }
+
+    private static Transform FindAncestorByName(Transform start, string objectName)
+    {
+        Transform current = start;
+        while (current != null)
+        {
+            if (string.Equals(current.name, objectName, System.StringComparison.Ordinal))
+            {
+                return current;
+            }
+
+            current = current.parent;
+        }
+
+        return null;
+    }
+
     private static void CreateRows(Transform parent)
     {
         ClearRow(parent, "HealthRow");
         ClearRow(parent, "InkRow");
 
-        StatusRow healthRow = CreateRow(parent, "HealthRow", "HP", new Vector2(14f, -10f), new Color(0.87f, 0.27f, 0.24f, 0.95f));
-        StatusRow weaponRow = CreateRow(parent, "InkRow", "Ink", new Vector2(14f, -46f), new Color(0.25f, 0.70f, 0.96f, 0.95f));
+        StatusRow healthRow = CreateRow(parent, "HealthRow", "血", new Vector2(16f, -14f), HealthFillColor);
+        StatusRow weaponRow = CreateRow(parent, "InkRow", "墨", new Vector2(16f, -60f), InkFillColor);
 
         healthGauge = healthRow.gauge;
         weaponGauge = weaponRow.gauge;
-        weaponFillGraphic = weaponGauge != null && weaponGauge.slider != null && weaponGauge.slider.fillRect != null
-            ? weaponGauge.slider.fillRect.GetComponent<Graphic>()
-            : null;
+        weaponFillGraphic = weaponRow.fillGraphic;
         healthValueText = healthRow.valueText;
         weaponValueText = weaponRow.valueText;
     }
@@ -265,16 +312,23 @@ public static class GameplayStatusHudRuntime
         rowRect.anchorMax = new Vector2(0f, 1f);
         rowRect.pivot = new Vector2(0f, 1f);
         rowRect.anchoredPosition = anchoredPosition;
-        rowRect.sizeDelta = new Vector2(364f, 28f);
+        rowRect.sizeDelta = new Vector2(RowWidth, RowHeight);
 
         Image background = rowObject.AddComponent<Image>();
-        RuntimeUiSpriteFactory.ApplyRoundedSprite(
-            background,
-            new Color(0.14f, 0.11f, 0.08f, 0.82f),
-            8,
-            10);
+        ApplyPixelFrame(background, rowName, RowPanelColor);
 
-        TextMeshProUGUI titleText = CreateText("Label", rowObject.transform, title, 17f, new Vector2(10f, -4f), new Vector2(48f, 20f), TextAlignmentOptions.MidlineLeft);
+        GameObject badgeObject = CreateUIObject("Badge", rowObject.transform);
+        RectTransform badgeRect = badgeObject.GetComponent<RectTransform>();
+        badgeRect.anchorMin = new Vector2(0f, 1f);
+        badgeRect.anchorMax = new Vector2(0f, 1f);
+        badgeRect.pivot = new Vector2(0f, 1f);
+        badgeRect.anchoredPosition = new Vector2(10f, -7f);
+        badgeRect.sizeDelta = new Vector2(42f, 28f);
+
+        Image badgeImage = badgeObject.AddComponent<Image>();
+        ApplyPixelFrame(badgeImage, rowName + "_badge", new Color(0.63f, 0.39f, 0.13f, 0.98f), 48, 32, 5);
+
+        TextMeshProUGUI titleText = CreateText("Label", badgeObject.transform, title, 20f, new Vector2(0f, 0f), new Vector2(42f, 28f), TextAlignmentOptions.Center);
         titleText.fontStyle = FontStyles.Bold;
 
         GameObject barObject = CreateUIObject("Bar", rowObject.transform);
@@ -282,15 +336,11 @@ public static class GameplayStatusHudRuntime
         barRect.anchorMin = new Vector2(0f, 0.5f);
         barRect.anchorMax = new Vector2(0f, 0.5f);
         barRect.pivot = new Vector2(0f, 0.5f);
-        barRect.anchoredPosition = new Vector2(56f, 0f);
-        barRect.sizeDelta = new Vector2(206f, 14f);
+        barRect.anchoredPosition = new Vector2(62f, -1f);
+        barRect.sizeDelta = new Vector2(232f, 20f);
 
         Image barBackground = barObject.AddComponent<Image>();
-        RuntimeUiSpriteFactory.ApplyRoundedSprite(
-            barBackground,
-            new Color(0.17f, 0.17f, 0.20f, 0.95f),
-            7,
-            10);
+        ApplyPixelFrame(barBackground, rowName + "_track", GaugeTrackColor, 64, 20, 5);
 
         Slider slider = barObject.AddComponent<Slider>();
         slider.direction = Slider.Direction.LeftToRight;
@@ -303,8 +353,8 @@ public static class GameplayStatusHudRuntime
         RectTransform fillAreaRect = fillArea.GetComponent<RectTransform>();
         fillAreaRect.anchorMin = Vector2.zero;
         fillAreaRect.anchorMax = Vector2.one;
-        fillAreaRect.offsetMin = new Vector2(2f, 2f);
-        fillAreaRect.offsetMax = new Vector2(-2f, -2f);
+        fillAreaRect.offsetMin = new Vector2(5f, 5f);
+        fillAreaRect.offsetMax = new Vector2(-5f, -5f);
 
         GameObject fillObject = CreateUIObject("Fill", fillArea.transform);
         RectTransform fillRect = fillObject.GetComponent<RectTransform>();
@@ -314,15 +364,15 @@ public static class GameplayStatusHudRuntime
         fillRect.offsetMax = Vector2.zero;
 
         Image fillImage = fillObject.AddComponent<Image>();
-        RuntimeUiSpriteFactory.ApplyRoundedSprite(fillImage, fillColor, 7, 10);
+        ApplyGaugeFill(fillImage, fillColor);
         slider.fillRect = fillRect;
 
         ValueTrans gauge = barObject.AddComponent<ValueTrans>();
         gauge.slider = slider;
 
-        TextMeshProUGUI valueText = CreateText("Value", rowObject.transform, "100/100", 15f, new Vector2(268f, -4f), new Vector2(72f, 20f), TextAlignmentOptions.MidlineRight);
+        TextMeshProUGUI valueText = CreateText("Value", rowObject.transform, "100/100", 16f, new Vector2(304f, -9f), new Vector2(72f, 24f), TextAlignmentOptions.MidlineRight);
 
-        return new StatusRow(gauge, valueText);
+        return new StatusRow(gauge, valueText, fillImage);
     }
 
     private static GameObject CreateUIObject(string name, Transform parent)
@@ -355,9 +405,168 @@ public static class GameplayStatusHudRuntime
         tmp.alignment = alignment;
         tmp.color = Color.white;
         tmp.enableWordWrapping = false;
+        tmp.raycastTarget = false;
         tmp.font = ResolveHudFont();
 
         return tmp;
+    }
+
+    private static void ApplyPixelFrame(Image image, string key, Color faceColor)
+    {
+        ApplyPixelFrame(image, key, faceColor, PixelFrameWidth, PixelFrameHeight, PixelFrameBorder);
+    }
+
+    private static void ApplyPixelFrame(Image image, string key, Color faceColor, int width, int height, int border)
+    {
+        if (image == null)
+        {
+            return;
+        }
+
+        image.sprite = GetPixelFrameSprite(key, faceColor, width, height, border);
+        image.type = Image.Type.Sliced;
+        image.color = Color.white;
+        image.raycastTarget = false;
+    }
+
+    private static Sprite GetPixelFrameSprite(string key, Color faceColor, int width, int height, int border)
+    {
+        string cacheKey = $"pixel_frame_{key}_{width}_{height}_{border}";
+        if (HudSpriteCache.TryGetValue(cacheKey, out Sprite cachedSprite) && cachedSprite != null)
+        {
+            return cachedSprite;
+        }
+
+        Texture2D texture = new Texture2D(width, height, TextureFormat.RGBA32, false)
+        {
+            name = cacheKey,
+            filterMode = FilterMode.Point,
+            wrapMode = TextureWrapMode.Clamp
+        };
+
+        int cut = Mathf.Max(2, border - 1);
+        for (int y = 0; y < height; y++)
+        {
+            for (int x = 0; x < width; x++)
+            {
+                bool clippedCorner =
+                    (x < cut && y < cut && x + y < cut - 1) ||
+                    (x >= width - cut && y < cut && width - 1 - x + y < cut - 1) ||
+                    (x < cut && y >= height - cut && x + height - 1 - y < cut - 1) ||
+                    (x >= width - cut && y >= height - cut && width - 1 - x + height - 1 - y < cut - 1);
+
+                if (clippedCorner)
+                {
+                    texture.SetPixel(x, y, Color.clear);
+                    continue;
+                }
+
+                bool outer = x <= 1 || y <= 1 || x >= width - 2 || y >= height - 2;
+                bool frame = x < border || y < border || x >= width - border || y >= height - border;
+                bool highlight = (x == border || y == height - border - 1) && frame;
+                bool shadow = (x == width - border - 1 || y == border) && frame;
+
+                Color pixelColor = faceColor;
+                if (outer)
+                {
+                    pixelColor = DarkOutlineColor;
+                }
+                else if (highlight)
+                {
+                    pixelColor = GoldHighlightColor;
+                }
+                else if (shadow)
+                {
+                    pixelColor = DarkOutlineColor;
+                }
+                else if (frame)
+                {
+                    pixelColor = GoldBorderColor;
+                }
+                else
+                {
+                    float vertical = height > 1 ? (float)y / (height - 1) : 0f;
+                    pixelColor = Color.Lerp(faceColor * 0.82f, faceColor * 1.08f, vertical);
+                    pixelColor.a = faceColor.a;
+                }
+
+                texture.SetPixel(x, y, pixelColor);
+            }
+        }
+
+        texture.Apply();
+        Sprite sprite = Sprite.Create(
+            texture,
+            new Rect(0f, 0f, width, height),
+            new Vector2(0.5f, 0.5f),
+            100f,
+            0u,
+            SpriteMeshType.FullRect,
+            new Vector4(border, border, border, border));
+        sprite.name = cacheKey;
+        HudSpriteCache[cacheKey] = sprite;
+        return sprite;
+    }
+
+    private static void ApplyGaugeFill(Image image, Color fillColor)
+    {
+        if (image == null)
+        {
+            return;
+        }
+
+        image.sprite = GetGaugeFillSprite();
+        image.type = Image.Type.Sliced;
+        image.color = fillColor;
+        image.raycastTarget = false;
+    }
+
+    private static Sprite GetGaugeFillSprite()
+    {
+        const string cacheKey = "pixel_gauge_fill";
+        if (HudSpriteCache.TryGetValue(cacheKey, out Sprite cachedSprite) && cachedSprite != null)
+        {
+            return cachedSprite;
+        }
+
+        Texture2D texture = new Texture2D(PixelFillWidth, PixelFillHeight, TextureFormat.RGBA32, false)
+        {
+            name = cacheKey,
+            filterMode = FilterMode.Point,
+            wrapMode = TextureWrapMode.Clamp
+        };
+
+        for (int y = 0; y < PixelFillHeight; y++)
+        {
+            for (int x = 0; x < PixelFillWidth; x++)
+            {
+                float vertical = PixelFillHeight > 1 ? (float)y / (PixelFillHeight - 1) : 0f;
+                Color pixelColor = Color.Lerp(new Color(0.55f, 0.55f, 0.55f, 1f), Color.white, vertical);
+                if (y <= 1)
+                {
+                    pixelColor = new Color(0.36f, 0.36f, 0.36f, 1f);
+                }
+                else if (y >= PixelFillHeight - 3)
+                {
+                    pixelColor = Color.white;
+                }
+
+                texture.SetPixel(x, y, pixelColor);
+            }
+        }
+
+        texture.Apply();
+        Sprite sprite = Sprite.Create(
+            texture,
+            new Rect(0f, 0f, PixelFillWidth, PixelFillHeight),
+            new Vector2(0.5f, 0.5f),
+            100f,
+            0u,
+            SpriteMeshType.FullRect,
+            new Vector4(4f, 4f, 4f, 4f));
+        sprite.name = cacheKey;
+        HudSpriteCache[cacheKey] = sprite;
+        return sprite;
     }
 
     private static TMP_FontAsset ResolveHudFont()
@@ -464,48 +673,22 @@ public static class GameplayStatusHudRuntime
         rootRect.anchorMax = new Vector2(0f, 1f);
         rootRect.pivot = new Vector2(0f, 1f);
         rootRect.anchoredPosition = new Vector2(24f, -24f);
-        rootRect.sizeDelta = new Vector2(392f, 80f);
+        rootRect.sizeDelta = new Vector2(RootWidth, RootHeight);
         rootRect.localScale = Vector3.one;
         rootRect.SetAsLastSibling();
-    }
-
-    private static Graphic ResolveGaugeFillGraphic(ValueTrans gauge)
-    {
-        if (gauge == null)
-        {
-            return null;
-        }
-
-        if (gauge.slider != null && gauge.slider.fillRect != null)
-        {
-            return gauge.slider.fillRect.GetComponent<Graphic>();
-        }
-
-        return gauge.GetComponentInChildren<Graphic>(true);
-    }
-
-    private static void HideRuntimeHudIfPresent()
-    {
-        if (rootRect != null)
-        {
-            rootRect.gameObject.SetActive(false);
-        }
-
-        if (hudCanvas != null)
-        {
-            hudCanvas.gameObject.SetActive(false);
-        }
     }
 
     private readonly struct StatusRow
     {
         public readonly ValueTrans gauge;
         public readonly TextMeshProUGUI valueText;
+        public readonly Graphic fillGraphic;
 
-        public StatusRow(ValueTrans gauge, TextMeshProUGUI valueText)
+        public StatusRow(ValueTrans gauge, TextMeshProUGUI valueText, Graphic fillGraphic)
         {
             this.gauge = gauge;
             this.valueText = valueText;
+            this.fillGraphic = fillGraphic;
         }
     }
 }
