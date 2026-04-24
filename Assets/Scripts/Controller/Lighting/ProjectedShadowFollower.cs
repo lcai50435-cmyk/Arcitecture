@@ -3,7 +3,7 @@ using UnityEngine;
 [DisallowMultipleComponent]
 public sealed class ProjectedShadowFollower : MonoBehaviour
 {
-    private const string ShadowObjectName = "ProjectedShadow";
+    public const string ShadowObjectName = "ProjectedShadow";
     private const int ShadowTextureWidth = 64;
     private const int ShadowTextureHeight = 32;
     private const float ShadowPixelsPerUnit = 64f;
@@ -80,7 +80,9 @@ public sealed class ProjectedShadowFollower : MonoBehaviour
                 continue;
             }
 
-            if (candidate.GetComponent<ProjectedShadowFollowerShadowMarker>() != null)
+            if (candidate == shadowRenderer ||
+                string.Equals(candidate.gameObject.name, ShadowObjectName, System.StringComparison.Ordinal) ||
+                string.Equals(candidate.gameObject.name, NightLocalLightSource.VisualObjectName, System.StringComparison.Ordinal))
             {
                 continue;
             }
@@ -103,14 +105,10 @@ public sealed class ProjectedShadowFollower : MonoBehaviour
             return;
         }
 
-        ProjectedShadowFollowerShadowMarker existingMarker = GetComponentInChildren<ProjectedShadowFollowerShadowMarker>(true);
-        GameObject shadowObject = existingMarker != null ? existingMarker.gameObject : new GameObject(ShadowObjectName);
+        Transform existingShadowTransform = ResolveExistingShadowTransform();
+        GameObject shadowObject = existingShadowTransform != null ? existingShadowTransform.gameObject : new GameObject(ShadowObjectName);
         shadowObject.layer = NightLightingLayers.VisualLayer;
-
-        if (shadowObject.GetComponent<ProjectedShadowFollowerShadowMarker>() == null)
-        {
-            shadowObject.AddComponent<ProjectedShadowFollowerShadowMarker>();
-        }
+        shadowObject.hideFlags = HideFlags.DontSaveInEditor | HideFlags.DontSaveInBuild;
 
         shadowRenderer = shadowObject.GetComponent<SpriteRenderer>();
         if (shadowRenderer == null)
@@ -126,6 +124,27 @@ public sealed class ProjectedShadowFollower : MonoBehaviour
         {
             shadowObject.transform.SetParent(transform, false);
         }
+    }
+
+    private Transform ResolveExistingShadowTransform()
+    {
+        Transform direct = sourceRenderer != null ? sourceRenderer.transform.Find(ShadowObjectName) : transform.Find(ShadowObjectName);
+        if (direct != null)
+        {
+            return direct;
+        }
+
+        Transform[] children = GetComponentsInChildren<Transform>(true);
+        for (int i = 0; i < children.Length; i++)
+        {
+            Transform child = children[i];
+            if (child != null && string.Equals(child.name, ShadowObjectName, System.StringComparison.Ordinal))
+            {
+                return child;
+            }
+        }
+
+        return null;
     }
 
     private void UpdateShadow()
@@ -148,6 +167,7 @@ public sealed class ProjectedShadowFollower : MonoBehaviour
         }
 
         shadowRenderer.sprite = GetOrCreateEllipseShadowSprite();
+        shadowRenderer.sharedMaterial = null;
         shadowRenderer.flipX = false;
         shadowRenderer.flipY = false;
         shadowRenderer.color = shadowColor;
@@ -228,8 +248,4 @@ public sealed class ProjectedShadowFollower : MonoBehaviour
         sharedEllipseShadowSprite.hideFlags = HideFlags.HideAndDontSave;
         return sharedEllipseShadowSprite;
     }
-}
-
-public sealed class ProjectedShadowFollowerShadowMarker : MonoBehaviour
-{
 }

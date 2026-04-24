@@ -1,10 +1,18 @@
 using UnityEngine;
 
+public enum NightLightSortingMode
+{
+    RelativeToSource,
+    AccentOverlay
+}
+
 [DisallowMultipleComponent]
 public sealed class NightLocalLightSource : MonoBehaviour
 {
-    private const string VisualObjectName = "NightLocalLightVisual";
+    public const string VisualObjectName = "NightLocalLightVisual";
+
     private const int BaseSortingOrder = 28200;
+    private const int DefaultSourceSortingOffset = -1;
 
     [SerializeField] private Color lightColor = Color.white;
     [SerializeField] private float radius = 2.4f;
@@ -12,8 +20,11 @@ public sealed class NightLocalLightSource : MonoBehaviour
     [SerializeField] private float nightBoost = 0.14f;
     [SerializeField] private Vector3 localOffset = new Vector3(0f, 0.18f, 0f);
     [SerializeField] private bool scaleWithSceneLightMultiplier = true;
+    [SerializeField] private NightLightSortingMode sortingMode = NightLightSortingMode.RelativeToSource;
+    [SerializeField] private int sourceSortingOrderOffset = DefaultSourceSortingOffset;
 
     private SpriteRenderer lightRenderer;
+    private SpriteRenderer sourceRenderer;
 
     public void Configure(
         Color color,
@@ -21,7 +32,9 @@ public sealed class NightLocalLightSource : MonoBehaviour
         float baseIntensity,
         float nightBoost,
         Vector3 localOffset,
-        bool scaleWithSceneLightMultiplier)
+        bool scaleWithSceneLightMultiplier,
+        NightLightSortingMode sortingMode = NightLightSortingMode.RelativeToSource,
+        int sourceSortingOrderOffset = DefaultSourceSortingOffset)
     {
         this.lightColor = color;
         this.radius = Mathf.Max(0.1f, radius);
@@ -29,6 +42,8 @@ public sealed class NightLocalLightSource : MonoBehaviour
         this.nightBoost = Mathf.Max(0f, nightBoost);
         this.localOffset = localOffset;
         this.scaleWithSceneLightMultiplier = scaleWithSceneLightMultiplier;
+        this.sortingMode = sortingMode;
+        this.sourceSortingOrderOffset = sourceSortingOrderOffset;
 
         EnsureRenderer();
         UpdateVisual();
@@ -56,6 +71,7 @@ public sealed class NightLocalLightSource : MonoBehaviour
         GameObject visualObject = visualTransform != null ? visualTransform.gameObject : new GameObject(VisualObjectName);
         visualObject.transform.SetParent(transform, false);
         visualObject.layer = NightLightingLayers.VisualLayer;
+        visualObject.hideFlags = HideFlags.DontSaveInEditor | HideFlags.DontSaveInBuild;
 
         lightRenderer = visualObject.GetComponent<SpriteRenderer>();
         if (lightRenderer == null)
@@ -64,6 +80,7 @@ public sealed class NightLocalLightSource : MonoBehaviour
         }
 
         lightRenderer.sprite = NightLightingVisualFactory.GetRadialGlowSprite();
+        lightRenderer.sharedMaterial = NightLightingVisualFactory.GetAdditiveGlowMaterial();
         lightRenderer.sortingLayerID = NightLightingVisualFactory.GetTopSortingLayerId();
         lightRenderer.sortingOrder = BaseSortingOrder;
     }
@@ -87,11 +104,43 @@ public sealed class NightLocalLightSource : MonoBehaviour
 
         lightRenderer.transform.localPosition = localOffset;
         lightRenderer.transform.localScale = new Vector3(radius, radius, 1f);
-        lightRenderer.sortingLayerID = NightLightingVisualFactory.GetTopSortingLayerId();
-        lightRenderer.sortingOrder = BaseSortingOrder;
+        lightRenderer.sharedMaterial = NightLightingVisualFactory.GetAdditiveGlowMaterial();
+        ApplySorting();
 
         Color color = lightColor;
         color.a = Mathf.Clamp01(intensity);
         lightRenderer.color = color;
+    }
+
+    private void ApplySorting()
+    {
+        if (sortingMode == NightLightSortingMode.AccentOverlay)
+        {
+            lightRenderer.sortingLayerID = NightLightingVisualFactory.GetTopSortingLayerId();
+            lightRenderer.sortingOrder = BaseSortingOrder;
+            return;
+        }
+
+        SpriteRenderer source = ResolveSourceRenderer();
+        if (source == null)
+        {
+            lightRenderer.sortingLayerID = NightLightingVisualFactory.GetTopSortingLayerId();
+            lightRenderer.sortingOrder = BaseSortingOrder;
+            return;
+        }
+
+        lightRenderer.sortingLayerID = source.sortingLayerID;
+        lightRenderer.sortingOrder = source.sortingOrder + sourceSortingOrderOffset;
+    }
+
+    private SpriteRenderer ResolveSourceRenderer()
+    {
+        if (sourceRenderer != null && sourceRenderer != lightRenderer)
+        {
+            return sourceRenderer;
+        }
+
+        sourceRenderer = NightLightingController.ResolvePrimarySpriteRenderer(gameObject);
+        return sourceRenderer;
     }
 }

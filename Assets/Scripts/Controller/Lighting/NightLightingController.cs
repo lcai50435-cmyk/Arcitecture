@@ -72,7 +72,9 @@ public sealed class NightLightingController : MonoBehaviour
     private const string BaseSceneName = "NewBase";
     private const string DeadSceneName = "DeadScene";
     private const int OverlaySortingOrder = 28000;
-    private const float BindingRefreshInterval = 0.35f;
+    private const int InitialSceneBindingPassCount = 3;
+    private const float InitialSceneBindingInterval = 0.25f;
+    private const string ProfileResourcePath = "Lighting/NightLightingProfiles";
 
     private static readonly Color GameplayLightColor = new Color(0.96f, 0.86f, 0.62f, 1f);
     private static readonly Color GameplayEnemyLightColor = new Color(1f, 0.42f, 0.26f, 1f);
@@ -82,41 +84,49 @@ public sealed class NightLightingController : MonoBehaviour
     private static readonly Color DeadSceneLightColor = new Color(0.54f, 0.72f, 1f, 1f);
     private static readonly Vector3 GameplayPlayerLightOffset = new Vector3(0f, 0.14f, 0f);
     private static readonly Vector3 GameplayEnemyLightOffset = new Vector3(0f, 0.12f, 0f);
-    private static readonly Color UnifiedOverlayTint = new Color(0.06f, 0.10f, 0.18f, 1f);
-    private static readonly Color UnifiedCameraBackgroundNight = new Color(0.02f, 0.05f, 0.09f, 1f);
-    private static readonly Color UnifiedCharacterShadowColor = new Color(0.04f, 0.05f, 0.08f, 0.40f);
-    private static readonly Vector3 UnifiedCharacterShadowOffset = new Vector3(0.10f, -0.18f, 0f);
-    private static readonly Vector3 UnifiedCharacterShadowScale = new Vector3(1.08f, 0.42f, 1f);
-    private const float UnifiedOverlayAlphaAtStart = 0.12f;
-    private const float UnifiedOverlayAlphaAtEnd = 0.36f;
-    private const float UnifiedLightMultiplierAtStart = 0.96f;
-    private const float UnifiedLightMultiplierAtEnd = 1.24f;
+    private static readonly Color ReadableOverlayTint = new Color(0.04f, 0.07f, 0.11f, 1f);
+    private static readonly Color ReadableCameraBackgroundNight = new Color(0.04f, 0.06f, 0.09f, 1f);
+    private static readonly Color ReadableCharacterShadowColor = new Color(0.03f, 0.04f, 0.06f, 0.32f);
+    private static readonly Vector3 ReadableCharacterShadowOffset = new Vector3(0.09f, -0.15f, 0f);
+    private static readonly Vector3 ReadableCharacterShadowScale = new Vector3(1.02f, 0.36f, 1f);
 
     private static readonly Dictionary<string, SceneNightProfile> Profiles = new Dictionary<string, SceneNightProfile>(StringComparer.Ordinal)
     {
         {
             MainSceneName,
-            CreateUnifiedSceneProfile(MainSceneName, false, 0.35f)
+            CreateReadableSceneProfile(MainSceneName, false, 0.28f, 0.03f, 0.12f, 0.98f, 1.06f)
         },
         {
             BaseSceneName,
-            CreateUnifiedSceneProfile(BaseSceneName, false, 0.34f)
+            CreateReadableSceneProfile(BaseSceneName, false, 0.30f, 0.05f, 0.14f, 1.00f, 1.08f)
         },
         {
             "GameScene",
-            CreateUnifiedSceneProfile("GameScene", true, 0f)
+            CreateReadableSceneProfile("GameScene", true, 0f, 0.04f, 0.20f, 1.00f, 1.12f)
         },
         {
             "GameScene_02",
-            CreateUnifiedSceneProfile("GameScene_02", true, 0f)
+            CreateReadableSceneProfile("GameScene_02", true, 0f, 0.04f, 0.20f, 1.00f, 1.12f)
         },
         {
             "GameScene_03",
-            CreateUnifiedSceneProfile("GameScene_03", true, 0f)
+            CreateReadableSceneProfile("GameScene_03", true, 0f, 0.04f, 0.20f, 1.00f, 1.12f)
         },
         {
             DeadSceneName,
-            CreateUnifiedSceneProfile(DeadSceneName, false, 0.86f)
+            new SceneNightProfile(
+                DeadSceneName,
+                false,
+                0.82f,
+                new Color(0.02f, 0.04f, 0.08f, 1f),
+                0.14f,
+                0.30f,
+                new Color(0.01f, 0.02f, 0.04f, 1f),
+                1.04f,
+                1.16f,
+                ReadableCharacterShadowColor,
+                ReadableCharacterShadowOffset,
+                ReadableCharacterShadowScale)
         }
     };
 
@@ -132,6 +142,7 @@ public sealed class NightLightingController : MonoBehaviour
     private string currentSceneName;
     private float currentNightProgress;
     private float bindingRefreshTimer;
+    private int pendingSceneBindingPasses;
     private bool hasCapturedCameraBaseColor;
     private Color baseCameraBackgroundColor = Color.black;
 
@@ -152,24 +163,28 @@ public sealed class NightLightingController : MonoBehaviour
 
     public static bool HasActiveProfile => instance != null && instance.currentProfile != null;
 
-    private static SceneNightProfile CreateUnifiedSceneProfile(
+    private static SceneNightProfile CreateReadableSceneProfile(
         string sceneName,
         bool useCountdownProgress,
-        float fixedNightProgress)
+        float fixedNightProgress,
+        float overlayAlphaAtStart,
+        float overlayAlphaAtEnd,
+        float localLightMultiplierAtStart,
+        float localLightMultiplierAtEnd)
     {
         return new SceneNightProfile(
             sceneName,
             useCountdownProgress,
             fixedNightProgress,
-            UnifiedOverlayTint,
-            UnifiedOverlayAlphaAtStart,
-            UnifiedOverlayAlphaAtEnd,
-            UnifiedCameraBackgroundNight,
-            UnifiedLightMultiplierAtStart,
-            UnifiedLightMultiplierAtEnd,
-            UnifiedCharacterShadowColor,
-            UnifiedCharacterShadowOffset,
-            UnifiedCharacterShadowScale);
+            ReadableOverlayTint,
+            overlayAlphaAtStart,
+            overlayAlphaAtEnd,
+            ReadableCameraBackgroundNight,
+            localLightMultiplierAtStart,
+            localLightMultiplierAtEnd,
+            ReadableCharacterShadowColor,
+            ReadableCharacterShadowOffset,
+            ReadableCharacterShadowScale);
     }
 
     public static int ExcludeEffectLayerFromMask(int cullingMask)
@@ -258,11 +273,15 @@ public sealed class NightLightingController : MonoBehaviour
         UpdateOverlayVisual();
         UpdateViewportLights();
 
-        bindingRefreshTimer -= Time.unscaledDeltaTime;
-        if (bindingRefreshTimer <= 0f)
+        if (pendingSceneBindingPasses > 0)
         {
-            bindingRefreshTimer = BindingRefreshInterval;
-            RefreshSceneBindings();
+            bindingRefreshTimer -= Time.unscaledDeltaTime;
+            if (bindingRefreshTimer <= 0f)
+            {
+                bindingRefreshTimer = InitialSceneBindingInterval;
+                pendingSceneBindingPasses--;
+                RefreshSceneBindings();
+            }
         }
 
         if (currentProfile.useCountdownProgress)
@@ -287,7 +306,8 @@ public sealed class NightLightingController : MonoBehaviour
         currentProfile = ResolveProfile(sceneName);
         currentCamera = null;
         hasCapturedCameraBaseColor = false;
-        bindingRefreshTimer = 0f;
+        bindingRefreshTimer = InitialSceneBindingInterval;
+        pendingSceneBindingPasses = InitialSceneBindingPassCount;
 
         ClearViewportLights();
         UnbindCountdownManager();
@@ -300,6 +320,7 @@ public sealed class NightLightingController : MonoBehaviour
 
         EnsureOverlayRenderer();
         SetOverlayVisible(true);
+        CleanupPersistedLightingArtifacts();
         ConfigureViewportLightsForScene(sceneName);
 
         if (currentProfile.useCountdownProgress)
@@ -314,6 +335,68 @@ public sealed class NightLightingController : MonoBehaviour
 
         UpdateOverlayVisual();
         RefreshSceneBindings();
+    }
+
+    private void CleanupPersistedLightingArtifacts()
+    {
+        Transform[] transforms = FindObjectsOfType<Transform>(true);
+        for (int i = 0; i < transforms.Length; i++)
+        {
+            Transform candidate = transforms[i];
+            if (candidate == null || candidate == transform || !candidate.gameObject.scene.IsValid())
+            {
+                continue;
+            }
+
+            if (!string.Equals(candidate.gameObject.scene.name, currentSceneName, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            if (ShouldDestroyPersistedLightingArtifact(candidate))
+            {
+                DestroyLightingArtifact(candidate.gameObject);
+            }
+        }
+    }
+
+    private static bool ShouldDestroyPersistedLightingArtifact(Transform candidate)
+    {
+        string objectName = candidate.name;
+        if (string.Equals(objectName, ProjectedShadowFollower.ShadowObjectName, StringComparison.Ordinal))
+        {
+            return candidate.GetComponentInParent<ProjectedShadowFollower>() == null;
+        }
+
+        if (string.Equals(objectName, NightLocalLightSource.VisualObjectName, StringComparison.Ordinal))
+        {
+            return candidate.GetComponentInParent<NightLocalLightSource>() == null;
+        }
+
+        if (string.Equals(objectName, OverlayObjectName, StringComparison.Ordinal) ||
+            string.Equals(objectName, AccentRootObjectName, StringComparison.Ordinal))
+        {
+            return candidate.GetComponentInParent<NightLightingController>() == null;
+        }
+
+        return false;
+    }
+
+    private static void DestroyLightingArtifact(GameObject artifact)
+    {
+        if (artifact == null)
+        {
+            return;
+        }
+
+        if (Application.isPlaying)
+        {
+            Destroy(artifact);
+        }
+        else
+        {
+            DestroyImmediate(artifact);
+        }
     }
 
     public void BindCountdown(GameCountDownManager manager)
@@ -348,7 +431,9 @@ public sealed class NightLightingController : MonoBehaviour
         float nightBoost = 0.14f,
         Vector3? localOffset = null,
         Color? lightColor = null,
-        bool scaleWithSceneLightMultiplier = true)
+        bool scaleWithSceneLightMultiplier = true,
+        NightLightSortingMode sortingMode = NightLightSortingMode.RelativeToSource,
+        int sourceSortingOrderOffset = -1)
     {
         if (target == null)
         {
@@ -367,7 +452,9 @@ public sealed class NightLightingController : MonoBehaviour
             Mathf.Max(0f, baseIntensity),
             Mathf.Max(0f, nightBoost),
             localOffset ?? new Vector3(0f, 0.18f, 0f),
-            scaleWithSceneLightMultiplier);
+            scaleWithSceneLightMultiplier,
+            sortingMode,
+            sourceSortingOrderOffset);
         return lightSource;
     }
 
@@ -438,7 +525,7 @@ public sealed class NightLightingController : MonoBehaviour
             Destroy(lightSource);
         }
 
-        Transform lightVisual = target.transform.Find("NightLocalLightVisual");
+        Transform lightVisual = target.transform.Find(NightLocalLightSource.VisualObjectName);
         if (lightVisual != null)
         {
             Destroy(lightVisual.gameObject);
@@ -526,6 +613,7 @@ public sealed class NightLightingController : MonoBehaviour
         GameObject overlayObject = overlayTransform != null ? overlayTransform.gameObject : new GameObject(OverlayObjectName);
         overlayObject.transform.SetParent(transform, false);
         overlayObject.layer = NightLightingLayers.VisualLayer;
+        overlayObject.hideFlags = HideFlags.DontSaveInEditor | HideFlags.DontSaveInBuild;
 
         overlayRenderer = overlayObject.GetComponent<SpriteRenderer>();
         if (overlayRenderer == null)
@@ -593,6 +681,8 @@ public sealed class NightLightingController : MonoBehaviour
             return;
         }
 
+        RefreshAnchorBindings();
+
         if (GameplayStageCatalog.IsGameplayScene(currentSceneName))
         {
             RefreshGameplayBindings();
@@ -608,6 +698,26 @@ public sealed class NightLightingController : MonoBehaviour
         if (string.Equals(currentSceneName, MainSceneName, StringComparison.Ordinal))
         {
             RefreshMainSceneBindings();
+        }
+    }
+
+    private void RefreshAnchorBindings()
+    {
+        NightLightingAnchor[] anchors = FindObjectsOfType<NightLightingAnchor>(true);
+        for (int i = 0; i < anchors.Length; i++)
+        {
+            NightLightingAnchor anchor = anchors[i];
+            if (anchor == null || !anchor.gameObject.scene.IsValid())
+            {
+                continue;
+            }
+
+            if (!string.Equals(anchor.gameObject.scene.name, currentSceneName, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            anchor.ApplyLighting();
         }
     }
 
@@ -653,15 +763,15 @@ public sealed class NightLightingController : MonoBehaviour
         TryAttachNamedLight("SpiritInteractable", 1.4f, 0.06f, 0.02f, new Vector3(0f, 0.32f, 0f), new Color(0.74f, 0.89f, 1f, 1f), false, false);
         TryAttachNamedLight("AlbumInteractable", 1.3f, 0.08f, 0.03f, new Vector3(0f, 0.28f, 0f), new Color(1f, 0.82f, 0.62f, 1f), false, true);
         TryAttachNamedLight("GameSceneGateInteractable", 1.7f, 0.08f, 0.03f, new Vector3(0f, 0.36f, 0f), BaseWarmLightColor, false, false);
-        TryAttachNamedLight("TrainingDummy_Left", 1.2f, 0.04f, 0.02f, new Vector3(0f, 0.28f, 0f), new Color(1f, 0.88f, 0.72f, 1f), true, true);
-        TryAttachNamedLight("TrainingDummy_Right", 1.2f, 0.04f, 0.02f, new Vector3(0f, 0.28f, 0f), new Color(1f, 0.88f, 0.72f, 1f), true, true);
+        TryAttachNamedLight("TrainingDummy_Left", 1.2f, 0.04f, 0.02f, new Vector3(0f, 0.28f, 0f), new Color(1f, 0.88f, 0.72f, 1f), false, true);
+        TryAttachNamedLight("TrainingDummy_Right", 1.2f, 0.04f, 0.02f, new Vector3(0f, 0.28f, 0f), new Color(1f, 0.88f, 0.72f, 1f), false, true);
     }
 
     private void RefreshMainSceneBindings()
     {
-        TryAttachNamedLight("GameTitle", 3.6f, 0.12f, 0.08f, new Vector3(0f, 0f, 0f), MainSceneLightColor);
-        TryAttachNamedLight("Title", 2.8f, 0.10f, 0.06f, new Vector3(0f, 0f, 0f), MainSceneLightColor);
-        TryAttachNamedLightContains("HomeButton", 2.4f, 0.10f, 0.08f, new Vector3(0f, 0f, 0f), new Color(0.92f, 0.96f, 1f, 1f));
+        TryAttachNamedLight("GameTitle", 3.6f, 0.10f, 0.04f, new Vector3(0f, 0f, 0f), MainSceneLightColor, false, true, NightLightSortingMode.AccentOverlay);
+        TryAttachNamedLight("Title", 2.8f, 0.08f, 0.04f, new Vector3(0f, 0f, 0f), MainSceneLightColor, false, true, NightLightSortingMode.AccentOverlay);
+        TryAttachNamedLightContains("HomeButton", 2.4f, 0.08f, 0.04f, new Vector3(0f, 0f, 0f), new Color(0.92f, 0.96f, 1f, 1f), NightLightSortingMode.AccentOverlay);
     }
 
     private void TryAttachNamedLight(
@@ -672,7 +782,8 @@ public sealed class NightLightingController : MonoBehaviour
         Vector3 localOffset,
         Color lightColor,
         bool withShadow = false,
-        bool allowAnchorOnly = true)
+        bool allowAnchorOnly = true,
+        NightLightSortingMode sortingMode = NightLightSortingMode.RelativeToSource)
     {
         GameObject target = FindSceneObjectByName(objectName);
         if (target == null)
@@ -685,7 +796,7 @@ public sealed class NightLightingController : MonoBehaviour
             return;
         }
 
-        EnsureLocalLight(target, radius, baseIntensity, nightBoost, localOffset, lightColor);
+        EnsureLocalLight(target, radius, baseIntensity, nightBoost, localOffset, lightColor, true, sortingMode);
         if (withShadow)
         {
             EnsureProjectedShadow(target);
@@ -698,7 +809,8 @@ public sealed class NightLightingController : MonoBehaviour
         float baseIntensity,
         float nightBoost,
         Vector3 localOffset,
-        Color lightColor)
+        Color lightColor,
+        NightLightSortingMode sortingMode = NightLightSortingMode.RelativeToSource)
     {
         GameObject target = FindSceneObjectByContains(objectNameFragment);
         if (target == null)
@@ -706,29 +818,13 @@ public sealed class NightLightingController : MonoBehaviour
             return;
         }
 
-        EnsureLocalLight(target, radius, baseIntensity, nightBoost, localOffset, lightColor);
+        EnsureLocalLight(target, radius, baseIntensity, nightBoost, localOffset, lightColor, true, sortingMode);
     }
 
     private void ConfigureViewportLightsForScene(string sceneName)
     {
         if (GameplayStageCatalog.IsGameplayScene(sceneName))
         {
-            AddViewportLight(
-                "GameplaySunCore",
-                new Vector2(0.08f, 0.96f),
-                new Vector3(-1.2f, 0.9f, 0f),
-                8.8f,
-                0.08f,
-                0f,
-                new Color(1f, 0.84f, 0.60f, 1f));
-            AddViewportLight(
-                "GameplaySunSpread",
-                new Vector2(0.16f, 0.92f),
-                new Vector3(-0.4f, 0.4f, 0f),
-                12.5f,
-                0.04f,
-                0f,
-                new Color(1f, 0.92f, 0.76f, 1f));
             return;
         }
 
@@ -760,8 +856,17 @@ public sealed class NightLightingController : MonoBehaviour
         GameObject anchorObject = new GameObject(lightName);
         anchorObject.transform.SetParent(accentRoot, false);
         anchorObject.layer = NightLightingLayers.VisualLayer;
+        anchorObject.hideFlags = HideFlags.DontSaveInEditor | HideFlags.DontSaveInBuild;
 
-        NightLocalLightSource lightSource = EnsureLocalLight(anchorObject, radius, baseIntensity, nightBoost, Vector3.zero, lightColor);
+        NightLocalLightSource lightSource = EnsureLocalLight(
+            anchorObject,
+            radius,
+            baseIntensity,
+            nightBoost,
+            Vector3.zero,
+            lightColor,
+            false,
+            NightLightSortingMode.AccentOverlay);
         viewportLights.Add(new ViewportLightBinding(anchorObject.transform, lightSource, viewportPosition, worldOffset));
     }
 
@@ -781,6 +886,7 @@ public sealed class NightLightingController : MonoBehaviour
 
         GameObject accentObject = new GameObject(AccentRootObjectName);
         accentObject.transform.SetParent(transform, false);
+        accentObject.hideFlags = HideFlags.DontSaveInEditor | HideFlags.DontSaveInBuild;
         accentRoot = accentObject.transform;
     }
 
@@ -872,8 +978,34 @@ public sealed class NightLightingController : MonoBehaviour
             return null;
         }
 
+        SceneNightProfile assetProfile = ResolveProfileAsset(sceneName);
+        if (assetProfile != null)
+        {
+            return assetProfile;
+        }
+
         Profiles.TryGetValue(sceneName, out SceneNightProfile profile);
         return profile;
+    }
+
+    private static SceneNightProfile ResolveProfileAsset(string sceneName)
+    {
+        NightLightingProfileAsset[] assets = Resources.LoadAll<NightLightingProfileAsset>(ProfileResourcePath);
+        for (int i = 0; i < assets.Length; i++)
+        {
+            NightLightingProfileAsset asset = assets[i];
+            if (asset == null)
+            {
+                continue;
+            }
+
+            if (string.Equals(asset.TargetSceneName, sceneName, StringComparison.Ordinal))
+            {
+                return asset.CreateProfile(sceneName);
+            }
+        }
+
+        return null;
     }
 
     private static void EnsureCameraIncludesEffectLayer(Camera camera)
@@ -890,7 +1022,7 @@ public sealed class NightLightingController : MonoBehaviour
         }
     }
 
-    private static SpriteRenderer ResolvePrimarySpriteRenderer(GameObject target)
+    public static SpriteRenderer ResolvePrimarySpriteRenderer(GameObject target)
     {
         if (target == null)
         {
@@ -898,7 +1030,7 @@ public sealed class NightLightingController : MonoBehaviour
         }
 
         SpriteRenderer directRenderer = target.GetComponent<SpriteRenderer>();
-        if (directRenderer != null)
+        if (directRenderer != null && !IsGeneratedLightingRenderer(directRenderer))
         {
             return directRenderer;
         }
@@ -912,7 +1044,7 @@ public sealed class NightLightingController : MonoBehaviour
                 continue;
             }
 
-            if (candidate.GetComponent<ProjectedShadowFollowerShadowMarker>() != null)
+            if (IsGeneratedLightingRenderer(candidate))
             {
                 continue;
             }
@@ -921,6 +1053,19 @@ public sealed class NightLightingController : MonoBehaviour
         }
 
         return null;
+    }
+
+    private static bool IsGeneratedLightingRenderer(SpriteRenderer candidate)
+    {
+        if (candidate == null)
+        {
+            return true;
+        }
+
+        string objectName = candidate.gameObject.name;
+        return string.Equals(objectName, ProjectedShadowFollower.ShadowObjectName, StringComparison.Ordinal) ||
+               string.Equals(objectName, NightLocalLightSource.VisualObjectName, StringComparison.Ordinal) ||
+               string.Equals(objectName, OverlayObjectName, StringComparison.Ordinal);
     }
 
     private static GameObject FindByTagSafe(string tag)
@@ -1136,6 +1281,7 @@ internal static class NightLightingVisualFactory
 {
     private static Sprite unitSprite;
     private static Sprite radialGlowSprite;
+    private static Material additiveGlowMaterial;
 
     public static Sprite GetUnitSprite()
     {
@@ -1196,6 +1342,37 @@ internal static class NightLightingVisualFactory
             textureSize);
         radialGlowSprite.name = "NightLightingRadialGlowSprite";
         return radialGlowSprite;
+    }
+
+    public static Material GetAdditiveGlowMaterial()
+    {
+        if (additiveGlowMaterial != null)
+        {
+            return additiveGlowMaterial;
+        }
+
+        Shader shader = Shader.Find("Arcitecture/NightLightingAdditive");
+        if (shader == null)
+        {
+            shader = Shader.Find("Particles/Additive");
+        }
+
+        if (shader == null)
+        {
+            shader = Shader.Find("Sprites/Default");
+        }
+
+        if (shader == null)
+        {
+            return null;
+        }
+
+        additiveGlowMaterial = new Material(shader)
+        {
+            name = "RuntimeNightLightingAdditiveGlow",
+            hideFlags = HideFlags.HideAndDontSave
+        };
+        return additiveGlowMaterial;
     }
 
     public static int GetTopSortingLayerId()
