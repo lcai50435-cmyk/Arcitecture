@@ -124,6 +124,11 @@ jobs:
             -arcitectureGitSha ${{ steps.source.outputs.sha }}
             -arcitectureGitDescribe ${{ steps.version.outputs.release_tag || steps.version.outputs.source_ref }}
 
+      - name: Fix build output ownership
+        shell: bash
+        run: |
+          sudo chown -R "${USER}:${USER}" Builds
+
       - name: Prepare Pages files
         shell: bash
         run: |
