@@ -5,6 +5,7 @@ using UnityEngine;
 [RequireComponent(typeof(EnemyAvoidObstacle))]
 [RequireComponent(typeof(CharacterCore))]
 [RequireComponent(typeof(SpriteRenderer))]
+[RequireComponent(typeof(BoxCollider2D))]
 public sealed class SpriteCompanionFollowController : MonoBehaviour
 {
     private const float CompanionMoveSpeedMultiplier = 0.7f;
@@ -23,6 +24,8 @@ public sealed class SpriteCompanionFollowController : MonoBehaviour
     private CharacterCore companionCore;
     private SpriteRenderer companionRenderer;
     private Collider2D companionCollider;
+    private BoxCollider2D companionBoxCollider;
+    private Sprite colliderSourceSprite;
 
     private Transform playerTransform;
     private CharacterCore playerCore;
@@ -39,15 +42,20 @@ public sealed class SpriteCompanionFollowController : MonoBehaviour
             ? targetPlayerCore
             : (playerTransform != null ? playerTransform.GetComponent<CharacterCore>() : null);
         playerRenderer = playerTransform != null ? playerTransform.GetComponent<SpriteRenderer>() : null;
+        companionRenderer = GetComponent<SpriteRenderer>();
+        companionBoxCollider = targetCompanionCollider as BoxCollider2D ?? GetComponent<BoxCollider2D>();
         companionCollider = targetCompanionCollider != null
             ? targetCompanionCollider
-            : GetComponent<Collider2D>();
+            : companionBoxCollider != null
+                ? companionBoxCollider
+                : GetComponent<Collider2D>();
 
         if (playerTransform == null)
         {
             return;
         }
 
+        SyncCompanionCollider();
         IgnorePlayerCollisions();
         SyncSortingFromPlayer();
         float initialDistanceToPlayer = Vector2.Distance(transform.position, playerTransform.position);
@@ -69,7 +77,8 @@ public sealed class SpriteCompanionFollowController : MonoBehaviour
         avoidObstacle = GetComponent<EnemyAvoidObstacle>();
         companionCore = GetComponent<CharacterCore>();
         companionRenderer = GetComponent<SpriteRenderer>();
-        companionCollider = GetComponent<Collider2D>();
+        companionBoxCollider = GetComponent<BoxCollider2D>();
+        companionCollider = companionBoxCollider != null ? companionBoxCollider : GetComponent<Collider2D>();
     }
 
     private void Update()
@@ -81,6 +90,7 @@ public sealed class SpriteCompanionFollowController : MonoBehaviour
         }
 
         SyncSortingFromPlayer();
+        SyncCompanionCollider();
         float distanceToPlayer = Vector2.Distance(transform.position, playerTransform.position);
         SyncMoveSpeed(distanceToPlayer);
     }
@@ -333,6 +343,23 @@ public sealed class SpriteCompanionFollowController : MonoBehaviour
 
         companionRenderer.sortingLayerID = playerRenderer.sortingLayerID;
         companionRenderer.sortingOrder = playerRenderer.sortingOrder - 1;
+    }
+
+    private void SyncCompanionCollider()
+    {
+        if (companionBoxCollider == null || companionRenderer == null)
+        {
+            return;
+        }
+
+        Sprite currentSprite = companionRenderer.sprite;
+        if (currentSprite == colliderSourceSprite)
+        {
+            return;
+        }
+
+        SpriteCompanionRuntime.ConfigureCompanionCollider(companionBoxCollider, companionRenderer);
+        colliderSourceSprite = currentSprite;
     }
 
     private void SyncMoveSpeed(float distanceToPlayer = 0f)

@@ -23,16 +23,15 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
 {
     public const string RootObjectName = "IllustratedHandbookCanvasUI";
     public const string IllustratedHandbookCanvasName = "IllustratedHandbookCanvas";
-    public const string PersonalInformationCanvasName = "PersonalInformationCanvas";
-    public const string PhotoAlbumCanvasName = "PhotoAlbumCanvas";
-    public const string MissionCanvasName = "MissionCanvas";
-    public const string SettingCanvasName = "SettingCanvas";
 
-    private static readonly string LegacyPersonalInformationCanvasName = string.Concat("Personal", "nformationCanvas");
     private const string BackgroundName = "BackGround";
     private const string TabsRailName = "TabsRail";
     private const string SelectedTabsRailName = "SelectedTabsRail";
     private const string ContentPanelName = "ContentPanel";
+    private const string BookScrollViewName = "BookScrollView";
+    private const string BookViewportName = "Viewport";
+    private const string BookContentName = "Content";
+    private const string BookPageContentPrefix = "PageContent_";
     private const string PageTagName = "PageTag";
     private const string TitleName = "Title";
     private const string SubtitleName = "Subtitle";
@@ -40,12 +39,11 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
     private const string FooterName = "Footer";
 
     private static readonly Color PageBackgroundColor = new Color(0.20f, 0.15f, 0.10f, 0.76f);
-    private static readonly Color PagePanelColor = new Color(0.16f, 0.12f, 0.08f, 0.78f);
     private static readonly Color SelectedButtonColor = new Color(0.78f, 0.62f, 0.33f, 0.98f);
-    private static readonly Color TitleColor = new Color(0.98f, 0.95f, 0.87f, 1f);
-    private static readonly Color SubtitleColor = new Color(0.84f, 0.81f, 0.73f, 1f);
-    private static readonly Color BodyColor = new Color(0.92f, 0.90f, 0.86f, 1f);
-    private static readonly Color FooterColor = new Color(0.76f, 0.73f, 0.68f, 1f);
+    private static readonly Color TitleColor = new Color(0.27f, 0.18f, 0.09f, 1f);
+    private static readonly Color SubtitleColor = new Color(0.40f, 0.28f, 0.16f, 1f);
+    private static readonly Color BodyColor = new Color(0.24f, 0.18f, 0.12f, 1f);
+    private static readonly Color FooterColor = new Color(0.48f, 0.38f, 0.25f, 1f);
     private static readonly Color CloseButtonColor = new Color(0.48f, 0.16f, 0.14f, 0.96f);
     private static readonly Color SelectedBookmarkTint = new Color(0.92f, 0.92f, 0.90f, 1f);
     private static readonly Color InactiveBookmarkTint = new Color(0.72f, 0.72f, 0.70f, 0.96f);
@@ -60,28 +58,24 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
     private const float CloseButtonX = 840f;
     private const float CloseButtonY = -330f;
 
+    private const float BookSafeLeft = 190f;
+    private const float BookSafeRight = 900f;
+    private const float BookSafeTop = 118f;
+    private const float BookSafeBottom = 118f;
+    private const float BookContentHeight = 920f;
+    private const float BookScrollSensitivity = 34f;
+
     [SerializeField] private UIManager owner;
 
-    [Header("标准页根")]
+    [Header("书本根")]
     [SerializeField] private GameObject illustratedHandbookCanvas;
-    [SerializeField] private GameObject personalInformationCanvas;
-    [SerializeField] private GameObject photoAlbumCanvas;
-    [SerializeField] private GameObject missionCanvas;
-    [SerializeField] private GameObject settingCanvas;
-
-    [Header("页签按钮")]
-    [SerializeField] private Button illustratedHandbookButton;
-    [SerializeField] private Button personalInformationButton;
-    [SerializeField] private Button photoAlbumButton;
-    [SerializeField] private Button missionButton;
-    [SerializeField] private Button settingButton;
 
     [Header("配置")]
     [SerializeField] private IllustratedHandbookPage defaultPage = IllustratedHandbookPage.IllustratedHandbook;
     [SerializeField] private Button closeButton;
 
-    private readonly Dictionary<IllustratedHandbookPage, GameObject> pageRoots =
-        new Dictionary<IllustratedHandbookPage, GameObject>();
+    private readonly Dictionary<IllustratedHandbookPage, RectTransform> pageContentRoots =
+        new Dictionary<IllustratedHandbookPage, RectTransform>();
 
     private readonly Dictionary<IllustratedHandbookPage, List<Button>> tabButtons =
         new Dictionary<IllustratedHandbookPage, List<Button>>();
@@ -94,7 +88,11 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
 
     private static readonly Dictionary<IllustratedHandbookPage, Sprite> BookmarkSpriteCache =
         new Dictionary<IllustratedHandbookPage, Sprite>();
+    private static readonly Dictionary<string, Sprite> BookmarkAssetCache =
+        new Dictionary<string, Sprite>(StringComparer.Ordinal);
 
+    private ScrollRect sharedBookScrollRect;
+    private RectTransform sharedBookContentRoot;
     private bool initialized;
 
     public static IllustratedHandbookTabsController EnsureInstalled(UIManager manager)
@@ -104,56 +102,44 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
             return null;
         }
 
-        GameObject handbookPage = manager.illustratedHandbook;
-        GameObject standardRoot = FindExistingStandardRoot(handbookPage);
-        GameObject rootObject = standardRoot != null
-            ? standardRoot
-            : string.Equals(handbookPage.name, RootObjectName, StringComparison.Ordinal)
-            ? handbookPage
-            : ResolveOrCreateRoot(handbookPage);
-        IllustratedHandbookTabsController controller = rootObject.GetComponent<IllustratedHandbookTabsController>();
+        GameObject handbookObject = manager.illustratedHandbook;
+        GameObject chromeObject = ResolveChromeObject(handbookObject);
+        if (chromeObject == null)
+        {
+            return null;
+        }
+
+        IllustratedHandbookTabsController controller = chromeObject.GetComponent<IllustratedHandbookTabsController>();
         if (controller == null)
         {
-            controller = rootObject.AddComponent<IllustratedHandbookTabsController>();
+            controller = chromeObject.AddComponent<IllustratedHandbookTabsController>();
         }
 
         controller.owner = manager;
-        controller.illustratedHandbookCanvas = rootObject == handbookPage || rootObject == standardRoot
-            ? controller.ResolveOrCreatePageRoot(IllustratedHandbookCanvasName)
-            : string.Equals(handbookPage.name, RootObjectName, StringComparison.Ordinal)
-            ? controller.ResolveOrCreatePageRoot(IllustratedHandbookCanvasName)
-            : ResolveOrAttachPage(rootObject.transform, handbookPage, IllustratedHandbookCanvasName);
-        controller.personalInformationCanvas = controller.ResolveOrCreatePageRoot(PersonalInformationCanvasName);
-        controller.photoAlbumCanvas = controller.ResolveOrCreatePageRoot(PhotoAlbumCanvasName);
-        controller.missionCanvas = controller.ResolveOrCreatePageRoot(MissionCanvasName);
-        controller.settingCanvas = controller.ResolveOrCreatePageRoot(SettingCanvasName);
+        controller.illustratedHandbookCanvas = chromeObject;
         controller.EnsureInitialized();
-
-        manager.illustratedHandbook = controller.gameObject;
+        manager.illustratedHandbook = chromeObject;
         return controller;
     }
 
     public void SwitchToPage(IllustratedHandbookPage page)
     {
+        page = NormalizePage(page);
         if (!initialized)
         {
             EnsureInitialized();
         }
 
         RefreshGeneratedPageContent();
-
-        foreach (KeyValuePair<IllustratedHandbookPage, GameObject> entry in pageRoots)
-        {
-            if (entry.Value == null)
-            {
-                continue;
-            }
-
-            bool visible = entry.Key == page;
-            entry.Value.SetActive(visible);
-        }
-
+        ActivateChromeRoot();
+        SetActiveGeneratedPage(page);
         UpdateButtonState(page);
+        ResetScrollPosition();
+    }
+
+    public void OpenPage(IllustratedHandbookPage page)
+    {
+        SwitchToPage(page);
     }
 
     public void ResetToDefaultPage()
@@ -177,6 +163,7 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
     private void EnsureInitialized()
     {
         EnsureRootCanvas();
+        NormalizePageRoot(illustratedHandbookCanvas);
 
         if (initialized)
         {
@@ -184,7 +171,6 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
             return;
         }
 
-        RegisterPageRoots();
         EnsurePageScaffolding();
         BindPageButtons();
         BindCloseButtons();
@@ -193,112 +179,75 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         ResetToDefaultPage();
     }
 
-    private void RegisterPageRoots()
+    private static GameObject ResolveChromeObject(GameObject handbookObject)
     {
-        pageRoots.Clear();
-        pageRoots[IllustratedHandbookPage.IllustratedHandbook] = illustratedHandbookCanvas;
-        pageRoots[IllustratedHandbookPage.PersonalInformation] = personalInformationCanvas;
-        pageRoots[IllustratedHandbookPage.PhotoAlbum] = photoAlbumCanvas;
-        pageRoots[IllustratedHandbookPage.Mission] = missionCanvas;
-        pageRoots[IllustratedHandbookPage.Setting] = settingCanvas;
-
-        foreach (KeyValuePair<IllustratedHandbookPage, GameObject> entry in pageRoots)
+        if (handbookObject == null)
         {
-            NormalizePageRoot(entry.Value);
+            return null;
         }
+
+        if (string.Equals(handbookObject.name, IllustratedHandbookCanvasName, StringComparison.Ordinal))
+        {
+            return handbookObject;
+        }
+
+        if (string.Equals(handbookObject.name, RootObjectName, StringComparison.Ordinal))
+        {
+            Transform chromeChild = FindDirectChild(handbookObject.transform, IllustratedHandbookCanvasName);
+            if (chromeChild != null)
+            {
+                return chromeChild.gameObject;
+            }
+        }
+
+        Transform handbookChild = FindDirectChild(handbookObject.transform, IllustratedHandbookCanvasName);
+        if (handbookChild != null)
+        {
+            return handbookChild.gameObject;
+        }
+
+        return handbookObject;
     }
 
     private void EnsurePageScaffolding()
     {
-        EnsureGeneratedPage(illustratedHandbookCanvas, "图鉴总览", "已解锁结构、当前运行进度与入口导航。");
-        EnsureGeneratedPage(personalInformationCanvas, "角色", "当前角色、装备与图鉴进度摘要。");
-        EnsureGeneratedPage(photoAlbumCanvas, "相册留念", "本地照片数量与最近留念记录。");
-        EnsureGeneratedPage(missionCanvas, "任务", "关卡开放状态与当前场景进度。");
-        EnsureGeneratedPage(settingCanvas, "设置", "当前配置摘要，完整设置仍走原入口。");
-
-        EnsureTabsRail(IllustratedHandbookPage.IllustratedHandbook, illustratedHandbookCanvas);
-        EnsureTabsRail(IllustratedHandbookPage.PersonalInformation, personalInformationCanvas);
-        EnsureTabsRail(IllustratedHandbookPage.PhotoAlbum, photoAlbumCanvas);
-        EnsureTabsRail(IllustratedHandbookPage.Mission, missionCanvas);
-        EnsureTabsRail(IllustratedHandbookPage.Setting, settingCanvas);
-    }
-
-    private void BindPageButtons()
-    {
-        tabButtons.Clear();
-        buttonTexts.Clear();
-
-        RegisterTabsForPage(IllustratedHandbookPage.IllustratedHandbook, illustratedHandbookCanvas);
-        RegisterTabsForPage(IllustratedHandbookPage.PersonalInformation, personalInformationCanvas);
-        RegisterTabsForPage(IllustratedHandbookPage.PhotoAlbum, photoAlbumCanvas);
-        RegisterTabsForPage(IllustratedHandbookPage.Mission, missionCanvas);
-        RegisterTabsForPage(IllustratedHandbookPage.Setting, settingCanvas);
-
-        illustratedHandbookButton = GetPrimaryButton(IllustratedHandbookPage.IllustratedHandbook);
-        personalInformationButton = GetPrimaryButton(IllustratedHandbookPage.PersonalInformation);
-        photoAlbumButton = GetPrimaryButton(IllustratedHandbookPage.PhotoAlbum);
-        missionButton = GetPrimaryButton(IllustratedHandbookPage.Mission);
-        settingButton = GetPrimaryButton(IllustratedHandbookPage.Setting);
-    }
-
-    private void BindCloseButtons()
-    {
-        closeButton = null;
-
-        foreach (KeyValuePair<IllustratedHandbookPage, GameObject> entry in pageRoots)
-        {
-            GameObject pageRoot = entry.Value;
-            if (pageRoot == null)
-            {
-                continue;
-            }
-
-            Button pageCloseButton = FindButtonByName(pageRoot.transform, "CloseButton");
-            if (pageCloseButton == null)
-            {
-                continue;
-            }
-
-            pageCloseButton.onClick.RemoveListener(HandleCloseRequested);
-            pageCloseButton.onClick.AddListener(HandleCloseRequested);
-            if (closeButton == null)
-            {
-                closeButton = pageCloseButton;
-            }
-        }
-    }
-
-    private void HandleCloseRequested()
-    {
-        UIManager targetManager = owner != null ? owner : FindObjectOfType<UIManager>(true);
-        if (targetManager != null)
-        {
-            targetManager.CloseIllustratedHandbook();
-            return;
-        }
-
-        gameObject.SetActive(false);
-    }
-
-    private void EnsureGeneratedPage(GameObject pageRoot, string title, string subtitle)
-    {
-        if (pageRoot == null)
+        GameObject chromeRoot = GetChromePageRoot();
+        if (chromeRoot == null)
         {
             return;
         }
 
-        Transform background = FindDirectChild(pageRoot.transform, BackgroundName);
+        Transform background = FindOrCreateBackground(chromeRoot.transform);
+        Transform contentPanel = EnsureContentPanel(background);
+        sharedBookContentRoot = EnsureSharedContent(contentPanel);
+
+        EnsureGeneratedPage(IllustratedHandbookPage.IllustratedHandbook, "图鉴总览", "已解锁结构、当前运行进度与入口导航。");
+        EnsureGeneratedPage(IllustratedHandbookPage.PersonalInformation, "角色", "当前角色、装备与图鉴进度摘要。");
+        EnsureGeneratedPage(IllustratedHandbookPage.PhotoAlbum, "相册留念", "本地照片数量与最近留念记录。");
+        EnsureGeneratedPage(IllustratedHandbookPage.Setting, "设置", "当前配置摘要，保持在书页区域内显示。");
+
+        EnsureTabsRail(chromeRoot.transform, background as RectTransform);
+    }
+
+    private Transform FindOrCreateBackground(Transform pageRoot)
+    {
+        Transform background = FindDirectChild(pageRoot, BackgroundName);
         bool usesPrefabBackground = background != null;
         if (background == null)
         {
-            background = CreateUiObject(BackgroundName, pageRoot.transform).transform;
+            background = CreateUiObject(BackgroundName, pageRoot).transform;
         }
 
         RectTransform backgroundRect = background as RectTransform;
-        if (backgroundRect != null && !usesPrefabBackground)
+        if (backgroundRect != null)
         {
-            SetStretch(backgroundRect, 48f, 48f, 48f, 48f);
+            if (!usesPrefabBackground)
+            {
+                SetStretch(backgroundRect, 48f, 48f, 48f, 48f);
+            }
+
             backgroundRect.localScale = Vector3.one;
+            backgroundRect.anchoredPosition = Vector2.zero;
         }
 
         Image backgroundImage = background.GetComponent<Image>();
@@ -313,62 +262,8 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         }
 
         backgroundImage.raycastTarget = false;
-
-        Transform contentPanel = FindDirectChild(background, ContentPanelName);
-        if (contentPanel == null)
-        {
-            contentPanel = CreateUiObject(ContentPanelName, background).transform;
-        }
-
-        contentPanel.gameObject.SetActive(true);
         HideLegacyBackgroundChildren(background);
-
-        RectTransform contentRect = contentPanel as RectTransform;
-        if (contentRect != null)
-        {
-            if (usesPrefabBackground)
-            {
-                SetStretch(contentRect, 96f, 760f, 92f, 112f);
-            }
-            else
-            {
-                SetStretch(contentRect, 72f, 280f, 72f, 72f);
-            }
-        }
-
-        TMP_Text pageTag = EnsureContentText(contentPanel, PageTagName, "统一多页签图鉴", 20f, SubtitleColor, TextAlignmentOptions.Left);
-        ConfigureAnchoredRect(pageTag.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(420f, 34f), new Vector2(0f, -8f), new Vector2(0f, 1f));
-
-        TMP_Text titleText = EnsureContentText(contentPanel, TitleName, title, 42f, TitleColor, TextAlignmentOptions.Left, FontStyles.Bold);
-        ConfigureAnchoredRect(titleText.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(620f, 56f), new Vector2(0f, -56f), new Vector2(0f, 1f));
-
-        TMP_Text subtitleText = EnsureContentText(contentPanel, SubtitleName, subtitle, 24f, SubtitleColor, TextAlignmentOptions.Left);
-        ConfigureAnchoredRect(subtitleText.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(880f, 36f), new Vector2(0f, -114f), new Vector2(0f, 1f));
-
-        TMP_Text bodyText = EnsureContentText(contentPanel, BodyName, string.Empty, 28f, BodyColor, TextAlignmentOptions.TopLeft);
-        SetStretch(bodyText.rectTransform, 24f, 24f, 156f, 92f);
-        bodyText.rectTransform.pivot = new Vector2(0f, 1f);
-
-        TMP_Text footerText = EnsureContentText(contentPanel, FooterName, string.Empty, 21f, FooterColor, TextAlignmentOptions.BottomLeft);
-        ConfigureAnchoredRect(footerText.rectTransform, new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(0f, 52f), new Vector2(0f, 16f), new Vector2(0f, 0f));
-
-        Image contentPanelImage = contentPanel.GetComponent<Image>();
-        if (contentPanelImage == null)
-        {
-            contentPanelImage = contentPanel.gameObject.AddComponent<Image>();
-        }
-
-        if (usesPrefabBackground)
-        {
-            contentPanelImage.sprite = null;
-            contentPanelImage.color = Color.clear;
-        }
-        else
-        {
-            RuntimeUiSpriteFactory.ApplyRoundedSprite(contentPanelImage, PagePanelColor, 20, 18, 1.2f);
-        }
-
-        contentPanelImage.raycastTarget = false;
+        return background;
     }
 
     private static void HideLegacyBackgroundChildren(Transform background)
@@ -398,37 +293,157 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         }
     }
 
-    private void EnsureTabsRail(IllustratedHandbookPage hostPage, GameObject pageRoot)
+    private Transform EnsureContentPanel(Transform background)
     {
-        if (pageRoot == null)
+        Transform contentPanel = FindDirectChild(background, ContentPanelName);
+        if (contentPanel == null)
         {
-            return;
+            contentPanel = CreateUiObject(ContentPanelName, background).transform;
         }
 
-        Transform background = FindDirectChild(pageRoot.transform, BackgroundName);
-        Transform chromeParent = pageRoot.transform;
-        Transform existingRail = FindDirectChild(chromeParent, TabsRailName);
-        if (existingRail == null && background != null)
+        contentPanel.gameObject.SetActive(true);
+
+        RectTransform contentRect = contentPanel as RectTransform;
+        if (contentRect != null)
         {
-            existingRail = FindDirectChild(background, TabsRailName);
+            SetStretch(contentRect, BookSafeLeft, BookSafeRight, BookSafeTop, BookSafeBottom);
         }
 
-        GameObject railObject = existingRail != null ? existingRail.gameObject : CreateUiObject(TabsRailName, chromeParent);
-        if (railObject.transform.parent != chromeParent)
+        Image image = contentPanel.GetComponent<Image>();
+        if (image == null)
         {
-            railObject.transform.SetParent(chromeParent, false);
+            image = contentPanel.gameObject.AddComponent<Image>();
         }
 
-        railObject.SetActive(true);
+        image.sprite = null;
+        image.color = Color.clear;
+        image.raycastTarget = false;
+        return contentPanel;
+    }
 
-        VerticalLayoutGroup legacyLayoutGroup = railObject.GetComponent<VerticalLayoutGroup>();
-        if (legacyLayoutGroup != null)
+    private RectTransform EnsureSharedContent(Transform contentPanel)
+    {
+        Transform scrollRoot = FindDirectChild(contentPanel, BookScrollViewName);
+        if (scrollRoot == null)
         {
-            legacyLayoutGroup.enabled = false;
+            scrollRoot = CreateUiObject(BookScrollViewName, contentPanel).transform;
         }
 
-        RectTransform railRect = railObject.GetComponent<RectTransform>();
-        RectTransform backgroundRect = background as RectTransform;
+        RectTransform scrollRectTransform = scrollRoot as RectTransform;
+        SetStretch(scrollRectTransform, 0f, 0f, 0f, 0f);
+
+        Image scrollImage = scrollRoot.GetComponent<Image>();
+        if (scrollImage == null)
+        {
+            scrollImage = scrollRoot.gameObject.AddComponent<Image>();
+        }
+
+        scrollImage.color = new Color(1f, 1f, 1f, 0.001f);
+        scrollImage.raycastTarget = true;
+
+        ScrollRect scrollRect = scrollRoot.GetComponent<ScrollRect>();
+        if (scrollRect == null)
+        {
+            scrollRect = scrollRoot.gameObject.AddComponent<ScrollRect>();
+        }
+
+        scrollRect.horizontal = false;
+        scrollRect.vertical = true;
+        scrollRect.movementType = ScrollRect.MovementType.Clamped;
+        scrollRect.inertia = true;
+        scrollRect.scrollSensitivity = BookScrollSensitivity;
+
+        Transform viewport = FindDirectChild(scrollRoot, BookViewportName);
+        if (viewport == null)
+        {
+            viewport = CreateUiObject(BookViewportName, scrollRoot).transform;
+        }
+
+        RectTransform viewportRect = viewport as RectTransform;
+        SetStretch(viewportRect, 0f, 0f, 0f, 0f);
+
+        Image viewportImage = viewport.GetComponent<Image>();
+        if (viewportImage == null)
+        {
+            viewportImage = viewport.gameObject.AddComponent<Image>();
+        }
+
+        viewportImage.color = new Color(1f, 1f, 1f, 0.001f);
+        viewportImage.raycastTarget = true;
+
+        if (viewport.GetComponent<RectMask2D>() == null)
+        {
+            viewport.gameObject.AddComponent<RectMask2D>();
+        }
+
+        Transform content = FindDirectChild(viewport, BookContentName);
+        if (content == null)
+        {
+            content = CreateUiObject(BookContentName, viewport).transform;
+        }
+
+        RectTransform contentRect = content as RectTransform;
+        ConfigureAnchoredRect(
+            contentRect,
+            new Vector2(0f, 1f),
+            new Vector2(1f, 1f),
+            new Vector2(0f, BookContentHeight),
+            Vector2.zero,
+            new Vector2(0.5f, 1f));
+
+        scrollRect.viewport = viewportRect;
+        scrollRect.content = contentRect;
+        sharedBookScrollRect = scrollRect;
+        return contentRect;
+    }
+
+    private void EnsureGeneratedPage(IllustratedHandbookPage page, string title, string subtitle)
+    {
+        string pageName = $"{BookPageContentPrefix}{page}";
+        Transform pageTransform = FindDirectChild(sharedBookContentRoot, pageName);
+        if (pageTransform == null)
+        {
+            pageTransform = CreateUiObject(pageName, sharedBookContentRoot).transform;
+        }
+
+        RectTransform pageRect = pageTransform as RectTransform;
+        ConfigureAnchoredRect(
+            pageRect,
+            new Vector2(0f, 1f),
+            new Vector2(1f, 1f),
+            new Vector2(0f, BookContentHeight),
+            Vector2.zero,
+            new Vector2(0.5f, 1f));
+
+        TMP_Text pageTag = EnsureContentText(pageTransform, PageTagName, "统一多页签图鉴书", 18f, FooterColor, TextAlignmentOptions.Left);
+        ConfigureTopStretchRect(pageTag.rectTransform, 0f, 0f, 8f, 28f);
+
+        TMP_Text titleText = EnsureContentText(pageTransform, TitleName, title, 36f, TitleColor, TextAlignmentOptions.Left, FontStyles.Bold);
+        ConfigureTopStretchRect(titleText.rectTransform, 0f, 0f, 44f, 52f);
+
+        TMP_Text subtitleText = EnsureContentText(pageTransform, SubtitleName, subtitle, 21f, SubtitleColor, TextAlignmentOptions.Left);
+        ConfigureTopStretchRect(subtitleText.rectTransform, 0f, 0f, 98f, 38f);
+
+        TMP_Text bodyText = EnsureContentText(pageTransform, BodyName, string.Empty, 23f, BodyColor, TextAlignmentOptions.TopLeft);
+        ConfigureTopStretchRect(bodyText.rectTransform, 0f, 0f, 154f, 520f);
+        bodyText.lineSpacing = 10f;
+
+        TMP_Text footerText = EnsureContentText(pageTransform, FooterName, string.Empty, 18f, FooterColor, TextAlignmentOptions.TopLeft);
+        ConfigureTopStretchRect(footerText.rectTransform, 0f, 0f, 710f, 84f);
+
+        pageContentRoots[page] = pageRect;
+    }
+
+    private void EnsureTabsRail(Transform chromeRoot, RectTransform backgroundRect)
+    {
+        Transform rail = FindDirectChild(chromeRoot, TabsRailName);
+        if (rail == null)
+        {
+            rail = CreateUiObject(TabsRailName, chromeRoot).transform;
+        }
+
+        rail.gameObject.SetActive(true);
+        RectTransform railRect = rail as RectTransform;
         if (backgroundRect != null)
         {
             CopyRectTransform(railRect, backgroundRect);
@@ -438,76 +453,42 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
             SetStretch(railRect, 0f, 0f, 0f, 0f);
         }
 
-        if (background != null)
-        {
-            railRect.SetSiblingIndex(background.GetSiblingIndex());
-        }
-
-        Transform selectedRail = EnsureSelectedTabsRail(chromeParent, background, backgroundRect);
-
-        CreateTabButton(railObject.transform, hostPage, IllustratedHandbookPage.IllustratedHandbook, "图鉴");
-        CreateTabButton(railObject.transform, hostPage, IllustratedHandbookPage.PersonalInformation, "角色");
-        CreateTabButton(railObject.transform, hostPage, IllustratedHandbookPage.PhotoAlbum, "相册");
-        CreateTabButton(railObject.transform, hostPage, IllustratedHandbookPage.Setting, "设置");
-
-        CreateCloseButton(railObject.transform, hostPage);
-        HideUnusedTabButton(railObject.transform, IllustratedHandbookPage.Mission);
-        HideUnusedTabButton(selectedRail, IllustratedHandbookPage.Mission);
-    }
-
-    private static Transform EnsureSelectedTabsRail(Transform chromeParent, Transform background, RectTransform backgroundRect)
-    {
-        Transform selectedRail = FindDirectChild(chromeParent, SelectedTabsRailName);
+        Transform selectedRail = FindDirectChild(chromeRoot, SelectedTabsRailName);
         if (selectedRail == null)
         {
-            selectedRail = CreateUiObject(SelectedTabsRailName, chromeParent).transform;
+            selectedRail = CreateUiObject(SelectedTabsRailName, chromeRoot).transform;
         }
 
         selectedRail.gameObject.SetActive(true);
-        RectTransform selectedRailRect = selectedRail as RectTransform;
+        RectTransform selectedRect = selectedRail as RectTransform;
         if (backgroundRect != null)
         {
-            CopyRectTransform(selectedRailRect, backgroundRect);
+            CopyRectTransform(selectedRect, backgroundRect);
         }
         else
         {
-            SetStretch(selectedRailRect, 0f, 0f, 0f, 0f);
+            SetStretch(selectedRect, 0f, 0f, 0f, 0f);
         }
 
-        if (selectedRailRect == null)
+        if (backgroundRect != null)
         {
-            return selectedRail;
+            railRect.SetSiblingIndex(backgroundRect.GetSiblingIndex());
+            selectedRect.SetSiblingIndex(backgroundRect.GetSiblingIndex() + 1);
         }
 
-        if (background != null)
-        {
-            selectedRailRect.SetSiblingIndex(background.GetSiblingIndex() + 1);
-        }
-        else
-        {
-            selectedRailRect.SetAsLastSibling();
-        }
-
-        return selectedRail;
+        CreateTabButton(rail, IllustratedHandbookPage.IllustratedHandbook, "图鉴");
+        CreateTabButton(rail, IllustratedHandbookPage.PersonalInformation, "角色");
+        CreateTabButton(rail, IllustratedHandbookPage.PhotoAlbum, "相册");
+        CreateTabButton(rail, IllustratedHandbookPage.Setting, "设置");
+        CreateCloseButton(rail);
     }
 
-    private void CreateTabButton(Transform parent, IllustratedHandbookPage hostPage, IllustratedHandbookPage targetPage, string label)
+    private void CreateTabButton(Transform parent, IllustratedHandbookPage targetPage, string label)
     {
         string buttonName = $"{targetPage}TabButton";
-        Transform existingButton = FindDirectChild(parent, buttonName);
-        GameObject buttonObject = existingButton != null ? existingButton.gameObject : CreateUiObject(buttonName, parent);
-        RectTransform buttonRect = buttonObject.GetComponent<RectTransform>();
-        ConfigureBookmarkRect(buttonRect, targetPage, false, null);
-
-        LayoutElement layoutElement = buttonObject.GetComponent<LayoutElement>();
-        if (layoutElement == null)
-        {
-            layoutElement = buttonObject.AddComponent<LayoutElement>();
-        }
-
-        layoutElement.ignoreLayout = true;
-        layoutElement.preferredWidth = BookmarkWidth;
-        layoutElement.preferredHeight = BookmarkHeight;
+        Transform existing = FindDirectChild(parent, buttonName);
+        GameObject buttonObject = existing != null ? existing.gameObject : CreateUiObject(buttonName, parent);
+        RectTransform rectTransform = buttonObject.GetComponent<RectTransform>();
 
         Image background = buttonObject.GetComponent<Image>();
         if (background == null)
@@ -516,10 +497,14 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         }
 
         ApplyBookmarkSprite(background, targetPage);
-        Vector2 bookmarkSize = GetBookmarkSize(background.sprite);
-        layoutElement.preferredWidth = bookmarkSize.x;
-        layoutElement.preferredHeight = bookmarkSize.y;
-        ConfigureBookmarkRect(buttonRect, targetPage, false, background.sprite);
+        Vector2 size = GetBookmarkSize(background.sprite);
+        ConfigureAnchoredRect(
+            rectTransform,
+            new Vector2(0.5f, 0.5f),
+            new Vector2(0.5f, 0.5f),
+            size,
+            GetBookmarkAnchoredPosition(targetPage, false),
+            new Vector2(0.5f, 0.5f));
 
         Button button = buttonObject.GetComponent<Button>();
         if (button == null)
@@ -532,60 +517,15 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         button.onClick.RemoveAllListeners();
         button.onClick.AddListener(() => HandleBookmarkClicked(targetPage));
 
-        ColorBlock colors = button.colors;
-        colors.normalColor = Color.white;
-        colors.highlightedColor = Color.white;
-        colors.selectedColor = Color.white;
-        colors.pressedColor = new Color(0.92f, 0.92f, 0.92f, 1f);
-        colors.disabledColor = new Color(0.25f, 0.24f, 0.22f, 0.55f);
-        colors.colorMultiplier = 1f;
-        colors.fadeDuration = 0.08f;
-        button.colors = colors;
-
-        Transform existingLabel = FindDirectChild(buttonObject.transform, "Label");
-        TextMeshProUGUI text = existingLabel != null ? existingLabel.GetComponent<TextMeshProUGUI>() : null;
-        if (text == null)
-        {
-            text = CreateTmpText("Label", buttonObject.transform, label, 28f, Color.white, TextAlignmentOptions.Center, FontStyles.Bold);
-        }
-
-        text.text = label;
-        text.fontSize = 28f;
-        text.color = Color.white;
-        text.alignment = TextAlignmentOptions.Center;
-        text.fontStyle = FontStyles.Bold;
-        RectTransform textRect = text.rectTransform;
-        ConfigureBookmarkLabelRect(textRect, false);
+        TMP_Text text = EnsureButtonLabel(buttonObject.transform, label);
+        ConfigureBookmarkLabelRect(text.rectTransform, false);
     }
 
-    private void HandleBookmarkClicked(IllustratedHandbookPage targetPage)
+    private void CreateCloseButton(Transform parent)
     {
-        MusicManager.PlaySfx(SfxCueId.HandbookBookmark);
-        SwitchToPage(targetPage);
-    }
-
-    private void CreateCloseButton(Transform parent, IllustratedHandbookPage hostPage)
-    {
-        Transform legacySpacer = FindDirectChild(parent, "Spacer");
-        if (legacySpacer != null)
-        {
-            legacySpacer.gameObject.SetActive(false);
-        }
-
-        Transform existingButton = FindDirectChild(parent, "CloseButton");
-        GameObject buttonObject = existingButton != null ? existingButton.gameObject : CreateUiObject("CloseButton", parent);
-        RectTransform buttonRect = buttonObject.GetComponent<RectTransform>();
-        ConfigureAnchoredRect(buttonRect, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(BookmarkWidth, BookmarkHeight), new Vector2(CloseButtonX, CloseButtonY), new Vector2(0.5f, 0.5f));
-
-        LayoutElement layoutElement = buttonObject.GetComponent<LayoutElement>();
-        if (layoutElement == null)
-        {
-            layoutElement = buttonObject.AddComponent<LayoutElement>();
-        }
-
-        layoutElement.ignoreLayout = true;
-        layoutElement.preferredWidth = BookmarkWidth;
-        layoutElement.preferredHeight = BookmarkHeight;
+        Transform existing = FindDirectChild(parent, "CloseButton");
+        GameObject buttonObject = existing != null ? existing.gameObject : CreateUiObject("CloseButton", parent);
+        RectTransform rectTransform = buttonObject.GetComponent<RectTransform>();
 
         Image background = buttonObject.GetComponent<Image>();
         if (background == null)
@@ -594,10 +534,14 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         }
 
         ApplyPlainBookmarkSprite(background, "UI_2");
-        Vector2 closeButtonSize = GetBookmarkSize(background.sprite);
-        layoutElement.preferredWidth = closeButtonSize.x;
-        layoutElement.preferredHeight = closeButtonSize.y;
-        ConfigureAnchoredRect(buttonRect, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), closeButtonSize, new Vector2(CloseButtonX, CloseButtonY), new Vector2(0.5f, 0.5f));
+        Vector2 size = GetBookmarkSize(background.sprite);
+        ConfigureAnchoredRect(
+            rectTransform,
+            new Vector2(0.5f, 0.5f),
+            new Vector2(0.5f, 0.5f),
+            size,
+            new Vector2(CloseButtonX, CloseButtonY),
+            new Vector2(0.5f, 0.5f));
 
         Button button = buttonObject.GetComponent<Button>();
         if (button == null)
@@ -610,34 +554,40 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         button.onClick.RemoveAllListeners();
         button.onClick.AddListener(HandleCloseRequested);
 
-        Transform existingLabel = FindDirectChild(buttonObject.transform, "Label");
+        TMP_Text text = EnsureButtonLabel(buttonObject.transform, "关闭");
+        ConfigureAnchoredRect(
+            text.rectTransform,
+            new Vector2(0.5f, 0.5f),
+            new Vector2(0.5f, 0.5f),
+            new Vector2(132f, 76f),
+            new Vector2(20f, 0f),
+            new Vector2(0.5f, 0.5f));
+    }
+
+    private TMP_Text EnsureButtonLabel(Transform buttonTransform, string label)
+    {
+        Transform existingLabel = FindDirectChild(buttonTransform, "Label");
         TextMeshProUGUI text = existingLabel != null ? existingLabel.GetComponent<TextMeshProUGUI>() : null;
         if (text == null)
         {
-            text = CreateTmpText("Label", buttonObject.transform, "关闭", 28f, Color.white, TextAlignmentOptions.Center, FontStyles.Bold);
+            text = CreateTmpText("Label", buttonTransform, label, 28f, Color.white, TextAlignmentOptions.Center, FontStyles.Bold);
         }
 
-        text.text = "关闭";
+        text.text = label;
         text.fontSize = 28f;
         text.color = Color.white;
         text.alignment = TextAlignmentOptions.Center;
         text.fontStyle = FontStyles.Bold;
-        RectTransform textRect = text.rectTransform;
-        ConfigureAnchoredRect(textRect, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(132f, 76f), new Vector2(20f, 0f), new Vector2(0.5f, 0.5f));
+        return text;
     }
 
-    private static void HideUnusedTabButton(Transform parent, IllustratedHandbookPage page)
+    private void BindPageButtons()
     {
-        Transform button = FindDirectChild(parent, $"{page}TabButton");
-        if (button != null)
-        {
-            button.gameObject.SetActive(false);
-        }
-    }
+        tabButtons.Clear();
+        buttonTexts.Clear();
 
-    private void RegisterTabsForPage(IllustratedHandbookPage hostPage, GameObject pageRoot)
-    {
-        if (pageRoot == null)
+        Transform chromeRoot = GetChromePageRoot() != null ? GetChromePageRoot().transform : null;
+        if (chromeRoot == null)
         {
             return;
         }
@@ -649,26 +599,80 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
                 continue;
             }
 
-            Button button = FindButtonByName(pageRoot.transform, $"{page}TabButton");
+            Button button = FindButtonByName(chromeRoot, $"{page}TabButton");
             if (button == null)
             {
                 continue;
             }
 
-            if (!tabButtons.TryGetValue(page, out List<Button> buttons))
-            {
-                buttons = new List<Button>();
-                tabButtons[page] = buttons;
-            }
-
-            buttons.Add(button);
-
+            tabButtons[page] = new List<Button> { button };
             TMP_Text label = button.GetComponentInChildren<TMP_Text>(true);
             if (label != null)
             {
                 buttonTexts[button] = label;
             }
         }
+    }
+
+    private void BindCloseButtons()
+    {
+        closeButton = null;
+        Transform chromeRoot = GetChromePageRoot() != null ? GetChromePageRoot().transform : null;
+        if (chromeRoot == null)
+        {
+            return;
+        }
+
+        closeButton = FindButtonByName(chromeRoot, "CloseButton");
+    }
+
+    private void HandleBookmarkClicked(IllustratedHandbookPage targetPage)
+    {
+        MusicManager.PlaySfx(SfxCueId.HandbookBookmark);
+        SwitchToPage(targetPage);
+    }
+
+    private void HandleCloseRequested()
+    {
+        UIManager targetManager = owner != null ? owner : FindObjectOfType<UIManager>(true);
+        if (targetManager != null)
+        {
+            targetManager.CloseIllustratedHandbook();
+            return;
+        }
+
+        gameObject.SetActive(false);
+    }
+
+    private void ActivateChromeRoot()
+    {
+        GameObject chromeRoot = GetChromePageRoot();
+        if (chromeRoot != null && !chromeRoot.activeSelf)
+        {
+            chromeRoot.SetActive(true);
+        }
+    }
+
+    private void SetActiveGeneratedPage(IllustratedHandbookPage activePage)
+    {
+        foreach (KeyValuePair<IllustratedHandbookPage, RectTransform> entry in pageContentRoots)
+        {
+            if (entry.Value != null)
+            {
+                entry.Value.gameObject.SetActive(entry.Key == activePage);
+            }
+        }
+    }
+
+    private void ResetScrollPosition()
+    {
+        if (sharedBookScrollRect == null)
+        {
+            return;
+        }
+
+        Canvas.ForceUpdateCanvases();
+        sharedBookScrollRect.verticalNormalizedPosition = 1f;
     }
 
     private void UpdateButtonState(IllustratedHandbookPage activePage)
@@ -714,14 +718,14 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         }
 
         Transform currentRail = button.transform.parent;
-        Transform pageRoot = currentRail.parent;
-        if (pageRoot == null)
+        Transform chromeRoot = currentRail.parent;
+        if (chromeRoot == null)
         {
             return;
         }
 
         string targetRailName = selected ? SelectedTabsRailName : TabsRailName;
-        Transform targetRail = FindDirectChild(pageRoot, targetRailName);
+        Transform targetRail = FindDirectChild(chromeRoot, targetRailName);
         if (targetRail == null || currentRail == targetRail)
         {
             return;
@@ -731,309 +735,32 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         button.transform.SetAsLastSibling();
     }
 
-    private static void ApplyBookmarkSprite(Image image, IllustratedHandbookPage page)
-    {
-        if (image == null)
-        {
-            return;
-        }
-
-        Sprite bookmarkSprite = LoadBookmarkSprite(page);
-        if (bookmarkSprite != null)
-        {
-            image.sprite = bookmarkSprite;
-            image.type = Image.Type.Simple;
-            image.preserveAspect = true;
-            image.color = Color.white;
-            image.raycastTarget = true;
-            return;
-        }
-
-        RuntimeUiSpriteFactory.ApplyRoundedSprite(image, GetBookmarkColor(page, false), 10, 10, 1.1f);
-    }
-
-    private static void ApplyPlainBookmarkSprite(Image image, string assetName)
-    {
-        if (image == null)
-        {
-            return;
-        }
-
-        Sprite bookmarkSprite = LoadBookmarkSprite(assetName);
-        if (bookmarkSprite != null)
-        {
-            image.sprite = bookmarkSprite;
-            image.type = Image.Type.Simple;
-            image.preserveAspect = true;
-            image.color = Color.white;
-            image.raycastTarget = true;
-            return;
-        }
-
-        RuntimeUiSpriteFactory.ApplyRoundedSprite(image, CloseButtonColor, 12, 10, 1.1f);
-    }
-
-    private static Sprite LoadBookmarkSprite(IllustratedHandbookPage page)
-    {
-        if (BookmarkSpriteCache.TryGetValue(page, out Sprite cachedSprite) && cachedSprite != null)
-        {
-            return cachedSprite;
-        }
-
-        Sprite sprite = LoadBookmarkSprite(GetBookmarkAssetName(page));
-        if (sprite != null)
-        {
-            BookmarkSpriteCache[page] = sprite;
-        }
-
-        return sprite;
-    }
-
-    private static Sprite LoadBookmarkSprite(string assetName)
-    {
-        Sprite sprite = FindLoadedBookmarkSprite(assetName);
-        if (sprite == null)
-        {
-            sprite = Resources.Load<Sprite>($"UI/NewUI/{assetName}");
-        }
-
-#if UNITY_EDITOR
-        if (sprite == null)
-        {
-            sprite = AssetDatabase.LoadAssetAtPath<Sprite>($"Assets/File/Prop/UIProp/NewUI/{assetName}.png");
-        }
-#endif
-
-        return sprite;
-    }
-
-    private static Sprite FindLoadedBookmarkSprite(string assetName)
-    {
-        Sprite[] sprites = Resources.FindObjectsOfTypeAll<Sprite>();
-        for (int i = 0; i < sprites.Length; i++)
-        {
-            Sprite sprite = sprites[i];
-            if (sprite != null && string.Equals(sprite.name, assetName, StringComparison.Ordinal))
-            {
-                return sprite;
-            }
-        }
-
-        return null;
-    }
-
-    private static void ConfigureBookmarkRect(RectTransform rectTransform, IllustratedHandbookPage page, bool selected, Sprite sprite)
-    {
-        if (rectTransform == null)
-        {
-            return;
-        }
-
-        Vector2 bookmarkSize = GetBookmarkSize(sprite);
-        ConfigureAnchoredRect(
-            rectTransform,
-            new Vector2(0.5f, 0.5f),
-            new Vector2(0.5f, 0.5f),
-            bookmarkSize,
-            GetBookmarkAnchoredPosition(page, selected),
-            new Vector2(0.5f, 0.5f));
-        rectTransform.localScale = Vector3.one;
-    }
-
-    private static void ConfigureBookmarkLabelRect(RectTransform rectTransform, bool selected)
-    {
-        ConfigureAnchoredRect(
-            rectTransform,
-            new Vector2(0.5f, 0.5f),
-            new Vector2(0.5f, 0.5f),
-            new Vector2(132f, 76f),
-            new Vector2(selected ? BookmarkSelectedLabelX : BookmarkInactiveLabelX, 0f),
-            new Vector2(0.5f, 0.5f));
-    }
-
-    private void AnimateBookmarkRect(Button button, IllustratedHandbookPage page, bool selected, Sprite sprite)
-    {
-        if (button == null)
-        {
-            return;
-        }
-
-        RectTransform rectTransform = button.transform as RectTransform;
-        if (rectTransform == null)
-        {
-            return;
-        }
-
-        Vector2 targetSize = GetBookmarkSize(sprite);
-        Vector2 targetPosition = GetBookmarkAnchoredPosition(page, selected);
-        if (buttonMoveAnimations.TryGetValue(button, out Coroutine runningAnimation) && runningAnimation != null)
-        {
-            StopCoroutine(runningAnimation);
-            buttonMoveAnimations.Remove(button);
-        }
-
-        if (!isActiveAndEnabled || !button.gameObject.activeInHierarchy)
-        {
-            ConfigureBookmarkRect(rectTransform, page, selected, sprite);
-            return;
-        }
-
-        buttonMoveAnimations[button] = StartCoroutine(AnimateBookmarkRectRoutine(button, rectTransform, targetSize, targetPosition));
-    }
-
-    private IEnumerator AnimateBookmarkRectRoutine(Button button, RectTransform rectTransform, Vector2 targetSize, Vector2 targetPosition)
-    {
-        Vector2 startPosition = rectTransform.anchoredPosition;
-        Vector2 startSize = rectTransform.sizeDelta;
-        float elapsed = 0f;
-
-        while (elapsed < BookmarkAnimationDuration)
-        {
-            if (rectTransform == null)
-            {
-                yield break;
-            }
-
-            elapsed += Time.unscaledDeltaTime;
-            float progress = Mathf.Clamp01(elapsed / BookmarkAnimationDuration);
-            float easedProgress = 1f - Mathf.Pow(1f - progress, 3f);
-            rectTransform.anchoredPosition = Vector2.LerpUnclamped(startPosition, targetPosition, easedProgress);
-            rectTransform.sizeDelta = Vector2.LerpUnclamped(startSize, targetSize, easedProgress);
-            yield return null;
-        }
-
-        if (rectTransform != null)
-        {
-            rectTransform.anchoredPosition = targetPosition;
-            rectTransform.sizeDelta = targetSize;
-        }
-
-        if (button != null)
-        {
-            buttonMoveAnimations.Remove(button);
-        }
-    }
-
-    private static Vector2 GetBookmarkSize(Sprite sprite)
-    {
-        if (sprite == null || sprite.rect.height <= 0f)
-        {
-            return new Vector2(BookmarkWidth, BookmarkHeight);
-        }
-
-        float aspect = sprite.rect.width / sprite.rect.height;
-        return new Vector2(BookmarkHeight * aspect, BookmarkHeight);
-    }
-
-    private static Vector2 GetBookmarkAnchoredPosition(IllustratedHandbookPage page, bool selected)
-    {
-        return new Vector2(selected ? BookmarkSelectedX : BookmarkInactiveX, GetBookmarkAnchoredY(page));
-    }
-
-    private static float GetBookmarkAnchoredY(IllustratedHandbookPage page)
-    {
-        switch (page)
-        {
-            case IllustratedHandbookPage.IllustratedHandbook:
-                return 310f;
-            case IllustratedHandbookPage.PersonalInformation:
-                return 185f;
-            case IllustratedHandbookPage.PhotoAlbum:
-                return 60f;
-            case IllustratedHandbookPage.Setting:
-                return -65f;
-            case IllustratedHandbookPage.Mission:
-                return -65f;
-            default:
-                return 310f;
-        }
-    }
-
-    private static string GetBookmarkAssetName(IllustratedHandbookPage page)
-    {
-        switch (page)
-        {
-            case IllustratedHandbookPage.IllustratedHandbook:
-                return "UI_3";
-            case IllustratedHandbookPage.PersonalInformation:
-                return "UI_4";
-            case IllustratedHandbookPage.PhotoAlbum:
-                return "UI_5";
-            case IllustratedHandbookPage.Mission:
-                return "UI_1";
-            case IllustratedHandbookPage.Setting:
-                return "UI_1";
-            default:
-                return "UI_3";
-        }
-    }
-
-    private static bool IsBookmarkSprite(Sprite sprite)
-    {
-        return sprite != null &&
-               !string.IsNullOrEmpty(sprite.name) &&
-               sprite.name.StartsWith("UI_", StringComparison.Ordinal);
-    }
-
-    private static Color GetBookmarkColor(IllustratedHandbookPage page, bool selected)
-    {
-        Color color;
-        switch (page)
-        {
-            case IllustratedHandbookPage.IllustratedHandbook:
-                color = new Color(0.47f, 0.74f, 0.33f, 0.98f);
-                break;
-            case IllustratedHandbookPage.PersonalInformation:
-                color = new Color(0.35f, 0.62f, 0.77f, 0.98f);
-                break;
-            case IllustratedHandbookPage.PhotoAlbum:
-                color = new Color(0.48f, 0.34f, 0.66f, 0.98f);
-                break;
-            case IllustratedHandbookPage.Mission:
-                color = new Color(0.72f, 0.47f, 0.24f, 0.98f);
-                break;
-            case IllustratedHandbookPage.Setting:
-                color = new Color(0.72f, 0.24f, 0.22f, 0.98f);
-                break;
-            default:
-                color = SelectedButtonColor;
-                break;
-        }
-
-        if (selected)
-        {
-            return Color.Lerp(color, new Color(0.98f, 0.86f, 0.48f, 1f), 0.45f);
-        }
-
-        return Color.Lerp(color, Color.black, 0.16f);
-    }
-
     private void RefreshGeneratedPageContent()
     {
-        UpdateTextPage(
-            illustratedHandbookCanvas,
-            BuildIllustratedHandbookBody(),
-            BuildIllustratedHandbookFooter());
+        UpdateTextPage(IllustratedHandbookPage.IllustratedHandbook, BuildIllustratedHandbookBody(), BuildIllustratedHandbookFooter());
+        UpdateTextPage(IllustratedHandbookPage.PersonalInformation, BuildPersonalInformationBody(), BuildPersonalInformationFooter());
+        UpdateTextPage(IllustratedHandbookPage.PhotoAlbum, BuildPhotoAlbumBody(), BuildPhotoAlbumFooter());
+        UpdateTextPage(IllustratedHandbookPage.Setting, BuildSettingBody(), BuildSettingFooter());
+    }
 
-        UpdateTextPage(
-            personalInformationCanvas,
-            BuildPersonalInformationBody(),
-            BuildPersonalInformationFooter());
+    private void UpdateTextPage(IllustratedHandbookPage page, string body, string footer)
+    {
+        if (!pageContentRoots.TryGetValue(page, out RectTransform root) || root == null)
+        {
+            return;
+        }
 
-        UpdateTextPage(
-            photoAlbumCanvas,
-            BuildPhotoAlbumBody(),
-            BuildPhotoAlbumFooter());
+        TMP_Text bodyText = FindTmpText(root, BodyName);
+        if (bodyText != null)
+        {
+            bodyText.text = body;
+        }
 
-        UpdateTextPage(
-            missionCanvas,
-            BuildMissionBody(),
-            BuildMissionFooter());
-
-        UpdateTextPage(
-            settingCanvas,
-            BuildSettingBody(),
-            BuildSettingFooter());
+        TMP_Text footerText = FindTmpText(root, FooterName);
+        if (footerText != null)
+        {
+            footerText.text = footer;
+        }
     }
 
     private string BuildIllustratedHandbookBody()
@@ -1081,13 +808,13 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         }
 
         lines.Add("右侧页签可切到角色、相册、设置。");
-        lines.Add("这一页作为统一入口，负责承接各场景的图鉴/手册打开行为。");
+        lines.Add("当前实现已回到轻量稳定结构，避免运行时再拼装过多书页 UI。");
         return string.Join("\n", lines);
     }
 
     private string BuildIllustratedHandbookFooter()
     {
-        return "默认页固定为图鉴总览；右侧切页时内容会同步切换，不再依赖旧场景里那套散装显隐状态。";
+        return "当前书本只保留一套书签和一个黄色内容区，减少运行时生成对象数量。";
     }
 
     private string BuildPersonalInformationBody()
@@ -1133,11 +860,6 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         if (runtimeState != null)
         {
             lines.Add($"图鉴总进度：{runtimeState.GetTotalProgress()}/{runtimeState.GetTotalMaxProgress()}");
-            lines.Add($"特殊结构库存：{runtimeState.AvailableSpecialStructureInventory}");
-        }
-        else
-        {
-            lines.Add("图鉴总进度：进入基地或战斗后同步本轮运行时进度。");
         }
 
         return string.Join("\n", lines);
@@ -1145,7 +867,7 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
 
     private string BuildPersonalInformationFooter()
     {
-        return "这一页只做多页签统一入口，完整的精灵 / 属性 / 武器面板仍保持原有行为。";
+        return "角色入口仍统一走书本，但页面内容保持轻量，不再在这里运行时拼完整独立面板。";
     }
 
     private string BuildPhotoAlbumBody()
@@ -1179,40 +901,7 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
     private string BuildPhotoAlbumFooter()
     {
         KeyCode captureKey = GameSettingsStore.GetKeyBinding(GameInputAction.PhotoCapture);
-        return $"完整相册系统与拍照确认流程保持原实现；战斗内按 {captureKey} 可继续保存本地留念。";
-    }
-
-    private string BuildMissionBody()
-    {
-        RuntimeProgressState runtimeState = ResolveRuntimeProgressState();
-        string currentSceneName = SceneManager.GetActiveScene().name;
-        List<string> lines = new List<string>();
-        IReadOnlyList<GameplayStageDefinition> stages = GameplayStageCatalog.GetAll();
-
-        for (int i = 0; i < stages.Count; i++)
-        {
-            GameplayStageDefinition stage = stages[i];
-            bool unlocked = runtimeState != null
-                ? GameplayStageCatalog.IsStageUnlocked(stage, runtimeState)
-                : i == 0;
-            string currentTag = string.Equals(stage.sceneName, currentSceneName, StringComparison.Ordinal)
-                ? "当前场景"
-                : "可前往";
-            string stateText = unlocked ? currentTag : stage.lockedHint;
-            lines.Add($"{stage.displayName}\n{stateText}");
-        }
-
-        if (lines.Count == 0)
-        {
-            lines.Add("暂无可用关卡信息。");
-        }
-
-        return string.Join("\n\n", lines);
-    }
-
-    private string BuildMissionFooter()
-    {
-        return "这一页只统一展示关卡状态；基地独立的关卡入口与选择流程保持原行为。";
+        return $"相册入口已统一走书本；战斗内按 {captureKey} 可继续保存本地留念。";
     }
 
     private string BuildSettingBody()
@@ -1234,27 +923,7 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
 
     private string BuildSettingFooter()
     {
-        return "完整设置页仍走原系统入口；这里的目标只是把图鉴多页签在所有场景里统一起来。";
-    }
-
-    private void UpdateTextPage(GameObject pageRoot, string body, string footer)
-    {
-        if (pageRoot == null)
-        {
-            return;
-        }
-
-        TMP_Text bodyText = FindTmpText(pageRoot.transform, BodyName);
-        if (bodyText != null)
-        {
-            bodyText.text = body;
-        }
-
-        TMP_Text footerText = FindTmpText(pageRoot.transform, FooterName);
-        if (footerText != null)
-        {
-            footerText.text = footer;
-        }
+        return "设置入口统一走书本；完整设置业务仍交给原设置系统处理，避免在图鉴里复制一整套逻辑。";
     }
 
     private RuntimeProgressState ResolveRuntimeProgressState()
@@ -1269,208 +938,66 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
             : RuntimeProgressState.EnsureInstance();
     }
 
-    private GameObject ResolveOrCreatePageRoot(string pageName)
-    {
-        GameObject existing = FindPageRoot(pageName);
-        if (existing != null)
-        {
-            return existing;
-        }
-
-        return CreatePageRoot(pageName);
-    }
-
-    private GameObject FindPageRoot(string pageName)
-    {
-        if (string.Equals(pageName, PersonalInformationCanvasName, StringComparison.Ordinal))
-        {
-            Transform legacy = FindDirectChild(transform, LegacyPersonalInformationCanvasName);
-            if (legacy != null)
-            {
-                legacy.name = PersonalInformationCanvasName;
-                return legacy.gameObject;
-            }
-        }
-
-        Transform target = FindDirectChild(transform, pageName);
-        return target != null ? target.gameObject : null;
-    }
-
-    private GameObject CreatePageRoot(string pageName)
-    {
-        GameObject pageRoot = new GameObject(
-            pageName,
-            typeof(RectTransform),
-            typeof(Canvas),
-            typeof(CanvasScaler),
-            typeof(GraphicRaycaster),
-            typeof(CanvasGroup));
-        pageRoot.transform.SetParent(transform, false);
-
-        NormalizePageRoot(pageRoot);
-
-        Canvas canvas = pageRoot.GetComponent<Canvas>();
-        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-        canvas.pixelPerfect = false;
-
-        CanvasScaler scaler = pageRoot.GetComponent<CanvasScaler>();
-        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-        scaler.referenceResolution = new Vector2(1920f, 1080f);
-        scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
-        scaler.matchWidthOrHeight = 0.5f;
-
-        return pageRoot;
-    }
-
     private void EnsureRootCanvas()
     {
-        Canvas canvas = GetComponent<Canvas>();
-        if (canvas == null)
+        GameObject rootObject = GetChromePageRoot();
+        if (rootObject == null)
         {
-            canvas = gameObject.AddComponent<Canvas>();
-        }
-
-        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-        canvas.pixelPerfect = false;
-
-        RectTransform rectTransform = transform as RectTransform;
-        if (rectTransform != null)
-        {
-            SetStretch(rectTransform, 0f, 0f, 0f, 0f);
-            rectTransform.localScale = Vector3.one;
-            rectTransform.anchoredPosition = Vector2.zero;
-            rectTransform.pivot = new Vector2(0.5f, 0.5f);
-        }
-        else
-        {
-            transform.localScale = Vector3.one;
-            transform.localPosition = Vector3.zero;
-        }
-
-        CanvasScaler scaler = GetComponent<CanvasScaler>();
-        if (scaler == null)
-        {
-            scaler = gameObject.AddComponent<CanvasScaler>();
-        }
-
-        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-        scaler.referenceResolution = new Vector2(1920f, 1080f);
-        scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
-        scaler.matchWidthOrHeight = 0.5f;
-
-        if (GetComponent<GraphicRaycaster>() == null)
-        {
-            gameObject.AddComponent<GraphicRaycaster>();
-        }
-    }
-
-    private static GameObject ResolveOrCreateRoot(GameObject handbookPage)
-    {
-        Transform currentParent = handbookPage.transform.parent;
-        if (currentParent != null && string.Equals(currentParent.name, RootObjectName, StringComparison.Ordinal))
-        {
-            return currentParent.gameObject;
-        }
-
-        GameObject rootObject = new GameObject(
-            RootObjectName,
-            typeof(RectTransform),
-            typeof(Canvas),
-            typeof(CanvasScaler),
-            typeof(GraphicRaycaster),
-            typeof(CanvasGroup));
-        Transform originalParent = handbookPage.transform.parent;
-        if (originalParent != null)
-        {
-            rootObject.transform.SetParent(originalParent, false);
-        }
-
-        RectTransform rootRect = rootObject.GetComponent<RectTransform>();
-        if (rootRect != null)
-        {
-            SetStretch(rootRect, 0f, 0f, 0f, 0f);
-            rootRect.localScale = Vector3.one;
+            return;
         }
 
         Canvas canvas = rootObject.GetComponent<Canvas>();
+        if (canvas == null)
+        {
+            canvas = rootObject.AddComponent<Canvas>();
+        }
+
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;
         canvas.pixelPerfect = false;
 
+        RectTransform rectTransform = rootObject.GetComponent<RectTransform>();
+        if (rectTransform != null && rectTransform.localScale == Vector3.zero)
+        {
+            rectTransform.localScale = Vector3.one;
+        }
+
         CanvasScaler scaler = rootObject.GetComponent<CanvasScaler>();
+        if (scaler == null)
+        {
+            scaler = rootObject.AddComponent<CanvasScaler>();
+        }
+
         scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
         scaler.referenceResolution = new Vector2(1920f, 1080f);
         scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
-        scaler.matchWidthOrHeight = 0.5f;
+        scaler.matchWidthOrHeight = 0f;
 
-        handbookPage.transform.SetParent(rootObject.transform, false);
-        NormalizePageRoot(handbookPage);
-        rootObject.SetActive(handbookPage.activeSelf);
-        return rootObject;
+        if (rootObject.GetComponent<GraphicRaycaster>() == null)
+        {
+            rootObject.AddComponent<GraphicRaycaster>();
+        }
+
+        CanvasGroup canvasGroup = rootObject.GetComponent<CanvasGroup>();
+        if (canvasGroup == null)
+        {
+            canvasGroup = rootObject.AddComponent<CanvasGroup>();
+        }
+
+        canvasGroup.alpha = 1f;
+        canvasGroup.interactable = true;
+        canvasGroup.blocksRaycasts = true;
     }
 
-    private static GameObject FindExistingStandardRoot(GameObject handbookPage)
+    private GameObject GetChromePageRoot()
     {
-        if (handbookPage == null)
-        {
-            return null;
-        }
-
-        if (string.Equals(handbookPage.name, RootObjectName, StringComparison.Ordinal) &&
-            HasStandardPages(handbookPage.transform))
-        {
-            return handbookPage;
-        }
-
-        Transform[] transforms = FindObjectsOfType<Transform>(true);
-        for (int i = 0; i < transforms.Length; i++)
-        {
-            Transform candidate = transforms[i];
-            if (candidate == null ||
-                !string.Equals(candidate.name, RootObjectName, StringComparison.Ordinal) ||
-                candidate.gameObject == handbookPage)
-            {
-                continue;
-            }
-
-            if (candidate.gameObject.scene != handbookPage.scene)
-            {
-                continue;
-            }
-
-            if (HasStandardPages(candidate))
-            {
-                return candidate.gameObject;
-            }
-        }
-
-        return null;
+        return illustratedHandbookCanvas != null ? illustratedHandbookCanvas : gameObject;
     }
 
-    private static bool HasStandardPages(Transform root)
+    private static IllustratedHandbookPage NormalizePage(IllustratedHandbookPage page)
     {
-        return FindDirectChild(root, IllustratedHandbookCanvasName) != null &&
-               (FindDirectChild(root, PersonalInformationCanvasName) != null ||
-                FindDirectChild(root, LegacyPersonalInformationCanvasName) != null) &&
-               FindDirectChild(root, PhotoAlbumCanvasName) != null &&
-               FindDirectChild(root, MissionCanvasName) != null &&
-               FindDirectChild(root, SettingCanvasName) != null;
-    }
-
-    private static GameObject ResolveOrAttachPage(Transform root, GameObject handbookPage, string expectedName)
-    {
-        if (handbookPage == null)
-        {
-            return null;
-        }
-
-        handbookPage.name = expectedName;
-        if (handbookPage.transform.parent != root)
-        {
-            handbookPage.transform.SetParent(root, false);
-        }
-
-        NormalizePageRoot(handbookPage);
-        return handbookPage;
+        return page == IllustratedHandbookPage.Mission
+            ? IllustratedHandbookPage.IllustratedHandbook
+            : page;
     }
 
     private static void NormalizePageRoot(GameObject pageRoot)
@@ -1480,14 +1007,6 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
             return;
         }
 
-        RectTransform rectTransform = pageRoot.GetComponent<RectTransform>();
-        if (rectTransform != null)
-        {
-            SetStretch(rectTransform, 0f, 0f, 0f, 0f);
-            rectTransform.localScale = Vector3.one;
-            rectTransform.anchoredPosition = Vector2.zero;
-        }
-
         Canvas canvas = pageRoot.GetComponent<Canvas>();
         if (canvas != null)
         {
@@ -1495,25 +1014,275 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
             canvas.overrideSorting = true;
             canvas.sortingOrder = RuntimeModalStyle.ModalSortingOrder + 1;
         }
+
+        CanvasGroup canvasGroup = pageRoot.GetComponent<CanvasGroup>();
+        if (canvasGroup != null)
+        {
+            canvasGroup.alpha = 1f;
+            canvasGroup.interactable = true;
+            canvasGroup.blocksRaycasts = true;
+        }
     }
 
-    private static Transform FindDirectChild(Transform parent, string childName)
+    private static void ApplyBookmarkSprite(Image image, IllustratedHandbookPage page)
     {
-        if (parent == null)
+        if (image == null)
+        {
+            return;
+        }
+
+        Sprite sprite = LoadBookmarkSprite(page);
+        if (sprite != null)
+        {
+            image.sprite = sprite;
+            image.type = Image.Type.Simple;
+            image.preserveAspect = true;
+            image.color = Color.white;
+            image.raycastTarget = true;
+            return;
+        }
+
+        RuntimeUiSpriteFactory.ApplyRoundedSprite(image, GetBookmarkColor(page, false), 10, 10, 1.1f);
+    }
+
+    private static void ApplyPlainBookmarkSprite(Image image, string assetName)
+    {
+        if (image == null)
+        {
+            return;
+        }
+
+        Sprite sprite = LoadBookmarkSprite(assetName);
+        if (sprite != null)
+        {
+            image.sprite = sprite;
+            image.type = Image.Type.Simple;
+            image.preserveAspect = true;
+            image.color = Color.white;
+            image.raycastTarget = true;
+            return;
+        }
+
+        RuntimeUiSpriteFactory.ApplyRoundedSprite(image, CloseButtonColor, 12, 10, 1.1f);
+    }
+
+    private static Sprite LoadBookmarkSprite(IllustratedHandbookPage page)
+    {
+        if (BookmarkSpriteCache.TryGetValue(page, out Sprite sprite) && sprite != null)
+        {
+            return sprite;
+        }
+
+        sprite = LoadBookmarkSprite(GetBookmarkAssetName(page));
+        if (sprite != null)
+        {
+            BookmarkSpriteCache[page] = sprite;
+        }
+
+        return sprite;
+    }
+
+    private static Sprite LoadBookmarkSprite(string assetName)
+    {
+        if (string.IsNullOrWhiteSpace(assetName))
         {
             return null;
         }
 
-        for (int i = 0; i < parent.childCount; i++)
+        if (BookmarkAssetCache.TryGetValue(assetName, out Sprite cachedSprite))
         {
-            Transform child = parent.GetChild(i);
-            if (string.Equals(child.name, childName, StringComparison.Ordinal))
+            return cachedSprite;
+        }
+
+        Sprite sprite = Resources.Load<Sprite>($"UI/NewUI/{assetName}");
+        if (sprite != null)
+        {
+            BookmarkAssetCache[assetName] = sprite;
+            return sprite;
+        }
+
+#if UNITY_EDITOR
+        sprite = AssetDatabase.LoadAssetAtPath<Sprite>($"Assets/File/Prop/UIProp/NewUI/{assetName}.png");
+        if (sprite != null)
+        {
+            BookmarkAssetCache[assetName] = sprite;
+            return sprite;
+        }
+#else
+        return null;
+#endif
+
+        Sprite[] sprites = Resources.FindObjectsOfTypeAll<Sprite>();
+        for (int i = 0; i < sprites.Length; i++)
+        {
+            if (sprites[i] != null && string.Equals(sprites[i].name, assetName, StringComparison.Ordinal))
             {
-                return child;
+                BookmarkAssetCache[assetName] = sprites[i];
+                return sprites[i];
             }
         }
 
+        BookmarkAssetCache[assetName] = null;
         return null;
+    }
+
+    private static Vector2 GetBookmarkSize(Sprite sprite)
+    {
+        if (sprite == null || sprite.rect.height <= 0f)
+        {
+            return new Vector2(BookmarkWidth, BookmarkHeight);
+        }
+
+        float aspect = sprite.rect.width / sprite.rect.height;
+        return new Vector2(BookmarkHeight * aspect, BookmarkHeight);
+    }
+
+    private static Vector2 GetBookmarkAnchoredPosition(IllustratedHandbookPage page, bool selected)
+    {
+        return new Vector2(selected ? BookmarkSelectedX : BookmarkInactiveX, GetBookmarkAnchoredY(page));
+    }
+
+    private static float GetBookmarkAnchoredY(IllustratedHandbookPage page)
+    {
+        switch (page)
+        {
+            case IllustratedHandbookPage.IllustratedHandbook:
+                return 310f;
+            case IllustratedHandbookPage.PersonalInformation:
+                return 185f;
+            case IllustratedHandbookPage.PhotoAlbum:
+                return 60f;
+            case IllustratedHandbookPage.Setting:
+                return -65f;
+            default:
+                return 310f;
+        }
+    }
+
+    private static string GetBookmarkAssetName(IllustratedHandbookPage page)
+    {
+        switch (page)
+        {
+            case IllustratedHandbookPage.IllustratedHandbook:
+                return "UI_3";
+            case IllustratedHandbookPage.PersonalInformation:
+                return "UI_4";
+            case IllustratedHandbookPage.PhotoAlbum:
+                return "UI_5";
+            case IllustratedHandbookPage.Setting:
+                return "UI_1";
+            default:
+                return "UI_3";
+        }
+    }
+
+    private static bool IsBookmarkSprite(Sprite sprite)
+    {
+        return sprite != null &&
+               !string.IsNullOrEmpty(sprite.name) &&
+               sprite.name.StartsWith("UI_", StringComparison.Ordinal);
+    }
+
+    private static Color GetBookmarkColor(IllustratedHandbookPage page, bool selected)
+    {
+        Color color;
+        switch (page)
+        {
+            case IllustratedHandbookPage.IllustratedHandbook:
+                color = new Color(0.47f, 0.74f, 0.33f, 0.98f);
+                break;
+            case IllustratedHandbookPage.PersonalInformation:
+                color = new Color(0.35f, 0.62f, 0.77f, 0.98f);
+                break;
+            case IllustratedHandbookPage.PhotoAlbum:
+                color = new Color(0.48f, 0.34f, 0.66f, 0.98f);
+                break;
+            case IllustratedHandbookPage.Setting:
+                color = new Color(0.72f, 0.24f, 0.22f, 0.98f);
+                break;
+            default:
+                color = SelectedButtonColor;
+                break;
+        }
+
+        return selected
+            ? Color.Lerp(color, new Color(0.98f, 0.86f, 0.48f, 1f), 0.45f)
+            : Color.Lerp(color, Color.black, 0.16f);
+    }
+
+    private void AnimateBookmarkRect(Button button, IllustratedHandbookPage page, bool selected, Sprite sprite)
+    {
+        if (button == null)
+        {
+            return;
+        }
+
+        RectTransform rectTransform = button.transform as RectTransform;
+        if (rectTransform == null)
+        {
+            return;
+        }
+
+        Vector2 targetSize = GetBookmarkSize(sprite);
+        Vector2 targetPosition = GetBookmarkAnchoredPosition(page, selected);
+        if (buttonMoveAnimations.TryGetValue(button, out Coroutine animation) && animation != null)
+        {
+            StopCoroutine(animation);
+            buttonMoveAnimations.Remove(button);
+        }
+
+        if (!isActiveAndEnabled || !button.gameObject.activeInHierarchy)
+        {
+            rectTransform.anchoredPosition = targetPosition;
+            rectTransform.sizeDelta = targetSize;
+            return;
+        }
+
+        buttonMoveAnimations[button] = StartCoroutine(AnimateBookmarkRectRoutine(button, rectTransform, targetSize, targetPosition));
+    }
+
+    private IEnumerator AnimateBookmarkRectRoutine(Button button, RectTransform rectTransform, Vector2 targetSize, Vector2 targetPosition)
+    {
+        Vector2 startPosition = rectTransform.anchoredPosition;
+        Vector2 startSize = rectTransform.sizeDelta;
+        float elapsed = 0f;
+
+        while (elapsed < BookmarkAnimationDuration)
+        {
+            if (rectTransform == null)
+            {
+                yield break;
+            }
+
+            elapsed += Time.unscaledDeltaTime;
+            float progress = Mathf.Clamp01(elapsed / BookmarkAnimationDuration);
+            float eased = 1f - Mathf.Pow(1f - progress, 3f);
+            rectTransform.anchoredPosition = Vector2.LerpUnclamped(startPosition, targetPosition, eased);
+            rectTransform.sizeDelta = Vector2.LerpUnclamped(startSize, targetSize, eased);
+            yield return null;
+        }
+
+        if (rectTransform != null)
+        {
+            rectTransform.anchoredPosition = targetPosition;
+            rectTransform.sizeDelta = targetSize;
+        }
+
+        if (button != null)
+        {
+            buttonMoveAnimations.Remove(button);
+        }
+    }
+
+    private static void ConfigureBookmarkLabelRect(RectTransform rectTransform, bool selected)
+    {
+        ConfigureAnchoredRect(
+            rectTransform,
+            new Vector2(0.5f, 0.5f),
+            new Vector2(0.5f, 0.5f),
+            new Vector2(132f, 76f),
+            new Vector2(selected ? BookmarkSelectedLabelX : BookmarkInactiveLabelX, 0f),
+            new Vector2(0.5f, 0.5f));
     }
 
     private static Button FindButtonByName(Transform parent, string childName)
@@ -1526,13 +1295,12 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         Transform[] children = parent.GetComponentsInChildren<Transform>(true);
         for (int i = 0; i < children.Length; i++)
         {
-            Transform child = children[i];
-            if (!string.Equals(child.name, childName, StringComparison.Ordinal))
+            if (!string.Equals(children[i].name, childName, StringComparison.Ordinal))
             {
                 continue;
             }
 
-            Button button = child.GetComponent<Button>();
+            Button button = children[i].GetComponent<Button>();
             if (button != null)
             {
                 return button;
@@ -1552,13 +1320,12 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         Transform[] children = parent.GetComponentsInChildren<Transform>(true);
         for (int i = 0; i < children.Length; i++)
         {
-            Transform child = children[i];
-            if (!string.Equals(child.name, childName, StringComparison.Ordinal))
+            if (!string.Equals(children[i].name, childName, StringComparison.Ordinal))
             {
                 continue;
             }
 
-            return child.GetComponent<TMP_Text>();
+            return children[i].GetComponent<TMP_Text>();
         }
 
         return null;
@@ -1624,6 +1391,25 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         return gameObject;
     }
 
+    private static Transform FindDirectChild(Transform parent, string childName)
+    {
+        if (parent == null)
+        {
+            return null;
+        }
+
+        for (int i = 0; i < parent.childCount; i++)
+        {
+            Transform child = parent.GetChild(i);
+            if (string.Equals(child.name, childName, StringComparison.Ordinal))
+            {
+                return child;
+            }
+        }
+
+        return null;
+    }
+
     private static void SetStretch(RectTransform rectTransform, float left, float right, float top, float bottom)
     {
         if (rectTransform == null)
@@ -1676,14 +1462,29 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         rectTransform.pivot = pivot;
     }
 
-    private Button GetPrimaryButton(IllustratedHandbookPage page)
+    private static void ConfigureTopLeftRect(RectTransform rectTransform, float x, float y, float width, float height)
     {
-        if (!tabButtons.TryGetValue(page, out List<Button> buttons) || buttons.Count == 0)
+        ConfigureAnchoredRect(
+            rectTransform,
+            new Vector2(0f, 1f),
+            new Vector2(0f, 1f),
+            new Vector2(width, height),
+            new Vector2(x, -y),
+            new Vector2(0f, 1f));
+    }
+
+    private static void ConfigureTopStretchRect(RectTransform rectTransform, float left, float right, float top, float height)
+    {
+        if (rectTransform == null)
         {
-            return null;
+            return;
         }
 
-        return buttons[0];
+        rectTransform.anchorMin = new Vector2(0f, 1f);
+        rectTransform.anchorMax = new Vector2(1f, 1f);
+        rectTransform.offsetMin = new Vector2(left, -(top + height));
+        rectTransform.offsetMax = new Vector2(-right, -top);
+        rectTransform.pivot = new Vector2(0.5f, 1f);
     }
 
     private static string FormatSavedTime(string savedAtUtc)

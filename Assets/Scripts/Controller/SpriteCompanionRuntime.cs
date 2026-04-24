@@ -8,6 +8,12 @@ public static class SpriteCompanionRuntime
     private const int DefaultSortingOrder = 4;
     private const float BaseCompanionScaleMultiplier = 0.54f;
     private const float GameplayCompanionScaleMultiplier = BaseCompanionScaleMultiplier * 3f;
+    private const float FootColliderWidthFactor = 0.52f;
+    private const float FootColliderHeightFactor = 0.28f;
+    private const float FootColliderLiftFactor = 0.04f;
+    private static readonly Vector3 CompanionShadowOffset = new Vector3(0.08f, -0.14f, 0f);
+    private static readonly Vector3 CompanionShadowScale = new Vector3(0.92f, 0.40f, 1f);
+    private static readonly Color CompanionShadowColor = new Color(0.035f, 0.04f, 0.06f, 0.40f);
     private static readonly Vector2 CompanionColliderSize = new Vector2(0.28f, 0.32f);
     private static readonly Vector2 CompanionColliderOffset = new Vector2(0f, -0.02f);
 
@@ -34,6 +40,8 @@ public static class SpriteCompanionRuntime
             {
                 activeCompanion.Bind(playerTransform, playerCore);
                 ApplyCompanionScale(activeCompanion.transform, player.scene.name);
+                ConfigureCompanionCollider(activeCompanion.GetComponent<BoxCollider2D>(), activeCompanion.GetComponent<SpriteRenderer>());
+                EnsureCompanionShadow(activeCompanion.gameObject);
                 return activeCompanion;
             }
 
@@ -81,8 +89,7 @@ public static class SpriteCompanionRuntime
         body.collisionDetectionMode = CollisionDetectionMode2D.Continuous;
 
         BoxCollider2D collider = companionObject.AddComponent<BoxCollider2D>();
-        collider.size = CompanionColliderSize;
-        collider.offset = CompanionColliderOffset;
+        ConfigureCompanionCollider(collider, companionRenderer);
 
         CharacterCore companionCore = companionObject.AddComponent<CharacterCore>();
         CharacterStats stats = new CharacterStats
@@ -110,6 +117,8 @@ public static class SpriteCompanionRuntime
 
         animator.Play(SpriteCompanionAnimator.FrontStateName, 0, 0f);
         animator.Update(0f);
+        ConfigureCompanionCollider(collider, companionRenderer);
+        EnsureCompanionShadow(companionObject);
 
         SpriteCompanionFollowController followController = companionObject.AddComponent<SpriteCompanionFollowController>();
         followController.Bind(playerTransform, playerCore, collider);
@@ -144,6 +153,39 @@ public static class SpriteCompanionRuntime
         }
 
         companionTransform.localScale = Vector3.one * ResolveCompanionScale(sceneName);
+    }
+
+    private static void EnsureCompanionShadow(GameObject companionObject)
+    {
+        NightLightingController.EnsureProjectedShadow(
+            companionObject,
+            CompanionShadowOffset,
+            CompanionShadowScale,
+            CompanionShadowColor);
+    }
+
+    internal static void ConfigureCompanionCollider(BoxCollider2D collider, SpriteRenderer renderer)
+    {
+        if (collider == null)
+        {
+            return;
+        }
+
+        collider.isTrigger = false;
+        if (renderer == null || renderer.sprite == null)
+        {
+            collider.size = CompanionColliderSize;
+            collider.offset = CompanionColliderOffset;
+            return;
+        }
+
+        Bounds bounds = renderer.sprite.bounds;
+        float width = Mathf.Max(CompanionColliderSize.x, bounds.size.x * FootColliderWidthFactor);
+        float height = Mathf.Max(CompanionColliderSize.y, bounds.size.y * FootColliderHeightFactor);
+        collider.size = new Vector2(width, height);
+        collider.offset = new Vector2(
+            bounds.center.x,
+            bounds.min.y + height * 0.5f + bounds.size.y * FootColliderLiftFactor);
     }
 
     private static float ResolveCompanionScale(string sceneName)

@@ -37,6 +37,7 @@ public class MusicManager : MonoBehaviour
     private float nextCombatScanAt;
     private float lastCombatDetectedAt = float.NegativeInfinity;
     private bool isCombatMusicActive;
+    private bool gameplayMusicPaused;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     private static void ResetStaticState()
@@ -96,6 +97,11 @@ public class MusicManager : MonoBehaviour
 
     private void Update()
     {
+        if (gameplayMusicPaused)
+        {
+            return;
+        }
+
         UpdateCombatMusicState();
     }
 
@@ -148,6 +154,17 @@ public class MusicManager : MonoBehaviour
         }
 
         manager.PlaySfxInternal(cueId);
+    }
+
+    public static void SetGameplayMusicPaused(bool paused)
+    {
+        MusicManager manager = Instance != null ? Instance : EnsureInstance();
+        if (manager == null)
+        {
+            return;
+        }
+
+        manager.SetGameplayMusicPausedInternal(paused);
     }
 
     private void HandleSceneLoaded(Scene scene, LoadSceneMode mode)
@@ -421,6 +438,37 @@ public class MusicManager : MonoBehaviour
         lastSfxPlayTimes[cueId] = now;
         sfxSource.pitch = Random.Range(SfxPitchMin, SfxPitchMax);
         sfxSource.PlayOneShot(clip, audioCatalog.GetSfxGain(cueId));
+    }
+
+    private void SetGameplayMusicPausedInternal(bool paused)
+    {
+        EnsureAudioSources();
+        if (gameplayMusicPaused == paused)
+        {
+            return;
+        }
+
+        gameplayMusicPaused = paused;
+        for (int i = 0; i < bgmSources.Length; i++)
+        {
+            AudioSource source = bgmSources[i];
+            if (source == null)
+            {
+                continue;
+            }
+
+            if (paused)
+            {
+                if (source.isPlaying)
+                {
+                    source.Pause();
+                }
+            }
+            else if (source.clip != null && bgmSourceCues[i] != MusicCueId.None)
+            {
+                source.UnPause();
+            }
+        }
     }
 
     private void LoadAudioCatalog()

@@ -82,104 +82,41 @@ public sealed class NightLightingController : MonoBehaviour
     private static readonly Color DeadSceneLightColor = new Color(0.54f, 0.72f, 1f, 1f);
     private static readonly Vector3 GameplayPlayerLightOffset = new Vector3(0f, 0.14f, 0f);
     private static readonly Vector3 GameplayEnemyLightOffset = new Vector3(0f, 0.12f, 0f);
+    private static readonly Color UnifiedOverlayTint = new Color(0.06f, 0.10f, 0.18f, 1f);
+    private static readonly Color UnifiedCameraBackgroundNight = new Color(0.02f, 0.05f, 0.09f, 1f);
+    private static readonly Color UnifiedCharacterShadowColor = new Color(0.04f, 0.05f, 0.08f, 0.40f);
+    private static readonly Vector3 UnifiedCharacterShadowOffset = new Vector3(0.10f, -0.18f, 0f);
+    private static readonly Vector3 UnifiedCharacterShadowScale = new Vector3(1.08f, 0.42f, 1f);
+    private const float UnifiedOverlayAlphaAtStart = 0.12f;
+    private const float UnifiedOverlayAlphaAtEnd = 0.36f;
+    private const float UnifiedLightMultiplierAtStart = 0.96f;
+    private const float UnifiedLightMultiplierAtEnd = 1.24f;
 
     private static readonly Dictionary<string, SceneNightProfile> Profiles = new Dictionary<string, SceneNightProfile>(StringComparer.Ordinal)
     {
         {
             MainSceneName,
-            new SceneNightProfile(
-                MainSceneName,
-                false,
-                0.35f,
-                new Color(0.07f, 0.12f, 0.22f, 1f),
-                0.10f,
-                0.22f,
-                new Color(0.04f, 0.08f, 0.15f, 1f),
-                0.92f,
-                1.06f,
-                new Color(0.04f, 0.06f, 0.10f, 0.34f),
-                new Vector3(0.20f, -0.24f, 0f),
-                new Vector3(1.12f, 0.42f, 1f))
+            CreateUnifiedSceneProfile(MainSceneName, false, 0.35f)
         },
         {
             BaseSceneName,
-            new SceneNightProfile(
-                BaseSceneName,
-                false,
-                0.46f,
-                new Color(0.08f, 0.11f, 0.18f, 1f),
-                0.08f,
-                0.22f,
-                new Color(0.03f, 0.07f, 0.12f, 1f),
-                0.86f,
-                0.98f,
-                new Color(0.04f, 0.05f, 0.08f, 0.40f),
-                new Vector3(0.18f, -0.30f, 0f),
-                new Vector3(1.12f, 0.44f, 1f))
+            CreateUnifiedSceneProfile(BaseSceneName, false, 0.34f)
         },
         {
             "GameScene",
-            new SceneNightProfile(
-                "GameScene",
-                true,
-                0f,
-                new Color(0.06f, 0.10f, 0.18f, 1f),
-                0.18f,
-                0.48f,
-                new Color(0.01f, 0.03f, 0.07f, 1f),
-                0.95f,
-                1.30f,
-                new Color(0.04f, 0.05f, 0.08f, 0.44f),
-                new Vector3(0.18f, -0.28f, 0f),
-                new Vector3(1.10f, 0.42f, 1f))
+            CreateUnifiedSceneProfile("GameScene", true, 0f)
         },
         {
             "GameScene_02",
-            new SceneNightProfile(
-                "GameScene_02",
-                true,
-                0f,
-                new Color(0.06f, 0.10f, 0.18f, 1f),
-                0.18f,
-                0.52f,
-                new Color(0.01f, 0.03f, 0.07f, 1f),
-                0.98f,
-                1.34f,
-                new Color(0.04f, 0.05f, 0.08f, 0.46f),
-                new Vector3(0.18f, -0.28f, 0f),
-                new Vector3(1.12f, 0.42f, 1f))
+            CreateUnifiedSceneProfile("GameScene_02", true, 0f)
         },
         {
             "GameScene_03",
-            new SceneNightProfile(
-                "GameScene_03",
-                true,
-                0f,
-                new Color(0.06f, 0.10f, 0.18f, 1f),
-                0.20f,
-                0.56f,
-                new Color(0.01f, 0.03f, 0.07f, 1f),
-                1.00f,
-                1.38f,
-                new Color(0.04f, 0.05f, 0.08f, 0.48f),
-                new Vector3(0.20f, -0.30f, 0f),
-                new Vector3(1.12f, 0.44f, 1f))
+            CreateUnifiedSceneProfile("GameScene_03", true, 0f)
         },
         {
             DeadSceneName,
-            new SceneNightProfile(
-                DeadSceneName,
-                false,
-                0.86f,
-                new Color(0.06f, 0.10f, 0.20f, 1f),
-                0.18f,
-                0.48f,
-                new Color(0.01f, 0.03f, 0.08f, 1f),
-                1.02f,
-                1.18f,
-                new Color(0.04f, 0.05f, 0.08f, 0.50f),
-                new Vector3(0.18f, -0.26f, 0f),
-                new Vector3(1.08f, 0.40f, 1f))
+            CreateUnifiedSceneProfile(DeadSceneName, false, 0.86f)
         }
     };
 
@@ -214,6 +151,26 @@ public sealed class NightLightingController : MonoBehaviour
     }
 
     public static bool HasActiveProfile => instance != null && instance.currentProfile != null;
+
+    private static SceneNightProfile CreateUnifiedSceneProfile(
+        string sceneName,
+        bool useCountdownProgress,
+        float fixedNightProgress)
+    {
+        return new SceneNightProfile(
+            sceneName,
+            useCountdownProgress,
+            fixedNightProgress,
+            UnifiedOverlayTint,
+            UnifiedOverlayAlphaAtStart,
+            UnifiedOverlayAlphaAtEnd,
+            UnifiedCameraBackgroundNight,
+            UnifiedLightMultiplierAtStart,
+            UnifiedLightMultiplierAtEnd,
+            UnifiedCharacterShadowColor,
+            UnifiedCharacterShadowOffset,
+            UnifiedCharacterShadowScale);
+    }
 
     public static int ExcludeEffectLayerFromMask(int cullingMask)
     {
