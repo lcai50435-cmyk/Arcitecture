@@ -4,9 +4,23 @@ on:
   push:
     branches:
       - release/webgl
+      - release/webgl-*
     tags:
       - "v*.*.*"
   workflow_dispatch:
+    inputs:
+      sourceRef:
+        description: "Git ref to build, for example v3.0.1"
+        required: false
+        type: string
+      version:
+        description: "Version to show in game, for example 3.0.1"
+        required: false
+        type: string
+      releaseTag:
+        description: "GitHub Release tag, for example v3.0.1"
+        required: false
+        type: string
 
 permissions:
   contents: write
@@ -24,24 +38,64 @@ jobs:
     outputs:
       version: ${{ steps.version.outputs.version }}
       is_release: ${{ steps.version.outputs.is_release }}
+      release_tag: ${{ steps.version.outputs.release_tag }}
+      source_sha: ${{ steps.source.outputs.sha }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          lfs: true
-
       - name: Resolve version
         id: version
         shell: bash
+        env:
+          INPUT_SOURCE_REF: ${{ inputs.sourceRef }}
+          INPUT_VERSION: ${{ inputs.version }}
+          INPUT_RELEASE_TAG: ${{ inputs.releaseTag }}
         run: |
+          source_ref="${INPUT_SOURCE_REF}"
+          version="${INPUT_VERSION}"
+          release_tag="${INPUT_RELEASE_TAG}"
+          is_release=false
+
           if [[ "${GITHUB_REF_TYPE}" == "tag" && "${GITHUB_REF_NAME}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "version=${GITHUB_REF_NAME#v}" >> "${GITHUB_OUTPUT}"
-            echo "is_release=true" >> "${GITHUB_OUTPUT}"
+            source_ref="${GITHUB_REF_NAME}"
+            version="${GITHUB_REF_NAME#v}"
+            release_tag="${GITHUB_REF_NAME}"
+            is_release=true
+          elif [[ -n "${source_ref}" ]]; then
+            if [[ -z "${version}" && "${source_ref}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              version="${source_ref#v}"
+            fi
+            if [[ -z "${release_tag}" && "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              release_tag="v${version}"
+            fi
+            if [[ "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              is_release=true
+            fi
+          elif [[ "${GITHUB_REF_TYPE}" == "branch" && "${GITHUB_REF_NAME}" =~ ^release/webgl-([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
+            version="${BASH_REMATCH[1]}"
+            source_ref="v${version}"
+            release_tag="v${version}"
+            is_release=true
           else
-            echo "version=0.0.${GITHUB_RUN_NUMBER}" >> "${GITHUB_OUTPUT}"
-            echo "is_release=false" >> "${GITHUB_OUTPUT}"
+            source_ref="${GITHUB_REF_NAME}"
+            version="0.0.${GITHUB_RUN_NUMBER}"
           fi
+
+          echo "source_ref=${source_ref}" >> "${GITHUB_OUTPUT}"
+          echo "version=${version}" >> "${GITHUB_OUTPUT}"
+          echo "release_tag=${release_tag}" >> "${GITHUB_OUTPUT}"
+          echo "is_release=${is_release}" >> "${GITHUB_OUTPUT}"
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.version.outputs.source_ref }}
+          fetch-depth: 0
+          lfs: true
+
+      - name: Resolve source commit
+        id: source
+        shell: bash
+        run: |
+          echo "sha=$(git rev-parse HEAD)" >> "${GITHUB_OUTPUT}"
 
       - name: Cache Unity Library
         uses: actions/cache@v4
@@ -67,8 +121,8 @@ jobs:
           customParameters: >
             -arcitectureVersion ${{ steps.version.outputs.version }}
             -arcitectureBuildNumber ${{ github.run_number }}
-            -arcitectureGitSha ${{ github.sha }}
-            -arcitectureGitDescribe ${{ github.ref_name }}
+            -arcitectureGitSha ${{ steps.source.outputs.sha }}
+            -arcitectureGitDescribe ${{ steps.version.outputs.release_tag || steps.version.outputs.source_ref }}
 
       - name: Prepare Pages files
         shell: bash
@@ -120,8 +174,9 @@ jobs:
     runs-on: ubuntu-latest
     env:
       GH_TOKEN: ${{ github.token }}
-      RELEASE_TAG: ${{ github.ref_name }}
+      RELEASE_TAG: ${{ needs.build.outputs.release_tag }}
       VERSION: ${{ needs.build.outputs.version }}
+      SOURCE_SHA: ${{ needs.build.outputs.source_sha }}
       PAGE_URL: ${{ needs.deploy.outputs.page_url }}
     steps:
       - name: Download WebGL artifact
@@ -137,7 +192,7 @@ jobs:
 
           试玩地址：${PAGE_URL}
           版本：${VERSION}
-          提交：${GITHUB_SHA}
+          提交：${SOURCE_SHA}
           EOF
 
       - name: Publish release
