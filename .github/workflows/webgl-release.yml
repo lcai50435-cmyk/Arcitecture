@@ -40,6 +40,7 @@ jobs:
       is_release: ${{ steps.version.outputs.is_release }}
       release_tag: ${{ steps.version.outputs.release_tag }}
       source_sha: ${{ steps.source.outputs.sha }}
+      pages_enabled: ${{ steps.pages.outputs.enabled }}
     steps:
       - name: Resolve version
         id: version
@@ -148,12 +149,25 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+      - name: Check GitHub Pages
+        id: pages
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh api "repos/${GITHUB_REPOSITORY}/pages" >/dev/null 2>&1; then
+            echo "enabled=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "enabled=false" >> "${GITHUB_OUTPUT}"
+            echo "::notice::GitHub Pages is not enabled or this workflow token cannot access it. Skipping Pages deploy."
+          fi
+
       - name: Configure GitHub Pages
+        if: steps.pages.outputs.enabled == 'true'
         uses: actions/configure-pages@v5
-        with:
-          enablement: true
 
       - name: Upload GitHub Pages artifact
+        if: steps.pages.outputs.enabled == 'true'
         uses: actions/upload-pages-artifact@v4
         with:
           path: Builds/WebGL
@@ -161,6 +175,7 @@ jobs:
   deploy:
     name: Deploy GitHub Pages
     needs: build
+    if: needs.build.outputs.pages_enabled == 'true'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -177,7 +192,7 @@ jobs:
     needs:
       - build
       - deploy
-    if: needs.build.outputs.is_release == 'true'
+    if: always() && needs.build.result == 'success' && needs.build.outputs.is_release == 'true'
     runs-on: ubuntu-latest
     env:
       GH_TOKEN: ${{ github.token }}
@@ -194,10 +209,16 @@ jobs:
       - name: Write release notes
         shell: bash
         run: |
+          if [[ -n "${PAGE_URL}" ]]; then
+            preview_line="试玩地址：${PAGE_URL}"
+          else
+            preview_line="试玩地址：GitHub Pages 尚未启用；请仓库管理员启用 Pages 后重新运行 WebGL Release workflow。"
+          fi
+
           cat > release-notes.md <<EOF
           Arcitecture WebGL 试玩版本。
 
-          试玩地址：${PAGE_URL}
+          ${preview_line}
           版本：${VERSION}
           提交：${SOURCE_SHA}
           EOF
