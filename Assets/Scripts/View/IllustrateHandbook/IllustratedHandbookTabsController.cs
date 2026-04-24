@@ -653,45 +653,54 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
             Vector2.zero,
             new Vector2(0.5f, 1f));
 
-        TMP_Text pageTag = EnsureContentText(pageTransform, PageTagName, "统一多页签图鉴书", 20f, SubtitleColor, TextAlignmentOptions.Left);
+        const float leftPageTextX = 16f;
+        const float leftPageTextWidth = 500f;
+
+        TMP_Text pageTag = EnsureContentText(pageTransform, PageTagName, "统一多页签图鉴书", 12f, SubtitleColor, TextAlignmentOptions.Left);
         ConfigureAnchoredRect(
             pageTag.rectTransform,
             new Vector2(0f, 1f),
             new Vector2(0f, 1f),
-            new Vector2(420f, 34f),
-            new Vector2(0f, -8f),
+            new Vector2(leftPageTextWidth, 24f),
+            new Vector2(leftPageTextX, -8f),
             new Vector2(0f, 1f));
 
-        TMP_Text titleText = EnsureContentText(pageTransform, TitleName, title, 42f, TitleColor, TextAlignmentOptions.Left, FontStyles.Bold);
+        TMP_Text titleText = EnsureContentText(pageTransform, TitleName, title, 24f, TitleColor, TextAlignmentOptions.Left, FontStyles.Bold);
         ConfigureAnchoredRect(
             titleText.rectTransform,
             new Vector2(0f, 1f),
             new Vector2(0f, 1f),
-            new Vector2(620f, 56f),
-            new Vector2(0f, -56f),
+            new Vector2(leftPageTextWidth, 36f),
+            new Vector2(leftPageTextX, -42f),
             new Vector2(0f, 1f));
 
-        TMP_Text subtitleText = EnsureContentText(pageTransform, SubtitleName, subtitle, 24f, SubtitleColor, TextAlignmentOptions.Left);
+        TMP_Text subtitleText = EnsureContentText(pageTransform, SubtitleName, subtitle, 13f, SubtitleColor, TextAlignmentOptions.Left);
         ConfigureAnchoredRect(
             subtitleText.rectTransform,
             new Vector2(0f, 1f),
             new Vector2(0f, 1f),
-            new Vector2(880f, 72f),
-            new Vector2(0f, -114f),
+            new Vector2(leftPageTextWidth, 44f),
+            new Vector2(leftPageTextX, -84f),
             new Vector2(0f, 1f));
 
-        TMP_Text bodyText = EnsureContentText(pageTransform, BodyName, string.Empty, 28f, BodyColor, TextAlignmentOptions.TopLeft);
-        SetStretch(bodyText.rectTransform, 24f, 24f, 180f, 92f);
+        TMP_Text bodyText = EnsureContentText(pageTransform, BodyName, string.Empty, 15f, BodyColor, TextAlignmentOptions.TopLeft);
+        ConfigureAnchoredRect(
+            bodyText.rectTransform,
+            new Vector2(0f, 1f),
+            new Vector2(0f, 1f),
+            new Vector2(leftPageTextWidth, 700f),
+            new Vector2(leftPageTextX, -140f),
+            new Vector2(0f, 1f));
         bodyText.rectTransform.pivot = new Vector2(0f, 1f);
-        bodyText.lineSpacing = 10f;
+        bodyText.lineSpacing = 2f;
 
-        TMP_Text footerText = EnsureContentText(pageTransform, FooterName, string.Empty, 21f, FooterColor, TextAlignmentOptions.BottomLeft);
+        TMP_Text footerText = EnsureContentText(pageTransform, FooterName, string.Empty, 12f, FooterColor, TextAlignmentOptions.BottomLeft);
         ConfigureAnchoredRect(
             footerText.rectTransform,
             new Vector2(0f, 0f),
-            new Vector2(1f, 0f),
-            new Vector2(0f, 52f),
-            new Vector2(0f, 16f),
+            new Vector2(0f, 0f),
+            new Vector2(leftPageTextWidth, 44f),
+            new Vector2(leftPageTextX, 16f),
             new Vector2(0f, 0f));
 
         pageContentRoots[page] = pageRect;

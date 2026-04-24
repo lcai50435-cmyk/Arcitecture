@@ -8,10 +8,16 @@ public static class GameplayStatusHudRuntime
     private const string HudFontResourcePath = "Fonts & Materials/LiberationSans SDF";
     private const string CanvasName = "GameplayStatusHudCanvas";
     private const string RootName = "GameplayStatusHudRoot";
-    private const float RootWidth = 420f;
-    private const float RootHeight = 112f;
-    private const float RowWidth = 388f;
-    private const float RowHeight = 42f;
+    private const string HeartIconAssetPath = "Assets/File/Prop/UIProp/Heart.png";
+    private const string HealthTrackAssetPath = "Assets/File/Prop/UIProp/GrayHealth.png";
+    private const string HealthFillAssetPath = "Assets/File/Prop/UIProp/RedHealth.png";
+    private const string InkTrackAssetPath = "Assets/File/Prop/UIProp/BlackHealth.png";
+    private const string StructureIconAssetPath = "Assets/File/Prop/Prop/Prism.png";
+    private const string StructureTrackAssetPath = "Assets/File/Prop/UIProp/Bar.png";
+    private const float RootWidth = 330f;
+    private const float RootHeight = 128f;
+    private const float RowWidth = 306f;
+    private const float RowHeight = 36f;
     private const int PixelFrameWidth = 96;
     private const int PixelFrameHeight = 36;
     private const int PixelFrameBorder = 6;
@@ -24,20 +30,24 @@ public static class GameplayStatusHudRuntime
     private static RectTransform rootRect;
     private static ValueTrans healthGauge;
     private static ValueTrans weaponGauge;
+    private static ValueTrans structureGauge;
     private static Graphic weaponFillGraphic;
+    private static Graphic structureFillGraphic;
     private static TextMeshProUGUI healthValueText;
     private static TextMeshProUGUI weaponValueText;
+    private static TextMeshProUGUI structureValueText;
     private static TextMeshProUGUI countdownText;
     private static bool externallyHidden;
     private static readonly Dictionary<string, Sprite> HudSpriteCache = new Dictionary<string, Sprite>();
-    private static readonly Color RootPanelColor = new Color(0.15f, 0.10f, 0.06f, 0.84f);
-    private static readonly Color RowPanelColor = new Color(0.24f, 0.15f, 0.08f, 0.94f);
+    private static readonly Color RootPanelColor = new Color(1f, 1f, 1f, 0f);
+    private static readonly Color RowPanelColor = new Color(1f, 1f, 1f, 0f);
     private static readonly Color GaugeTrackColor = new Color(0.10f, 0.10f, 0.11f, 0.96f);
     private static readonly Color GoldBorderColor = new Color(0.78f, 0.53f, 0.22f, 1f);
     private static readonly Color GoldHighlightColor = new Color(1f, 0.83f, 0.46f, 1f);
     private static readonly Color DarkOutlineColor = new Color(0.14f, 0.08f, 0.04f, 1f);
     private static readonly Color HealthFillColor = new Color(0.82f, 0.19f, 0.16f, 1f);
     private static readonly Color InkFillColor = new Color(0.20f, 0.58f, 0.86f, 1f);
+    private static readonly Color StructureFillColor = new Color(0.20f, 0.78f, 0.82f, 1f);
 
     public static ValueTrans EnsureHealthGauge(ValueTrans currentGauge)
     {
@@ -93,6 +103,29 @@ public static class GameplayStatusHudRuntime
         if (weaponValueText != null)
         {
             weaponValueText.text = $"{current:0}/{max:0}";
+        }
+    }
+
+    public static void RefreshStructureProgressText()
+    {
+        RuntimeProgressState state = RuntimeProgressState.Instance ?? RuntimeProgressState.EnsureInstance();
+        float max = state != null ? Mathf.Max(1, state.GetTotalMaxProgress()) : 1f;
+        float current = state != null ? Mathf.Clamp(state.GetTotalProgress(), 0f, max) : 0f;
+
+        if (structureGauge != null)
+        {
+            structureGauge.SetMaxValue(max);
+            structureGauge.SetValue(current);
+        }
+
+        if (structureFillGraphic != null)
+        {
+            structureFillGraphic.color = StructureFillColor;
+        }
+
+        if (structureValueText != null)
+        {
+            structureValueText.text = $"{current:0}/{max:0}";
         }
     }
 
@@ -173,10 +206,11 @@ public static class GameplayStatusHudRuntime
     {
         RuntimeMiniMapHud.EnsureInstance();
 
-        if (rootRect != null && IsRuntimeGauge(healthGauge) && IsRuntimeGauge(weaponGauge))
+        if (rootRect != null && IsRuntimeGauge(healthGauge) && IsRuntimeGauge(weaponGauge) && IsRuntimeGauge(structureGauge))
         {
             ReattachToHudCanvas();
             rootRect.gameObject.SetActive(true);
+            RefreshStructureProgressText();
             return;
         }
 
@@ -200,17 +234,21 @@ public static class GameplayStatusHudRuntime
             rootBackground = rootObject.AddComponent<Image>();
         }
 
-        ApplyPixelFrame(rootBackground, "root", RootPanelColor);
+        rootBackground.sprite = null;
+        rootBackground.color = RootPanelColor;
+        rootBackground.raycastTarget = false;
         ReattachToHudCanvas();
         rootRect.gameObject.SetActive(!externallyHidden);
         HideLegacyStatusPanels();
 
         // 旧场景里仍可能保留 legacy ValueTrans 引用；这里统一回收到运行时 HUD，
         // 避免只创建了外层底板、却没有真正生成血量/Ink 两行内容。
-        if (!IsRuntimeGauge(healthGauge) || !IsRuntimeGauge(weaponGauge))
+        if (!IsRuntimeGauge(healthGauge) || !IsRuntimeGauge(weaponGauge) || !IsRuntimeGauge(structureGauge))
         {
             CreateRows(rootObject.transform);
         }
+
+        RefreshStructureProgressText();
     }
 
     private static bool IsRuntimeGauge(ValueTrans gauge)
@@ -284,15 +322,41 @@ public static class GameplayStatusHudRuntime
     {
         ClearRow(parent, "HealthRow");
         ClearRow(parent, "InkRow");
+        ClearRow(parent, "StructureRow");
 
-        StatusRow healthRow = CreateRow(parent, "HealthRow", "血", new Vector2(16f, -14f), HealthFillColor);
-        StatusRow weaponRow = CreateRow(parent, "InkRow", "墨", new Vector2(16f, -60f), InkFillColor);
+        StatusRow healthRow = CreateRow(
+            parent,
+            "HealthRow",
+            HeartIconAssetPath,
+            HealthTrackAssetPath,
+            HealthFillAssetPath,
+            new Vector2(10f, -8f),
+            HealthFillColor);
+        StatusRow weaponRow = CreateRow(
+            parent,
+            "InkRow",
+            null,
+            InkTrackAssetPath,
+            null,
+            new Vector2(10f, -46f),
+            InkFillColor);
+        StatusRow structureRow = CreateRow(
+            parent,
+            "StructureRow",
+            StructureIconAssetPath,
+            StructureTrackAssetPath,
+            null,
+            new Vector2(10f, -84f),
+            StructureFillColor);
 
         healthGauge = healthRow.gauge;
         weaponGauge = weaponRow.gauge;
+        structureGauge = structureRow.gauge;
         weaponFillGraphic = weaponRow.fillGraphic;
+        structureFillGraphic = structureRow.fillGraphic;
         healthValueText = healthRow.valueText;
         weaponValueText = weaponRow.valueText;
+        structureValueText = structureRow.valueText;
     }
 
     private static void ClearRow(Transform parent, string name)
@@ -304,7 +368,14 @@ public static class GameplayStatusHudRuntime
         }
     }
 
-    private static StatusRow CreateRow(Transform parent, string rowName, string title, Vector2 anchoredPosition, Color fillColor)
+    private static StatusRow CreateRow(
+        Transform parent,
+        string rowName,
+        string iconAssetPath,
+        string trackAssetPath,
+        string fillAssetPath,
+        Vector2 anchoredPosition,
+        Color fillColor)
     {
         GameObject rowObject = CreateUIObject(rowName, parent);
         RectTransform rowRect = rowObject.GetComponent<RectTransform>();
@@ -315,32 +386,33 @@ public static class GameplayStatusHudRuntime
         rowRect.sizeDelta = new Vector2(RowWidth, RowHeight);
 
         Image background = rowObject.AddComponent<Image>();
-        ApplyPixelFrame(background, rowName, RowPanelColor);
+        background.color = RowPanelColor;
+        background.raycastTarget = false;
 
-        GameObject badgeObject = CreateUIObject("Badge", rowObject.transform);
-        RectTransform badgeRect = badgeObject.GetComponent<RectTransform>();
-        badgeRect.anchorMin = new Vector2(0f, 1f);
-        badgeRect.anchorMax = new Vector2(0f, 1f);
-        badgeRect.pivot = new Vector2(0f, 1f);
-        badgeRect.anchoredPosition = new Vector2(10f, -7f);
-        badgeRect.sizeDelta = new Vector2(42f, 28f);
-
-        Image badgeImage = badgeObject.AddComponent<Image>();
-        ApplyPixelFrame(badgeImage, rowName + "_badge", new Color(0.63f, 0.39f, 0.13f, 0.98f), 48, 32, 5);
-
-        TextMeshProUGUI titleText = CreateText("Label", badgeObject.transform, title, 20f, new Vector2(0f, 0f), new Vector2(42f, 28f), TextAlignmentOptions.Center);
-        titleText.fontStyle = FontStyles.Bold;
+        CreateRowIcon(rowObject.transform, rowName, iconAssetPath, fillColor);
 
         GameObject barObject = CreateUIObject("Bar", rowObject.transform);
         RectTransform barRect = barObject.GetComponent<RectTransform>();
         barRect.anchorMin = new Vector2(0f, 0.5f);
         barRect.anchorMax = new Vector2(0f, 0.5f);
         barRect.pivot = new Vector2(0f, 0.5f);
-        barRect.anchoredPosition = new Vector2(62f, -1f);
-        barRect.sizeDelta = new Vector2(232f, 20f);
+        barRect.anchoredPosition = new Vector2(42f, -1f);
+        barRect.sizeDelta = new Vector2(214f, 18f);
 
         Image barBackground = barObject.AddComponent<Image>();
-        ApplyPixelFrame(barBackground, rowName + "_track", GaugeTrackColor, 64, 20, 5);
+        Sprite trackSprite = LoadHudSprite(trackAssetPath);
+        if (trackSprite != null)
+        {
+            barBackground.sprite = trackSprite;
+            barBackground.type = Image.Type.Simple;
+            barBackground.preserveAspect = false;
+            barBackground.color = Color.white;
+            barBackground.raycastTarget = false;
+        }
+        else
+        {
+            ApplyPixelFrame(barBackground, rowName + "_track", GaugeTrackColor, 64, 20, 5);
+        }
 
         Slider slider = barObject.AddComponent<Slider>();
         slider.direction = Slider.Direction.LeftToRight;
@@ -353,8 +425,8 @@ public static class GameplayStatusHudRuntime
         RectTransform fillAreaRect = fillArea.GetComponent<RectTransform>();
         fillAreaRect.anchorMin = Vector2.zero;
         fillAreaRect.anchorMax = Vector2.one;
-        fillAreaRect.offsetMin = new Vector2(5f, 5f);
-        fillAreaRect.offsetMax = new Vector2(-5f, -5f);
+        fillAreaRect.offsetMin = new Vector2(6f, 4f);
+        fillAreaRect.offsetMax = new Vector2(-6f, -4f);
 
         GameObject fillObject = CreateUIObject("Fill", fillArea.transform);
         RectTransform fillRect = fillObject.GetComponent<RectTransform>();
@@ -364,15 +436,44 @@ public static class GameplayStatusHudRuntime
         fillRect.offsetMax = Vector2.zero;
 
         Image fillImage = fillObject.AddComponent<Image>();
-        ApplyGaugeFill(fillImage, fillColor);
+        ApplyGaugeFill(fillImage, fillColor, fillAssetPath);
         slider.fillRect = fillRect;
 
         ValueTrans gauge = barObject.AddComponent<ValueTrans>();
         gauge.slider = slider;
 
-        TextMeshProUGUI valueText = CreateText("Value", rowObject.transform, "100/100", 16f, new Vector2(304f, -9f), new Vector2(72f, 24f), TextAlignmentOptions.MidlineRight);
+        TextMeshProUGUI valueText = CreateText("Value", rowObject.transform, "100/100", 12f, new Vector2(188f, -10f), new Vector2(60f, 18f), TextAlignmentOptions.MidlineRight);
+        valueText.fontStyle = FontStyles.Bold;
 
         return new StatusRow(gauge, valueText, fillImage);
+    }
+
+    private static Image CreateRowIcon(Transform parent, string rowName, string iconAssetPath, Color fallbackColor)
+    {
+        GameObject iconObject = CreateUIObject("Icon", parent);
+        RectTransform iconRect = iconObject.GetComponent<RectTransform>();
+        iconRect.anchorMin = new Vector2(0f, 0.5f);
+        iconRect.anchorMax = new Vector2(0f, 0.5f);
+        iconRect.pivot = new Vector2(0.5f, 0.5f);
+        iconRect.anchoredPosition = new Vector2(22f, -1f);
+        iconRect.sizeDelta = new Vector2(34f, 34f);
+
+        Image iconImage = iconObject.AddComponent<Image>();
+        Sprite iconSprite = LoadHudSprite(iconAssetPath);
+        if (iconSprite != null)
+        {
+            iconImage.sprite = iconSprite;
+            iconImage.type = Image.Type.Simple;
+            iconImage.preserveAspect = true;
+            iconImage.color = Color.white;
+        }
+        else
+        {
+            ApplyPixelFrame(iconImage, rowName + "_icon", fallbackColor, 28, 28, 5);
+        }
+
+        iconImage.raycastTarget = false;
+        return iconImage;
     }
 
     private static GameObject CreateUIObject(string name, Transform parent)
@@ -508,17 +609,41 @@ public static class GameplayStatusHudRuntime
         return sprite;
     }
 
-    private static void ApplyGaugeFill(Image image, Color fillColor)
+    private static void ApplyGaugeFill(Image image, Color fillColor, string fillAssetPath = null)
     {
         if (image == null)
         {
             return;
         }
 
-        image.sprite = GetGaugeFillSprite();
-        image.type = Image.Type.Sliced;
-        image.color = fillColor;
+        Sprite fillSprite = LoadHudSprite(fillAssetPath);
+        image.sprite = fillSprite ?? GetGaugeFillSprite();
+        image.type = fillSprite != null ? Image.Type.Simple : Image.Type.Sliced;
+        image.preserveAspect = false;
+        image.color = fillSprite != null ? Color.white : fillColor;
         image.raycastTarget = false;
+    }
+
+    private static Sprite LoadHudSprite(string assetPath)
+    {
+        if (string.IsNullOrWhiteSpace(assetPath))
+        {
+            return null;
+        }
+
+        string cacheKey = $"asset_{assetPath}";
+        if (HudSpriteCache.TryGetValue(cacheKey, out Sprite cachedSprite) && cachedSprite != null)
+        {
+            return cachedSprite;
+        }
+
+        Sprite sprite = RuntimeProjectSpriteLoader.LoadSprite(assetPath, true, SpriteMeshType.FullRect);
+        if (sprite != null)
+        {
+            HudSpriteCache[cacheKey] = sprite;
+        }
+
+        return sprite;
     }
 
     private static Sprite GetGaugeFillSprite()

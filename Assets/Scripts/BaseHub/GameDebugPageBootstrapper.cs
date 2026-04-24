@@ -268,7 +268,7 @@ public class GameDebugPageBootstrapper : MonoBehaviour
         {
             int unlockedSlots = runtimeState.GetUnlockedSlotCount(definition.buildingId);
             builder.AppendLine(
-                $"{definition.displayName}：{runtimeState.GetBuildingProgress(definition.buildingId)}/{definition.requiredProgress}    槽位：{unlockedSlots}/{definition.slotDefinitions.Length}    完成：{(runtimeState.IsBuildingUnlocked(definition.buildingId) ? "是" : "否")}");
+                $"{definition.displayName}：{runtimeState.GetBuildingProgress(definition.buildingId)}/{definition.requiredProgress}    槽位：{unlockedSlots}/{definition.slotDefinitions.Length}    图鉴完成：{(runtimeState.IsBuildingUnlocked(definition.buildingId) ? "是" : "否")}    已修复：{(runtimeState.IsBuildingRepaired(definition.buildingId) ? "是" : "否")}");
         }
 
         if (!IsBaseScene())

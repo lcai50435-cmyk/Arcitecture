@@ -11,7 +11,7 @@ public class BaseHubBootstrapper : MonoBehaviour
 {
     private const string BaseHubMapResourcePath = "BaseHub/base_hub_map";
     private const string DefaultHandbookPrefabPath = "Assets/Scripts/View/Prefab/CatagloueUI.prefab";
-    private const string RequiredRuntimeCharacters = "图鉴精灵关卡入口打开查看属性武器攻击基地允许生命上限耐久攻击力移动速度防御调试面板按住显示关闭点击装备相册留念拍照本地保存时间场景分辨率暂无上一页下一页";
+    private const string RequiredRuntimeCharacters = "图鉴精灵河狸关卡入口打开查看属性武器攻击基地允许生命上限耐久攻击力移动速度防御调试面板按住显示关闭点击装备相册留念拍照本地保存时间场景分辨率暂无上一页下一页修复工作台材料";
     private static readonly string[] RuntimeFontNames =
     {
         "Arial Unicode MS",
@@ -28,6 +28,7 @@ public class BaseHubBootstrapper : MonoBehaviour
     private static readonly Vector3 DetailedSpiritPosition = new Vector3(4.2f, 0.4f, 0f);
     private static readonly Vector3 DetailedGatePosition = new Vector3(0f, 2.85f, 0f);
     private static readonly Vector3 DetailedAlbumPosition = new Vector3(0f, -4.05f, 0f);
+    private static readonly Vector3 DetailedRepairWorkbenchPosition = new Vector3(0f, -2.92f, 0f);
     private static readonly Vector3 DetailedLeftDummyPosition = new Vector3(-4.1f, -3.3f, 0f);
     private static readonly Vector3 DetailedRightDummyPosition = new Vector3(4.1f, -3.3f, 0f);
 
@@ -100,6 +101,7 @@ public class BaseHubBootstrapper : MonoBehaviour
         CreateBookInteractable(uiController);
         CreateSpiritInteractable(uiController);
         CreateAlbumInteractable(uiController);
+        CreateRepairWorkbenchInteractable();
         CreateGameSceneInteractable(uiController);
         CreateTrainingDummies();
     }
@@ -1487,6 +1489,31 @@ public class BaseHubBootstrapper : MonoBehaviour
                 new Vector3(0f, 0.36f, 0f),
                 new Color(1f, 0.82f, 0.58f, 1f));
         }
+    }
+
+    private void CreateRepairWorkbenchInteractable()
+    {
+        Sprite workbenchSprite = CreateSolidSprite(new Color(0.36f, 0.25f, 0.16f, 1f));
+        GameObject workbench = CreateWorldObject(
+            "RepairWorkbenchInteractable",
+            useDetailedHubMap ? DetailedRepairWorkbenchPosition : new Vector3(0f, -1.62f, 0f),
+            workbenchSprite,
+            useDetailedHubMap ? new Vector3(1.65f, 0.78f, 1f) : new Vector3(1.45f, 0.7f, 1f),
+            2);
+
+        BoxCollider2D trigger = workbench.AddComponent<BoxCollider2D>();
+        trigger.isTrigger = true;
+        trigger.size = new Vector2(1.5f, 0.82f);
+
+        workbench.AddComponent<BaseHubRepairWorkbenchInteract>();
+
+        NightLightingController.EnsureLocalLight(
+            workbench,
+            1.2f,
+            0.08f,
+            0.02f,
+            new Vector3(0f, 0.24f, 0f),
+            new Color(0.54f, 1f, 0.72f, 1f));
     }
 
     private void CreateTrainingDummies()

@@ -48,6 +48,11 @@ public static class RuntimeCrystalDropFactory
             return ArchitecturalCrystalFactory.CreateSpecialStructureMaterial().icon;
         }
 
+        if (crystal.IsRepairMaterial)
+        {
+            return ArchitecturalCrystalFactory.CreateRepairMaterial(crystal.repairBuildingId).icon;
+        }
+
         if (crystal.IsInkSupply)
         {
             return ArchitecturalCrystalFactory.CreateInkSupply(
@@ -72,9 +77,11 @@ public static class RuntimeCrystalDropFactory
 
         Color color = crystal.IsSpecialStructure
             ? new Color(0.98f, 0.82f, 0.26f, 1f)
-            : crystal.IsInkSupply
-                ? new Color(0.24f, 0.74f, 0.92f, 1f)
-                : new Color(0.92f, 0.92f, 0.92f, 1f);
+            : crystal.IsRepairMaterial
+                ? new Color(0.34f, 0.88f, 0.68f, 1f)
+                : crystal.IsInkSupply
+                    ? new Color(0.24f, 0.74f, 0.92f, 1f)
+                    : new Color(0.92f, 0.92f, 0.92f, 1f);
 
         Texture2D texture = new Texture2D(16, 16, TextureFormat.RGBA32, false);
         texture.filterMode = FilterMode.Point;
@@ -151,6 +158,7 @@ public static class RuntimeCrystalDropFactory
             handler.subBonusValue = crystal.subBonusValue;
             handler.isUnlockMaterial = crystal.isUnlockMaterial;
             handler.resourceCategory = crystal.resourceCategory;
+            handler.repairBuildingId = crystal.repairBuildingId;
             handler.inkRestoreValue = crystal.inkRestoreValue;
             handler.textDescription = crystal.textDescription;
             handler.persistCollectedAcrossSceneLoads = false;

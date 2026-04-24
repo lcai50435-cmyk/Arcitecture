@@ -21,7 +21,8 @@ public enum ArchitecturalResourceCategory
 {
     CommonStructure,
     SpecialStructure,
-    InkSupply
+    InkSupply,
+    RepairMaterial
 }
 
 public enum AttributeBonusType
@@ -56,6 +57,7 @@ public struct ArchitecturalCrystal
 
     public bool isUnlockMaterial;
     public ArchitecturalResourceCategory resourceCategory;
+    public CatalogueBuildingId repairBuildingId;
     public int inkRestoreValue;
     public int runtimePickupOrder;
 
@@ -66,6 +68,11 @@ public struct ArchitecturalCrystal
             if (resourceCategory == ArchitecturalResourceCategory.InkSupply)
             {
                 return ArchitecturalResourceCategory.InkSupply;
+            }
+
+            if (resourceCategory == ArchitecturalResourceCategory.RepairMaterial)
+            {
+                return ArchitecturalResourceCategory.RepairMaterial;
             }
 
             if (isUnlockMaterial || resourceCategory == ArchitecturalResourceCategory.SpecialStructure)
@@ -80,11 +87,17 @@ public struct ArchitecturalCrystal
     public bool IsCommonStructure => Category == ArchitecturalResourceCategory.CommonStructure;
     public bool IsSpecialStructure => Category == ArchitecturalResourceCategory.SpecialStructure;
     public bool IsInkSupply => Category == ArchitecturalResourceCategory.InkSupply;
+    public bool IsRepairMaterial => Category == ArchitecturalResourceCategory.RepairMaterial;
 
     public string DisplayName
     {
         get
         {
+            if (IsRepairMaterial)
+            {
+                return $"{BuildingDefinitionLibrary.Get(repairBuildingId).displayName}修复材料";
+            }
+
             if (IsSpecialStructure)
             {
                 return "专用结构材料";
@@ -136,7 +149,8 @@ public struct ArchitecturalCrystal
         bool isUnlockMaterial,
         ArchitecturalResourceCategory resourceCategory,
         int inkRestoreValue,
-        int buildProgressPercent = 0)
+        int buildProgressPercent = 0,
+        CatalogueBuildingId repairBuildingId = CatalogueBuildingId.Building1)
         : this()
     {
         this.type = type;
@@ -151,6 +165,7 @@ public struct ArchitecturalCrystal
         this.subBonusValue = subBonusValue;
         this.isUnlockMaterial = isUnlockMaterial;
         this.resourceCategory = resourceCategory;
+        this.repairBuildingId = repairBuildingId;
         this.inkRestoreValue = inkRestoreValue;
         this.runtimePickupOrder = 0;
     }
@@ -310,6 +325,37 @@ public static class ArchitecturalCrystalFactory
             true,
             ArchitecturalResourceCategory.SpecialStructure,
             0);
+    }
+
+    public static ArchitecturalCrystal CreateRepairMaterial(
+        CatalogueBuildingId buildingId,
+        Sprite icon = null,
+        Sprite backIcon = null)
+    {
+        ArchitecturalCrystalVisualSet visuals = ArchitecturalCrystalVisualResolver.Resolve(
+            ArchitecturalType.MortiseAndTenonJoint,
+            ArchitecturalResourceCategory.RepairMaterial,
+            icon,
+            backIcon);
+        BuildingDefinition definition = BuildingDefinitionLibrary.Get(buildingId);
+        Sprite repairIcon = visuals.icon != null ? visuals.icon : GetOrCreateSpecialStructureSprite();
+        Sprite repairBackIcon = visuals.backIcon != null ? visuals.backIcon : repairIcon;
+
+        return new ArchitecturalCrystal(
+            ArchitecturalType.MortiseAndTenonJoint,
+            0,
+            repairIcon,
+            repairBackIcon,
+            $"{definition.displayName}修复材料，可带回对应关卡修复残破建筑。",
+            AttributeBonusType.None,
+            0f,
+            AttributeBonusType.None,
+            0f,
+            false,
+            ArchitecturalResourceCategory.RepairMaterial,
+            0,
+            0,
+            buildingId);
     }
 
     private static Sprite GetOrCreateSpecialStructureSprite()
@@ -567,6 +613,11 @@ public static class ArchitecturalCrystalVisualResolver
         "Assets/File/Prop/Prop/LightBall.png",
         new Color32(243, 199, 96, 255),
         new Color32(125, 83, 26, 255));
+    private static readonly VisualConfig repairMaterialVisualConfig = new VisualConfig(
+        "Assets/File/Prop/Prop/ItemBag_2.png",
+        "Assets/File/Prop/Prop/LightBall.png",
+        new Color32(105, 210, 170, 255),
+        new Color32(31, 105, 86, 255));
     private static readonly VisualConfig largeInkVisualConfig = new VisualConfig(
         null,
         null,
@@ -623,6 +674,23 @@ public static class ArchitecturalCrystalVisualResolver
                 specialStructureVisualConfig.backIconPath,
                 specialStructureVisualConfig.primaryColor,
                 specialStructureVisualConfig.secondaryColor,
+                true);
+        }
+        else if (category == ArchitecturalResourceCategory.RepairMaterial)
+        {
+            resolvedIcon ??= ResolveSprite(
+                type,
+                category,
+                repairMaterialVisualConfig.iconPath,
+                repairMaterialVisualConfig.primaryColor,
+                repairMaterialVisualConfig.secondaryColor,
+                false);
+            resolvedBackIcon ??= ResolveSprite(
+                type,
+                category,
+                repairMaterialVisualConfig.backIconPath,
+                repairMaterialVisualConfig.primaryColor,
+                repairMaterialVisualConfig.secondaryColor,
                 true);
         }
 

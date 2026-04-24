@@ -22,25 +22,30 @@ public class BackpackUI : MonoBehaviour
     private const int RuntimeAttackSelectionIndex = -1;
     private const int RuntimeSlotCount = 6;
     private const int RuntimeCanvasSortingOrder = 1;
-    private const float RuntimePanelX = 47f;
+    private const float RuntimeSurfaceWidth = 720f;
+    private const float RuntimeSurfaceHeight = 126f;
+    private const float RuntimeSurfaceBottom = 24f;
+    private const float RuntimeItemPanelX = 0f;
     private const float RuntimeItemPanelY = 0f;
-    private const float RuntimeAttackPanelY = -304f;
-    private const float RuntimeSlotStartY = 158.3f;
-    private const float RuntimeSlotGapY = 63.25f;
+    private const float RuntimeAttackPanelX = -300f;
+    private const float RuntimeAttackPanelY = 0f;
+    private const float RuntimeSlotStartX = -185f;
+    private const float RuntimeSlotGapX = 74f;
+    private const float RuntimeSlotY = 0f;
     private const float RuntimeSlotSize = 60f;
-    private const float RuntimeItemPanelWidth = 94f;
-    private const float RuntimeItemPanelHeight = 406f;
-    private const float RuntimeAttackPanelWidth = 94f;
-    private const float RuntimeAttackPanelHeight = 91f;
+    private const float RuntimeItemPanelWidth = 500f;
+    private const float RuntimeItemPanelHeight = 92f;
+    private const float RuntimeAttackPanelWidth = 86f;
+    private const float RuntimeAttackPanelHeight = 86f;
     private const float RuntimeSlotIconSize = 46f;
     private const float RuntimeSelectionBorderThickness = 3f;
     private const float RuntimeSelectionFramePadding = 3f;
     private const float RuntimeSelectionFadeSpeed = 12f;
     private const string TogglePromptId = "backpack_toggle";
-    private const float ToggleHotspotY = -168f;
+    private const float ToggleHotspotY = 18f;
     private const float ToggleHotspotWidth = 138f;
     private const float ToggleHotspotHeight = 44f;
-    private const float CollapseSlideDistance = 150f;
+    private const float CollapseSlideDistance = 112f;
     private const float SlideSmoothTime = 0.08f;
     private const float ModalHideSlideDistance = 92f;
     private const float VisibilitySmoothTime = 0.12f;
@@ -431,11 +436,11 @@ public class BackpackUI : MonoBehaviour
         }
 
         generatedSurfaceRect = EnsureChildRect(runtimeCanvasRoot, RuntimeSurfaceName);
-        generatedSurfaceRect.anchorMin = new Vector2(0f, 0.5f);
-        generatedSurfaceRect.anchorMax = new Vector2(0f, 0.5f);
-        generatedSurfaceRect.pivot = new Vector2(0f, 0.5f);
-        generatedSurfaceRect.anchoredPosition = Vector2.zero;
-        generatedSurfaceRect.sizeDelta = new Vector2(120f, 680f);
+        generatedSurfaceRect.anchorMin = new Vector2(0.5f, 0f);
+        generatedSurfaceRect.anchorMax = new Vector2(0.5f, 0f);
+        generatedSurfaceRect.pivot = new Vector2(0.5f, 0f);
+        generatedSurfaceRect.anchoredPosition = new Vector2(0f, RuntimeSurfaceBottom);
+        generatedSurfaceRect.sizeDelta = new Vector2(RuntimeSurfaceWidth, RuntimeSurfaceHeight);
         generatedSurfaceRect.localScale = Vector3.one;
         generatedSurfaceRect.gameObject.SetActive(true);
 
@@ -445,7 +450,7 @@ public class BackpackUI : MonoBehaviour
             generatedSurfaceRect,
             RuntimeItemPanelName,
             ResolveRuntimeSprite("BackpackSlots"),
-            new Vector2(RuntimePanelX, RuntimeItemPanelY),
+            new Vector2(RuntimeItemPanelX, RuntimeItemPanelY),
             new Vector2(RuntimeItemPanelWidth, RuntimeItemPanelHeight),
             new Color(0.25f, 0.19f, 0.13f, 0.96f));
 
@@ -455,7 +460,7 @@ public class BackpackUI : MonoBehaviour
             generatedSurfaceRect,
             RuntimeAttackPanelName,
             ResolveRuntimeSprite("AttackSlot"),
-            new Vector2(RuntimePanelX, RuntimeAttackPanelY),
+            new Vector2(RuntimeAttackPanelX, RuntimeAttackPanelY),
             new Vector2(RuntimeAttackPanelWidth, RuntimeAttackPanelHeight),
             new Color(0.25f, 0.19f, 0.13f, 0.96f));
         CenterPanelHorizontally(attackPanel);
@@ -627,8 +632,8 @@ public class BackpackUI : MonoBehaviour
         Color fallbackColor)
     {
         RectTransform panel = EnsureChildRect(parent, panelName);
-        panel.anchorMin = new Vector2(0f, 0.5f);
-        panel.anchorMax = new Vector2(0f, 0.5f);
+        panel.anchorMin = new Vector2(0.5f, 0.5f);
+        panel.anchorMax = new Vector2(0.5f, 0.5f);
         panel.pivot = new Vector2(0.5f, 0.5f);
         panel.anchoredPosition = position;
         panel.sizeDelta = size;
@@ -655,7 +660,7 @@ public class BackpackUI : MonoBehaviour
         slot.anchorMin = new Vector2(0.5f, 0.5f);
         slot.anchorMax = new Vector2(0.5f, 0.5f);
         slot.pivot = new Vector2(0.5f, 0.5f);
-        slot.anchoredPosition = new Vector2(0f, RuntimeSlotStartY - RuntimeSlotGapY * slotIndex);
+        slot.anchoredPosition = new Vector2(RuntimeSlotStartX + RuntimeSlotGapX * slotIndex, RuntimeSlotY);
         slot.sizeDelta = new Vector2(RuntimeSlotSize, RuntimeSlotSize);
         slot.localScale = Vector3.one;
 
@@ -1151,10 +1156,9 @@ public class BackpackUI : MonoBehaviour
             return;
         }
 
-        panel.anchorMin = new Vector2(0f, panel.anchorMin.y);
-        panel.anchorMax = new Vector2(0f, panel.anchorMax.y);
+        panel.anchorMin = new Vector2(0.5f, 0.5f);
+        panel.anchorMax = new Vector2(0.5f, 0.5f);
         panel.pivot = new Vector2(0.5f, 0.5f);
-        panel.anchoredPosition = new Vector2(panel.sizeDelta.x * 0.5f, panel.anchoredPosition.y);
     }
 
     private void EnsureSlideToggle()

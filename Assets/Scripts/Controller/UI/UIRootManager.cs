@@ -639,6 +639,7 @@ public class UIRootManager : MonoBehaviour
                IsCanvasGroupOpen(albumPanelUI) ||
                IsCanvasGroupOpen(stageSelectionPanelUI) ||
                (UIManager.Instance != null && UIManager.Instance.IsHandbookOpen) ||
+               BeaverAssistantPanel.IsOpen ||
                RuntimePauseMenu.IsPauseOpen ||
                RuntimePhotoCaptureManager.IsCaptureInProgress;
     }

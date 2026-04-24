@@ -11,6 +11,7 @@ public class BuildingRuntimeStateData
     public bool[] grantedSlotRewards;
     public bool grantedCompletionReward;
     public bool isBuildingUnlocked;
+    public bool isRepaired;
 
     public void EnsureSlotCapacity(int slotCount)
     {
@@ -251,6 +252,33 @@ public class RuntimeProgressState : MonoBehaviour
         return GetBuildingState(buildingId).isBuildingUnlocked;
     }
 
+    public bool IsBuildingRepairReady(CatalogueBuildingId buildingId)
+    {
+        BuildingDefinition definition = BuildingDefinitionLibrary.Get(buildingId);
+        BuildingRuntimeStateData state = GetBuildingState(buildingId);
+        state.EnsureSlotCapacity(definition.slotDefinitions != null ? definition.slotDefinitions.Length : 0);
+        return state.progress >= definition.requiredProgress &&
+               GetUnlockedSlotCountInternal(state) >= state.unlockedSlots.Length;
+    }
+
+    public bool IsBuildingRepaired(CatalogueBuildingId buildingId)
+    {
+        return GetBuildingState(buildingId).isRepaired;
+    }
+
+    public bool MarkBuildingRepaired(CatalogueBuildingId buildingId)
+    {
+        BuildingRuntimeStateData state = GetBuildingState(buildingId);
+        if (state.isRepaired || !IsBuildingRepairReady(buildingId))
+        {
+            return false;
+        }
+
+        state.isRepaired = true;
+        NotifyStateChanged();
+        return true;
+    }
+
     public IEnumerable<BuildingRewardDefinition> GetGrantedRewards()
     {
         InitializeDefinitions();
@@ -289,7 +317,8 @@ public class RuntimeProgressState : MonoBehaviour
                 progress = state.progress,
                 unlockedSlots = CloneBoolArray(state.unlockedSlots),
                 grantedSlotRewards = CloneBoolArray(state.grantedSlotRewards),
-                grantedCompletionReward = state.grantedCompletionReward
+                grantedCompletionReward = state.grantedCompletionReward,
+                isRepaired = state.isRepaired
             });
         }
 
@@ -334,6 +363,7 @@ public class RuntimeProgressState : MonoBehaviour
                 CopyBoolArray(savedState.unlockedSlots, state.unlockedSlots);
                 CopyBoolArray(savedState.grantedSlotRewards, state.grantedSlotRewards);
                 state.grantedCompletionReward = savedState.grantedCompletionReward;
+                state.isRepaired = savedState.isRepaired;
             }
         }
 

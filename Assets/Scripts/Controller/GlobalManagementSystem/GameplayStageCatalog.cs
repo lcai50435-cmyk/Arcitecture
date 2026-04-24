@@ -9,6 +9,7 @@ public class GameplayStageDefinition
     public string mapTitle;
     public string displayName;
     public string sceneName;
+    public CatalogueBuildingId stageBuildingId;
     public CatalogueBuildingId gatingBuildingId;
     public string lockedHint;
 }
@@ -24,6 +25,7 @@ public static class GameplayStageCatalog
             mapTitle = "福建土楼",
             displayName = "第一关 · 福建土楼",
             sceneName = "GameScene",
+            stageBuildingId = CatalogueBuildingId.Building1,
             gatingBuildingId = CatalogueBuildingId.Building1,
             lockedHint = "默认开放"
         },
@@ -34,8 +36,9 @@ public static class GameplayStageCatalog
             mapTitle = "赵州桥",
             displayName = "第二关 · 赵州桥",
             sceneName = "GameScene_02",
+            stageBuildingId = CatalogueBuildingId.Building2,
             gatingBuildingId = CatalogueBuildingId.Building1,
-            lockedHint = "完整解锁福建土楼图鉴后开放"
+            lockedHint = "修复福建土楼后开放"
         },
         new GameplayStageDefinition
         {
@@ -44,8 +47,9 @@ public static class GameplayStageCatalog
             mapTitle = "安徽水乡民居",
             displayName = "第三关 · 安徽水乡民居",
             sceneName = "GameScene_03",
+            stageBuildingId = CatalogueBuildingId.Building3,
             gatingBuildingId = CatalogueBuildingId.Building2,
-            lockedHint = "完整解锁赵州桥图鉴后开放"
+            lockedHint = "修复赵州桥后开放"
         }
     };
 
@@ -129,7 +133,7 @@ public static class GameplayStageCatalog
         }
 
         runtimeState = runtimeState ?? RuntimeProgressState.Instance ?? RuntimeProgressState.EnsureInstance();
-        return runtimeState.IsBuildingUnlocked(definition.gatingBuildingId);
+        return runtimeState.IsBuildingRepaired(definition.gatingBuildingId);
     }
 
     public static GameplayStageDefinition GetFirstUnlockedStage(RuntimeProgressState runtimeState = null)

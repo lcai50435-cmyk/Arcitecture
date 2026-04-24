@@ -11,6 +11,7 @@ public class BuildingRuntimeStateSaveData
     public bool[] unlockedSlots;
     public bool[] grantedSlotRewards;
     public bool grantedCompletionReward;
+    public bool isRepaired;
 }
 
 [Serializable]
@@ -41,7 +42,7 @@ public static class GameProgressPersistence
 {
     public const int SlotCount = 3;
 
-    private const int CurrentVersion = 2;
+    private const int CurrentVersion = 3;
     private const string SaveDirectoryName = "Saves";
     private const string SlotDirectoryNameFormat = "slot_{0}";
     private const string SaveFileName = "game_progress.json";

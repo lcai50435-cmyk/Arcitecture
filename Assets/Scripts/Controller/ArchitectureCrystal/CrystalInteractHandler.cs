@@ -16,6 +16,9 @@ public class CrystalInteractHandler : MonoBehaviour, IInteractable
     [Header("资源分类")]
     public ArchitecturalResourceCategory resourceCategory = ArchitecturalResourceCategory.CommonStructure;
 
+    [Header("修复材料目标建筑")]
+    public CatalogueBuildingId repairBuildingId = CatalogueBuildingId.Building1;
+
     [Header("晶体配置")]
     public ArchitecturalType type;
     public int expValue;
@@ -119,6 +122,11 @@ public class CrystalInteractHandler : MonoBehaviour, IInteractable
                 return "拾取材料";
             }
 
+            if (category == ArchitecturalResourceCategory.RepairMaterial)
+            {
+                return "拾取修复材料";
+            }
+
             if (category == ArchitecturalResourceCategory.InkSupply)
             {
                 return "拾取补给";
@@ -141,6 +149,15 @@ public class CrystalInteractHandler : MonoBehaviour, IInteractable
         if (category == ArchitecturalResourceCategory.SpecialStructure)
         {
             crystal = ArchitecturalCrystalFactory.CreateSpecialStructureMaterial(icon, backIcon);
+            OverrideCrystalPresentation(ref crystal);
+            runtimeCrystalData = crystal;
+            hasRuntimeCrystalData = true;
+            return runtimeCrystalData;
+        }
+
+        if (category == ArchitecturalResourceCategory.RepairMaterial)
+        {
+            crystal = ArchitecturalCrystalFactory.CreateRepairMaterial(repairBuildingId, icon, backIcon);
             OverrideCrystalPresentation(ref crystal);
             runtimeCrystalData = crystal;
             hasRuntimeCrystalData = true;

@@ -88,7 +88,7 @@ public class BackpackMananger : MonoBehaviour
         EnsureCapacity();
         slotIndex = -1;
 
-        if (!crystal.IsCommonStructure)
+        if (!crystal.IsCommonStructure && !crystal.IsRepairMaterial)
         {
             return false;
         }
@@ -149,6 +149,44 @@ public class BackpackMananger : MonoBehaviour
         }
 
         return null;
+    }
+
+    public bool HasRepairMaterial(CatalogueBuildingId buildingId)
+    {
+        EnsureCapacity();
+
+        for (int i = 0; i < backpackItems.Count; i++)
+        {
+            ArchitecturalCrystal? item = backpackItems[i];
+            if (item.HasValue && item.Value.IsRepairMaterial && item.Value.repairBuildingId == buildingId)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public bool TryConsumeRepairMaterial(CatalogueBuildingId buildingId)
+    {
+        EnsureCapacity();
+
+        for (int i = 0; i < backpackItems.Count; i++)
+        {
+            ArchitecturalCrystal? item = backpackItems[i];
+            if (!item.HasValue || !item.Value.IsRepairMaterial || item.Value.repairBuildingId != buildingId)
+            {
+                continue;
+            }
+
+            backpackItems[i] = null;
+            RefreshPlayerTemporaryAttributes();
+            OnInventoryChanged?.Invoke();
+            Debug.Log($"消耗 {item.Value.DisplayName}，背包格子 {i} 已清空");
+            return true;
+        }
+
+        return false;
     }
 
     public void ClearAllItems()
@@ -261,7 +299,8 @@ public class BackpackMananger : MonoBehaviour
             crystal.isUnlockMaterial,
             crystal.resourceCategory,
             crystal.inkRestoreValue,
-            crystal.buildProgressPercent);
+            crystal.buildProgressPercent,
+            crystal.repairBuildingId);
         storedItem.runtimePickupOrder = nextRuntimePickupOrder++;
         return storedItem;
     }

@@ -153,7 +153,9 @@ public sealed class RuntimeSubtitleFeedHud : MonoBehaviour
 
     private void HandleSceneChanged(string sceneName)
     {
-        sceneSupported = GameplayStageCatalog.IsGameplayScene(sceneName);
+        sceneSupported = GameplayStageCatalog.IsGameplayScene(sceneName) ||
+                         string.Equals(sceneName, "NewBase", System.StringComparison.Ordinal) ||
+                         string.Equals(sceneName, "BaseScene", System.StringComparison.Ordinal);
         ClearMessages();
         RefreshVisibility();
         TrySubscribe();
