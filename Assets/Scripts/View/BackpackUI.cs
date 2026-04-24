@@ -1,13 +1,9 @@
 using System.Collections.Generic;
-using System.IO;
 using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
-#if UNITY_EDITOR
-using UnityEditor;
-#endif
 
 public class BackpackUI : MonoBehaviour
 {
@@ -927,56 +923,7 @@ public class BackpackUI : MonoBehaviour
 
     private static Sprite LoadRuntimeSpriteFromAssetPath(string assetPath)
     {
-        if (string.IsNullOrWhiteSpace(assetPath))
-        {
-            return null;
-        }
-
-#if UNITY_EDITOR
-        Sprite editorSprite = AssetDatabase.LoadAssetAtPath<Sprite>(assetPath);
-        if (editorSprite != null)
-        {
-            return editorSprite;
-        }
-#endif
-
-        if (!assetPath.StartsWith("Assets/"))
-        {
-            return null;
-        }
-
-        string relativePath = assetPath.Substring("Assets/".Length).Replace('/', Path.DirectorySeparatorChar);
-        string absolutePath = Path.Combine(Application.dataPath, relativePath);
-        if (!File.Exists(absolutePath))
-        {
-            return null;
-        }
-
-        byte[] bytes = File.ReadAllBytes(absolutePath);
-        if (bytes == null || bytes.Length == 0)
-        {
-            return null;
-        }
-
-        Texture2D texture = new Texture2D(2, 2, TextureFormat.RGBA32, false);
-        if (!texture.LoadImage(bytes))
-        {
-            Destroy(texture);
-            return null;
-        }
-
-        texture.name = Path.GetFileNameWithoutExtension(assetPath);
-        texture.wrapMode = TextureWrapMode.Clamp;
-
-        Sprite sprite = Sprite.Create(
-            texture,
-            new Rect(0f, 0f, texture.width, texture.height),
-            new Vector2(0.5f, 0.5f),
-            100f,
-            0,
-            SpriteMeshType.FullRect);
-        sprite.name = texture.name;
-        return sprite;
+        return RuntimeProjectSpriteLoader.LoadSprite(assetPath, false, SpriteMeshType.FullRect);
     }
 
     private static Sprite FindLoadedRuntimeSprite(string spriteName)

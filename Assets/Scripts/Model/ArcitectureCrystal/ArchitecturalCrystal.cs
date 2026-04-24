@@ -1,9 +1,5 @@
 using System.Collections.Generic;
-using System.IO;
 using UnityEngine;
-#if UNITY_EDITOR
-using UnityEditor;
-#endif
 
 // 建筑结构物品类型
 public enum ArchitecturalType
@@ -675,52 +671,7 @@ public static class ArchitecturalCrystalVisualResolver
 
     private static Sprite LoadProjectSprite(string assetPath)
     {
-        if (string.IsNullOrWhiteSpace(assetPath))
-        {
-            return null;
-        }
-
-#if UNITY_EDITOR
-        Sprite editorSprite = AssetDatabase.LoadAssetAtPath<Sprite>(assetPath);
-        if (editorSprite != null)
-        {
-            return editorSprite;
-        }
-#endif
-
-        if (!assetPath.StartsWith("Assets/"))
-        {
-            return null;
-        }
-
-        string relativePath = assetPath.Substring("Assets/".Length).Replace('/', Path.DirectorySeparatorChar);
-        string absolutePath = Path.Combine(Application.dataPath, relativePath);
-        if (!File.Exists(absolutePath))
-        {
-            return null;
-        }
-
-        byte[] bytes = File.ReadAllBytes(absolutePath);
-        if (bytes == null || bytes.Length == 0)
-        {
-            return null;
-        }
-
-        Texture2D texture = new Texture2D(2, 2, TextureFormat.RGBA32, false);
-        if (!texture.LoadImage(bytes))
-        {
-            Object.Destroy(texture);
-            return null;
-        }
-
-        texture.name = Path.GetFileNameWithoutExtension(assetPath);
-        texture.filterMode = FilterMode.Point;
-        texture.wrapMode = TextureWrapMode.Clamp;
-
-        Rect rect = new Rect(0f, 0f, texture.width, texture.height);
-        Sprite sprite = Sprite.Create(texture, rect, new Vector2(0.5f, 0.5f), 100f);
-        sprite.name = texture.name;
-        return sprite;
+        return RuntimeProjectSpriteLoader.LoadSprite(assetPath, true);
     }
 
     private static Sprite CreateFallbackSprite(
