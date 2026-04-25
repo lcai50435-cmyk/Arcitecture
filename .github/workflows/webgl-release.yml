@@ -124,6 +124,9 @@ jobs:
       VERSION: ${{ needs.build.outputs.version }}
       PAGE_URL: https://lcai50435-cmyk.github.io/Arcitecture/
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Download WebGL artifact
         uses: actions/download-artifact@v4
         with:
