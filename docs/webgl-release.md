@@ -4,7 +4,7 @@
 
 - 发布分支：`release/webgl`
 - 正式版本 tag：`vX.Y.Z`
-- Unity 版本：`2022.3.62f3c1`
+- Unity CI 版本：`2022.3.62f1`
 - 构建入口：`ArcitectureWebGLBuildCommand.Build`
 - WebGL 输出目录：`Builds/WebGL`
 - GitHub Pages 发布源：GitHub Actions
