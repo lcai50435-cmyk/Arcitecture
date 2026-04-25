@@ -101,6 +101,7 @@ jobs:
   deploy:
     name: Deploy GitHub Pages
     needs: build
+    if: github.ref_type != 'tag'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -114,16 +115,14 @@ jobs:
 
   release:
     name: Create GitHub Release
-    needs:
-      - build
-      - deploy
+    needs: build
     if: needs.build.outputs.is_release == 'true'
     runs-on: ubuntu-latest
     env:
       GH_TOKEN: ${{ github.token }}
       RELEASE_TAG: ${{ github.ref_name }}
       VERSION: ${{ needs.build.outputs.version }}
-      PAGE_URL: ${{ needs.deploy.outputs.page_url }}
+      PAGE_URL: https://lcai50435-cmyk.github.io/Arcitecture/
     steps:
       - name: Download WebGL artifact
         uses: actions/download-artifact@v4

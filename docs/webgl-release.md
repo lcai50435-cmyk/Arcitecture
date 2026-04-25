@@ -25,7 +25,7 @@
 2. 推送 `release/webgl` 后，workflow 会自动构建 WebGL 并部署 GitHub Pages 预览。
 3. 在 GitHub Actions 的 `Deploy GitHub Pages` job 输出中查看预览地址。
 4. 在发布提交上打 tag，例如 `v0.1.0`。
-5. 推送 tag 后，workflow 会自动构建 WebGL、更新 GitHub Pages、创建 GitHub Release。
+5. 推送 tag 后，workflow 会自动构建 WebGL，并创建 GitHub Release。
 
 ## Web 预览
 
