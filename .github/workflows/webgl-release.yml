@@ -73,6 +73,7 @@ jobs:
       - name: Prepare Pages files
         shell: bash
         run: |
+          sudo chown -R "$(id -u):$(id -g)" Builds
           touch Builds/WebGL/.nojekyll
 
       - name: Package WebGL artifact
