@@ -8,8 +8,8 @@ using UnityEngine.UI;
 public sealed class CountdownRollingDisplay : MonoBehaviour
 {
     private const string OverlayRootName = "CountdownRollingOverlay";
-    private const float DigitWidthPadding = 6f;
-    private const float SymbolWidthPadding = 4f;
+    private const float DigitWidthScale = 0.62f;
+    private const float SymbolWidthScale = 0.28f;
     private const float NormalRollDuration = 0.18f;
     private const float DangerRollDuration = 0.12f;
     private const float NormalBounceDistance = 3f;
@@ -77,6 +77,7 @@ public sealed class CountdownRollingDisplay : MonoBehaviour
             return;
         }
 
+        HideAnchorText();
         if (hasValue && currentValue == value && currentDangerState == isDangerState)
         {
             return;
@@ -295,7 +296,7 @@ public sealed class CountdownRollingDisplay : MonoBehaviour
 
         slotHeight = ResolveSlotHeight();
         digitWidth = ResolveDigitWidth();
-        symbolWidth = ResolvePreferredWidth(":") + SymbolWidthPadding;
+        symbolWidth = ResolveSymbolWidth();
 
         layoutGroup.childAlignment = ResolveLayoutAlignment(anchorText.alignment);
         overlayRoot.gameObject.SetActive(true);
@@ -306,12 +307,21 @@ public sealed class CountdownRollingDisplay : MonoBehaviour
             slots[i].ApplyTextStyle(anchorText, slotHeight);
         }
 
+        HideAnchorText();
+        LayoutRebuilder.ForceRebuildLayoutImmediate(overlayRoot);
+    }
+
+    private void HideAnchorText()
+    {
+        if (anchorText == null)
+        {
+            return;
+        }
+
         Color hiddenColor = anchorText.color;
         hiddenColor.a = 0f;
         anchorText.color = hiddenColor;
         anchorText.raycastTarget = false;
-
-        LayoutRebuilder.ForceRebuildLayoutImmediate(overlayRoot);
     }
 
     private void EnsureSlotCapacity(int count)
@@ -334,18 +344,33 @@ public sealed class CountdownRollingDisplay : MonoBehaviour
             return symbolWidth;
         }
 
-        return ResolvePreferredWidth(character.ToString()) + SymbolWidthPadding;
+        return ResolvePreferredWidth(character.ToString());
     }
 
     private float ResolveDigitWidth()
     {
-        float maxWidth = 0f;
+        float maxWidth = ResolveScaledWidth(DigitWidthScale);
         for (char c = '0'; c <= '9'; c++)
         {
-            maxWidth = Mathf.Max(maxWidth, ResolvePreferredWidth(c.ToString()));
+            maxWidth = Mathf.Max(maxWidth, ResolvePreferredWidth(c.ToString()) * 0.92f);
         }
 
-        return maxWidth + DigitWidthPadding;
+        return maxWidth;
+    }
+
+    private float ResolveSymbolWidth()
+    {
+        return Mathf.Max(ResolveScaledWidth(SymbolWidthScale), ResolvePreferredWidth(":") * 0.72f);
+    }
+
+    private float ResolveScaledWidth(float scale)
+    {
+        if (anchorText == null)
+        {
+            return 0f;
+        }
+
+        return Mathf.Max(1f, anchorText.fontSize * scale);
     }
 
     private float ResolvePreferredWidth(string content)

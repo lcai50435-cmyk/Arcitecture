@@ -7,25 +7,33 @@ public static class GameplayStatusHudRuntime
 {
     private const string HudFontResourcePath = "Fonts & Materials/LiberationSans SDF";
     private const string CanvasName = "GameplayStatusHudCanvas";
+    private const string CountdownTextName = "GameplayCountdownText";
     private const string RootName = "GameplayStatusHudRoot";
+    private const string ScenePanelName = "ShowPanel";
+    private const string HealthSliderName = "HealthSlider";
+    private const string InkSliderName = "InkSlider";
+    private const string StructureSliderName = "StructureSlider";
     private const string HeartIconAssetPath = "Assets/File/Prop/UIProp/Heart.png";
     private const string HealthTrackAssetPath = "Assets/File/Prop/UIProp/GrayHealth.png";
     private const string HealthFillAssetPath = "Assets/File/Prop/UIProp/RedHealth.png";
     private const string InkTrackAssetPath = "Assets/File/Prop/UIProp/BlackHealth.png";
     private const string StructureIconAssetPath = "Assets/File/Prop/Prop/Prism.png";
     private const string StructureTrackAssetPath = "Assets/File/Prop/UIProp/Bar.png";
-    private const float RootWidth = 330f;
-    private const float RootHeight = 128f;
-    private const float RowWidth = 306f;
-    private const float RowHeight = 36f;
+    private const float RootWidth = 204f;
+    private const float RootHeight = 78f;
+    private const float RowWidth = 190f;
+    private const float RowHeight = 22f;
     private const int PixelFrameWidth = 96;
     private const int PixelFrameHeight = 36;
     private const int PixelFrameBorder = 6;
     private const int PixelFillWidth = 64;
     private const int PixelFillHeight = 12;
+    private static readonly Vector2 BoundCountdownTextSize = new Vector2(104f, 28f);
+    private static readonly Vector2 RuntimeCountdownTextSize = new Vector2(220f, 52f);
 
     private static Canvas hudCanvas;
     private static CanvasGroup hudCanvasGroup;
+    private static CanvasGroup rootCanvasGroup;
     private static TMP_FontAsset hudFontAsset;
     private static RectTransform rootRect;
     private static ValueTrans healthGauge;
@@ -38,6 +46,7 @@ public static class GameplayStatusHudRuntime
     private static TextMeshProUGUI structureValueText;
     private static TextMeshProUGUI countdownText;
     private static bool externallyHidden;
+    private static bool usingSceneShowPanel;
     private static readonly Dictionary<string, Sprite> HudSpriteCache = new Dictionary<string, Sprite>();
     private static readonly Color RootPanelColor = new Color(1f, 1f, 1f, 0f);
     private static readonly Color RowPanelColor = new Color(1f, 1f, 1f, 0f);
@@ -133,43 +142,108 @@ public static class GameplayStatusHudRuntime
     {
         if (currentText != null)
         {
-            countdownText = currentText;
-            return currentText;
+            if (string.Equals(currentText.gameObject.name, CountdownTextName, System.StringComparison.Ordinal))
+            {
+                ApplyRuntimeCountdownTextLayout(currentText.rectTransform);
+                ConfigureCountdownText(currentText, 30f);
+                countdownText = currentText;
+                return currentText;
+            }
+
+            if (!TryNormalizeBoundCountdownText(currentText))
+            {
+                currentText = null;
+            }
+            else
+            {
+                countdownText = currentText;
+                return currentText;
+            }
         }
 
-        EnsureHudCanvas();
+        if (currentText == null)
+        {
+            EnsureHudCanvas();
+        }
 
         if (countdownText != null)
         {
+            ApplyRuntimeCountdownTextLayout(countdownText.rectTransform);
+            ConfigureCountdownText(countdownText, 30f);
+            countdownText.gameObject.SetActive(!externallyHidden);
             return countdownText;
         }
 
-        GameObject textObject = GameObject.Find("GameplayCountdownText");
+        GameObject textObject = GameObject.Find(CountdownTextName);
         if (textObject == null)
         {
-            textObject = new GameObject("GameplayCountdownText", typeof(RectTransform), typeof(TextMeshProUGUI));
+            textObject = new GameObject(CountdownTextName, typeof(RectTransform), typeof(TextMeshProUGUI));
             textObject.transform.SetParent(hudCanvas.transform, false);
         }
 
-        RectTransform rect = textObject.GetComponent<RectTransform>();
+        countdownText = textObject.GetComponent<TextMeshProUGUI>();
+        ApplyRuntimeCountdownTextLayout(textObject.GetComponent<RectTransform>());
+        ConfigureCountdownText(countdownText, 30f);
+        countdownText.gameObject.SetActive(!externallyHidden);
+
+        return countdownText;
+    }
+
+    private static bool TryNormalizeBoundCountdownText(TextMeshProUGUI text)
+    {
+        if (text == null || text.transform == null || text.transform.parent == null)
+        {
+            return false;
+        }
+
+        RectTransform rect = text.rectTransform;
+        if (rect == null)
+        {
+            return false;
+        }
+
+        rect.anchorMin = new Vector2(0.5f, 0.5f);
+        rect.anchorMax = new Vector2(0.5f, 0.5f);
+        rect.pivot = new Vector2(0.5f, 0.5f);
+        rect.anchoredPosition = Vector2.zero;
+        rect.sizeDelta = BoundCountdownTextSize;
+        rect.localScale = Vector3.one;
+        rect.SetAsLastSibling();
+
+        ConfigureCountdownText(text, 18f);
+        text.gameObject.SetActive(!externallyHidden);
+        return true;
+    }
+
+    private static void ApplyRuntimeCountdownTextLayout(RectTransform rect)
+    {
+        if (rect == null)
+        {
+            return;
+        }
+
         rect.anchorMin = new Vector2(0.5f, 1f);
         rect.anchorMax = new Vector2(0.5f, 1f);
         rect.pivot = new Vector2(0.5f, 1f);
         rect.anchoredPosition = new Vector2(0f, -24f);
-        rect.sizeDelta = new Vector2(220f, 52f);
+        rect.sizeDelta = RuntimeCountdownTextSize;
         rect.localScale = Vector3.one;
         rect.SetAsLastSibling();
+    }
 
-        countdownText = textObject.GetComponent<TextMeshProUGUI>();
-        countdownText.font = ResolveHudFont();
-        countdownText.fontSize = 30f;
-        countdownText.color = Color.white;
-        countdownText.alignment = TextAlignmentOptions.Center;
-        countdownText.enableWordWrapping = false;
-        countdownText.raycastTarget = false;
-        countdownText.gameObject.SetActive(!externallyHidden);
+    private static void ConfigureCountdownText(TextMeshProUGUI text, float fontSize)
+    {
+        if (text == null)
+        {
+            return;
+        }
 
-        return countdownText;
+        text.font = ResolveHudFont();
+        text.fontSize = fontSize;
+        text.color = Color.white;
+        text.alignment = TextAlignmentOptions.Center;
+        text.enableWordWrapping = false;
+        text.raycastTarget = false;
     }
 
     public static void SetVisible(bool shouldShow)
@@ -194,11 +268,17 @@ public static class GameplayStatusHudRuntime
 
     public static void SetAlpha(float alpha)
     {
-        EnsureHudCanvas();
+        EnsureRoot();
+        float clampedAlpha = Mathf.Clamp01(alpha);
 
         if (hudCanvasGroup != null)
         {
-            hudCanvasGroup.alpha = Mathf.Clamp01(alpha);
+            hudCanvasGroup.alpha = clampedAlpha;
+        }
+
+        if (rootCanvasGroup != null)
+        {
+            rootCanvasGroup.alpha = clampedAlpha;
         }
     }
 
@@ -206,49 +286,21 @@ public static class GameplayStatusHudRuntime
     {
         RuntimeMiniMapHud.EnsureInstance();
 
-        if (rootRect != null && IsRuntimeGauge(healthGauge) && IsRuntimeGauge(weaponGauge) && IsRuntimeGauge(structureGauge))
+        if (TryBindSceneShowPanel())
         {
-            ReattachToHudCanvas();
-            rootRect.gameObject.SetActive(true);
             RefreshStructureProgressText();
             return;
         }
 
-        EnsureHudCanvas();
-
-        GameObject rootObject = GameObject.Find(RootName);
-        if (rootObject == null)
+        if (usingSceneShowPanel
+            && rootRect != null
+            && IsRuntimeGauge(healthGauge)
+            && IsRuntimeGauge(weaponGauge)
+            && IsRuntimeGauge(structureGauge))
         {
-            rootObject = new GameObject(RootName, typeof(RectTransform));
+            rootRect.gameObject.SetActive(!externallyHidden);
+            RefreshStructureProgressText();
         }
-
-        rootRect = rootObject.GetComponent<RectTransform>();
-        if (rootRect == null)
-        {
-            return;
-        }
-
-        Image rootBackground = rootObject.GetComponent<Image>();
-        if (rootBackground == null)
-        {
-            rootBackground = rootObject.AddComponent<Image>();
-        }
-
-        rootBackground.sprite = null;
-        rootBackground.color = RootPanelColor;
-        rootBackground.raycastTarget = false;
-        ReattachToHudCanvas();
-        rootRect.gameObject.SetActive(!externallyHidden);
-        HideLegacyStatusPanels();
-
-        // 旧场景里仍可能保留 legacy ValueTrans 引用；这里统一回收到运行时 HUD，
-        // 避免只创建了外层底板、却没有真正生成血量/Ink 两行内容。
-        if (!IsRuntimeGauge(healthGauge) || !IsRuntimeGauge(weaponGauge) || !IsRuntimeGauge(structureGauge))
-        {
-            CreateRows(rootObject.transform);
-        }
-
-        RefreshStructureProgressText();
     }
 
     private static bool IsRuntimeGauge(ValueTrans gauge)
@@ -259,6 +311,286 @@ public static class GameplayStatusHudRuntime
             && gauge.transform.IsChildOf(rootRect);
     }
 
+    private static bool TryBindSceneShowPanel()
+    {
+        RectTransform panel = FindSceneShowPanel() ?? CreateSceneShowPanel();
+        if (panel == null)
+        {
+            return false;
+        }
+
+        Slider healthSlider = FindChildSlider(panel, HealthSliderName);
+        Slider weaponSlider = FindChildSlider(panel, InkSliderName);
+        Slider structureSlider = FindChildSlider(panel, StructureSliderName);
+        if (healthSlider == null || weaponSlider == null || structureSlider == null)
+        {
+            return false;
+        }
+
+        rootRect = panel;
+        usingSceneShowPanel = true;
+        EnsureSceneShowPanelVisible(rootRect);
+        rootCanvasGroup = EnsureCanvasGroup(rootRect.gameObject, false);
+        healthGauge = EnsureValueTrans(healthSlider);
+        weaponGauge = EnsureValueTrans(weaponSlider);
+        structureGauge = EnsureValueTrans(structureSlider);
+        weaponFillGraphic = ResolveFillGraphic(weaponSlider);
+        structureFillGraphic = ResolveFillGraphic(structureSlider);
+        healthValueText = null;
+        weaponValueText = null;
+        structureValueText = null;
+        rootRect.gameObject.SetActive(!externallyHidden);
+        return true;
+    }
+
+    private static RectTransform FindSceneShowPanel()
+    {
+        RectTransform[] rectTransforms = Object.FindObjectsOfType<RectTransform>(true);
+        foreach (RectTransform rectTransform in rectTransforms)
+        {
+            if (rectTransform == null || !string.Equals(rectTransform.name, ScenePanelName, System.StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            if (FindChildSlider(rectTransform, HealthSliderName) != null
+                && FindChildSlider(rectTransform, InkSliderName) != null
+                && FindChildSlider(rectTransform, StructureSliderName) != null)
+            {
+                return rectTransform;
+            }
+        }
+
+        return null;
+    }
+
+    private static RectTransform CreateSceneShowPanel()
+    {
+        Canvas canvas = FindGameplayCanvas() ?? CreateShowPanelCanvas();
+        if (canvas == null)
+        {
+            return null;
+        }
+
+        GameObject panelObject = CreateUIObject(ScenePanelName, canvas.transform);
+        RectTransform panel = panelObject.GetComponent<RectTransform>();
+        panel.anchorMin = new Vector2(0f, 1f);
+        panel.anchorMax = new Vector2(0f, 1f);
+        panel.pivot = new Vector2(0f, 1f);
+        panel.anchoredPosition = new Vector2(24f, -24f);
+        panel.sizeDelta = new Vector2(260f, 132f);
+        panel.localScale = Vector3.one;
+
+        Image panelImage = panelObject.AddComponent<Image>();
+        panelImage.color = new Color(1f, 1f, 1f, 0f);
+        panelImage.raycastTarget = false;
+
+        CreateShowPanelSlider(panel, HealthSliderName, HeartIconAssetPath, HealthTrackAssetPath, HealthFillAssetPath, new Vector2(0f, -4f), HealthFillColor);
+        CreateShowPanelSlider(panel, InkSliderName, null, InkTrackAssetPath, null, new Vector2(0f, -44f), InkFillColor);
+        CreateShowPanelSlider(panel, StructureSliderName, StructureIconAssetPath, StructureTrackAssetPath, null, new Vector2(0f, -84f), StructureFillColor);
+
+        return panel;
+    }
+
+    private static Canvas FindGameplayCanvas()
+    {
+        Canvas[] canvases = Object.FindObjectsOfType<Canvas>(true);
+        foreach (Canvas canvas in canvases)
+        {
+            if (canvas == null || canvas.renderMode != RenderMode.ScreenSpaceOverlay)
+            {
+                continue;
+            }
+
+            return canvas;
+        }
+
+        return null;
+    }
+
+    private static Canvas CreateShowPanelCanvas()
+    {
+        GameObject canvasObject = new GameObject("ShowPanelCanvas", typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
+        Canvas canvas = canvasObject.GetComponent<Canvas>();
+        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        canvas.overrideSorting = true;
+        canvas.sortingOrder = 240;
+
+        CanvasScaler scaler = canvasObject.GetComponent<CanvasScaler>();
+        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+        scaler.referenceResolution = new Vector2(1920f, 1080f);
+        scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
+        scaler.matchWidthOrHeight = 0.5f;
+
+        GraphicRaycaster raycaster = canvasObject.GetComponent<GraphicRaycaster>();
+        raycaster.enabled = false;
+
+        RectTransform canvasRect = canvasObject.GetComponent<RectTransform>();
+        canvasRect.anchorMin = Vector2.zero;
+        canvasRect.anchorMax = Vector2.one;
+        canvasRect.offsetMin = Vector2.zero;
+        canvasRect.offsetMax = Vector2.zero;
+        canvasRect.localScale = Vector3.one;
+
+        return canvas;
+    }
+
+    private static void CreateShowPanelSlider(
+        Transform parent,
+        string sliderName,
+        string iconAssetPath,
+        string trackAssetPath,
+        string fillAssetPath,
+        Vector2 anchoredPosition,
+        Color fillColor)
+    {
+        GameObject rowObject = CreateUIObject(sliderName, parent);
+        RectTransform rowRect = rowObject.GetComponent<RectTransform>();
+        rowRect.anchorMin = new Vector2(0f, 1f);
+        rowRect.anchorMax = new Vector2(0f, 1f);
+        rowRect.pivot = new Vector2(0f, 1f);
+        rowRect.anchoredPosition = anchoredPosition;
+        rowRect.sizeDelta = new Vector2(236f, 32f);
+
+        CreateRowIcon(rowObject.transform, sliderName, iconAssetPath, fillColor);
+
+        GameObject barObject = CreateUIObject("Bar", rowObject.transform);
+        RectTransform barRect = barObject.GetComponent<RectTransform>();
+        barRect.anchorMin = new Vector2(0f, 0.5f);
+        barRect.anchorMax = new Vector2(0f, 0.5f);
+        barRect.pivot = new Vector2(0f, 0.5f);
+        barRect.anchoredPosition = new Vector2(34f, -1f);
+        barRect.sizeDelta = new Vector2(182f, 16f);
+
+        Image barBackground = barObject.AddComponent<Image>();
+        Sprite trackSprite = LoadHudSprite(trackAssetPath);
+        if (trackSprite != null)
+        {
+            barBackground.sprite = trackSprite;
+            barBackground.type = Image.Type.Simple;
+            barBackground.color = Color.white;
+            barBackground.raycastTarget = false;
+        }
+        else
+        {
+            ApplyPixelFrame(barBackground, sliderName + "_track", GaugeTrackColor, 64, 20, 5);
+        }
+
+        Slider slider = barObject.AddComponent<Slider>();
+        slider.direction = Slider.Direction.LeftToRight;
+        slider.minValue = 0f;
+        slider.maxValue = 100f;
+        slider.value = 100f;
+        slider.targetGraphic = barBackground;
+
+        GameObject fillArea = CreateUIObject("FillArea", barObject.transform);
+        RectTransform fillAreaRect = fillArea.GetComponent<RectTransform>();
+        fillAreaRect.anchorMin = Vector2.zero;
+        fillAreaRect.anchorMax = Vector2.one;
+        fillAreaRect.offsetMin = new Vector2(5f, 3f);
+        fillAreaRect.offsetMax = new Vector2(-5f, -3f);
+
+        GameObject fillObject = CreateUIObject("Fill", fillArea.transform);
+        RectTransform fillRect = fillObject.GetComponent<RectTransform>();
+        fillRect.anchorMin = Vector2.zero;
+        fillRect.anchorMax = Vector2.one;
+        fillRect.offsetMin = Vector2.zero;
+        fillRect.offsetMax = Vector2.zero;
+
+        Image fillImage = fillObject.AddComponent<Image>();
+        ApplyGaugeFill(fillImage, fillColor, fillAssetPath);
+        slider.fillRect = fillRect;
+
+        ValueTrans valueTrans = barObject.AddComponent<ValueTrans>();
+        valueTrans.slider = slider;
+    }
+
+    private static Slider FindChildSlider(Transform parent, string sliderName)
+    {
+        if (parent == null)
+        {
+            return null;
+        }
+
+        Transform child = parent.Find(sliderName);
+        Slider slider = child != null ? child.GetComponent<Slider>() : null;
+        if (slider != null)
+        {
+            return slider;
+        }
+
+        return child != null ? child.GetComponentInChildren<Slider>(true) : null;
+    }
+
+    private static ValueTrans EnsureValueTrans(Slider slider)
+    {
+        if (slider == null)
+        {
+            return null;
+        }
+
+        ValueTrans valueTrans = slider.GetComponent<ValueTrans>();
+        if (valueTrans == null)
+        {
+            valueTrans = slider.gameObject.AddComponent<ValueTrans>();
+        }
+
+        valueTrans.slider = slider;
+        return valueTrans;
+    }
+
+    private static Graphic ResolveFillGraphic(Slider slider)
+    {
+        return slider != null && slider.fillRect != null ? slider.fillRect.GetComponent<Graphic>() : null;
+    }
+
+    private static void EnsureSceneShowPanelVisible(RectTransform panel)
+    {
+        if (panel == null)
+        {
+            return;
+        }
+
+        Canvas canvas = panel.GetComponentInParent<Canvas>(true);
+        if (canvas != null)
+        {
+            canvas.gameObject.SetActive(true);
+            canvas.enabled = true;
+            canvas.overrideSorting = true;
+            canvas.sortingOrder = 240;
+        }
+
+        Transform current = panel.transform;
+        while (current != null)
+        {
+            current.gameObject.SetActive(true);
+            if (current is RectTransform rectTransform && rectTransform.localScale.sqrMagnitude <= 0.0001f)
+            {
+                rectTransform.localScale = Vector3.one;
+            }
+
+            current = current.parent;
+        }
+    }
+
+    private static CanvasGroup EnsureCanvasGroup(GameObject target, bool blocksRaycasts)
+    {
+        if (target == null)
+        {
+            return null;
+        }
+
+        CanvasGroup canvasGroup = target.GetComponent<CanvasGroup>();
+        if (canvasGroup == null)
+        {
+            canvasGroup = target.AddComponent<CanvasGroup>();
+        }
+
+        canvasGroup.interactable = false;
+        canvasGroup.blocksRaycasts = blocksRaycasts;
+        return canvasGroup;
+    }
+
     private static void HideLegacyGauge(ValueTrans gauge)
     {
         if (gauge == null || IsRuntimeGauge(gauge))
@@ -266,7 +598,7 @@ public static class GameplayStatusHudRuntime
             return;
         }
 
-        Transform legacyRoot = FindAncestorByName(gauge.transform, "ShowPanel");
+        Transform legacyRoot = FindAncestorByName(gauge.transform, ScenePanelName);
         if (legacyRoot != null)
         {
             legacyRoot.gameObject.SetActive(false);
@@ -281,7 +613,7 @@ public static class GameplayStatusHudRuntime
         RectTransform[] rectTransforms = Object.FindObjectsOfType<RectTransform>(true);
         foreach (RectTransform rectTransform in rectTransforms)
         {
-            if (rectTransform == null || !string.Equals(rectTransform.name, "ShowPanel", System.StringComparison.Ordinal))
+            if (rectTransform == null || !string.Equals(rectTransform.name, ScenePanelName, System.StringComparison.Ordinal))
             {
                 continue;
             }
@@ -291,9 +623,9 @@ public static class GameplayStatusHudRuntime
                 continue;
             }
 
-            if (rectTransform.Find("HealthSlider") == null
-                || rectTransform.Find("InkSlider") == null
-                || rectTransform.Find("StructureSlider") == null)
+            if (rectTransform.Find(HealthSliderName) == null
+                || rectTransform.Find(InkSliderName) == null
+                || rectTransform.Find(StructureSliderName) == null)
             {
                 continue;
             }
@@ -330,7 +662,7 @@ public static class GameplayStatusHudRuntime
             HeartIconAssetPath,
             HealthTrackAssetPath,
             HealthFillAssetPath,
-            new Vector2(10f, -8f),
+            new Vector2(6f, -5f),
             HealthFillColor);
         StatusRow weaponRow = CreateRow(
             parent,
@@ -338,7 +670,7 @@ public static class GameplayStatusHudRuntime
             null,
             InkTrackAssetPath,
             null,
-            new Vector2(10f, -46f),
+            new Vector2(6f, -29f),
             InkFillColor);
         StatusRow structureRow = CreateRow(
             parent,
@@ -346,7 +678,7 @@ public static class GameplayStatusHudRuntime
             StructureIconAssetPath,
             StructureTrackAssetPath,
             null,
-            new Vector2(10f, -84f),
+            new Vector2(6f, -53f),
             StructureFillColor);
 
         healthGauge = healthRow.gauge;
@@ -396,8 +728,8 @@ public static class GameplayStatusHudRuntime
         barRect.anchorMin = new Vector2(0f, 0.5f);
         barRect.anchorMax = new Vector2(0f, 0.5f);
         barRect.pivot = new Vector2(0f, 0.5f);
-        barRect.anchoredPosition = new Vector2(42f, -1f);
-        barRect.sizeDelta = new Vector2(214f, 18f);
+        barRect.anchoredPosition = new Vector2(26f, -1f);
+        barRect.sizeDelta = new Vector2(132f, 11f);
 
         Image barBackground = barObject.AddComponent<Image>();
         Sprite trackSprite = LoadHudSprite(trackAssetPath);
@@ -425,8 +757,8 @@ public static class GameplayStatusHudRuntime
         RectTransform fillAreaRect = fillArea.GetComponent<RectTransform>();
         fillAreaRect.anchorMin = Vector2.zero;
         fillAreaRect.anchorMax = Vector2.one;
-        fillAreaRect.offsetMin = new Vector2(6f, 4f);
-        fillAreaRect.offsetMax = new Vector2(-6f, -4f);
+        fillAreaRect.offsetMin = new Vector2(4f, 2f);
+        fillAreaRect.offsetMax = new Vector2(-4f, -2f);
 
         GameObject fillObject = CreateUIObject("Fill", fillArea.transform);
         RectTransform fillRect = fillObject.GetComponent<RectTransform>();
@@ -442,7 +774,7 @@ public static class GameplayStatusHudRuntime
         ValueTrans gauge = barObject.AddComponent<ValueTrans>();
         gauge.slider = slider;
 
-        TextMeshProUGUI valueText = CreateText("Value", rowObject.transform, "100/100", 12f, new Vector2(188f, -10f), new Vector2(60f, 18f), TextAlignmentOptions.MidlineRight);
+        TextMeshProUGUI valueText = CreateText("Value", rowObject.transform, "100/100", 7f, new Vector2(118f, -6f), new Vector2(36f, 11f), TextAlignmentOptions.MidlineRight);
         valueText.fontStyle = FontStyles.Bold;
 
         return new StatusRow(gauge, valueText, fillImage);
@@ -455,8 +787,8 @@ public static class GameplayStatusHudRuntime
         iconRect.anchorMin = new Vector2(0f, 0.5f);
         iconRect.anchorMax = new Vector2(0f, 0.5f);
         iconRect.pivot = new Vector2(0.5f, 0.5f);
-        iconRect.anchoredPosition = new Vector2(22f, -1f);
-        iconRect.sizeDelta = new Vector2(34f, 34f);
+        iconRect.anchoredPosition = new Vector2(13f, -1f);
+        iconRect.sizeDelta = new Vector2(20f, 20f);
 
         Image iconImage = iconObject.AddComponent<Image>();
         Sprite iconSprite = LoadHudSprite(iconAssetPath);
