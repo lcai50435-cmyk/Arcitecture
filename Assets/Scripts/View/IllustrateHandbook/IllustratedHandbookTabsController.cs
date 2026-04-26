@@ -517,6 +517,7 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
             }
 
             if (string.Equals(child.name, "CloseButton", StringComparison.Ordinal) ||
+                IsLegacyHandbookContentLayer(child) ||
                 child.name.StartsWith("ArcitectureImage_", StringComparison.Ordinal))
             {
                 legacyHandbookContentObjects.Add(child.gameObject);
@@ -579,8 +580,9 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
             scrollImage = scrollRoot.gameObject.AddComponent<Image>();
         }
 
+        bool allowScrollRaycasts = !usesSceneAuthoredPages;
         scrollImage.color = new Color(1f, 1f, 1f, 0.001f);
-        scrollImage.raycastTarget = true;
+        scrollImage.raycastTarget = allowScrollRaycasts;
 
         ScrollRect scrollRect = scrollRoot.GetComponent<ScrollRect>();
         if (scrollRect == null)
@@ -610,7 +612,7 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         }
 
         viewportImage.color = new Color(1f, 1f, 1f, 0.001f);
-        viewportImage.raycastTarget = true;
+        viewportImage.raycastTarget = allowScrollRaycasts;
 
         if (viewport.GetComponent<RectMask2D>() == null)
         {
@@ -976,6 +978,7 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         }
 
         button.targetGraphic = background;
+        EnsureButtonRaycastTarget(button);
         button.transition = Selectable.Transition.None;
         button.onClick.AddListener(() => HandleBookmarkClicked(targetPage));
 
@@ -1012,6 +1015,7 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         }
 
         button.targetGraphic = background;
+        EnsureButtonRaycastTarget(button);
         button.transition = Selectable.Transition.None;
         button.onClick.AddListener(HandleCloseRequested);
 
@@ -1137,6 +1141,7 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         }
 
         sceneCloseButton.onClick.RemoveListener(HandleCloseRequested);
+        EnsureButtonRaycastTarget(sceneCloseButton);
         sceneCloseButton.onClick.AddListener(HandleCloseRequested);
         return sceneCloseButton;
     }
@@ -1192,6 +1197,7 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
                 continue;
             }
 
+            EnsureButtonRaycastTarget(button);
             button.onClick.AddListener(() => HandleBookmarkClicked(targetPage));
 
             if (!tabButtons.TryGetValue(targetPage, out List<Button> buttons))
@@ -1492,8 +1498,26 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
                 continue;
             }
 
-            contentObject.SetActive(false);
+            contentObject.SetActive(activePage == IllustratedHandbookPage.IllustratedHandbook);
         }
+    }
+
+    private static bool IsLegacyHandbookContentLayer(Transform transform)
+    {
+        if (transform == null)
+        {
+            return false;
+        }
+
+        if (string.Equals(transform.name, "FuJianTuLouButton", StringComparison.Ordinal) ||
+            transform.name.StartsWith("ArcitectureImage_", StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        return FindTransformByName(transform, "FuJianTuLouButton") != null ||
+               transform.GetComponentInChildren<CatalogueBuildingUnlockState>(true) != null ||
+               transform.GetComponentInChildren<BuildingProgressController>(true) != null;
     }
 
     private void ResetScrollPosition()
@@ -2243,6 +2267,29 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         }
 
         return null;
+    }
+
+    private static void EnsureButtonRaycastTarget(Button button)
+    {
+        if (button == null)
+        {
+            return;
+        }
+
+        Graphic targetGraphic = button.targetGraphic;
+        if (targetGraphic == null)
+        {
+            targetGraphic = button.GetComponent<Graphic>();
+            if (targetGraphic != null)
+            {
+                button.targetGraphic = targetGraphic;
+            }
+        }
+
+        if (targetGraphic != null)
+        {
+            targetGraphic.raycastTarget = true;
+        }
     }
 
     private static Transform FindTransformByName(Transform parent, string childName)
