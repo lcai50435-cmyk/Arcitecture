@@ -75,9 +75,12 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
     private const float BookContentHeight = 920f;
     private const float BookScrollSensitivity = 34f;
     private const string LegacyHandbookCardsContainerName = "LegacyHandbookCards";
-    private const float HandbookCardCenterX = 168f;
-    private const float HandbookCardStartY = 170f;
-    private const float HandbookCardVerticalSpacing = 224f;
+    private const int HandbookCardTargetCount = 3;
+    private const float HandbookCardCenterX = 230f;
+    private const float HandbookCardStartY = 140f;
+    private const float HandbookCardVerticalSpacing = 226f;
+    private const float HandbookRightPageTextX = 790f;
+    private const float HandbookRightPageTextWidth = 600f;
 
     [SerializeField] private UIManager owner;
 
@@ -653,16 +656,13 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
             Vector2.zero,
             new Vector2(0.5f, 1f));
 
-        const float leftPageTextX = 16f;
-        const float leftPageTextWidth = 500f;
-
         TMP_Text pageTag = EnsureContentText(pageTransform, PageTagName, "统一多页签图鉴书", 12f, SubtitleColor, TextAlignmentOptions.Left);
         ConfigureAnchoredRect(
             pageTag.rectTransform,
             new Vector2(0f, 1f),
             new Vector2(0f, 1f),
-            new Vector2(leftPageTextWidth, 24f),
-            new Vector2(leftPageTextX, -8f),
+            new Vector2(HandbookRightPageTextWidth, 24f),
+            new Vector2(HandbookRightPageTextX, -8f),
             new Vector2(0f, 1f));
 
         TMP_Text titleText = EnsureContentText(pageTransform, TitleName, title, 24f, TitleColor, TextAlignmentOptions.Left, FontStyles.Bold);
@@ -670,8 +670,8 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
             titleText.rectTransform,
             new Vector2(0f, 1f),
             new Vector2(0f, 1f),
-            new Vector2(leftPageTextWidth, 36f),
-            new Vector2(leftPageTextX, -42f),
+            new Vector2(HandbookRightPageTextWidth, 36f),
+            new Vector2(HandbookRightPageTextX, -42f),
             new Vector2(0f, 1f));
 
         TMP_Text subtitleText = EnsureContentText(pageTransform, SubtitleName, subtitle, 13f, SubtitleColor, TextAlignmentOptions.Left);
@@ -679,8 +679,8 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
             subtitleText.rectTransform,
             new Vector2(0f, 1f),
             new Vector2(0f, 1f),
-            new Vector2(leftPageTextWidth, 44f),
-            new Vector2(leftPageTextX, -84f),
+            new Vector2(HandbookRightPageTextWidth, 44f),
+            new Vector2(HandbookRightPageTextX, -84f),
             new Vector2(0f, 1f));
 
         TMP_Text bodyText = EnsureContentText(pageTransform, BodyName, string.Empty, 15f, BodyColor, TextAlignmentOptions.TopLeft);
@@ -688,8 +688,8 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
             bodyText.rectTransform,
             new Vector2(0f, 1f),
             new Vector2(0f, 1f),
-            new Vector2(leftPageTextWidth, 700f),
-            new Vector2(leftPageTextX, -140f),
+            new Vector2(HandbookRightPageTextWidth, 700f),
+            new Vector2(HandbookRightPageTextX, -140f),
             new Vector2(0f, 1f));
         bodyText.rectTransform.pivot = new Vector2(0f, 1f);
         bodyText.lineSpacing = 2f;
@@ -699,8 +699,8 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
             footerText.rectTransform,
             new Vector2(0f, 0f),
             new Vector2(0f, 0f),
-            new Vector2(leftPageTextWidth, 44f),
-            new Vector2(leftPageTextX, 16f),
+            new Vector2(HandbookRightPageTextWidth, 44f),
+            new Vector2(HandbookRightPageTextX, 16f),
             new Vector2(0f, 0f));
 
         pageContentRoots[page] = pageRect;
@@ -724,6 +724,8 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         SetStretch(containerRect, 0f, 0f, 0f, 0f);
 
         List<RectTransform> cardRects = new List<RectTransform>();
+        CollectExistingHandbookCards(container, cardRects);
+
         for (int i = 0; i < legacyHandbookContentObjects.Count; i++)
         {
             GameObject contentObject = legacyHandbookContentObjects[i];
@@ -746,13 +748,15 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
 
             cardRect.localScale = Vector3.one;
             cardRect.localRotation = Quaternion.identity;
-            cardRects.Add(cardRect);
+            AddUniqueCardRect(cardRects, cardRect);
         }
 
-        cardRects.Sort((left, right) => string.CompareOrdinal(left.name, right.name));
+        EnsureMinimumHandbookCards(cardRects, container);
+        cardRects.Sort((left, right) => GetHandbookCardOrder(left).CompareTo(GetHandbookCardOrder(right)));
         for (int i = 0; i < cardRects.Count; i++)
         {
             RectTransform cardRect = cardRects[i];
+            bool visible = i < HandbookCardTargetCount;
             ConfigureAnchoredRect(
                 cardRect,
                 new Vector2(0f, 1f),
@@ -760,15 +764,108 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
                 cardRect.sizeDelta,
                 new Vector2(HandbookCardCenterX, -(HandbookCardStartY + i * HandbookCardVerticalSpacing)),
                 new Vector2(0.5f, 0.5f));
-            cardRect.gameObject.SetActive(true);
+            cardRect.gameObject.SetActive(visible);
         }
 
-        SetGeneratedTextVisibility(handbookPage, cardRects.Count == 0);
+        SetGeneratedTextVisibility(handbookPage, false);
 
         legacyHandbookContentObjects.RemoveAll(item =>
             item != null &&
             item.transform.parent == container &&
             item.name.StartsWith("ArcitectureImage_", StringComparison.Ordinal));
+    }
+
+    private static void CollectExistingHandbookCards(Transform container, List<RectTransform> cardRects)
+    {
+        if (container == null || cardRects == null)
+        {
+            return;
+        }
+
+        for (int i = 0; i < container.childCount; i++)
+        {
+            Transform child = container.GetChild(i);
+            if (child == null || !child.name.StartsWith("ArcitectureImage_", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            AddUniqueCardRect(cardRects, child as RectTransform);
+        }
+    }
+
+    private static void AddUniqueCardRect(List<RectTransform> cardRects, RectTransform cardRect)
+    {
+        if (cardRects == null || cardRect == null || cardRects.Contains(cardRect))
+        {
+            return;
+        }
+
+        cardRects.Add(cardRect);
+    }
+
+    private static void EnsureMinimumHandbookCards(List<RectTransform> cardRects, Transform container)
+    {
+        if (cardRects == null || container == null || cardRects.Count == 0)
+        {
+            return;
+        }
+
+        cardRects.Sort((left, right) => GetHandbookCardOrder(left).CompareTo(GetHandbookCardOrder(right)));
+        RectTransform template = cardRects[0];
+        for (int i = cardRects.Count; i < HandbookCardTargetCount; i++)
+        {
+            GameObject cardObject = Instantiate(template.gameObject, container, false);
+            cardObject.name = $"ArcitectureImage_{i + 1}";
+
+            RectTransform cardRect = cardObject.transform as RectTransform;
+            ApplyCatalogueBuildingId(cardObject, i);
+            AddUniqueCardRect(cardRects, cardRect);
+        }
+    }
+
+    private static void ApplyCatalogueBuildingId(GameObject cardObject, int zeroBasedIndex)
+    {
+        if (cardObject == null)
+        {
+            return;
+        }
+
+        CatalogueBuildingId buildingId = (CatalogueBuildingId)Mathf.Clamp(
+            zeroBasedIndex,
+            0,
+            Enum.GetValues(typeof(CatalogueBuildingId)).Length - 1);
+
+        CatalogueBuildingUnlockState unlockState = cardObject.GetComponent<CatalogueBuildingUnlockState>();
+        if (unlockState != null)
+        {
+            unlockState.buildingId = buildingId;
+        }
+
+        BuildingProgressController progressController = cardObject.GetComponent<BuildingProgressController>();
+        if (progressController != null)
+        {
+            progressController.buildingId = buildingId;
+        }
+    }
+
+    private static int GetHandbookCardOrder(RectTransform cardRect)
+    {
+        if (cardRect == null || string.IsNullOrWhiteSpace(cardRect.name))
+        {
+            return int.MaxValue;
+        }
+
+        const string prefix = "ArcitectureImage_";
+        if (!cardRect.name.StartsWith(prefix, StringComparison.Ordinal))
+        {
+            return int.MaxValue;
+        }
+
+        string suffix = cardRect.name.Substring(prefix.Length);
+        return int.TryParse(suffix, NumberStyles.Integer, CultureInfo.InvariantCulture, out int order)
+            ? order
+            : int.MaxValue;
     }
 
     private static void SetGeneratedTextVisibility(RectTransform pageRoot, bool visible)
