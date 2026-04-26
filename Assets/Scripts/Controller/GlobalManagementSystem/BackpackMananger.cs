@@ -9,6 +9,7 @@ public class BackpackMananger : MonoBehaviour
     public List<ArchitecturalCrystal?> backpackItems = new List<ArchitecturalCrystal?>();
 
     private const int MaxCapacity = 6;
+    private const int MaxSpecialStructureMaterials = 3;
     private readonly HashSet<ArchitecturalType> alreadyPickedCommonTypes = new HashSet<ArchitecturalType>();
     private readonly HashSet<int> reservedSlots = new HashSet<int>();
     private int nextRuntimePickupOrder = 1;
@@ -248,7 +249,15 @@ public class BackpackMananger : MonoBehaviour
 
         if (crystal.IsSpecialStructure)
         {
-            RuntimeProgressState.EnsureInstance().AddSpecialStructureInventory(1);
+            RuntimeProgressState progressState = RuntimeProgressState.EnsureInstance();
+            if (progressState.AvailableSpecialStructureInventory >= MaxSpecialStructureMaterials)
+            {
+                Debug.LogWarning($"材料库存已达获得上限 {MaxSpecialStructureMaterials}，无法继续拾取");
+                success = false;
+                return true;
+            }
+
+            progressState.AddSpecialStructureInventory(1);
             OnItemPicked?.Invoke(crystal);
             OnInventoryChanged?.Invoke();
             Debug.Log($"拾取 {crystal.DisplayName}，已加入专用材料库存");
