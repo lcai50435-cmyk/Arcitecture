@@ -156,6 +156,11 @@ public class MusicManager : MonoBehaviour
         manager.PlaySfxInternal(cueId);
     }
 
+    public static void PlayButtonClickSfx()
+    {
+        PlaySfx(SfxCueId.ButtonClick);
+    }
+
     public static void SetGameplayMusicPaused(bool paused)
     {
         MusicManager manager = Instance != null ? Instance : EnsureInstance();

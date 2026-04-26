@@ -48,3 +48,7 @@ MonoBehaviour:
     clip: {fileID: 8300000, guid: 35f28964bdfb49a7ac9ebf4d8c69573a, type: 3}
     variants: []
     gain: 1
+  - cueId: 5
+    clip: {fileID: 8300000, guid: 02d424af7d82b4d68b2a73dacd8e7e17, type: 3}
+    variants: []
+    gain: 0.76
