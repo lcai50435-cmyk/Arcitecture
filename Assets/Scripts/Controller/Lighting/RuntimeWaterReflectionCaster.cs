@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using UnityEngine.Tilemaps;
 
 [DisallowMultipleComponent]
 public sealed class RuntimeWaterReflectionCaster : MonoBehaviour
@@ -122,6 +123,10 @@ public sealed class RuntimeWaterReflectionSceneController : MonoBehaviour
     private const string ControllerName = "RuntimeWaterReflectionSceneController";
     private const string ShimmerObjectName = "RuntimeWaterShimmer";
     private const float RescanInterval = 0.8f;
+    private const float ShimmerPixelsPerUnit = 32f;
+    private const int ShimmerTextureWidth = 64;
+    private const int ShimmerTextureHeight = 16;
+    private const int MaxShimmerTileQuads = 12000;
     private static readonly List<Bounds> WaterBounds = new List<Bounds>();
     private static RuntimeWaterReflectionSceneController instance;
     private static Sprite sharedShimmerSprite;
@@ -256,7 +261,14 @@ public sealed class RuntimeWaterReflectionSceneController : MonoBehaviour
             }
 
             WaterBounds.Add(bounds);
-            EnsureWaterShimmer(renderer, bounds);
+            if (ShouldCreateWaterShimmer(renderer, bounds))
+            {
+                EnsureWaterShimmer(renderer, bounds);
+            }
+            else
+            {
+                RemoveWaterShimmer(renderer);
+            }
         }
 
         Collider2D[] colliders = FindObjectsOfType<Collider2D>(true);
@@ -340,6 +352,62 @@ public sealed class RuntimeWaterReflectionSceneController : MonoBehaviour
         return false;
     }
 
+    private static bool ShouldCreateWaterShimmer(Renderer waterRenderer, Bounds bounds)
+    {
+        if (waterRenderer == null || IsCollisionOnlyWaterRenderer(waterRenderer))
+        {
+            return false;
+        }
+
+        return EstimateShimmerTileQuads(bounds.size) <= MaxShimmerTileQuads;
+    }
+
+    private static bool IsCollisionOnlyWaterRenderer(Renderer renderer)
+    {
+        if (renderer.GetComponent<TilemapRenderer>() == null ||
+            renderer.GetComponent<TilemapCollider2D>() == null)
+        {
+            return false;
+        }
+
+        string name = renderer.gameObject.name;
+        return name.IndexOf("Collision", StringComparison.OrdinalIgnoreCase) >= 0 ||
+               name.IndexOf("Collider", StringComparison.OrdinalIgnoreCase) >= 0 ||
+               name.IndexOf("碰撞", StringComparison.OrdinalIgnoreCase) >= 0;
+    }
+
+    private static int EstimateShimmerTileQuads(Vector3 boundsSize)
+    {
+        float tileWidth = ShimmerTextureWidth / ShimmerPixelsPerUnit;
+        float tileHeight = ShimmerTextureHeight / ShimmerPixelsPerUnit;
+        int columns = Mathf.CeilToInt(Mathf.Max(0.4f, boundsSize.x) / tileWidth);
+        int rows = Mathf.CeilToInt(Mathf.Max(0.25f, boundsSize.y) / tileHeight);
+        return columns * rows;
+    }
+
+    private static void RemoveWaterShimmer(Renderer waterRenderer)
+    {
+        if (waterRenderer == null)
+        {
+            return;
+        }
+
+        Transform existing = waterRenderer.transform.Find(ShimmerObjectName);
+        if (existing == null)
+        {
+            return;
+        }
+
+        if (Application.isPlaying)
+        {
+            Destroy(existing.gameObject);
+        }
+        else
+        {
+            DestroyImmediate(existing.gameObject);
+        }
+    }
+
     private static void EnsureWaterShimmer(Renderer waterRenderer, Bounds bounds)
     {
         Transform existing = waterRenderer.transform.Find(ShimmerObjectName);
@@ -381,18 +449,16 @@ public sealed class RuntimeWaterReflectionSceneController : MonoBehaviour
             return sharedShimmerSprite;
         }
 
-        const int width = 64;
-        const int height = 16;
-        Texture2D texture = new Texture2D(width, height, TextureFormat.RGBA32, false)
+        Texture2D texture = new Texture2D(ShimmerTextureWidth, ShimmerTextureHeight, TextureFormat.RGBA32, false)
         {
             name = "RuntimeWaterShimmerTexture",
             wrapMode = TextureWrapMode.Repeat,
             filterMode = FilterMode.Bilinear
         };
 
-        for (int y = 0; y < height; y++)
+        for (int y = 0; y < ShimmerTextureHeight; y++)
         {
-            for (int x = 0; x < width; x++)
+            for (int x = 0; x < ShimmerTextureWidth; x++)
             {
                 bool stripe = (x + y * 3) % 19 < 4;
                 byte alpha = stripe ? (byte)58 : (byte)0;
@@ -401,7 +467,7 @@ public sealed class RuntimeWaterReflectionSceneController : MonoBehaviour
         }
 
         texture.Apply(false, false);
-        sharedShimmerSprite = Sprite.Create(texture, new Rect(0f, 0f, width, height), new Vector2(0.5f, 0.5f), 32f);
+        sharedShimmerSprite = Sprite.Create(texture, new Rect(0f, 0f, ShimmerTextureWidth, ShimmerTextureHeight), new Vector2(0.5f, 0.5f), ShimmerPixelsPerUnit);
         sharedShimmerSprite.name = "RuntimeWaterShimmerSprite";
         return sharedShimmerSprite;
     }
