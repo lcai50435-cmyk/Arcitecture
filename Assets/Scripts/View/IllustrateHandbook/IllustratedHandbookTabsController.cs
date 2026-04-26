@@ -81,6 +81,9 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
     private const float HandbookCardVerticalSpacing = 226f;
     private const float HandbookRightPageTextX = 790f;
     private const float HandbookRightPageTextWidth = 600f;
+    private const string HandbookCardNamePrefix = "ArcitectureImage_";
+    private const string LegacyFujianTulouButtonName = "FuJianTuLouButton";
+    private const string LegacyHandbookLeftPanelName = "LeftPanel";
 
     [SerializeField] private UIManager owner;
 
@@ -284,9 +287,8 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
     private bool TryUseSceneAuthoredPages()
     {
         usesSceneAuthoredPages = illustratedHandbookCanvas != null &&
-                                personalInformationCanvas != null &&
-                                photoAlbumCanvas != null &&
-                                settingCanvas != null;
+                                (HasSceneAuthoredPages(illustratedHandbookCanvas.transform) ||
+                                 HasSceneAuthoredBookmarkTabs(illustratedHandbookCanvas.transform));
         if (!usesSceneAuthoredPages)
         {
             scenePageRoots.Clear();
@@ -335,7 +337,7 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         }
 
         if (string.Equals(handbookObject.name, RootObjectName, StringComparison.Ordinal) &&
-            HasSceneAuthoredPages(handbookObject.transform))
+            HasSceneAuthoredUi(handbookObject.transform))
         {
             return handbookObject;
         }
@@ -344,7 +346,7 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         while (current != null)
         {
             if (string.Equals(current.name, RootObjectName, StringComparison.Ordinal) &&
-                HasSceneAuthoredPages(current))
+                HasSceneAuthoredUi(current))
             {
                 return current.gameObject;
             }
@@ -361,6 +363,21 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
                ResolveScenePageRoot(root, IllustratedHandbookPage.PersonalInformation) != null &&
                ResolveScenePageRoot(root, IllustratedHandbookPage.PhotoAlbum) != null &&
                ResolveScenePageRoot(root, IllustratedHandbookPage.Setting) != null;
+    }
+
+    private static bool HasSceneAuthoredUi(Transform root)
+    {
+        return HasSceneAuthoredPages(root) || HasSceneAuthoredBookmarkTabs(root);
+    }
+
+    private static bool HasSceneAuthoredBookmarkTabs(Transform root)
+    {
+        return root != null &&
+               FindTransformByName(root, GetSceneTabButtonName(IllustratedHandbookPage.IllustratedHandbook)) != null &&
+               FindTransformByName(root, GetSceneTabButtonName(IllustratedHandbookPage.PersonalInformation)) != null &&
+               FindTransformByName(root, GetSceneTabButtonName(IllustratedHandbookPage.PhotoAlbum)) != null &&
+               FindTransformByName(root, GetSceneTabButtonName(IllustratedHandbookPage.Mission)) != null &&
+               FindTransformByName(root, GetSceneTabButtonName(IllustratedHandbookPage.Setting)) != null;
     }
 
     private static GameObject ResolveScenePageRoot(Transform root, IllustratedHandbookPage page)
@@ -423,6 +440,12 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         GameObject chromeRoot = GetChromePageRoot();
         if (chromeRoot == null)
         {
+            return;
+        }
+
+        if (usesSceneAuthoredPages)
+        {
+            EnsureSceneAuthoredHandbookCardsLayout();
             return;
         }
 
@@ -517,11 +540,32 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
             }
 
             if (string.Equals(child.name, "CloseButton", StringComparison.Ordinal) ||
-                IsLegacyHandbookContentLayer(child) ||
-                child.name.StartsWith("ArcitectureImage_", StringComparison.Ordinal))
+                IsLegacyHandbookContentLayer(child))
             {
                 legacyHandbookContentObjects.Add(child.gameObject);
+                continue;
             }
+
+            CollectLegacyHandbookContentObjects(child);
+        }
+    }
+
+    private void CollectLegacyHandbookContentObjects(Transform root)
+    {
+        if (root == null)
+        {
+            return;
+        }
+
+        if (IsLegacyHandbookContentLayer(root))
+        {
+            legacyHandbookContentObjects.Add(root.gameObject);
+            return;
+        }
+
+        for (int i = 0; i < root.childCount; i++)
+        {
+            CollectLegacyHandbookContentObjects(root.GetChild(i));
         }
     }
 
@@ -732,7 +776,7 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         {
             GameObject contentObject = legacyHandbookContentObjects[i];
             if (contentObject == null ||
-                !contentObject.name.StartsWith("ArcitectureImage_", StringComparison.Ordinal))
+                !IsLegacyHandbookContentLayer(contentObject.transform))
             {
                 continue;
             }
@@ -753,6 +797,7 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
             AddUniqueCardRect(cardRects, cardRect);
         }
 
+        NormalizeHandbookCardIdentities(cardRects);
         EnsureMinimumHandbookCards(cardRects, container);
         cardRects.Sort((left, right) => GetHandbookCardOrder(left).CompareTo(GetHandbookCardOrder(right)));
         for (int i = 0; i < cardRects.Count; i++)
@@ -774,7 +819,7 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         legacyHandbookContentObjects.RemoveAll(item =>
             item != null &&
             item.transform.parent == container &&
-            item.name.StartsWith("ArcitectureImage_", StringComparison.Ordinal));
+            IsLegacyHandbookContentLayer(item.transform));
     }
 
     private static void CollectExistingHandbookCards(Transform container, List<RectTransform> cardRects)
@@ -787,7 +832,7 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         for (int i = 0; i < container.childCount; i++)
         {
             Transform child = container.GetChild(i);
-            if (child == null || !child.name.StartsWith("ArcitectureImage_", StringComparison.Ordinal))
+            if (child == null || !IsLegacyHandbookContentLayer(child))
             {
                 continue;
             }
@@ -806,6 +851,130 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         cardRects.Add(cardRect);
     }
 
+    private static void NormalizeHandbookCardIdentities(List<RectTransform> cardRects)
+    {
+        if (cardRects == null)
+        {
+            return;
+        }
+
+        cardRects.Sort((left, right) => GetHandbookCardOrder(left).CompareTo(GetHandbookCardOrder(right)));
+        for (int i = 0; i < cardRects.Count; i++)
+        {
+            RectTransform cardRect = cardRects[i];
+            if (cardRect == null)
+            {
+                continue;
+            }
+
+            cardRect.name = $"{HandbookCardNamePrefix}{i + 1}";
+            ApplyCatalogueBuildingId(cardRect.gameObject, i);
+        }
+    }
+
+    private void EnsureSceneAuthoredHandbookCardsLayout()
+    {
+        if (illustratedHandbookCanvas == null)
+        {
+            return;
+        }
+
+        Transform leftPanel = FindTransformByName(illustratedHandbookCanvas.transform, LegacyHandbookLeftPanelName);
+        if (leftPanel == null)
+        {
+            return;
+        }
+
+        List<RectTransform> cardRects = new List<RectTransform>();
+        CollectSceneHandbookCards(leftPanel, cardRects);
+        if (cardRects.Count == 0)
+        {
+            return;
+        }
+
+        SortHandbookCardsForSceneLayout(cardRects);
+        RectTransform template = cardRects[0];
+        Vector2 templateAnchorMin = template.anchorMin;
+        Vector2 templateAnchorMax = template.anchorMax;
+        Vector2 templateSize = template.sizeDelta;
+        Vector2 templatePivot = template.pivot;
+        Vector2 startPosition = template.anchoredPosition;
+        float verticalSpacing = Mathf.Max(templateSize.y + 8f, 86f);
+
+        NormalizeHandbookCardIdentities(cardRects);
+        for (int i = cardRects.Count; i < HandbookCardTargetCount; i++)
+        {
+            GameObject cardObject = Instantiate(template.gameObject, leftPanel, false);
+            cardObject.name = $"{HandbookCardNamePrefix}{i + 1}";
+            RectTransform cardRect = cardObject.transform as RectTransform;
+            ApplyCatalogueBuildingId(cardObject, i);
+            AddUniqueCardRect(cardRects, cardRect);
+        }
+
+        SortHandbookCardsForSceneLayout(cardRects);
+        for (int i = 0; i < cardRects.Count; i++)
+        {
+            RectTransform cardRect = cardRects[i];
+            if (cardRect == null)
+            {
+                continue;
+            }
+
+            bool visible = i < HandbookCardTargetCount;
+            ConfigureAnchoredRect(
+                cardRect,
+                templateAnchorMin,
+                templateAnchorMax,
+                templateSize,
+                new Vector2(startPosition.x, startPosition.y - i * verticalSpacing),
+                templatePivot);
+            cardRect.localScale = Vector3.one;
+            cardRect.localRotation = Quaternion.identity;
+            cardRect.gameObject.SetActive(visible);
+        }
+    }
+
+    private static void CollectSceneHandbookCards(Transform root, List<RectTransform> cardRects)
+    {
+        if (root == null || cardRects == null)
+        {
+            return;
+        }
+
+        if (IsLegacyHandbookContentLayer(root))
+        {
+            AddUniqueCardRect(cardRects, root as RectTransform);
+            return;
+        }
+
+        for (int i = 0; i < root.childCount; i++)
+        {
+            CollectSceneHandbookCards(root.GetChild(i), cardRects);
+        }
+    }
+
+    private static void SortHandbookCardsForSceneLayout(List<RectTransform> cardRects)
+    {
+        if (cardRects == null)
+        {
+            return;
+        }
+
+        cardRects.Sort((left, right) =>
+        {
+            int leftOrder = GetHandbookCardOrder(left);
+            int rightOrder = GetHandbookCardOrder(right);
+            if (leftOrder != rightOrder)
+            {
+                return leftOrder.CompareTo(rightOrder);
+            }
+
+            int leftSibling = left != null ? left.GetSiblingIndex() : int.MaxValue;
+            int rightSibling = right != null ? right.GetSiblingIndex() : int.MaxValue;
+            return leftSibling.CompareTo(rightSibling);
+        });
+    }
+
     private static void EnsureMinimumHandbookCards(List<RectTransform> cardRects, Transform container)
     {
         if (cardRects == null || container == null || cardRects.Count == 0)
@@ -818,7 +987,7 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         for (int i = cardRects.Count; i < HandbookCardTargetCount; i++)
         {
             GameObject cardObject = Instantiate(template.gameObject, container, false);
-            cardObject.name = $"ArcitectureImage_{i + 1}";
+            cardObject.name = $"{HandbookCardNamePrefix}{i + 1}";
 
             RectTransform cardRect = cardObject.transform as RectTransform;
             ApplyCatalogueBuildingId(cardObject, i);
@@ -858,13 +1027,12 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
             return int.MaxValue;
         }
 
-        const string prefix = "ArcitectureImage_";
-        if (!cardRect.name.StartsWith(prefix, StringComparison.Ordinal))
+        if (!cardRect.name.StartsWith(HandbookCardNamePrefix, StringComparison.Ordinal))
         {
             return int.MaxValue;
         }
 
-        string suffix = cardRect.name.Substring(prefix.Length);
+        string suffix = cardRect.name.Substring(HandbookCardNamePrefix.Length);
         return int.TryParse(suffix, NumberStyles.Integer, CultureInfo.InvariantCulture, out int order)
             ? order
             : int.MaxValue;
@@ -1140,6 +1308,7 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
             return null;
         }
 
+        ConfigureSceneBookmarkHitArea(sceneCloseButton, closeVisualRoot as RectTransform);
         sceneCloseButton.onClick.RemoveListener(HandleCloseRequested);
         EnsureButtonRaycastTarget(sceneCloseButton);
         sceneCloseButton.onClick.AddListener(HandleCloseRequested);
@@ -1197,6 +1366,7 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
                 continue;
             }
 
+            ConfigureSceneBookmarkHitArea(button, visualRoot as RectTransform);
             EnsureButtonRaycastTarget(button);
             button.onClick.AddListener(() => HandleBookmarkClicked(targetPage));
 
@@ -1346,6 +1516,41 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         {
             selectedRoot.SetAsLastSibling();
         }
+
+        BringSceneBookmarkRootsToFront(chromeRoot, activePage);
+    }
+
+    private static void BringSceneBookmarkRootsToFront(Transform chromeRoot, IllustratedHandbookPage activePage)
+    {
+        if (chromeRoot == null)
+        {
+            return;
+        }
+
+        foreach (IllustratedHandbookPage page in Enum.GetValues(typeof(IllustratedHandbookPage)))
+        {
+            if (page == activePage || !IsSceneBookmarkVisualRoot(page))
+            {
+                continue;
+            }
+
+            Transform visualRoot = FindTransformByName(chromeRoot, GetSceneTabButtonName(page));
+            if (visualRoot != null)
+            {
+                visualRoot.SetAsLastSibling();
+            }
+        }
+
+        Transform selectedRoot = FindTransformByName(chromeRoot, GetSceneTabButtonName(activePage));
+        if (selectedRoot != null)
+        {
+            selectedRoot.SetAsLastSibling();
+        }
+    }
+
+    private static bool IsSceneBookmarkVisualRoot(IllustratedHandbookPage page)
+    {
+        return ShouldBindScenePage(page) || page == IllustratedHandbookPage.Setting;
     }
 
     private IEnumerator AnimateSceneBookmarkState(
@@ -1509,15 +1714,14 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
             return false;
         }
 
-        if (string.Equals(transform.name, "FuJianTuLouButton", StringComparison.Ordinal) ||
-            transform.name.StartsWith("ArcitectureImage_", StringComparison.Ordinal))
+        if (string.Equals(transform.name, LegacyFujianTulouButtonName, StringComparison.Ordinal) ||
+            transform.name.StartsWith(HandbookCardNamePrefix, StringComparison.Ordinal))
         {
             return true;
         }
 
-        return FindTransformByName(transform, "FuJianTuLouButton") != null ||
-               transform.GetComponentInChildren<CatalogueBuildingUnlockState>(true) != null ||
-               transform.GetComponentInChildren<BuildingProgressController>(true) != null;
+        return transform.GetComponent<CatalogueBuildingUnlockState>() != null ||
+               transform.GetComponent<BuildingProgressController>() != null;
     }
 
     private void ResetScrollPosition()
@@ -2288,8 +2492,37 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
 
         if (targetGraphic != null)
         {
+            Color targetColor = targetGraphic.color;
+            if (targetColor.a <= 0.001f)
+            {
+                targetColor.a = 0.001f;
+                targetGraphic.color = targetColor;
+            }
+
             targetGraphic.raycastTarget = true;
+            targetGraphic.canvasRenderer.cullTransparentMesh = false;
         }
+    }
+
+    private static void ConfigureSceneBookmarkHitArea(Button button, RectTransform visualRoot)
+    {
+        if (button == null || visualRoot == null)
+        {
+            return;
+        }
+
+        RectTransform hitRect = button.transform as RectTransform;
+        if (hitRect == null || hitRect == visualRoot || hitRect.parent != visualRoot)
+        {
+            return;
+        }
+
+        hitRect.anchorMin = Vector2.zero;
+        hitRect.anchorMax = Vector2.one;
+        hitRect.offsetMin = new Vector2(-12f, -8f);
+        hitRect.offsetMax = new Vector2(12f, 8f);
+        hitRect.pivot = new Vector2(0.5f, 0.5f);
+        hitRect.localScale = Vector3.one;
     }
 
     private static Transform FindTransformByName(Transform parent, string childName)
@@ -2355,6 +2588,7 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         label.fontStyle = fontStyle;
         label.enableWordWrapping = true;
         label.overflowMode = TextOverflowModes.Overflow;
+        label.raycastTarget = false;
         return label;
     }
 
@@ -2376,6 +2610,7 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         label.fontStyle = fontStyle;
         label.enableWordWrapping = true;
         label.overflowMode = TextOverflowModes.Overflow;
+        label.raycastTarget = false;
         if (TMP_Settings.defaultFontAsset != null)
         {
             label.font = TMP_Settings.defaultFontAsset;
