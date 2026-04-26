@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using TMPro;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 #if UNITY_EDITOR
@@ -39,6 +40,9 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
     private const string BookContentName = "Content";
     private const string BookPageContentPrefix = "PageContent_";
     private const string PageTagName = "PageTag";
+    private const string PersonalPortraitNodeName = "PersonalImage";
+    private const string PersonalBackpackSlotNamePrefix = "Slot_";
+    private const string PersonalBackpackSlotIconName = "ItemIcon";
     private const string TitleName = "Title";
     private const string SubtitleName = "Subtitle";
     private const string BodyName = "Body";
@@ -63,6 +67,7 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
     private const float BookmarkSelectedLabelX = 20f;
     private const float CloseButtonX = 840f;
     private const float CloseButtonY = -330f;
+    private const float PersonalBackpackSlotIconScale = 0.72f;
 
     private const float BookSafeLeft = 96f;
     private const float BookSafeRight = 760f;
@@ -128,6 +133,7 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
 
     private ScrollRect sharedBookScrollRect;
     private RectTransform sharedBookContentRoot;
+    private BackpackMananger subscribedBackpack;
     private bool initialized;
     private bool usesSceneAuthoredPages;
 
@@ -188,16 +194,17 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
 
         if (usesSceneAuthoredPages)
         {
+            IllustratedHandbookPage resolvedPage = ResolveAvailableSceneAuthoredPage(page);
             ActivateChromeRoot();
-            SetActiveSceneAuthoredPage(page);
+            SetActiveSceneAuthoredPage(resolvedPage);
             if (sharedBookContentRoot == null || bookContentPanel == null || pageContentRoots.Count == 0)
             {
                 EnsurePageScaffolding();
             }
 
             RefreshGeneratedPageContent();
-            SetActiveGeneratedPage(page);
-            UpdateSceneAuthoredBookmarkState(page);
+            SetActiveGeneratedPage(resolvedPage);
+            UpdateSceneAuthoredBookmarkState(resolvedPage);
             ResetScrollPosition();
             return;
         }
@@ -240,6 +247,12 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         }
 
         sceneBookmarkAnimations.Clear();
+        UnsubscribeBackpackInventoryEvents();
+    }
+
+    private void OnDestroy()
+    {
+        UnsubscribeBackpackInventoryEvents();
     }
 
     private void EnsureInitialized()
@@ -318,6 +331,7 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
             return;
         }
 
+        GameObject activePageRoot = ResolveSceneAuthoredPageRoot(activePage);
         foreach (KeyValuePair<IllustratedHandbookPage, GameObject> entry in scenePageRoots)
         {
             if (entry.Value == null)
@@ -325,8 +339,47 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
                 continue;
             }
 
-            entry.Value.SetActive(entry.Key == IllustratedHandbookPage.IllustratedHandbook);
+            entry.Value.SetActive(ReferenceEquals(entry.Value, activePageRoot));
         }
+    }
+
+    private IllustratedHandbookPage ResolveAvailableSceneAuthoredPage(IllustratedHandbookPage page)
+    {
+        if (!usesSceneAuthoredPages)
+        {
+            return page;
+        }
+
+        return scenePageRoots.TryGetValue(page, out GameObject pageRoot) && pageRoot != null
+            ? page
+            : IllustratedHandbookPage.IllustratedHandbook;
+    }
+
+    private GameObject ResolveSceneAuthoredPageRoot(IllustratedHandbookPage page)
+    {
+        if (scenePageRoots.TryGetValue(page, out GameObject pageRoot) && pageRoot != null)
+        {
+            return pageRoot;
+        }
+
+        return illustratedHandbookCanvas;
+    }
+
+    private List<GameObject> CollectUniqueScenePageRoots()
+    {
+        List<GameObject> roots = new List<GameObject>();
+        foreach (KeyValuePair<IllustratedHandbookPage, GameObject> entry in scenePageRoots)
+        {
+            GameObject pageRoot = entry.Value;
+            if (pageRoot == null || roots.Contains(pageRoot))
+            {
+                continue;
+            }
+
+            roots.Add(pageRoot);
+        }
+
+        return roots;
     }
 
     private static GameObject ResolveSceneAuthoredRoot(GameObject handbookObject)
@@ -1221,7 +1274,12 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
 
         if (usesSceneAuthoredPages)
         {
-            RegisterScenePageButtons(IllustratedHandbookPage.IllustratedHandbook);
+            List<GameObject> sceneRoots = CollectUniqueScenePageRoots();
+            for (int i = 0; i < sceneRoots.Count; i++)
+            {
+                RegisterScenePageButtons(sceneRoots[i]);
+            }
+
             return;
         }
 
@@ -1259,9 +1317,14 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
 
         if (usesSceneAuthoredPages)
         {
-            if (scenePageRoots.TryGetValue(IllustratedHandbookPage.IllustratedHandbook, out GameObject sceneRoot))
+            List<GameObject> sceneRoots = CollectUniqueScenePageRoots();
+            for (int i = 0; i < sceneRoots.Count; i++)
             {
-                closeButton = BindSceneCloseButton(sceneRoot);
+                Button sceneCloseButton = BindSceneCloseButton(sceneRoots[i]);
+                if (closeButton == null)
+                {
+                    closeButton = sceneCloseButton;
+                }
             }
 
             return;
@@ -1315,9 +1378,9 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         return sceneCloseButton;
     }
 
-    private void RegisterScenePageButtons(IllustratedHandbookPage hostPage)
+    private void RegisterScenePageButtons(GameObject pageRoot)
     {
-        if (!scenePageRoots.TryGetValue(hostPage, out GameObject pageRoot) || pageRoot == null)
+        if (pageRoot == null)
         {
             return;
         }
@@ -1417,12 +1480,30 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
             return;
         }
 
-        if (!scenePageRoots.TryGetValue(IllustratedHandbookPage.IllustratedHandbook, out GameObject activePageRoot) || activePageRoot == null)
+        List<GameObject> sceneRoots = CollectUniqueScenePageRoots();
+        for (int i = 0; i < sceneRoots.Count; i++)
+        {
+            GameObject pageRoot = sceneRoots[i];
+            if (pageRoot == null)
+            {
+                continue;
+            }
+
+            if (pageRoot.activeInHierarchy)
+            {
+                UpdateSceneBookmarkSiblingState(pageRoot.transform, activePage);
+            }
+
+            UpdateSceneBookmarkVisualState(pageRoot.transform, activePage);
+        }
+    }
+
+    private void UpdateSceneBookmarkVisualState(Transform pageRoot, IllustratedHandbookPage activePage)
+    {
+        if (pageRoot == null)
         {
             return;
         }
-
-        UpdateSceneBookmarkSiblingState(activePageRoot.transform, activePage);
 
         foreach (IllustratedHandbookPage page in Enum.GetValues(typeof(IllustratedHandbookPage)))
         {
@@ -1431,7 +1512,7 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
                 continue;
             }
 
-            Transform visualRoot = FindTransformByName(activePageRoot.transform, GetSceneTabButtonName(page));
+            Transform visualRoot = FindTransformByName(pageRoot, GetSceneTabButtonName(page));
             RectTransform visualRect = visualRoot as RectTransform;
             if (visualRect == null)
             {
@@ -1802,11 +1883,376 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
 
     private void RefreshGeneratedPageContent()
     {
+        RefreshSceneAuthoredPersonalPortrait();
+        RefreshSceneAuthoredPersonalBackpack();
         UpdateTextPage(IllustratedHandbookPage.IllustratedHandbook, BuildIllustratedHandbookBody(), BuildIllustratedHandbookFooter());
         UpdateTextPage(IllustratedHandbookPage.PersonalInformation, BuildPersonalInformationBody(), BuildPersonalInformationFooter());
         UpdateTextPage(IllustratedHandbookPage.PhotoAlbum, BuildPhotoAlbumBody(), BuildPhotoAlbumFooter());
         UpdateTextPage(IllustratedHandbookPage.Mission, BuildMissionBody(), BuildMissionFooter());
         UpdateTextPage(IllustratedHandbookPage.Setting, BuildSettingBody(), BuildSettingFooter());
+    }
+
+    private void RefreshSceneAuthoredPersonalPortrait()
+    {
+        if (!usesSceneAuthoredPages || personalInformationCanvas == null)
+        {
+            return;
+        }
+
+        Transform portraitTransform = FindTransformByName(personalInformationCanvas.transform, PersonalPortraitNodeName);
+        Image portraitImage = portraitTransform != null ? portraitTransform.GetComponent<Image>() : null;
+        if (portraitImage == null)
+        {
+            return;
+        }
+
+        Sprite portraitSprite = ResolveRuntimePlayerPortraitSprite();
+        portraitImage.sprite = portraitSprite;
+        portraitImage.type = Image.Type.Simple;
+        portraitImage.preserveAspect = true;
+        portraitImage.raycastTarget = false;
+        portraitImage.color = portraitSprite != null ? Color.white : Color.clear;
+        portraitImage.enabled = portraitSprite != null;
+    }
+
+    private static Sprite ResolveRuntimePlayerPortraitSprite()
+    {
+        PlayerProfileData profile = FindObjectOfType<PlayerProfileData>(true);
+        if (profile != null && profile.avatar != null)
+        {
+            return profile.avatar;
+        }
+
+        GameObject playerObject = ResolveRuntimePlayerObject(profile);
+        SpriteRenderer spriteRenderer = playerObject != null ? playerObject.GetComponent<SpriteRenderer>() : null;
+        if (spriteRenderer == null && playerObject != null)
+        {
+            spriteRenderer = playerObject.GetComponentInChildren<SpriteRenderer>(true);
+        }
+
+        Sprite fallbackSprite = spriteRenderer != null ? spriteRenderer.sprite : null;
+        if (profile != null && fallbackSprite != null)
+        {
+            profile.avatar = fallbackSprite;
+        }
+
+        return fallbackSprite;
+    }
+
+    private static GameObject ResolveRuntimePlayerObject(PlayerProfileData profile)
+    {
+        if (profile != null)
+        {
+            return profile.gameObject;
+        }
+
+        PlayerMove playerMove = FindObjectOfType<PlayerMove>(true);
+        if (playerMove != null)
+        {
+            return playerMove.gameObject;
+        }
+
+        PlayerAttack playerAttack = FindObjectOfType<PlayerAttack>(true);
+        if (playerAttack != null)
+        {
+            return playerAttack.gameObject;
+        }
+
+        return GameObject.FindGameObjectWithTag("Player");
+    }
+
+    private void RefreshSceneAuthoredPersonalBackpack()
+    {
+        if (!usesSceneAuthoredPages || personalInformationCanvas == null)
+        {
+            return;
+        }
+
+        BackpackMananger backpack = ResolveRuntimeBackpackManager();
+        EnsureBackpackInventorySubscription(backpack);
+
+        List<RectTransform> slotRects = new List<RectTransform>();
+        CollectPersonalBackpackSlotRects(personalInformationCanvas.transform, slotRects);
+        for (int i = 0; i < slotRects.Count; i++)
+        {
+            RectTransform slotRect = slotRects[i];
+            if (slotRect == null || !TryResolvePersonalBackpackSlotIndex(slotRect.name, out int slotIndex))
+            {
+                continue;
+            }
+
+            PersonalBackpackSlotHoverHandler hoverHandler = EnsurePersonalBackpackSlotHover(slotRect, slotIndex);
+            Image iconImage = EnsurePersonalBackpackSlotIcon(slotRect);
+            ArchitecturalCrystal? item = backpack != null ? backpack.GetItem(slotIndex) : null;
+            ApplyPersonalBackpackSlotIcon(iconImage, item);
+            hoverHandler.RefreshHover();
+        }
+    }
+
+    private void EnsureBackpackInventorySubscription(BackpackMananger backpack)
+    {
+        if (subscribedBackpack == backpack)
+        {
+            return;
+        }
+
+        UnsubscribeBackpackInventoryEvents();
+        subscribedBackpack = backpack;
+        if (subscribedBackpack != null)
+        {
+            subscribedBackpack.OnInventoryChanged += RefreshSceneAuthoredPersonalBackpack;
+        }
+    }
+
+    private void UnsubscribeBackpackInventoryEvents()
+    {
+        if (subscribedBackpack == null)
+        {
+            return;
+        }
+
+        subscribedBackpack.OnInventoryChanged -= RefreshSceneAuthoredPersonalBackpack;
+        subscribedBackpack = null;
+    }
+
+    private static BackpackMananger ResolveRuntimeBackpackManager()
+    {
+        return BackpackMananger.Instance != null
+            ? BackpackMananger.Instance
+            : FindObjectOfType<BackpackMananger>(true);
+    }
+
+    private static void CollectPersonalBackpackSlotRects(Transform root, List<RectTransform> slotRects)
+    {
+        if (root == null || slotRects == null)
+        {
+            return;
+        }
+
+        RectTransform rect = root as RectTransform;
+        if (rect != null && TryResolvePersonalBackpackSlotIndex(root.name, out _))
+        {
+            slotRects.Add(rect);
+            return;
+        }
+
+        for (int i = 0; i < root.childCount; i++)
+        {
+            CollectPersonalBackpackSlotRects(root.GetChild(i), slotRects);
+        }
+    }
+
+    private static bool TryResolvePersonalBackpackSlotIndex(string slotName, out int slotIndex)
+    {
+        slotIndex = -1;
+        if (string.IsNullOrWhiteSpace(slotName) ||
+            !slotName.StartsWith(PersonalBackpackSlotNamePrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        string indexText = slotName.Substring(PersonalBackpackSlotNamePrefix.Length);
+        if (!int.TryParse(indexText, NumberStyles.Integer, CultureInfo.InvariantCulture, out int oneBasedIndex) ||
+            oneBasedIndex < 1 ||
+            oneBasedIndex > 6)
+        {
+            return false;
+        }
+
+        slotIndex = oneBasedIndex - 1;
+        return true;
+    }
+
+    private static PersonalBackpackSlotHoverHandler EnsurePersonalBackpackSlotHover(RectTransform slotRect, int slotIndex)
+    {
+        Graphic slotGraphic = slotRect != null ? slotRect.GetComponent<Graphic>() : null;
+        if (slotGraphic != null)
+        {
+            slotGraphic.raycastTarget = true;
+        }
+
+        PersonalBackpackSlotHoverHandler hoverHandler = EnsurePersonalBackpackSlotHoverHandler(slotRect.gameObject, slotIndex);
+        Button[] childButtons = slotRect.GetComponentsInChildren<Button>(true);
+        for (int i = 0; i < childButtons.Length; i++)
+        {
+            Button button = childButtons[i];
+            if (button == null)
+            {
+                continue;
+            }
+
+            Graphic targetGraphic = button.targetGraphic != null ? button.targetGraphic : button.GetComponent<Graphic>();
+            if (targetGraphic != null)
+            {
+                targetGraphic.raycastTarget = true;
+            }
+
+            EnsurePersonalBackpackSlotHoverHandler(button.gameObject, slotIndex);
+        }
+
+        return hoverHandler;
+    }
+
+    private static PersonalBackpackSlotHoverHandler EnsurePersonalBackpackSlotHoverHandler(GameObject targetObject, int slotIndex)
+    {
+        PersonalBackpackSlotHoverHandler hoverHandler = targetObject.GetComponent<PersonalBackpackSlotHoverHandler>();
+        if (hoverHandler == null)
+        {
+            hoverHandler = targetObject.AddComponent<PersonalBackpackSlotHoverHandler>();
+        }
+
+        hoverHandler.Bind(slotIndex);
+        return hoverHandler;
+    }
+
+    private static Image EnsurePersonalBackpackSlotIcon(RectTransform slotRect)
+    {
+        Transform existing = FindDirectChild(slotRect, PersonalBackpackSlotIconName);
+        RectTransform iconRect;
+        Image iconImage;
+        if (existing != null)
+        {
+            iconRect = existing as RectTransform;
+            iconImage = existing.GetComponent<Image>();
+            if (iconImage == null)
+            {
+                iconImage = existing.gameObject.AddComponent<Image>();
+            }
+        }
+        else
+        {
+            GameObject iconObject = new GameObject(PersonalBackpackSlotIconName, typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+            iconRect = iconObject.GetComponent<RectTransform>();
+            iconRect.SetParent(slotRect, false);
+            iconImage = iconObject.GetComponent<Image>();
+        }
+
+        iconRect.anchorMin = new Vector2(0.5f, 0.5f);
+        iconRect.anchorMax = new Vector2(0.5f, 0.5f);
+        iconRect.pivot = new Vector2(0.5f, 0.5f);
+        iconRect.anchoredPosition = Vector2.zero;
+        iconRect.sizeDelta = ResolvePersonalBackpackSlotIconSize(slotRect);
+        iconRect.localScale = Vector3.one;
+        iconRect.localRotation = Quaternion.identity;
+        iconRect.SetAsLastSibling();
+
+        iconImage.raycastTarget = false;
+        iconImage.preserveAspect = true;
+        return iconImage;
+    }
+
+    private static Vector2 ResolvePersonalBackpackSlotIconSize(RectTransform slotRect)
+    {
+        if (slotRect == null)
+        {
+            return Vector2.zero;
+        }
+
+        Vector2 slotSize = slotRect.rect.size;
+        if (slotSize.x <= 1f || slotSize.y <= 1f)
+        {
+            slotSize = slotRect.sizeDelta;
+        }
+
+        float iconSize = Mathf.Max(1f, Mathf.Min(slotSize.x, slotSize.y) * PersonalBackpackSlotIconScale);
+        return new Vector2(iconSize, iconSize);
+    }
+
+    private static void ApplyPersonalBackpackSlotIcon(Image iconImage, ArchitecturalCrystal? item)
+    {
+        if (iconImage == null)
+        {
+            return;
+        }
+
+        if (!item.HasValue)
+        {
+            iconImage.sprite = null;
+            iconImage.color = Color.white;
+            iconImage.enabled = false;
+            return;
+        }
+
+        Sprite sprite = ResolveBackpackItemSprite(item.Value);
+        iconImage.sprite = sprite;
+        iconImage.color = Color.white;
+        iconImage.enabled = sprite != null;
+    }
+
+    private static Sprite ResolveBackpackItemSprite(ArchitecturalCrystal item)
+    {
+        Sprite displaySprite = item.backIcon != null
+            ? item.backIcon
+            : (item.icon != null ? item.icon : RuntimeCrystalDropFactory.ResolveSprite(item));
+        return RuntimeSpriteDisplaySanitizer.GetDisplaySprite(displaySprite);
+    }
+
+    private sealed class PersonalBackpackSlotHoverHandler : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, IPointerMoveHandler
+    {
+        private int slotIndex = -1;
+        private bool isHovered;
+        private Vector2 lastScreenPosition;
+
+        public void Bind(int index)
+        {
+            slotIndex = index;
+        }
+
+        public void OnPointerEnter(PointerEventData eventData)
+        {
+            isHovered = true;
+            lastScreenPosition = eventData != null ? eventData.position : (Vector2)Input.mousePosition;
+            RefreshHover();
+        }
+
+        public void OnPointerMove(PointerEventData eventData)
+        {
+            isHovered = true;
+            lastScreenPosition = eventData != null ? eventData.position : (Vector2)Input.mousePosition;
+            RefreshHover();
+        }
+
+        public void OnPointerExit(PointerEventData eventData)
+        {
+            HideHover();
+        }
+
+        private void OnDisable()
+        {
+            HideHover();
+        }
+
+        private void OnDestroy()
+        {
+            HideHover();
+        }
+
+        public void RefreshHover()
+        {
+            if (!isHovered)
+            {
+                return;
+            }
+
+            BackpackMananger backpack = ResolveRuntimeBackpackManager();
+            ArchitecturalCrystal? item = backpack != null ? backpack.GetItem(slotIndex) : null;
+            if (!item.HasValue)
+            {
+                HideHover();
+                return;
+            }
+
+            RuntimeBackpackHoverHud.EnsureInstance().ShowOrUpdate(this, item.Value, lastScreenPosition);
+        }
+
+        private void HideHover()
+        {
+            isHovered = false;
+            if (RuntimeBackpackHoverHud.Instance != null)
+            {
+                RuntimeBackpackHoverHud.Instance.HideForOwner(this);
+            }
+        }
     }
 
     private void UpdateTextPage(IllustratedHandbookPage page, string body, string footer)
