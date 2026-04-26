@@ -36,6 +36,7 @@
 .vs/
 .vscode/
 .serena/
+.spec-workflow/
 
 # Gradle cache directory
 .gradle/
