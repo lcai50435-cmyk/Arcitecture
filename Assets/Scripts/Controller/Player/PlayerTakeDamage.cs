@@ -22,7 +22,10 @@ public class PlayerTakeDamage : MonoBehaviour
         healthTrans = GameplayStatusHudRuntime.EnsureHealthGauge(healthTrans);
         PlayerCriticalStateFeedback.Ensure(gameObject);
 
-        characterCore.OnTakeDamage += PlayHurtAnimation;
+        if (characterCore != null)
+        {
+            characterCore.OnTakeDamage += PlayHurtAnimation;
+        }
 
         // 安全校验：确保移动脚本引用不为空
         if (playerMovement == null)
@@ -30,23 +33,13 @@ public class PlayerTakeDamage : MonoBehaviour
             playerMovement = GetComponent<PlayerMove>();
         }
 
-        if (healthTrans != null)
-        {
-            healthTrans.SetMaxValue(characterCore.stats.maxHp);
-            healthTrans.SetValue(characterCore.currentHp);
-            GameplayStatusHudRuntime.RefreshHealthText(characterCore.currentHp, characterCore.stats.maxHp);
-        }
+        RefreshHealthUi();
     }
 
     private void Start()
     {
         healthTrans = GameplayStatusHudRuntime.EnsureHealthGauge(healthTrans);
-        if (characterCore != null && healthTrans != null)
-        {
-            healthTrans.SetMaxValue(characterCore.stats.maxHp);
-            healthTrans.SetValue(characterCore.currentHp);
-            GameplayStatusHudRuntime.RefreshHealthText(characterCore.currentHp, characterCore.stats.maxHp);
-        }
+        RefreshHealthUi();
     }
 
     /// <summary>
@@ -54,24 +47,23 @@ public class PlayerTakeDamage : MonoBehaviour
     /// </summary>
     private void PlayHurtAnimation()
     {
-        if (playerAnim == null || playerMovement == null) return;
+        RefreshHealthUi();
 
-        // 受击时禁止移动
-        playerMovement.canMove = false;
-        // 清空刚体速度，立即停止位移
-        if (playerMovement.rb != null)
+        if (playerAnim != null)
         {
-            playerMovement.rb.velocity = Vector2.zero;
-        }
+            if (playerMovement != null)
+            {
+                // 受击时禁止移动
+                playerMovement.canMove = false;
+                // 清空刚体速度，立即停止位移
+                if (playerMovement.rb != null)
+                {
+                    playerMovement.rb.velocity = Vector2.zero;
+                }
+            }
 
-        // 触发受击动画
-        playerAnim.SetTrigger(hurtAnimParam);
-
-        // 血条减少
-        if (healthTrans != null)
-        {
-            healthTrans.SetValue(characterCore.currentHp);
-            GameplayStatusHudRuntime.RefreshHealthText(characterCore.currentHp, characterCore.stats.maxHp);
+            // 触发受击动画
+            playerAnim.SetTrigger(hurtAnimParam);
         }
     }
 
@@ -92,5 +84,23 @@ public class PlayerTakeDamage : MonoBehaviour
         {
             characterCore.OnTakeDamage -= PlayHurtAnimation;
         }
+    }
+
+    private void RefreshHealthUi()
+    {
+        if (characterCore == null || characterCore.stats == null)
+        {
+            return;
+        }
+
+        healthTrans = GameplayStatusHudRuntime.EnsureHealthGauge(healthTrans);
+        if (healthTrans == null)
+        {
+            return;
+        }
+
+        healthTrans.SetMaxValue(characterCore.stats.maxHp);
+        healthTrans.SetValue(characterCore.currentHp);
+        GameplayStatusHudRuntime.RefreshHealthText(characterCore.currentHp, characterCore.stats.maxHp);
     }
 }

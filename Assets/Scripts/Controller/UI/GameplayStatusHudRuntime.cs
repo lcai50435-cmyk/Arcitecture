@@ -13,6 +13,16 @@ public static class GameplayStatusHudRuntime
     private const string HealthSliderName = "HealthSlider";
     private const string InkSliderName = "InkSlider";
     private const string StructureSliderName = "StructureSlider";
+    private const float ScenePanelWidth = 210f;
+    private const float ScenePanelHeight = 112f;
+    private const float SceneRowWidth = 200f;
+    private const float SceneRowHeight = 32f;
+    private const float SceneRowSpacing = 34f;
+    private const float SceneIconSize = 42f;
+    private const float SceneBarWidth = 156f;
+    private const float SceneBarHeight = 14f;
+    private const float SceneBarCenterX = 126f;
+    private const float SceneRowCenterY = -16f;
     private const string HeartIconAssetPath = "Assets/File/Prop/UIProp/Heart.png";
     private const string HealthTrackAssetPath = "Assets/File/Prop/UIProp/GrayHealth.png";
     private const string HealthFillAssetPath = "Assets/File/Prop/UIProp/RedHealth.png";
@@ -313,7 +323,7 @@ public static class GameplayStatusHudRuntime
 
     private static bool TryBindSceneShowPanel()
     {
-        RectTransform panel = FindSceneShowPanel() ?? CreateSceneShowPanel();
+        RectTransform panel = FindSceneShowPanel();
         if (panel == null)
         {
             return false;
@@ -330,15 +340,17 @@ public static class GameplayStatusHudRuntime
         rootRect = panel;
         usingSceneShowPanel = true;
         EnsureSceneShowPanelVisible(rootRect);
+        NormalizeSceneShowPanelLayout(rootRect, healthSlider, weaponSlider, structureSlider);
+        NormalizeTransparentSlicedImages();
         rootCanvasGroup = EnsureCanvasGroup(rootRect.gameObject, false);
         healthGauge = EnsureValueTrans(healthSlider);
         weaponGauge = EnsureValueTrans(weaponSlider);
         structureGauge = EnsureValueTrans(structureSlider);
         weaponFillGraphic = ResolveFillGraphic(weaponSlider);
         structureFillGraphic = ResolveFillGraphic(structureSlider);
-        healthValueText = null;
-        weaponValueText = null;
-        structureValueText = null;
+        healthValueText = FindSceneValueText(healthSlider);
+        weaponValueText = FindSceneValueText(weaponSlider);
+        structureValueText = FindSceneValueText(structureSlider);
         rootRect.gameObject.SetActive(!externallyHidden);
         return true;
     }
@@ -362,147 +374,6 @@ public static class GameplayStatusHudRuntime
         }
 
         return null;
-    }
-
-    private static RectTransform CreateSceneShowPanel()
-    {
-        Canvas canvas = FindGameplayCanvas() ?? CreateShowPanelCanvas();
-        if (canvas == null)
-        {
-            return null;
-        }
-
-        GameObject panelObject = CreateUIObject(ScenePanelName, canvas.transform);
-        RectTransform panel = panelObject.GetComponent<RectTransform>();
-        panel.anchorMin = new Vector2(0f, 1f);
-        panel.anchorMax = new Vector2(0f, 1f);
-        panel.pivot = new Vector2(0f, 1f);
-        panel.anchoredPosition = new Vector2(24f, -24f);
-        panel.sizeDelta = new Vector2(260f, 132f);
-        panel.localScale = Vector3.one;
-
-        Image panelImage = panelObject.AddComponent<Image>();
-        panelImage.color = new Color(1f, 1f, 1f, 0f);
-        panelImage.raycastTarget = false;
-
-        CreateShowPanelSlider(panel, HealthSliderName, HeartIconAssetPath, HealthTrackAssetPath, HealthFillAssetPath, new Vector2(0f, -4f), HealthFillColor);
-        CreateShowPanelSlider(panel, InkSliderName, null, InkTrackAssetPath, null, new Vector2(0f, -44f), InkFillColor);
-        CreateShowPanelSlider(panel, StructureSliderName, StructureIconAssetPath, StructureTrackAssetPath, null, new Vector2(0f, -84f), StructureFillColor);
-
-        return panel;
-    }
-
-    private static Canvas FindGameplayCanvas()
-    {
-        Canvas[] canvases = Object.FindObjectsOfType<Canvas>(true);
-        foreach (Canvas canvas in canvases)
-        {
-            if (canvas == null || canvas.renderMode != RenderMode.ScreenSpaceOverlay)
-            {
-                continue;
-            }
-
-            return canvas;
-        }
-
-        return null;
-    }
-
-    private static Canvas CreateShowPanelCanvas()
-    {
-        GameObject canvasObject = new GameObject("ShowPanelCanvas", typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
-        Canvas canvas = canvasObject.GetComponent<Canvas>();
-        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-        canvas.overrideSorting = true;
-        canvas.sortingOrder = 240;
-
-        CanvasScaler scaler = canvasObject.GetComponent<CanvasScaler>();
-        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-        scaler.referenceResolution = new Vector2(1920f, 1080f);
-        scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
-        scaler.matchWidthOrHeight = 0.5f;
-
-        GraphicRaycaster raycaster = canvasObject.GetComponent<GraphicRaycaster>();
-        raycaster.enabled = false;
-
-        RectTransform canvasRect = canvasObject.GetComponent<RectTransform>();
-        canvasRect.anchorMin = Vector2.zero;
-        canvasRect.anchorMax = Vector2.one;
-        canvasRect.offsetMin = Vector2.zero;
-        canvasRect.offsetMax = Vector2.zero;
-        canvasRect.localScale = Vector3.one;
-
-        return canvas;
-    }
-
-    private static void CreateShowPanelSlider(
-        Transform parent,
-        string sliderName,
-        string iconAssetPath,
-        string trackAssetPath,
-        string fillAssetPath,
-        Vector2 anchoredPosition,
-        Color fillColor)
-    {
-        GameObject rowObject = CreateUIObject(sliderName, parent);
-        RectTransform rowRect = rowObject.GetComponent<RectTransform>();
-        rowRect.anchorMin = new Vector2(0f, 1f);
-        rowRect.anchorMax = new Vector2(0f, 1f);
-        rowRect.pivot = new Vector2(0f, 1f);
-        rowRect.anchoredPosition = anchoredPosition;
-        rowRect.sizeDelta = new Vector2(236f, 32f);
-
-        CreateRowIcon(rowObject.transform, sliderName, iconAssetPath, fillColor);
-
-        GameObject barObject = CreateUIObject("Bar", rowObject.transform);
-        RectTransform barRect = barObject.GetComponent<RectTransform>();
-        barRect.anchorMin = new Vector2(0f, 0.5f);
-        barRect.anchorMax = new Vector2(0f, 0.5f);
-        barRect.pivot = new Vector2(0f, 0.5f);
-        barRect.anchoredPosition = new Vector2(34f, -1f);
-        barRect.sizeDelta = new Vector2(182f, 16f);
-
-        Image barBackground = barObject.AddComponent<Image>();
-        Sprite trackSprite = LoadHudSprite(trackAssetPath);
-        if (trackSprite != null)
-        {
-            barBackground.sprite = trackSprite;
-            barBackground.type = Image.Type.Simple;
-            barBackground.color = Color.white;
-            barBackground.raycastTarget = false;
-        }
-        else
-        {
-            ApplyPixelFrame(barBackground, sliderName + "_track", GaugeTrackColor, 64, 20, 5);
-        }
-
-        Slider slider = barObject.AddComponent<Slider>();
-        slider.direction = Slider.Direction.LeftToRight;
-        slider.minValue = 0f;
-        slider.maxValue = 100f;
-        slider.value = 100f;
-        slider.targetGraphic = barBackground;
-
-        GameObject fillArea = CreateUIObject("FillArea", barObject.transform);
-        RectTransform fillAreaRect = fillArea.GetComponent<RectTransform>();
-        fillAreaRect.anchorMin = Vector2.zero;
-        fillAreaRect.anchorMax = Vector2.one;
-        fillAreaRect.offsetMin = new Vector2(5f, 3f);
-        fillAreaRect.offsetMax = new Vector2(-5f, -3f);
-
-        GameObject fillObject = CreateUIObject("Fill", fillArea.transform);
-        RectTransform fillRect = fillObject.GetComponent<RectTransform>();
-        fillRect.anchorMin = Vector2.zero;
-        fillRect.anchorMax = Vector2.one;
-        fillRect.offsetMin = Vector2.zero;
-        fillRect.offsetMax = Vector2.zero;
-
-        Image fillImage = fillObject.AddComponent<Image>();
-        ApplyGaugeFill(fillImage, fillColor, fillAssetPath);
-        slider.fillRect = fillRect;
-
-        ValueTrans valueTrans = barObject.AddComponent<ValueTrans>();
-        valueTrans.slider = slider;
     }
 
     private static Slider FindChildSlider(Transform parent, string sliderName)
@@ -558,6 +429,16 @@ public static class GameplayStatusHudRuntime
             canvas.enabled = true;
             canvas.overrideSorting = true;
             canvas.sortingOrder = 240;
+
+            RectTransform canvasRect = canvas.GetComponent<RectTransform>();
+            if (canvasRect != null)
+            {
+                canvasRect.anchorMin = Vector2.zero;
+                canvasRect.anchorMax = Vector2.one;
+                canvasRect.offsetMin = Vector2.zero;
+                canvasRect.offsetMax = Vector2.zero;
+                canvasRect.localScale = Vector3.one;
+            }
         }
 
         Transform current = panel.transform;
@@ -570,6 +451,190 @@ public static class GameplayStatusHudRuntime
             }
 
             current = current.parent;
+        }
+    }
+
+    private static void NormalizeSceneShowPanelLayout(
+        RectTransform panel,
+        Slider healthSlider,
+        Slider weaponSlider,
+        Slider structureSlider)
+    {
+        if (panel == null)
+        {
+            return;
+        }
+
+        panel.anchorMin = new Vector2(0f, 1f);
+        panel.anchorMax = new Vector2(0f, 1f);
+        panel.pivot = new Vector2(0f, 1f);
+        panel.anchoredPosition = new Vector2(18f, -22f);
+        panel.sizeDelta = new Vector2(ScenePanelWidth, ScenePanelHeight);
+        panel.localScale = Vector3.one;
+        panel.SetAsLastSibling();
+
+        NormalizeSceneSlider(healthSlider, new Vector2(0f, 0f));
+        NormalizeSceneSlider(weaponSlider, new Vector2(0f, -SceneRowSpacing));
+        NormalizeSceneSlider(structureSlider, new Vector2(0f, -SceneRowSpacing * 2f));
+
+        Graphic[] graphics = panel.GetComponentsInChildren<Graphic>(true);
+        foreach (Graphic graphic in graphics)
+        {
+            if (graphic != null)
+            {
+                graphic.raycastTarget = false;
+            }
+        }
+    }
+
+    private static void NormalizeSceneSlider(Slider slider, Vector2 anchoredPosition)
+    {
+        if (slider == null)
+        {
+            return;
+        }
+
+        RectTransform rect = slider.GetComponent<RectTransform>();
+        if (rect != null)
+        {
+            rect.anchorMin = new Vector2(0f, 1f);
+            rect.anchorMax = new Vector2(0f, 1f);
+            rect.pivot = new Vector2(0f, 1f);
+            rect.anchoredPosition = anchoredPosition;
+            rect.sizeDelta = new Vector2(SceneRowWidth, SceneRowHeight);
+            rect.localScale = Vector3.one;
+        }
+
+        NormalizeSceneSliderChildren(slider);
+        slider.gameObject.SetActive(true);
+        slider.interactable = false;
+        slider.transition = Selectable.Transition.None;
+        if (slider.targetGraphic != null)
+        {
+            slider.targetGraphic.raycastTarget = false;
+        }
+    }
+
+    private static void NormalizeSceneSliderChildren(Slider slider)
+    {
+        RectTransform sliderRect = slider.GetComponent<RectTransform>();
+        if (sliderRect == null)
+        {
+            return;
+        }
+
+        foreach (RectTransform child in sliderRect.GetComponentsInChildren<RectTransform>(true))
+        {
+            if (child == null || child == sliderRect)
+            {
+                continue;
+            }
+
+            if (string.Equals(child.name, "Background", System.StringComparison.Ordinal)
+                || string.Equals(child.name, "Fill Area", System.StringComparison.Ordinal))
+            {
+                ApplySceneBarRect(child);
+                continue;
+            }
+
+            if (slider.fillRect != null && child == slider.fillRect)
+            {
+                ApplySceneFillRect(child);
+                continue;
+            }
+
+            if (child.GetComponent<TextMeshProUGUI>() != null)
+            {
+                ApplySceneNumberRect(child);
+                continue;
+            }
+
+            if (child.name.EndsWith("BackGround", System.StringComparison.Ordinal))
+            {
+                ApplySceneIconRect(child);
+            }
+        }
+    }
+
+    private static void ApplySceneBarRect(RectTransform rect)
+    {
+        rect.anchorMin = new Vector2(0f, 1f);
+        rect.anchorMax = new Vector2(0f, 1f);
+        rect.pivot = new Vector2(0.5f, 0.5f);
+        rect.anchoredPosition = new Vector2(SceneBarCenterX, SceneRowCenterY);
+        rect.sizeDelta = new Vector2(SceneBarWidth, SceneBarHeight);
+        rect.localScale = Vector3.one;
+    }
+
+    private static void ApplySceneFillRect(RectTransform rect)
+    {
+        rect.anchorMin = Vector2.zero;
+        rect.anchorMax = Vector2.one;
+        rect.pivot = new Vector2(0.5f, 0.5f);
+        rect.offsetMin = Vector2.zero;
+        rect.offsetMax = Vector2.zero;
+        rect.localScale = Vector3.one;
+    }
+
+    private static void ApplySceneNumberRect(RectTransform rect)
+    {
+        rect.anchorMin = new Vector2(0f, 1f);
+        rect.anchorMax = new Vector2(0f, 1f);
+        rect.pivot = new Vector2(0.5f, 0.5f);
+        rect.anchoredPosition = new Vector2(SceneBarCenterX, SceneRowCenterY);
+        rect.sizeDelta = new Vector2(SceneBarWidth, 20f);
+        rect.localScale = Vector3.one;
+    }
+
+    private static void ApplySceneIconRect(RectTransform rect)
+    {
+        rect.anchorMin = new Vector2(0f, 1f);
+        rect.anchorMax = new Vector2(0f, 1f);
+        rect.pivot = new Vector2(0.5f, 0.5f);
+        rect.anchoredPosition = new Vector2(21f, SceneRowCenterY);
+        rect.sizeDelta = new Vector2(SceneIconSize, SceneIconSize);
+        rect.localScale = Vector3.one;
+    }
+
+    private static TextMeshProUGUI FindSceneValueText(Slider slider)
+    {
+        if (slider == null)
+        {
+            return null;
+        }
+
+        TextMeshProUGUI[] texts = slider.GetComponentsInChildren<TextMeshProUGUI>(true);
+        foreach (TextMeshProUGUI text in texts)
+        {
+            if (text == null)
+            {
+                continue;
+            }
+
+            ApplySceneNumberRect(text.rectTransform);
+            text.fontSize = 10f;
+            text.alignment = TextAlignmentOptions.Center;
+            text.enableWordWrapping = false;
+            text.raycastTarget = false;
+            return text;
+        }
+
+        return null;
+    }
+
+    private static void NormalizeTransparentSlicedImages()
+    {
+        Image[] images = Object.FindObjectsOfType<Image>(true);
+        foreach (Image image in images)
+        {
+            if (image == null || image.type != Image.Type.Sliced || image.color.a > 0.001f)
+            {
+                continue;
+            }
+
+            image.type = Image.Type.Simple;
+            image.raycastTarget = false;
+            image.useSpriteMesh = false;
         }
     }
 
