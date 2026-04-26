@@ -277,7 +277,7 @@ public class BackpackSlot : MonoBehaviour, IPointerDownHandler, IPointerUpHandle
 public sealed class RuntimeBackpackHoverHud : MonoBehaviour
 {
     private const string CanvasName = "RuntimeBackpackHoverHudCanvas";
-    private const int SortingOrder = 286;
+    private const int SortingOrder = RuntimeModalStyle.ModalSortingOrder + 80;
     private const float PanelWidth = 320f;
     private const float PanelMinHeight = 132f;
     private const float MouseOffsetX = 26f;
@@ -300,7 +300,7 @@ public sealed class RuntimeBackpackHoverHud : MonoBehaviour
     private int capturedScreenWidth;
     private int capturedScreenHeight;
     private float nextBackdropRefreshAt;
-    private BackpackSlot currentOwner;
+    private MonoBehaviour currentOwner;
     private string cachedTitle;
     private string cachedDescription;
     private Sprite cachedIcon;
@@ -340,6 +340,11 @@ public sealed class RuntimeBackpackHoverHud : MonoBehaviour
 
     public void ShowOrUpdate(BackpackSlot owner, ArchitecturalCrystal crystal, Vector2 screenPosition)
     {
+        ShowOrUpdate(owner as MonoBehaviour, crystal, screenPosition);
+    }
+
+    public void ShowOrUpdate(MonoBehaviour owner, ArchitecturalCrystal crystal, Vector2 screenPosition)
+    {
         if (owner == null)
         {
             return;
@@ -369,6 +374,11 @@ public sealed class RuntimeBackpackHoverHud : MonoBehaviour
 
     public void HideForSlot(BackpackSlot owner)
     {
+        HideForOwner(owner);
+    }
+
+    public void HideForOwner(MonoBehaviour owner)
+    {
         if (owner == null || currentOwner != owner)
         {
             return;
@@ -391,6 +401,8 @@ public sealed class RuntimeBackpackHoverHud : MonoBehaviour
     {
         if (canvas != null)
         {
+            canvas.overrideSorting = true;
+            canvas.sortingOrder = SortingOrder;
             return;
         }
 
@@ -493,7 +505,9 @@ public sealed class RuntimeBackpackHoverHud : MonoBehaviour
                 : crystal.textDescription;
         }
 
-        Sprite resolvedIcon = crystal.backIcon != null ? crystal.backIcon : crystal.icon;
+        Sprite resolvedIcon = crystal.backIcon != null
+            ? crystal.backIcon
+            : (crystal.icon != null ? crystal.icon : RuntimeCrystalDropFactory.ResolveSprite(crystal));
         resolvedIcon = RuntimeSpriteDisplaySanitizer.GetDisplaySprite(resolvedIcon);
         bool contentChanged = cachedTitle != title
             || cachedDescription != description
