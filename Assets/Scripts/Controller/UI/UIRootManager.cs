@@ -942,7 +942,7 @@ public class UIRootManager : MonoBehaviour
 
         IllustratedUISceneLoader.Open(
             RuntimeModalOpenSource.None,
-            IllustratedHandbookPage.IllustratedHandbook,
+            IllustratedHandbookPage.PersonalInformation,
             null,
             interactTipUI != null ? interactTipUI.gameObject : null,
             ResolveRuntimePlayerObject());
