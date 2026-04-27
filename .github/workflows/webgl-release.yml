@@ -71,10 +71,21 @@ jobs:
             -arcitectureGitDescribe ${{ github.ref_name }}
 
       - name: Prepare Pages files
+        id: prepare_pages
         shell: bash
         run: |
           sudo chown -R "$(id -u):$(id -g)" Builds
-          touch Builds/WebGL/.nojekyll
+          pages_path="Builds/WebGL"
+          if [[ ! -f "${pages_path}/index.html" && -f "${pages_path}/WebGL/index.html" ]]; then
+            pages_path="${pages_path}/WebGL"
+          fi
+          if [[ ! -f "${pages_path}/index.html" ]]; then
+            echo "WebGL index.html not found under Builds/WebGL" >&2
+            find Builds -maxdepth 3 -type f | sort >&2
+            exit 1
+          fi
+          touch "${pages_path}/.nojekyll"
+          echo "path=${pages_path}" >> "${GITHUB_OUTPUT}"
 
       - name: Package WebGL artifact
         shell: bash
@@ -96,7 +107,7 @@ jobs:
       - name: Upload GitHub Pages artifact
         uses: actions/upload-pages-artifact@v4
         with:
-          path: Builds/WebGL
+          path: ${{ steps.prepare_pages.outputs.path }}
 
   deploy:
     name: Deploy GitHub Pages
