@@ -84,9 +84,9 @@ public sealed class NightLightingController : MonoBehaviour
     private static readonly Color DeadSceneLightColor = new Color(0.54f, 0.72f, 1f, 1f);
     private static readonly Vector3 GameplayPlayerLightOffset = new Vector3(0f, 0.14f, 0f);
     private static readonly Vector3 GameplayEnemyLightOffset = new Vector3(0f, 0.12f, 0f);
-    private static readonly Color ReadableOverlayTint = new Color(0.04f, 0.07f, 0.11f, 1f);
-    private static readonly Color ReadableCameraBackgroundNight = new Color(0.04f, 0.06f, 0.09f, 1f);
-    private static readonly Color ReadableCharacterShadowColor = new Color(0.03f, 0.04f, 0.06f, 0.32f);
+    private static readonly Color ReadableOverlayTint = new Color(0.025f, 0.045f, 0.08f, 1f);
+    private static readonly Color ReadableCameraBackgroundNight = new Color(0.018f, 0.028f, 0.048f, 1f);
+    private static readonly Color ReadableCharacterShadowColor = new Color(0.015f, 0.018f, 0.026f, 0.42f);
     private static readonly Vector3 ReadableCharacterShadowOffset = new Vector3(0.09f, -0.15f, 0f);
     private static readonly Vector3 ReadableCharacterShadowScale = new Vector3(1.02f, 0.36f, 1f);
 
@@ -94,23 +94,23 @@ public sealed class NightLightingController : MonoBehaviour
     {
         {
             MainSceneName,
-            CreateReadableSceneProfile(MainSceneName, false, 0.28f, 0.03f, 0.12f, 0.98f, 1.06f)
+            CreateReadableSceneProfile(MainSceneName, false, 0.36f, 0.07f, 0.18f, 0.88f, 1.02f)
         },
         {
             BaseSceneName,
-            CreateReadableSceneProfile(BaseSceneName, false, 0.30f, 0.05f, 0.14f, 1.00f, 1.08f)
+            CreateReadableSceneProfile(BaseSceneName, false, 0.38f, 0.08f, 0.20f, 0.90f, 1.02f)
         },
         {
             "GameScene",
-            CreateReadableSceneProfile("GameScene", true, 0f, 0.04f, 0.20f, 1.00f, 1.12f)
+            CreateReadableSceneProfile("GameScene", true, 0f, 0.07f, 0.30f, 0.88f, 1.04f)
         },
         {
             "GameScene_02",
-            CreateReadableSceneProfile("GameScene_02", true, 0f, 0.04f, 0.20f, 1.00f, 1.12f)
+            CreateReadableSceneProfile("GameScene_02", true, 0f, 0.07f, 0.30f, 0.88f, 1.04f)
         },
         {
             "GameScene_03",
-            CreateReadableSceneProfile("GameScene_03", true, 0f, 0.04f, 0.20f, 1.00f, 1.12f)
+            CreateReadableSceneProfile("GameScene_03", true, 0f, 0.07f, 0.30f, 0.88f, 1.04f)
         },
         {
             DeadSceneName,
@@ -119,11 +119,11 @@ public sealed class NightLightingController : MonoBehaviour
                 false,
                 0.82f,
                 new Color(0.02f, 0.04f, 0.08f, 1f),
-                0.14f,
-                0.30f,
-                new Color(0.01f, 0.02f, 0.04f, 1f),
-                1.04f,
-                1.16f,
+                0.18f,
+                0.38f,
+                new Color(0.006f, 0.012f, 0.026f, 1f),
+                0.90f,
+                1.08f,
                 ReadableCharacterShadowColor,
                 ReadableCharacterShadowOffset,
                 ReadableCharacterShadowScale)
@@ -1065,6 +1065,8 @@ public sealed class NightLightingController : MonoBehaviour
         string objectName = candidate.gameObject.name;
         return string.Equals(objectName, ProjectedShadowFollower.ShadowObjectName, StringComparison.Ordinal) ||
                string.Equals(objectName, NightLocalLightSource.VisualObjectName, StringComparison.Ordinal) ||
+               string.Equals(objectName, RuntimeWaterReflectionCaster.ShadowObjectName, StringComparison.Ordinal) ||
+               string.Equals(objectName, RuntimeWaterReflectionCaster.LegacyReflectionObjectName, StringComparison.Ordinal) ||
                string.Equals(objectName, OverlayObjectName, StringComparison.Ordinal);
     }
 

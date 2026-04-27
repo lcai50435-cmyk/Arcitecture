@@ -208,7 +208,7 @@ public sealed class ProjectedShadowFollower : MonoBehaviour
         return new Vector3(width, height, 1f);
     }
 
-    private static Sprite GetOrCreateEllipseShadowSprite()
+    internal static Sprite GetOrCreateEllipseShadowSprite()
     {
         if (sharedEllipseShadowSprite != null)
         {
