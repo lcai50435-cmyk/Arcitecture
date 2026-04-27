@@ -2,6 +2,7 @@ using System;
 using System.Reflection;
 using NUnit.Framework;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 public sealed class RuntimeFireflyAmbientEffectTests
 {
@@ -31,8 +32,82 @@ public sealed class RuntimeFireflyAmbientEffectTests
         Assert.IsNull(resolveProfile.Invoke(null, new object[] { "IllustratedUIScene" }));
     }
 
+    [Test]
+    public void GameplayProfileUsesStrongVisibleParticleScale()
+    {
+        Type effectType = ResolveEffectType();
+        MethodInfo resolveProfile = effectType.GetMethod("ResolveProfile", BindingFlags.Static | BindingFlags.NonPublic);
+        object profile = resolveProfile.Invoke(null, new object[] { "GameScene" });
+
+        Assert.IsNotNull(profile);
+        Assert.GreaterOrEqual(ReadFloat(profile, "minSize"), 0.12f);
+        Assert.GreaterOrEqual(ReadFloat(profile, "maxSize"), 0.28f);
+        Assert.GreaterOrEqual(ReadFloat(profile, "emissionRate"), 32f);
+        Assert.GreaterOrEqual(ReadInt(profile, "maxParticles"), 220);
+    }
+
+    [Test]
+    public void AdditiveIllustratedUiSceneKeepsActiveGameplayProfile()
+    {
+        Type effectType = ResolveEffectType();
+        MethodInfo resolveAmbientSceneName = effectType.GetMethod("ResolveAmbientSceneName", BindingFlags.Static | BindingFlags.NonPublic);
+
+        Assert.IsNotNull(resolveAmbientSceneName);
+        Assert.AreEqual(
+            "GameScene",
+            resolveAmbientSceneName.Invoke(null, new object[] { "IllustratedUIScene", LoadSceneMode.Additive, "GameScene" }));
+        Assert.AreEqual(
+            "IllustratedUIScene",
+            resolveAmbientSceneName.Invoke(null, new object[] { "IllustratedUIScene", LoadSceneMode.Single, "GameScene" }));
+    }
+
+    [Test]
+    public void ConfigureParticleSystemUsesMatchingVelocityCurveModes()
+    {
+        Type effectType = ResolveEffectType();
+        MethodInfo resolveProfile = effectType.GetMethod("ResolveProfile", BindingFlags.Static | BindingFlags.NonPublic);
+        MethodInfo ensureParticleSystem = effectType.GetMethod("EnsureParticleSystem", BindingFlags.Instance | BindingFlags.NonPublic);
+        MethodInfo configureParticleSystem = effectType.GetMethod("ConfigureParticleSystem", BindingFlags.Instance | BindingFlags.NonPublic);
+        MethodInfo resetStatics = effectType.GetMethod("ResetStatics", BindingFlags.Static | BindingFlags.NonPublic);
+        object profile = resolveProfile.Invoke(null, new object[] { "GameScene" });
+        GameObject effectObject = new GameObject("RuntimeFireflyAmbientEffectTest");
+
+        try
+        {
+            Component effect = effectObject.AddComponent(effectType);
+            ensureParticleSystem.Invoke(effect, Array.Empty<object>());
+            configureParticleSystem.Invoke(effect, new[] { profile });
+
+            ParticleSystem.VelocityOverLifetimeModule velocity = effectObject.GetComponent<ParticleSystem>().velocityOverLifetime;
+            Assert.AreEqual(velocity.x.mode, velocity.y.mode);
+            Assert.AreEqual(velocity.x.mode, velocity.z.mode);
+
+            ParticleSystem.MainModule main = effectObject.GetComponent<ParticleSystem>().main;
+            Assert.IsTrue(main.useUnscaledTime);
+        }
+        finally
+        {
+            UnityEngine.Object.DestroyImmediate(effectObject);
+            resetStatics.Invoke(null, Array.Empty<object>());
+        }
+    }
+
     private static Type ResolveEffectType()
     {
         return Type.GetType("RuntimeFireflyAmbientEffect, Assembly-CSharp");
+    }
+
+    private static float ReadFloat(object target, string fieldName)
+    {
+        return (float)target.GetType()
+            .GetField(fieldName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
+            .GetValue(target);
+    }
+
+    private static int ReadInt(object target, string fieldName)
+    {
+        return (int)target.GetType()
+            .GetField(fieldName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
+            .GetValue(target);
     }
 }

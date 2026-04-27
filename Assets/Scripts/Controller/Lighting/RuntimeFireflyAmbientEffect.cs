@@ -29,20 +29,20 @@ public sealed class RuntimeFireflyAmbientEffect : MonoBehaviour
         new Color(0.66f, 0.96f, 1f, 0.52f));
 
     private static readonly FireflyAmbientProfile GameplayProfile = new FireflyAmbientProfile(
-        52,
-        7f,
-        4.2f,
-        6.6f,
-        0.028f,
-        0.072f,
+        240,
+        36f,
+        5.2f,
+        8.0f,
+        0.12f,
+        0.32f,
         0.07f,
         0.22f,
         0.045f,
         0.16f,
         0.36f,
-        0.22f,
-        new Color(1f, 0.82f, 0.34f, 0.60f),
-        new Color(0.62f, 0.92f, 1f, 0.42f));
+        0.26f,
+        new Color(1f, 0.84f, 0.34f, 1f),
+        new Color(0.64f, 0.96f, 1f, 0.82f));
 
     private static RuntimeFireflyAmbientEffect instance;
     private static bool sceneHookRegistered;
@@ -98,7 +98,8 @@ public sealed class RuntimeFireflyAmbientEffect : MonoBehaviour
     private static void HandleSceneLoaded(Scene scene, LoadSceneMode mode)
     {
         RuntimeFireflyAmbientEffect effect = EnsureInstance();
-        effect.ApplyScene(scene.name);
+        string sceneName = ResolveAmbientSceneName(scene.name, mode, SceneManager.GetActiveScene().name);
+        effect.ApplyScene(sceneName);
     }
 
     private void Awake()
@@ -171,6 +172,13 @@ public sealed class RuntimeFireflyAmbientEffect : MonoBehaviour
 
     private void ApplyScene(string sceneName)
     {
+        if (string.Equals(activeSceneName, sceneName, StringComparison.Ordinal) && activeProfile != null)
+        {
+            EnsureParticleSystem();
+            ConfigureParticleSystem(activeProfile);
+            return;
+        }
+
         activeSceneName = sceneName;
         activeCamera = null;
         activeProfile = ResolveProfile(sceneName);
@@ -184,6 +192,16 @@ public sealed class RuntimeFireflyAmbientEffect : MonoBehaviour
         }
 
         ConfigureParticleSystem(activeProfile);
+    }
+
+    private static string ResolveAmbientSceneName(string loadedSceneName, LoadSceneMode mode, string activeSceneName)
+    {
+        if (mode == LoadSceneMode.Additive && ResolveProfile(activeSceneName) != null)
+        {
+            return activeSceneName;
+        }
+
+        return loadedSceneName;
     }
 
     private static FireflyAmbientProfile ResolveProfile(string sceneName)
@@ -229,6 +247,7 @@ public sealed class RuntimeFireflyAmbientEffect : MonoBehaviour
         main.loop = true;
         main.playOnAwake = false;
         main.prewarm = true;
+        main.useUnscaledTime = true;
         main.simulationSpace = ParticleSystemSimulationSpace.World;
         main.scalingMode = ParticleSystemScalingMode.Shape;
         main.maxParticles = profile.maxParticles;
@@ -251,7 +270,7 @@ public sealed class RuntimeFireflyAmbientEffect : MonoBehaviour
         velocity.space = ParticleSystemSimulationSpace.World;
         velocity.x = new ParticleSystem.MinMaxCurve(-profile.horizontalDrift, profile.horizontalDrift);
         velocity.y = new ParticleSystem.MinMaxCurve(profile.minVerticalDrift, profile.maxVerticalDrift);
-        velocity.z = 0f;
+        velocity.z = new ParticleSystem.MinMaxCurve(0f, 0f);
 
         ParticleSystem.NoiseModule noise = fireflySystem.noise;
         noise.enabled = true;
