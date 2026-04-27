@@ -100,6 +100,11 @@ public static class BuildingKnowledgeLibrary
 
     public static string Answer(string query, string sceneName, RuntimeProgressState runtimeState)
     {
+        if (BeaverQuoteLibrary.TryAnswerStructureQuestion(query, out string structureAnswer))
+        {
+            return structureAnswer;
+        }
+
         IReadOnlyList<BuildingKnowledgeEntry> accessible = GetAccessibleEntries(sceneName, runtimeState);
         if (accessible.Count == 0)
         {
@@ -125,6 +130,12 @@ public static class BuildingKnowledgeLibrary
     public static string GetAmbientFact(string sceneName, RuntimeProgressState runtimeState)
     {
         IReadOnlyList<BuildingKnowledgeEntry> accessible = GetAccessibleEntries(sceneName, runtimeState);
+        string quote = BeaverQuoteLibrary.GetAmbientQuote(sceneName, accessible.Count > 0);
+        if (!string.IsNullOrWhiteSpace(quote))
+        {
+            return quote;
+        }
+
         if (accessible.Count == 0)
         {
             return UnityEngine.Random.value > 0.5f
