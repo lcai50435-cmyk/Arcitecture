@@ -133,6 +133,7 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
 
     private ScrollRect sharedBookScrollRect;
     private RectTransform sharedBookContentRoot;
+    private IllustratedPhotoAlbumPageBinder scenePhotoAlbumBinder;
     private BackpackMananger subscribedBackpack;
     private bool initialized;
     private bool usesSceneAuthoredPages;
@@ -204,6 +205,7 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
 
             RefreshGeneratedPageContent();
             SetActiveGeneratedPage(resolvedPage);
+            RefreshSceneAuthoredPhotoAlbum(resolvedPage);
             UpdateSceneAuthoredBookmarkState(resolvedPage);
             ResetScrollPosition();
             return;
@@ -247,11 +249,13 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         }
 
         sceneBookmarkAnimations.Clear();
+        scenePhotoAlbumBinder?.Release();
         UnsubscribeBackpackInventoryEvents();
     }
 
     private void OnDestroy()
     {
+        scenePhotoAlbumBinder?.Release();
         UnsubscribeBackpackInventoryEvents();
     }
 
@@ -1890,6 +1894,33 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         UpdateTextPage(IllustratedHandbookPage.PhotoAlbum, BuildPhotoAlbumBody(), BuildPhotoAlbumFooter());
         UpdateTextPage(IllustratedHandbookPage.Mission, BuildMissionBody(), BuildMissionFooter());
         UpdateTextPage(IllustratedHandbookPage.Setting, BuildSettingBody(), BuildSettingFooter());
+    }
+
+    private void RefreshSceneAuthoredPhotoAlbum(IllustratedHandbookPage activePage)
+    {
+        if (scenePhotoAlbumBinder != null && activePage != IllustratedHandbookPage.PhotoAlbum)
+        {
+            scenePhotoAlbumBinder.Release();
+        }
+
+        if (!usesSceneAuthoredPages ||
+            activePage != IllustratedHandbookPage.PhotoAlbum ||
+            photoAlbumCanvas == null)
+        {
+            return;
+        }
+
+#if UNITY_WEBGL && !UNITY_EDITOR
+        return;
+#else
+        if (scenePhotoAlbumBinder == null)
+        {
+            scenePhotoAlbumBinder = new IllustratedPhotoAlbumPageBinder();
+        }
+
+        scenePhotoAlbumBinder.Bind(photoAlbumCanvas.transform as RectTransform);
+        scenePhotoAlbumBinder.Refresh();
+#endif
     }
 
     private void RefreshSceneAuthoredPersonalPortrait()
