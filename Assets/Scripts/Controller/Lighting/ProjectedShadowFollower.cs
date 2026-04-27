@@ -171,8 +171,8 @@ public sealed class ProjectedShadowFollower : MonoBehaviour
         shadowRenderer.flipX = false;
         shadowRenderer.flipY = false;
         shadowRenderer.color = shadowColor;
-        shadowRenderer.sortingLayerID = sourceRenderer.sortingLayerID;
-        shadowRenderer.sortingOrder = sourceRenderer.sortingOrder + sortingOrderOffset;
+        shadowRenderer.sortingLayerID = NightLightingVisualFactory.GetTopSortingLayerId();
+        shadowRenderer.sortingOrder = NightLightingController.ShadowSortingOrder + sortingOrderOffset;
 
         shadowRenderer.transform.localPosition = ResolveShadowLocalPosition();
         shadowRenderer.transform.localRotation = Quaternion.identity;

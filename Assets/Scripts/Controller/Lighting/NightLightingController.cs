@@ -71,7 +71,9 @@ public sealed class NightLightingController : MonoBehaviour
     private const string MainSceneName = "MainScene";
     private const string BaseSceneName = "NewBase";
     private const string DeadSceneName = "DeadScene";
-    private const int OverlaySortingOrder = 28000;
+    internal const int OverlaySortingOrder = 28000;
+    internal const int ShadowSortingOrder = OverlaySortingOrder + 20;
+    internal const int LocalLightSortingOrder = OverlaySortingOrder + 200;
     private const int InitialSceneBindingPassCount = 3;
     private const float InitialSceneBindingInterval = 0.25f;
     private const string ProfileResourcePath = "Lighting/NightLightingProfiles";
@@ -84,9 +86,9 @@ public sealed class NightLightingController : MonoBehaviour
     private static readonly Color DeadSceneLightColor = new Color(0.54f, 0.72f, 1f, 1f);
     private static readonly Vector3 GameplayPlayerLightOffset = new Vector3(0f, 0.14f, 0f);
     private static readonly Vector3 GameplayEnemyLightOffset = new Vector3(0f, 0.12f, 0f);
-    private static readonly Color ReadableOverlayTint = new Color(0.025f, 0.045f, 0.08f, 1f);
-    private static readonly Color ReadableCameraBackgroundNight = new Color(0.018f, 0.028f, 0.048f, 1f);
-    private static readonly Color ReadableCharacterShadowColor = new Color(0.015f, 0.018f, 0.026f, 0.42f);
+    private static readonly Color ReadableOverlayTint = new Color(0.006f, 0.012f, 0.026f, 1f);
+    private static readonly Color ReadableCameraBackgroundNight = new Color(0.004f, 0.008f, 0.018f, 1f);
+    private static readonly Color ReadableCharacterShadowColor = new Color(0.004f, 0.005f, 0.008f, 0.58f);
     private static readonly Vector3 ReadableCharacterShadowOffset = new Vector3(0.09f, -0.15f, 0f);
     private static readonly Vector3 ReadableCharacterShadowScale = new Vector3(1.02f, 0.36f, 1f);
 
@@ -94,23 +96,23 @@ public sealed class NightLightingController : MonoBehaviour
     {
         {
             MainSceneName,
-            CreateReadableSceneProfile(MainSceneName, false, 0.36f, 0.07f, 0.18f, 0.88f, 1.02f)
+            CreateReadableSceneProfile(MainSceneName, false, 0.52f, 0.18f, 0.36f, 0.82f, 1.00f)
         },
         {
             BaseSceneName,
-            CreateReadableSceneProfile(BaseSceneName, false, 0.38f, 0.08f, 0.20f, 0.90f, 1.02f)
+            CreateReadableSceneProfile(BaseSceneName, false, 0.55f, 0.20f, 0.40f, 0.84f, 1.00f)
         },
         {
             "GameScene",
-            CreateReadableSceneProfile("GameScene", true, 0f, 0.07f, 0.30f, 0.88f, 1.04f)
+            CreateReadableSceneProfile("GameScene", true, 0f, 0.16f, 0.58f, 0.82f, 1.02f)
         },
         {
             "GameScene_02",
-            CreateReadableSceneProfile("GameScene_02", true, 0f, 0.07f, 0.30f, 0.88f, 1.04f)
+            CreateReadableSceneProfile("GameScene_02", true, 0f, 0.16f, 0.58f, 0.82f, 1.02f)
         },
         {
             "GameScene_03",
-            CreateReadableSceneProfile("GameScene_03", true, 0f, 0.07f, 0.30f, 0.88f, 1.04f)
+            CreateReadableSceneProfile("GameScene_03", true, 0f, 0.16f, 0.58f, 0.82f, 1.02f)
         },
         {
             DeadSceneName,
@@ -118,12 +120,12 @@ public sealed class NightLightingController : MonoBehaviour
                 DeadSceneName,
                 false,
                 0.82f,
-                new Color(0.02f, 0.04f, 0.08f, 1f),
-                0.18f,
-                0.38f,
-                new Color(0.006f, 0.012f, 0.026f, 1f),
-                0.90f,
-                1.08f,
+                new Color(0.004f, 0.008f, 0.018f, 1f),
+                0.32f,
+                0.70f,
+                new Color(0.002f, 0.004f, 0.012f, 1f),
+                0.82f,
+                1.02f,
                 ReadableCharacterShadowColor,
                 ReadableCharacterShadowOffset,
                 ReadableCharacterShadowScale)

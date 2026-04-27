@@ -117,8 +117,8 @@ public sealed class RuntimeWaterReflectionCaster : MonoBehaviour
         shadowRenderer.flipX = false;
         shadowRenderer.flipY = false;
         shadowRenderer.color = ResolveShadowColor();
-        shadowRenderer.sortingLayerID = sourceRenderer.sortingLayerID;
-        shadowRenderer.sortingOrder = sourceRenderer.sortingOrder - 2;
+        shadowRenderer.sortingLayerID = NightLightingVisualFactory.GetTopSortingLayerId();
+        shadowRenderer.sortingOrder = NightLightingController.ShadowSortingOrder - 2;
     }
 
     private static Vector3 ResolveShadowScale(Sprite sourceSprite)

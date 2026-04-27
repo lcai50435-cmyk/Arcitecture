@@ -11,7 +11,6 @@ public sealed class NightLocalLightSource : MonoBehaviour
 {
     public const string VisualObjectName = "NightLocalLightVisual";
 
-    private const int BaseSortingOrder = 28200;
     private const int DefaultSourceSortingOffset = -1;
 
     [SerializeField] private Color lightColor = Color.white;
@@ -82,7 +81,7 @@ public sealed class NightLocalLightSource : MonoBehaviour
         lightRenderer.sprite = NightLightingVisualFactory.GetRadialGlowSprite();
         lightRenderer.sharedMaterial = NightLightingVisualFactory.GetAdditiveGlowMaterial();
         lightRenderer.sortingLayerID = NightLightingVisualFactory.GetTopSortingLayerId();
-        lightRenderer.sortingOrder = BaseSortingOrder;
+        lightRenderer.sortingOrder = NightLightingController.LocalLightSortingOrder;
     }
 
     private void UpdateVisual()
@@ -117,7 +116,7 @@ public sealed class NightLocalLightSource : MonoBehaviour
         if (sortingMode == NightLightSortingMode.AccentOverlay)
         {
             lightRenderer.sortingLayerID = NightLightingVisualFactory.GetTopSortingLayerId();
-            lightRenderer.sortingOrder = BaseSortingOrder;
+            lightRenderer.sortingOrder = NightLightingController.LocalLightSortingOrder;
             return;
         }
 
@@ -125,12 +124,12 @@ public sealed class NightLocalLightSource : MonoBehaviour
         if (source == null)
         {
             lightRenderer.sortingLayerID = NightLightingVisualFactory.GetTopSortingLayerId();
-            lightRenderer.sortingOrder = BaseSortingOrder;
+            lightRenderer.sortingOrder = NightLightingController.LocalLightSortingOrder;
             return;
         }
 
-        lightRenderer.sortingLayerID = source.sortingLayerID;
-        lightRenderer.sortingOrder = source.sortingOrder + sourceSortingOrderOffset;
+        lightRenderer.sortingLayerID = NightLightingVisualFactory.GetTopSortingLayerId();
+        lightRenderer.sortingOrder = NightLightingController.LocalLightSortingOrder + sourceSortingOrderOffset;
     }
 
     private SpriteRenderer ResolveSourceRenderer()
