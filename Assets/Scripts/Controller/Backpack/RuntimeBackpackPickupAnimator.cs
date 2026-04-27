@@ -292,7 +292,7 @@ public sealed class RuntimeBackpackPickupAnimator : MonoBehaviour
         scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
         scaler.referenceResolution = new Vector2(1920f, 1080f);
         scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
-        scaler.matchWidthOrHeight = 0.5f;
+        scaler.matchWidthOrHeight = 0f;
 
         GraphicRaycaster raycaster = GetComponent<GraphicRaycaster>();
         if (raycaster == null)

@@ -323,32 +323,13 @@ public class BackpackUI : MonoBehaviour
         screenPosition = default;
         slotSize = default;
 
-        BackpackSlot[] slots = FindObjectsOfType<BackpackSlot>(true);
-        for (int i = 0; i < slots.Length; i++)
-        {
-            BackpackSlot slot = slots[i];
-            if (slot != null &&
-                slot.slotIndex == slotIndex &&
-                slot.transform.IsChildOf(transform) &&
-                slot.TryGetScreenCenter(out screenPosition, out slotSize))
-            {
-                return true;
-            }
-        }
-
-        if (backPackGrid == null || slotIndex < 0 || slotIndex >= backPackGrid.Length)
+        RectTransform slotRect = ResolveCurrentRuntimeSlotRect(slotIndex);
+        if (slotRect == null)
         {
             return false;
         }
 
-        Image slotImage = backPackGrid[slotIndex];
-        if (slotImage == null)
-        {
-            return false;
-        }
-
-        RectTransform slotRect = slotImage.rectTransform;
-        Canvas parentCanvas = GetComponentInParent<Canvas>();
+        Canvas parentCanvas = slotRect.GetComponentInParent<Canvas>();
         Camera canvasCamera = parentCanvas != null && parentCanvas.renderMode != RenderMode.ScreenSpaceOverlay
             ? parentCanvas.worldCamera
             : null;
@@ -358,6 +339,36 @@ public class BackpackUI : MonoBehaviour
             slotRect.TransformPoint(slotRect.rect.center));
         slotSize = Vector2.Scale(slotRect.rect.size, slotRect.lossyScale);
         return true;
+    }
+
+    private RectTransform ResolveCurrentRuntimeSlotRect(int slotIndex)
+    {
+        if (slotIndex < 0 || slotIndex >= RuntimeSlotCount)
+        {
+            return null;
+        }
+
+        if (runtimeSlotRects != null &&
+            slotIndex < runtimeSlotRects.Length &&
+            IsUsableRuntimeSlotRect(runtimeSlotRects[slotIndex]))
+        {
+            return runtimeSlotRects[slotIndex];
+        }
+
+        if (backPackGrid == null || slotIndex >= backPackGrid.Length || backPackGrid[slotIndex] == null)
+        {
+            return null;
+        }
+
+        RectTransform fallbackRect = backPackGrid[slotIndex].rectTransform;
+        return IsUsableRuntimeSlotRect(fallbackRect) ? fallbackRect : null;
+    }
+
+    private bool IsUsableRuntimeSlotRect(RectTransform slotRect)
+    {
+        return slotRect != null &&
+               slotRect.gameObject.activeInHierarchy &&
+               IsBackpackOwnedTransform(slotRect);
     }
 
     private void ResolveBackpackManager()
