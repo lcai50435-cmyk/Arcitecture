@@ -22,6 +22,9 @@ public class BackpackUI : MonoBehaviour
     private const float RuntimeFallbackSurfaceBottom = 24f;
     private const float RuntimeFallbackItemPanelWidth = 550f;
     private const float RuntimeFallbackItemPanelHeight = 124f;
+    private const float RuntimeSceneAuthoredLayoutBottom = 64f;
+    private const float RuntimeSceneAuthoredLayoutWidth = 920f;
+    private const float RuntimeSceneAuthoredLayoutHeight = 220f;
     private const float RuntimeFallbackAttackPanelX = 459f;
     private const float RuntimeFallbackAttackPanelY = 65f;
     private const float RuntimeFallbackAttackPanelSize = 130f;
@@ -435,7 +438,6 @@ public class BackpackUI : MonoBehaviour
             return;
         }
 
-        runtimeLayoutRootRect = runtimeCanvasRoot;
         DisableStaleGeneratedSurface(runtimeCanvasRoot);
 
         RectTransform itemPanel = FindBackpackPanel(runtimeCanvasRoot, RuntimeItemPanelName);
@@ -449,6 +451,9 @@ public class BackpackUI : MonoBehaviour
         {
             attackPanel = CreateFallbackAttackPanel(runtimeCanvasRoot);
         }
+
+        runtimeLayoutRootRect = ResolveRuntimeLayoutRoot(runtimeCanvasRoot, itemPanel, attackPanel);
+        NormalizeSceneAuthoredRuntimeLayout(runtimeLayoutRootRect, runtimeCanvasRoot, itemPanel, attackPanel);
 
         runtimeAttackSlotRect = attackPanel;
         EnsureRuntimeAttackSlotBehaviour(attackPanel);
@@ -626,6 +631,120 @@ public class BackpackUI : MonoBehaviour
         }
 
         return nestedRect;
+    }
+
+    private static RectTransform ResolveRuntimeLayoutRoot(
+        RectTransform runtimeCanvasRoot,
+        RectTransform itemPanel,
+        RectTransform attackPanel)
+    {
+        if (runtimeCanvasRoot == null)
+        {
+            return null;
+        }
+
+        Transform itemParent = itemPanel != null ? itemPanel.parent : null;
+        Transform attackParent = attackPanel != null ? attackPanel.parent : null;
+        if (itemParent != null &&
+            itemParent == attackParent &&
+            itemParent != runtimeCanvasRoot &&
+            itemParent is RectTransform sharedParent)
+        {
+            sharedParent.gameObject.SetActive(true);
+            return sharedParent;
+        }
+
+        return runtimeCanvasRoot;
+    }
+
+    private static void NormalizeSceneAuthoredRuntimeLayout(
+        RectTransform layoutRoot,
+        RectTransform runtimeCanvasRoot,
+        RectTransform itemPanel,
+        RectTransform attackPanel)
+    {
+        if (layoutRoot == null || runtimeCanvasRoot == null || layoutRoot == runtimeCanvasRoot)
+        {
+            return;
+        }
+
+        layoutRoot.anchorMin = new Vector2(0.5f, 0f);
+        layoutRoot.anchorMax = new Vector2(0.5f, 0f);
+        layoutRoot.pivot = new Vector2(0.5f, 0f);
+        layoutRoot.anchoredPosition = new Vector2(0f, RuntimeSceneAuthoredLayoutBottom);
+        layoutRoot.sizeDelta = ResolveSceneAuthoredLayoutSize(itemPanel, attackPanel);
+        layoutRoot.localScale = Vector3.one;
+        layoutRoot.localRotation = Quaternion.identity;
+        layoutRoot.gameObject.SetActive(true);
+
+        NormalizeSceneAuthoredItemPanel(itemPanel);
+        NormalizeSceneAuthoredAttackPanel(attackPanel);
+    }
+
+    private static Vector2 ResolveSceneAuthoredLayoutSize(RectTransform itemPanel, RectTransform attackPanel)
+    {
+        float halfWidth = RuntimeSceneAuthoredLayoutWidth * 0.5f;
+        float height = RuntimeSceneAuthoredLayoutHeight;
+
+        ExpandLayoutBounds(itemPanel, ref halfWidth, ref height);
+        ExpandLayoutBounds(attackPanel, ref halfWidth, ref height);
+
+        return new Vector2(halfWidth * 2f, height);
+    }
+
+    private static void ExpandLayoutBounds(RectTransform rectTransform, ref float halfWidth, ref float height)
+    {
+        if (rectTransform == null)
+        {
+            return;
+        }
+
+        Vector2 size = ResolveRectSize(rectTransform);
+        Vector2 position = rectTransform.anchoredPosition;
+        Vector2 pivot = rectTransform.pivot;
+
+        float left = position.x - size.x * pivot.x;
+        float right = position.x + size.x * (1f - pivot.x);
+        float bottom = position.y - size.y * pivot.y;
+        float top = position.y + size.y * (1f - pivot.y);
+
+        halfWidth = Mathf.Max(halfWidth, Mathf.Abs(left), Mathf.Abs(right));
+        height = Mathf.Max(height, top, -bottom + RuntimeFallbackSurfaceBottom);
+    }
+
+    private static void NormalizeSceneAuthoredItemPanel(RectTransform itemPanel)
+    {
+        if (itemPanel == null)
+        {
+            return;
+        }
+
+        itemPanel.anchorMin = new Vector2(0.5f, 0f);
+        itemPanel.anchorMax = new Vector2(0.5f, 0f);
+        itemPanel.pivot = new Vector2(0.5f, 0f);
+        itemPanel.anchoredPosition = new Vector2(itemPanel.anchoredPosition.x, 0f);
+        itemPanel.localScale = Vector3.one;
+        itemPanel.localRotation = Quaternion.identity;
+        itemPanel.gameObject.SetActive(true);
+    }
+
+    private static void NormalizeSceneAuthoredAttackPanel(RectTransform attackPanel)
+    {
+        if (attackPanel == null)
+        {
+            return;
+        }
+
+        Vector2 size = ResolveRectSize(attackPanel);
+        attackPanel.anchorMin = new Vector2(0.5f, 0f);
+        attackPanel.anchorMax = new Vector2(0.5f, 0f);
+        attackPanel.pivot = new Vector2(0.5f, 0.5f);
+        attackPanel.anchoredPosition = new Vector2(
+            attackPanel.anchoredPosition.x,
+            Mathf.Max(attackPanel.anchoredPosition.y, size.y * 0.5f));
+        attackPanel.localScale = Vector3.one;
+        attackPanel.localRotation = Quaternion.identity;
+        attackPanel.gameObject.SetActive(true);
     }
 
     private static RectTransform FindRuntimeSlot(Transform itemPanel, int slotIndex)

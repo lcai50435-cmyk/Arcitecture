@@ -266,7 +266,9 @@ public class UIRootManager : MonoBehaviour
             handbookManager = FindObjectOfType<UIManager>(true);
         }
         baseHubUiController = FindObjectOfType<BaseHubUIController>(true);
-        dialogController = FindObjectOfType<Dialog>(true);
+        dialogController = isGameplayScene
+            ? Dialog.EnsureGameplayRuntimeInstance()
+            : Dialog.FindUsableInstance() ?? FindObjectOfType<Dialog>(true);
         detailedInformationController = isGameplayScene ? FindObjectOfType<DetailedInformationUI>(true) : null;
         submitPanelControllers = isGameplayScene ? FindObjectsOfType<SubmitSelectionPanelUI>(true) : Array.Empty<SubmitSelectionPanelUI>();
 
@@ -408,6 +410,7 @@ public class UIRootManager : MonoBehaviour
 
             if (modalShell != null)
             {
+                ConfigureBackdropClickHandler(type);
                 modalShell.Show(binding.CanvasGroup);
             }
 
@@ -426,6 +429,7 @@ public class UIRootManager : MonoBehaviour
 
         if (modalShell != null)
         {
+            ConfigureBackdropClickHandler(type);
             modalShell.Retarget(binding.CanvasGroup);
         }
     }
@@ -654,6 +658,7 @@ public class UIRootManager : MonoBehaviour
         RuntimeModalBinding binding = GetBinding(activeModalType);
         if (binding == null)
         {
+            modalShell?.SetBackdropClickHandler(null);
             modalShell?.Hide(immediate);
             ShowBackpack(immediate);
             RuntimeGameplayPauseController.ReleasePause(ModalPauseReason);
@@ -669,6 +674,7 @@ public class UIRootManager : MonoBehaviour
         activeModalType = RuntimeModalType.None;
         activeFlowGroup = RuntimeModalFlowGroup.None;
         activeFlowSource = RuntimeModalOpenSource.None;
+        modalShell?.SetBackdropClickHandler(null);
 
         Action finishClose = () =>
         {
@@ -705,6 +711,7 @@ public class UIRootManager : MonoBehaviour
 
         if (modalShell != null)
         {
+            modalShell.SetBackdropClickHandler(null);
             modalShell.Hide(true);
         }
     }
@@ -827,6 +834,8 @@ public class UIRootManager : MonoBehaviour
         {
             binding.CanvasGroup.gameObject.SetActive(false);
         }
+
+        NotifySubmitPanelHidden(binding.Type);
     }
 
     private void SetCanvasGroupVisible(CanvasGroup canvasGroup, bool active, bool deactivateWhenHidden = true)
@@ -997,6 +1006,20 @@ public class UIRootManager : MonoBehaviour
         return null;
     }
 
+    private void NotifySubmitPanelHidden(RuntimeModalType type)
+    {
+        if (!IsSubmitModalType(type))
+        {
+            return;
+        }
+
+        SubmitSelectionPanelUI panel = FindSubmitPanel(type);
+        if (panel != null)
+        {
+            panel.NotifyHiddenByRoot();
+        }
+    }
+
     private void ApplyGameplayPauseForModalFlow()
     {
         if (activeFlowGroup == RuntimeModalFlowGroup.None)
@@ -1005,6 +1028,19 @@ public class UIRootManager : MonoBehaviour
         }
 
         RuntimeGameplayPauseController.RequestPause(ModalPauseReason);
+    }
+
+    private void ConfigureBackdropClickHandler(RuntimeModalType modalType)
+    {
+        if (modalShell == null)
+        {
+            return;
+        }
+
+        modalShell.SetBackdropClickHandler(
+            modalType == RuntimeModalType.Dialog
+                ? () => CloseActiveModal()
+                : null);
     }
 
     private CanvasGroup ResolveSubmitCanvasGroup(int index)
@@ -1022,6 +1058,13 @@ public class UIRootManager : MonoBehaviour
 
         GameObject panelRoot = panel.panelRoot != null ? panel.panelRoot : panel.gameObject;
         return EnsureCanvasGroup(panelRoot);
+    }
+
+    private static bool IsSubmitModalType(RuntimeModalType type)
+    {
+        return type == RuntimeModalType.SubmitSelection1 ||
+               type == RuntimeModalType.SubmitSelection2 ||
+               type == RuntimeModalType.SubmitSelection3;
     }
 
     private static RuntimeModalFlowGroup GetFlowGroup(RuntimeModalType type)
