@@ -44,9 +44,10 @@ public class BaseHubInkAttack : MonoBehaviour
             return;
         }
 
-        WeaponAttackProfile profile = WeaponAttackProfile.FromWeaponType(PlayerLoadoutRuntime.CurrentWeaponType);
+        WeaponType effectiveWeaponType = RuntimeWeaponTypeResolver.ResolveEffectiveWeaponType(BackpackMananger.Instance);
+        WeaponAttackProfile profile = WeaponAttackProfile.FromWeaponType(effectiveWeaponType);
         InkAttackRuntimeConfig config = profile.ApplyToInkConfig(InkModifierRuntimeConfig.BuildFromBackpack(BackpackMananger.Instance));
-        cooldownTimer = profile.AttackInterval;
+        cooldownTimer = config.attackInterval;
         MusicManager.PlaySfx(SfxCueId.PlayerAttack);
 
         Vector2 direction = directionTracker != null ? directionTracker.LastDirection : Vector2.right;
@@ -105,7 +106,7 @@ public class BaseHubInkAttack : MonoBehaviour
 
             SpriteRenderer renderer = projectile.AddComponent<SpriteRenderer>();
             renderer.sprite = CreateProjectileSprite();
-            renderer.color = InkTypeCatalog.GetDisplayColor(PlayerLoadoutRuntime.CurrentWeaponType);
+            renderer.color = config.displayColor;
             renderer.sortingOrder = 8;
 
             Rigidbody2D body = projectile.AddComponent<Rigidbody2D>();

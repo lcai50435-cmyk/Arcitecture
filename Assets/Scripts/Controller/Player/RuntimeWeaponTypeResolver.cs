@@ -7,9 +7,13 @@ public static class RuntimeWeaponTypeResolver
 
     public static WeaponType ResolveEffectiveWeaponType(BackpackMananger backpack, WeaponType fallbackWeaponType)
     {
+        WeaponType baseWeaponType = PlayerLoadoutRuntime.TryGetDebugWeaponOverride(out WeaponType debugWeaponType)
+            ? debugWeaponType
+            : fallbackWeaponType;
+
         return TryGetActiveWeaponOverride(backpack, out _, out WeaponType overrideWeaponType, out _)
             ? overrideWeaponType
-            : fallbackWeaponType;
+            : baseWeaponType;
     }
 
     public static bool TryGetActiveWeaponOverride(
