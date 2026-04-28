@@ -11,7 +11,10 @@ public class Dialog : MonoBehaviour
     private const string GameplayPauseReason = "RuntimeDialog";
     private const string RuntimeDialogObjectName = "RuntimeDialogController";
     private const string RuntimeDialogPanelName = "RuntimeDialogPanel";
-    private const string RuntimeDialogPrefabPath = "Assets/Scripts/View/Prefab/CatagloueUI.prefab";
+    private const string RuntimeTextAreaResourcePath = "UI/TextArea";
+    private const string RuntimeDialogFontResourcePath = "UI/NotoSansSC-Black";
+    private const string RuntimeTextAreaSpritePath = "Assets/File/UIResources/TextArea.png";
+    private const string RuntimeDialogFontPath = "Assets/File/Fonts/NotoSansSC-Black.ttf";
     private const int RuntimeDialogSortingOrder = 12000;
     private const float DefaultRevealDurationPerWeight = 0.03f;
     private const float MinimumRevealDuration = 0.2f;
@@ -20,6 +23,7 @@ public class Dialog : MonoBehaviour
     private const float TextFloatDistance = 10f;
     private const float TextStartScaleFactor = 0.985f;
     private const float TextPopStrength = 0.018f;
+    private static readonly Vector4 RuntimeTextAreaBorder = new Vector4(18f, 18f, 18f, 18f);
 
     [Header("UI 组件")]
     public GameObject dialogPanel;
@@ -105,6 +109,11 @@ public class Dialog : MonoBehaviour
         }
 
         return CreateRuntimeInstance();
+    }
+
+    public static Dialog EnsureTopmostRuntimeInstance()
+    {
+        return EnsureGameplayRuntimeInstance();
     }
 
     private void Start()
@@ -397,13 +406,11 @@ public class Dialog : MonoBehaviour
 
     private static Dialog CreateRuntimeInstance()
     {
-#if UNITY_EDITOR
-        Dialog prefabDialog = CreateRuntimeInstanceFromPrefab();
-        if (prefabDialog != null)
+        Dialog assetDialog = CreateRuntimeInstanceFromProjectAssets();
+        if (assetDialog != null)
         {
-            return prefabDialog;
+            return assetDialog;
         }
-#endif
 
         GameObject controllerObject = new GameObject(RuntimeDialogObjectName);
         Dialog dialog = controllerObject.AddComponent<Dialog>();
@@ -474,147 +481,162 @@ public class Dialog : MonoBehaviour
         return dialog;
     }
 
-#if UNITY_EDITOR
-    private static Dialog CreateRuntimeInstanceFromPrefab()
+    private static Dialog CreateRuntimeInstanceFromProjectAssets()
     {
-        GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(RuntimeDialogPrefabPath);
-        if (prefab == null)
+        Sprite textAreaSprite = LoadRuntimeTextAreaSprite();
+        if (textAreaSprite == null)
         {
             return null;
         }
 
-        Transform sourceDialogCanvas = FindChildRecursive(prefab.transform, "DialogCanvas");
-        if (sourceDialogCanvas == null)
+        Font dialogFont = LoadRuntimeDialogFont();
+        Sprite panelSprite = CreateSlicedRuntimeSprite(textAreaSprite, RuntimeTextAreaBorder, "RuntimeDialogTextAreaPanelSprite");
+
+        GameObject controllerObject = new GameObject(RuntimeDialogObjectName);
+        Dialog dialog = controllerObject.AddComponent<Dialog>();
+
+        GameObject panelObject = new GameObject(
+            RuntimeDialogPanelName,
+            typeof(RectTransform),
+            typeof(Canvas),
+            typeof(CanvasScaler),
+            typeof(GraphicRaycaster),
+            typeof(CanvasGroup),
+            typeof(Image),
+            typeof(Button));
+        panelObject.transform.SetParent(controllerObject.transform, false);
+        StretchRect(panelObject.GetComponent<RectTransform>());
+
+        Canvas canvas = panelObject.GetComponent<Canvas>();
+        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        canvas.overrideSorting = true;
+        canvas.sortingOrder = RuntimeDialogSortingOrder;
+
+        CanvasScaler scaler = panelObject.GetComponent<CanvasScaler>();
+        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+        scaler.referenceResolution = new Vector2(1920f, 1080f);
+        scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
+        scaler.matchWidthOrHeight = 0.5f;
+
+        CanvasGroup group = panelObject.GetComponent<CanvasGroup>();
+        group.alpha = 0f;
+        group.interactable = false;
+        group.blocksRaycasts = false;
+
+        Image backdrop = panelObject.GetComponent<Image>();
+        backdrop.color = Color.clear;
+
+        Button backdropButton = panelObject.GetComponent<Button>();
+        backdropButton.transition = Selectable.Transition.None;
+
+        GameObject cardObject = new GameObject("RuntimeDialogTextArea", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+        cardObject.transform.SetParent(panelObject.transform, false);
+        RectTransform cardRect = cardObject.GetComponent<RectTransform>();
+        SetRect(cardRect, Vector2.zero, new Vector2(1800f, 640f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f));
+
+        Image cardImage = cardObject.GetComponent<Image>();
+        cardImage.sprite = panelSprite;
+        cardImage.type = Image.Type.Sliced;
+        cardImage.preserveAspect = false;
+        cardImage.color = new Color(0.03f, 0.03f, 0.025f, 0.78f);
+
+        GameObject textObject = new GameObject("Description", typeof(RectTransform), typeof(CanvasRenderer), typeof(Text));
+        textObject.transform.SetParent(cardObject.transform, false);
+        Text description = textObject.GetComponent<Text>();
+        if (dialogFont != null)
         {
-            return null;
+            description.font = dialogFont;
         }
 
-        GameObject instance = new GameObject("RuntimeDialogPrefabRoot");
-        instance.SetActive(false);
+        description.fontSize = 54;
+        description.lineSpacing = 1.08f;
+        description.color = new Color(1f, 0.96f, 0.88f, 1f);
+        description.alignment = TextAnchor.UpperLeft;
+        description.horizontalOverflow = HorizontalWrapMode.Wrap;
+        description.verticalOverflow = VerticalWrapMode.Truncate;
+        StretchRectWithOffsets(description.rectTransform, 96f, 82f, 420f, 150f);
 
-        GameObject dialogCanvasObject = Object.Instantiate(sourceDialogCanvas.gameObject, instance.transform, false);
-        dialogCanvasObject.name = "DialogCanvas";
+        Button closeButton = CreateRuntimeButton(cardObject.transform);
+        RectTransform closeRect = closeButton.GetComponent<RectTransform>();
+        SetRect(closeRect, new Vector2(-104f, 76f), new Vector2(220f, 86f), new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(1f, 0f));
 
-        Dialog dialog = dialogCanvasObject.GetComponentInChildren<Dialog>(true);
-        if (dialog == null || dialog.dialogPanel == null || dialog.descriptionText == null)
+        Image closeImage = closeButton.GetComponent<Image>();
+        if (closeImage != null)
         {
-            DestroyRuntimeCreatedObject(instance);
-            return null;
+            closeImage.sprite = panelSprite;
+            closeImage.type = Image.Type.Sliced;
+            closeImage.preserveAspect = false;
+            closeImage.color = new Color(0.58f, 0.39f, 0.18f, 0.96f);
         }
 
-        dialog.gameObject.name = RuntimeDialogObjectName;
-        dialogCanvasObject.SetActive(true);
-        dialog.dialogPanel.SetActive(false);
-        ConfigureRuntimeDialogCanvas(dialogCanvasObject.transform);
+        Text closeLabel = closeButton.GetComponentInChildren<Text>();
+        if (closeLabel != null)
+        {
+            if (dialogFont != null)
+            {
+                closeLabel.font = dialogFont;
+            }
 
-        dialog.backdropCloseButton = EnsureRuntimeBackdropButton(dialogCanvasObject.transform, dialog.dialogPanel.transform);
+            closeLabel.fontSize = 44;
+            closeLabel.color = new Color(1f, 0.96f, 0.88f, 1f);
+        }
+
+        dialog.dialogPanel = panelObject;
+        dialog.descriptionText = description;
+        dialog.clickCloseButton = closeButton;
+        dialog.backdropCloseButton = backdropButton;
         dialog.uiToHide = new GameObject[0];
+        panelObject.SetActive(false);
         dialog.InitializeLifecycle(false);
-        instance.SetActive(true);
         return dialog;
     }
 
-    private static void DestroyRuntimeCreatedObject(GameObject instance)
+    private static Sprite LoadRuntimeTextAreaSprite()
     {
-        if (instance == null)
+        Sprite sprite = Resources.Load<Sprite>(RuntimeTextAreaResourcePath);
+#if UNITY_EDITOR
+        if (sprite == null)
         {
-            return;
+            sprite = AssetDatabase.LoadAssetAtPath<Sprite>(RuntimeTextAreaSpritePath);
         }
-
-        if (Application.isPlaying)
-        {
-            Object.Destroy(instance);
-        }
-        else
-        {
-            Object.DestroyImmediate(instance);
-        }
-    }
 #endif
 
-    private static Transform FindChildRecursive(Transform root, string childName)
-    {
-        if (root == null)
-        {
-            return null;
-        }
-
-        for (int i = 0; i < root.childCount; i++)
-        {
-            Transform child = root.GetChild(i);
-            if (child.name == childName)
-            {
-                return child;
-            }
-
-            Transform found = FindChildRecursive(child, childName);
-            if (found != null)
-            {
-                return found;
-            }
-        }
-
-        return null;
+        return sprite;
     }
 
-    private static void ConfigureRuntimeDialogCanvas(Transform dialogCanvas)
+    private static Sprite CreateSlicedRuntimeSprite(Sprite source, Vector4 border, string spriteName)
     {
-        Canvas canvas = dialogCanvas.GetComponent<Canvas>();
-        if (canvas != null)
+        if (source == null || source.texture == null)
         {
-            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            canvas.overrideSorting = true;
-            canvas.sortingOrder = RuntimeDialogSortingOrder;
+            return source;
         }
 
-        CanvasScaler scaler = dialogCanvas.GetComponent<CanvasScaler>();
-        if (scaler != null)
-        {
-            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            scaler.referenceResolution = new Vector2(1920f, 1080f);
-            scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
-            scaler.matchWidthOrHeight = 0.5f;
-        }
+        source.texture.filterMode = FilterMode.Point;
+        source.texture.wrapMode = TextureWrapMode.Clamp;
 
-        if (dialogCanvas.GetComponent<GraphicRaycaster>() == null)
-        {
-            dialogCanvas.gameObject.AddComponent<GraphicRaycaster>();
-        }
+        Sprite sprite = Sprite.Create(
+            source.texture,
+            source.rect,
+            source.pivot,
+            source.pixelsPerUnit,
+            0u,
+            SpriteMeshType.FullRect,
+            border);
+        sprite.name = spriteName;
+        return sprite;
     }
 
-    private static Button EnsureRuntimeBackdropButton(Transform dialogCanvas, Transform dialogPanel)
+    private static Font LoadRuntimeDialogFont()
     {
-        Transform existing = dialogCanvas.Find("RuntimeDialogBackdrop");
-        if (existing != null)
+        Font font = Resources.Load<Font>(RuntimeDialogFontResourcePath);
+#if UNITY_EDITOR
+        if (font == null)
         {
-            return existing.GetComponent<Button>();
+            font = AssetDatabase.LoadAssetAtPath<Font>(RuntimeDialogFontPath);
         }
+#endif
 
-        GameObject backdropObject = new GameObject(
-            "RuntimeDialogBackdrop",
-            typeof(RectTransform),
-            typeof(CanvasRenderer),
-            typeof(Image),
-            typeof(Button));
-        backdropObject.transform.SetParent(dialogCanvas, false);
-        backdropObject.transform.SetAsFirstSibling();
-
-        RectTransform backdropRect = backdropObject.GetComponent<RectTransform>();
-        StretchRect(backdropRect);
-
-        Image backdropImage = backdropObject.GetComponent<Image>();
-        backdropImage.color = Color.clear;
-        backdropImage.raycastTarget = true;
-
-        Button backdropButton = backdropObject.GetComponent<Button>();
-        backdropButton.transition = Selectable.Transition.None;
-
-        if (dialogPanel != null)
-        {
-            dialogPanel.SetAsLastSibling();
-        }
-
-        return backdropButton;
+        return font;
     }
 
     private void ShowRuntimeDialogPanelDirectly()

@@ -137,7 +137,7 @@ public class PlayerGetArchitectural : MonoBehaviour
             return;
         }
 
-        Dialog dialog = FindObjectOfType<Dialog>(true);
+        Dialog dialog = Dialog.EnsureTopmostRuntimeInstance();
         if (dialog == null)
         {
             return;

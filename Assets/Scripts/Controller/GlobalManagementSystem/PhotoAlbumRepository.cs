@@ -28,8 +28,35 @@ public static class PhotoAlbumRepository
     private const string AlbumDirectoryName = "PhotoAlbum";
     private const string IndexFileName = "album_index.json";
 
-    public static string AlbumDirectoryPath => Path.Combine(Application.persistentDataPath, AlbumDirectoryName);
+#if UNITY_INCLUDE_TESTS
+    private static string albumDirectoryPathOverride;
+#endif
+
+    public static string AlbumDirectoryPath
+    {
+        get
+        {
+#if UNITY_INCLUDE_TESTS
+            if (!string.IsNullOrWhiteSpace(albumDirectoryPathOverride))
+            {
+                return albumDirectoryPathOverride;
+            }
+#endif
+
+            return Path.Combine(Application.persistentDataPath, AlbumDirectoryName);
+        }
+    }
+
     public static string IndexPath => Path.Combine(AlbumDirectoryPath, IndexFileName);
+
+#if UNITY_INCLUDE_TESTS
+    public static IDisposable UseAlbumDirectoryForTests(string albumDirectoryPath)
+    {
+        string previousPath = albumDirectoryPathOverride;
+        albumDirectoryPathOverride = albumDirectoryPath;
+        return new AlbumDirectoryOverrideScope(previousPath);
+    }
+#endif
 
     public static bool HasEntries()
     {
@@ -158,6 +185,47 @@ public static class PhotoAlbumRepository
         }
     }
 
+    public static bool DeleteEntry(PhotoAlbumEntry entry)
+    {
+        if (entry == null ||
+            (string.IsNullOrWhiteSpace(entry.id) && string.IsNullOrWhiteSpace(entry.fileName)))
+        {
+            return false;
+        }
+
+        try
+        {
+            List<PhotoAlbumEntry> existingEntries = new List<PhotoAlbumEntry>(LoadEntries());
+            bool removed = false;
+
+            for (int i = existingEntries.Count - 1; i >= 0; i--)
+            {
+                PhotoAlbumEntry existingEntry = existingEntries[i];
+                if (!IsSameEntry(existingEntry, entry))
+                {
+                    continue;
+                }
+
+                DeletePhotoFile(existingEntry);
+                existingEntries.RemoveAt(i);
+                removed = true;
+            }
+
+            if (!removed)
+            {
+                return false;
+            }
+
+            WriteSaveData(existingEntries);
+            return true;
+        }
+        catch (Exception exception)
+        {
+            Debug.LogWarning($"删除留念截图失败：{exception.Message}");
+            return false;
+        }
+    }
+
     public static Texture2D LoadTexture(PhotoAlbumEntry entry)
     {
         if (entry == null || string.IsNullOrWhiteSpace(entry.fileName))
@@ -220,6 +288,36 @@ public static class PhotoAlbumRepository
         {
             Debug.LogWarning($"清空相册失败：{exception.Message}");
         }
+    }
+
+    private static bool IsSameEntry(PhotoAlbumEntry left, PhotoAlbumEntry right)
+    {
+        if (left == null || right == null)
+        {
+            return false;
+        }
+
+        if (!string.IsNullOrWhiteSpace(left.id) &&
+            !string.IsNullOrWhiteSpace(right.id) &&
+            string.Equals(left.id, right.id, StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        return !string.IsNullOrWhiteSpace(left.fileName) &&
+               !string.IsNullOrWhiteSpace(right.fileName) &&
+               string.Equals(left.fileName, right.fileName, StringComparison.Ordinal);
+    }
+
+    private static void DeletePhotoFile(PhotoAlbumEntry entry)
+    {
+        string photoPath = GetPhotoPath(entry);
+        if (!File.Exists(photoPath))
+        {
+            return;
+        }
+
+        File.Delete(photoPath);
     }
 
     private static void EnsureAlbumDirectory()
@@ -300,4 +398,28 @@ public static class PhotoAlbumRepository
                 left != null ? left.savedAtUtc : string.Empty,
                 StringComparison.Ordinal));
     }
+
+#if UNITY_INCLUDE_TESTS
+    private sealed class AlbumDirectoryOverrideScope : IDisposable
+    {
+        private readonly string previousPath;
+        private bool disposed;
+
+        public AlbumDirectoryOverrideScope(string previousPath)
+        {
+            this.previousPath = previousPath;
+        }
+
+        public void Dispose()
+        {
+            if (disposed)
+            {
+                return;
+            }
+
+            albumDirectoryPathOverride = previousPath;
+            disposed = true;
+        }
+    }
+#endif
 }

@@ -12,9 +12,12 @@ public sealed class IllustratedPhotoAlbumPageBinder
     private const string RuntimeTextureName = "RuntimePhotoTexture";
     private const string RuntimePreviousButtonName = "RuntimePhotoAlbumPreviousPage";
     private const string RuntimeNextButtonName = "RuntimePhotoAlbumNextPage";
+    private const string RuntimeDeleteButtonName = "RuntimePhotoAlbumDeleteSelected";
+    private const float DeleteButtonShareGap = 8f;
 
     private readonly Func<IReadOnlyList<PhotoAlbumEntry>> entryLoader;
     private readonly Func<PhotoAlbumEntry, Texture2D> textureLoader;
+    private readonly Func<PhotoAlbumEntry, bool> entryDeleter;
     private readonly bool destroyLoadedTextures;
     private readonly List<PhotoAlbumEntry> entries = new List<PhotoAlbumEntry>();
     private readonly List<RectTransform> slotRects = new List<RectTransform>();
@@ -31,11 +34,12 @@ public sealed class IllustratedPhotoAlbumPageBinder
     private TMP_Text pageNumberText;
     private Button previousPageButton;
     private Button nextPageButton;
+    private Button deleteSelectedButton;
     private int currentPageIndex;
     private int selectedEntryIndex = -1;
 
     public IllustratedPhotoAlbumPageBinder()
-        : this(PhotoAlbumRepository.LoadEntries, PhotoAlbumRepository.LoadTexture, true)
+        : this(PhotoAlbumRepository.LoadEntries, PhotoAlbumRepository.LoadTexture, PhotoAlbumRepository.DeleteEntry, true)
     {
     }
 
@@ -43,9 +47,19 @@ public sealed class IllustratedPhotoAlbumPageBinder
         Func<IReadOnlyList<PhotoAlbumEntry>> entryLoader,
         Func<PhotoAlbumEntry, Texture2D> textureLoader,
         bool destroyLoadedTextures)
+        : this(entryLoader, textureLoader, PhotoAlbumRepository.DeleteEntry, destroyLoadedTextures)
+    {
+    }
+
+    public IllustratedPhotoAlbumPageBinder(
+        Func<IReadOnlyList<PhotoAlbumEntry>> entryLoader,
+        Func<PhotoAlbumEntry, Texture2D> textureLoader,
+        Func<PhotoAlbumEntry, bool> entryDeleter,
+        bool destroyLoadedTextures)
     {
         this.entryLoader = entryLoader ?? PhotoAlbumRepository.LoadEntries;
         this.textureLoader = textureLoader ?? PhotoAlbumRepository.LoadTexture;
+        this.entryDeleter = entryDeleter ?? PhotoAlbumRepository.DeleteEntry;
         this.destroyLoadedTextures = destroyLoadedTextures;
     }
 
@@ -89,8 +103,11 @@ public sealed class IllustratedPhotoAlbumPageBinder
         pageNumberText = null;
         previousPageButton = null;
         nextPageButton = null;
+        deleteSelectedButton = null;
         slotRects.Clear();
         slotImages.Clear();
+        currentPageIndex = 0;
+        selectedEntryIndex = -1;
     }
 
     private void ResolveTargets()
@@ -123,6 +140,7 @@ public sealed class IllustratedPhotoAlbumPageBinder
         unlockText = FindTextContaining(root, "解锁条件");
         pageNumberText = FindTextByName(root, "PageNumber");
         EnsurePagingButtons();
+        EnsureDeleteSelectedButton(previewTarget as RectTransform);
     }
 
     private void LoadEntries()
@@ -230,6 +248,11 @@ public sealed class IllustratedPhotoAlbumPageBinder
         {
             nextPageButton.interactable = entries.Count > 0 && currentPageIndex < pageCount - 1;
         }
+
+        if (deleteSelectedButton != null)
+        {
+            deleteSelectedButton.interactable = selectedEntryIndex >= 0 && selectedEntryIndex < entries.Count;
+        }
     }
 
     private void RefreshSummaryCounters()
@@ -300,6 +323,29 @@ public sealed class IllustratedPhotoAlbumPageBinder
 
         currentPageIndex++;
         selectedEntryIndex = currentPageIndex * EntriesPerPage;
+        Refresh();
+    }
+
+    private void DeleteSelectedEntry()
+    {
+        if (selectedEntryIndex < 0 || selectedEntryIndex >= entries.Count)
+        {
+            return;
+        }
+
+        int deletedIndex = selectedEntryIndex;
+        if (!entryDeleter(entries[selectedEntryIndex]))
+        {
+            return;
+        }
+
+        int expectedCount = Mathf.Max(0, entries.Count - 1);
+        selectedEntryIndex = expectedCount == 0
+            ? -1
+            : Mathf.Clamp(deletedIndex, 0, expectedCount - 1);
+        currentPageIndex = selectedEntryIndex < 0
+            ? 0
+            : selectedEntryIndex / EntriesPerPage;
         Refresh();
     }
 
@@ -389,6 +435,51 @@ public sealed class IllustratedPhotoAlbumPageBinder
         nextPageButton.onClick.AddListener(SelectNextPage);
     }
 
+    private void EnsureDeleteSelectedButton(RectTransform previewTarget)
+    {
+        if (root == null)
+        {
+            return;
+        }
+
+        RectTransform shareButtonRect = FindTransformByName(root, "ShareButton") as RectTransform;
+        RectTransform referenceRect = shareButtonRect != null
+            ? shareButtonRect
+            : previewTarget != null
+                ? previewTarget
+                : pageNumberText != null
+                    ? pageNumberText.rectTransform
+                    : root;
+        Transform parent = referenceRect.parent != null ? referenceRect.parent : root;
+        Vector2 referenceSize = GetRectSize(referenceRect);
+        Vector2 deleteButtonSize = shareButtonRect != null
+            ? referenceSize
+            : new Vector2(148f, 44f);
+        Vector2 position = shareButtonRect != null
+            ? referenceRect.anchoredPosition + new Vector2(-deleteButtonSize.x - DeleteButtonShareGap, 0f)
+            : referenceRect.anchoredPosition + new Vector2(
+                Mathf.Min(110f, referenceSize.x * 0.34f),
+                -referenceSize.y * 0.64f);
+        string deleteLabel = shareButtonRect != null ? "删" : "删除选中";
+
+        deleteSelectedButton = EnsureTextButton(
+            parent,
+            RuntimeDeleteButtonName,
+            deleteLabel,
+            referenceRect,
+            position,
+            deleteButtonSize,
+            new Color(0.55f, 0.18f, 0.14f, 0.94f));
+        TextMeshProUGUI buttonText = deleteSelectedButton.GetComponentInChildren<TextMeshProUGUI>(true);
+        if (buttonText != null && titleText != null && titleText.font != null)
+        {
+            buttonText.font = titleText.font;
+        }
+
+        deleteSelectedButton.onClick.RemoveAllListeners();
+        deleteSelectedButton.onClick.AddListener(DeleteSelectedEntry);
+    }
+
     private static Button EnsurePagingButton(
         Transform parent,
         string name,
@@ -415,6 +506,63 @@ public sealed class IllustratedPhotoAlbumPageBinder
 
         Button button = buttonObject.GetComponent<Button>();
         button.targetGraphic = image;
+        return button;
+    }
+
+    private static Button EnsureTextButton(
+        Transform parent,
+        string name,
+        string label,
+        RectTransform referenceRect,
+        Vector2 anchoredPosition,
+        Vector2 size,
+        Color color)
+    {
+        Transform existing = parent != null ? parent.Find(name) : null;
+        GameObject buttonObject = existing != null
+            ? existing.gameObject
+            : new GameObject(name, typeof(RectTransform), typeof(Image), typeof(Button));
+        RectTransform buttonRect = buttonObject.GetComponent<RectTransform>();
+        buttonRect.SetParent(parent, false);
+        buttonRect.anchorMin = referenceRect.anchorMin;
+        buttonRect.anchorMax = referenceRect.anchorMax;
+        buttonRect.pivot = referenceRect.pivot;
+        buttonRect.anchoredPosition = anchoredPosition;
+        buttonRect.sizeDelta = size;
+        buttonRect.localScale = Vector3.one;
+        buttonRect.SetAsLastSibling();
+
+        Image image = buttonObject.GetComponent<Image>();
+        image.color = color;
+        image.raycastTarget = true;
+
+        Button button = buttonObject.GetComponent<Button>();
+        button.targetGraphic = image;
+
+        Transform textTransform = buttonObject.transform.Find("Text");
+        GameObject textObject = textTransform != null
+            ? textTransform.gameObject
+            : new GameObject("Text", typeof(RectTransform), typeof(TextMeshProUGUI));
+        RectTransform textRect = textObject.GetComponent<RectTransform>();
+        textRect.SetParent(buttonObject.transform, false);
+        textRect.anchorMin = Vector2.zero;
+        textRect.anchorMax = Vector2.one;
+        textRect.offsetMin = Vector2.zero;
+        textRect.offsetMax = Vector2.zero;
+        textRect.localScale = Vector3.one;
+
+        TextMeshProUGUI text = textObject.GetComponent<TextMeshProUGUI>();
+        if (text == null)
+        {
+            text = textObject.AddComponent<TextMeshProUGUI>();
+        }
+
+        text.text = label;
+        text.fontSize = Mathf.Min(21f, Mathf.Max(8f, size.y * 0.72f));
+        text.color = Color.white;
+        text.alignment = TextAlignmentOptions.Center;
+        text.enableWordWrapping = false;
+        text.raycastTarget = false;
         return button;
     }
 
@@ -538,16 +686,17 @@ public sealed class IllustratedPhotoAlbumPageBinder
         }
 
         List<RectTransform> candidates = new List<RectTransform>();
-        for (int i = 0; i < rightPanel.childCount; i++)
+        RectTransform[] descendants = rightPanel.GetComponentsInChildren<RectTransform>(true);
+        for (int i = 0; i < descendants.Length; i++)
         {
-            Transform child = rightPanel.GetChild(i);
-            RectTransform rect = child as RectTransform;
-            Image image = child.GetComponent<Image>();
+            RectTransform rect = descendants[i];
+            Image image = rect != null ? rect.GetComponent<Image>() : null;
             if (rect == null ||
+                rect == rightPanel ||
                 image == null ||
                 !image.enabled ||
                 image.color.a < 0.2f ||
-                !TryGetSceneSlotOrder(child.name, out _))
+                !TryGetSceneSlotOrder(rect.name, out _))
             {
                 continue;
             }
@@ -635,6 +784,7 @@ public sealed class IllustratedPhotoAlbumPageBinder
                 name.Contains("Setting") ||
                 name.Contains("ShareButton") ||
                 name.Contains("PageNumber") ||
+                name.Contains("RuntimePhotoAlbum") ||
                 name.Contains("PhotoPos") ||
                 name == "Photo" ||
                 name == "BackGround" ||

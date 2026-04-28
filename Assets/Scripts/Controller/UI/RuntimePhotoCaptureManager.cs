@@ -91,8 +91,20 @@ public sealed class RuntimePhotoCaptureManager : MonoBehaviour
         RuntimePhotoCaptureManager manager = EnsureInstance();
         if (manager != null)
         {
-            manager.PrepareForScene(scene.name);
+            manager.PrepareForScene(ResolvePreparedSceneName(scene.name, mode, SceneManager.GetActiveScene().name));
         }
+    }
+
+    private static string ResolvePreparedSceneName(string loadedSceneName, LoadSceneMode mode, string activeSceneName)
+    {
+        if (mode == LoadSceneMode.Additive &&
+            !GameplayStageCatalog.IsGameplayScene(loadedSceneName) &&
+            !string.IsNullOrWhiteSpace(activeSceneName))
+        {
+            return activeSceneName;
+        }
+
+        return loadedSceneName;
     }
 
     public static RuntimePhotoCaptureManager EnsureInstance()

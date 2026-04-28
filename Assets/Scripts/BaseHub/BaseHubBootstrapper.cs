@@ -11,7 +11,7 @@ public class BaseHubBootstrapper : MonoBehaviour
 {
     private const string BaseHubMapResourcePath = "BaseHub/base_hub_map";
     private const string DefaultHandbookPrefabPath = "Assets/Scripts/View/Prefab/CatagloueUI.prefab";
-    private const string RequiredRuntimeCharacters = "图鉴精灵河狸关卡入口打开查看属性武器攻击基地允许生命上限耐久攻击力移动速度防御调试面板按住显示关闭点击装备相册留念拍照本地保存时间场景分辨率暂无上一页下一页修复工作台材料第一二三四五未开放后续版本↑↓";
+    private const string RequiredRuntimeCharacters = "图鉴精灵河狸关卡入口打开查看属性武器攻击基地允许生命上限耐久攻击力移动速度防御调试面板按住显示关闭点击装备相册留念拍照本地保存时间场景分辨率暂无上一页下一页删除选中修复工作台材料第一二三四五未开放后续版本↑↓";
     private static readonly string[] RuntimeFontNames =
     {
         "Arial Unicode MS",
@@ -997,12 +997,21 @@ public class BaseHubBootstrapper : MonoBehaviour
             new Vector2(150f, 48f));
         nextPageButton.GetComponent<RectTransform>().anchoredPosition = new Vector2(108f, -326f);
 
+        Button deleteSelectedButton = CreateButton(
+            "DeleteSelectedButton",
+            rightPanel.transform,
+            "删除选中",
+            new Color(0.54f, 0.18f, 0.14f, 0.96f),
+            new Vector2(150f, 46f));
+        deleteSelectedButton.GetComponent<RectTransform>().anchoredPosition = new Vector2(198f, -244f);
+
         BaseHubAlbumPanel albumPanel = root.AddComponent<BaseHubAlbumPanel>();
         albumPanel.Configure(
             uiController,
             closeButton,
             previousPageButton,
             nextPageButton,
+            deleteSelectedButton,
             pageIndicator,
             previewTitle,
             previewMeta,

@@ -363,12 +363,7 @@ public class CatalogueUnlockSlotButton : MonoBehaviour
 
     private bool ResolveDialogReference()
     {
-        if (dialogUI != null)
-        {
-            return true;
-        }
-
-        dialogUI = FindObjectOfType<Dialog>(true);
+        dialogUI = Dialog.EnsureTopmostRuntimeInstance();
         return dialogUI != null;
     }
 

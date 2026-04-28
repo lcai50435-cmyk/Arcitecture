@@ -188,6 +188,7 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
     private float sceneHandbookPointerTime;
     private bool initialized;
     private bool usesSceneAuthoredPages;
+    private bool personalInformationPageAvailable = true;
 
     public static IllustratedHandbookTabsController EnsureInstalled(UIManager manager)
     {
@@ -271,6 +272,7 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
 
         RefreshGeneratedPageContent();
         ActivateChromeRoot();
+        page = ResolveAvailableGeneratedPage(page);
         SetActiveGeneratedPage(page);
         UpdateButtonState(page);
         ResetScrollPosition();
@@ -284,6 +286,28 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
     public void ResetToDefaultPage()
     {
         SwitchToPage(defaultPage);
+    }
+
+    public void SetPersonalInformationPageAvailable(bool available)
+    {
+        if (personalInformationPageAvailable == available)
+        {
+            RefreshScenePageAvailability();
+            return;
+        }
+
+        personalInformationPageAvailable = available;
+        if (initialized)
+        {
+            BindPageButtons();
+            BindCloseButtons();
+        }
+
+        RefreshScenePageAvailability();
+        if (!available)
+        {
+            SwitchToPage(IllustratedHandbookPage.IllustratedHandbook);
+        }
     }
 
     private void Update()
@@ -408,7 +432,7 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
                 continue;
             }
 
-            entry.Value.SetActive(ReferenceEquals(entry.Value, activePageRoot));
+            entry.Value.SetActive(IsPageAvailable(entry.Key) && ReferenceEquals(entry.Value, activePageRoot));
         }
     }
 
@@ -419,9 +443,21 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
             return page;
         }
 
-        return scenePageRoots.TryGetValue(page, out GameObject pageRoot) && pageRoot != null
+        return IsPageAvailable(page) &&
+               scenePageRoots.TryGetValue(page, out GameObject pageRoot) &&
+               pageRoot != null
             ? page
             : IllustratedHandbookPage.IllustratedHandbook;
+    }
+
+    private IllustratedHandbookPage ResolveAvailableGeneratedPage(IllustratedHandbookPage page)
+    {
+        return IsPageAvailable(page) ? page : IllustratedHandbookPage.IllustratedHandbook;
+    }
+
+    private bool IsPageAvailable(IllustratedHandbookPage page)
+    {
+        return page != IllustratedHandbookPage.PersonalInformation || personalInformationPageAvailable;
     }
 
     private GameObject ResolveSceneAuthoredPageRoot(IllustratedHandbookPage page)
@@ -1914,7 +1950,10 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         }
 
         CreateTabButton(rail, IllustratedHandbookPage.IllustratedHandbook, "图鉴");
-        CreateTabButton(rail, IllustratedHandbookPage.PersonalInformation, "角色");
+        if (IsPageAvailable(IllustratedHandbookPage.PersonalInformation))
+        {
+            CreateTabButton(rail, IllustratedHandbookPage.PersonalInformation, "角色");
+        }
 #if !(UNITY_WEBGL && !UNITY_EDITOR)
         CreateTabButton(rail, IllustratedHandbookPage.PhotoAlbum, "相册");
 #endif
@@ -2048,7 +2087,7 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
 
         foreach (IllustratedHandbookPage page in Enum.GetValues(typeof(IllustratedHandbookPage)))
         {
-            if (page == IllustratedHandbookPage.Mission)
+            if (page == IllustratedHandbookPage.Mission || !IsPageAvailable(page))
             {
                 continue;
             }
@@ -2103,6 +2142,8 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
             return null;
         }
 
+        DisableSceneBookmarkTransparentBlockers(pageRoot.transform);
+
         Transform closeVisualRoot = FindSceneBookmarkVisual(pageRoot.transform, SceneAuthoredCloseButtonName);
         if (closeVisualRoot != null)
         {
@@ -2122,10 +2163,18 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
             }
         }
 
+        Button authoredCloseButton = FindSceneAuthoredBookmarkButton(closeVisualRoot);
+        if (authoredCloseButton != null)
+        {
+            ConfigureSceneBookmarkButton(authoredCloseButton);
+            authoredCloseButton.onClick.RemoveListener(HandleCloseRequested);
+            authoredCloseButton.onClick.AddListener(HandleCloseRequested);
+        }
+
         Button sceneCloseButton = GetOrCreateBookmarkHitAreaButton(closeVisualRoot);
         if (sceneCloseButton == null)
         {
-            return null;
+            return authoredCloseButton;
         }
 
         ConfigureSceneBookmarkHitArea(sceneCloseButton, closeVisualRoot as RectTransform);
@@ -2142,6 +2191,8 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
             return;
         }
 
+        DisableSceneBookmarkTransparentBlockers(pageRoot.transform);
+
         foreach (IllustratedHandbookPage targetPage in Enum.GetValues(typeof(IllustratedHandbookPage)))
         {
             if (!ShouldBindScenePage(targetPage))
@@ -2151,6 +2202,12 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
 
             string sceneTabName = GetSceneTabButtonName(targetPage);
             Transform visualRoot = FindSceneBookmarkVisual(pageRoot.transform, sceneTabName);
+            ApplySceneBookmarkAvailability(visualRoot, targetPage);
+            if (!IsPageAvailable(targetPage))
+            {
+                continue;
+            }
+
             if (visualRoot != null)
             {
                 RectTransform visualRect = visualRoot as RectTransform;
@@ -2180,6 +2237,8 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
                 }
             }
 
+            BindSceneBookmarkButton(FindSceneAuthoredBookmarkButton(visualRoot), targetPage);
+
             Button button = GetOrCreateBookmarkHitAreaButton(visualRoot);
             if (button == null)
             {
@@ -2188,7 +2247,7 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
 
             ConfigureSceneBookmarkHitArea(button, visualRoot as RectTransform);
             EnsureButtonRaycastTarget(button);
-            button.onClick.AddListener(() => HandleBookmarkClicked(targetPage));
+            BindSceneBookmarkButton(button, targetPage);
 
             if (!tabButtons.TryGetValue(targetPage, out List<Button> buttons))
             {
@@ -2228,6 +2287,93 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
     {
         MusicManager.PlaySfx(SfxCueId.HandbookBookmark);
         SwitchToPage(targetPage);
+    }
+
+    private void BindSceneBookmarkButton(Button button, IllustratedHandbookPage targetPage)
+    {
+        if (button == null)
+        {
+            return;
+        }
+
+        ConfigureSceneBookmarkButton(button);
+        button.onClick.RemoveAllListeners();
+        button.onClick.AddListener(() => HandleBookmarkClicked(targetPage));
+    }
+
+    private void RefreshScenePageAvailability()
+    {
+        if (personalInformationCanvas != null && !personalInformationPageAvailable)
+        {
+            personalInformationCanvas.SetActive(false);
+        }
+
+        if (usesSceneAuthoredPages)
+        {
+            List<GameObject> sceneRoots = CollectUniqueScenePageRoots();
+            for (int i = 0; i < sceneRoots.Count; i++)
+            {
+                GameObject pageRoot = sceneRoots[i];
+                if (pageRoot == null)
+                {
+                    continue;
+                }
+
+                foreach (IllustratedHandbookPage page in Enum.GetValues(typeof(IllustratedHandbookPage)))
+                {
+                    if (!ShouldBindScenePage(page))
+                    {
+                        continue;
+                    }
+
+                    ApplySceneBookmarkAvailability(FindSceneBookmarkVisual(pageRoot.transform, page), page);
+                }
+            }
+        }
+
+        foreach (KeyValuePair<IllustratedHandbookPage, List<Button>> entry in tabButtons)
+        {
+            bool available = IsPageAvailable(entry.Key);
+            for (int i = 0; i < entry.Value.Count; i++)
+            {
+                if (entry.Value[i] != null)
+                {
+                    entry.Value[i].gameObject.SetActive(available);
+                }
+            }
+        }
+    }
+
+    private void ApplySceneBookmarkAvailability(Transform visualRoot, IllustratedHandbookPage page)
+    {
+        if (visualRoot == null)
+        {
+            return;
+        }
+
+        bool available = IsPageAvailable(page);
+        visualRoot.gameObject.SetActive(available);
+
+        Button authoredButton = FindSceneAuthoredBookmarkButton(visualRoot);
+        if (authoredButton != null)
+        {
+            authoredButton.interactable = available;
+            if (!available)
+            {
+                authoredButton.onClick.RemoveAllListeners();
+            }
+        }
+
+        Transform hitArea = FindDirectChild(visualRoot, SceneBookmarkHitAreaName);
+        Button hitAreaButton = hitArea != null ? hitArea.GetComponent<Button>() : null;
+        if (hitAreaButton != null)
+        {
+            hitAreaButton.interactable = available;
+            if (!available)
+            {
+                hitAreaButton.onClick.RemoveAllListeners();
+            }
+        }
     }
 
     private void UpdateSceneAuthoredBookmarkState(IllustratedHandbookPage activePage)
@@ -2270,6 +2416,12 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
             }
 
             Transform visualRoot = FindSceneBookmarkVisual(pageRoot, page);
+            ApplySceneBookmarkAvailability(visualRoot, page);
+            if (!IsPageAvailable(page))
+            {
+                continue;
+            }
+
             RectTransform visualRect = visualRoot as RectTransform;
             if (visualRect == null)
             {
@@ -2315,6 +2467,11 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         foreach (IllustratedHandbookPage page in Enum.GetValues(typeof(IllustratedHandbookPage)))
         {
             if (!ShouldBindScenePage(page))
+            {
+                continue;
+            }
+
+            if (!IsPageAvailable(page))
             {
                 continue;
             }
@@ -4166,6 +4323,47 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         return hitButton;
     }
 
+    private static Button FindSceneAuthoredBookmarkButton(Transform visualRoot)
+    {
+        if (visualRoot == null)
+        {
+            return null;
+        }
+
+        Button rootButton = visualRoot.GetComponent<Button>();
+        if (rootButton != null)
+        {
+            return rootButton;
+        }
+
+        Button[] buttons = visualRoot.GetComponentsInChildren<Button>(true);
+        for (int i = 0; i < buttons.Length; i++)
+        {
+            Button button = buttons[i];
+            if (button == null ||
+                string.Equals(button.gameObject.name, SceneBookmarkHitAreaName, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            return button;
+        }
+
+        return null;
+    }
+
+    private static void ConfigureSceneBookmarkButton(Button button)
+    {
+        if (button == null)
+        {
+            return;
+        }
+
+        EnsureButtonRaycastTarget(button);
+        button.transition = Selectable.Transition.None;
+        button.interactable = true;
+    }
+
     private static Button FindButtonByName(Transform parent, string childName)
     {
         if (parent == null)
@@ -4225,6 +4423,31 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
 
             targetGraphic.raycastTarget = true;
             targetGraphic.canvasRenderer.cullTransparentMesh = false;
+        }
+    }
+
+    private static void DisableSceneBookmarkTransparentBlockers(Transform pageRoot)
+    {
+        Transform bookmarkRoot = FindDirectChild(pageRoot, SceneAuthoredBookmarkRootName) ??
+                                 FindTransformByName(pageRoot, SceneAuthoredBookmarkRootName);
+        if (bookmarkRoot == null)
+        {
+            return;
+        }
+
+        Graphic[] graphics = bookmarkRoot.GetComponentsInChildren<Graphic>(true);
+        for (int i = 0; i < graphics.Length; i++)
+        {
+            Graphic graphic = graphics[i];
+            if (graphic == null ||
+                !graphic.raycastTarget ||
+                graphic.color.a > 0.001f ||
+                graphic.GetComponent<Selectable>() != null)
+            {
+                continue;
+            }
+
+            graphic.raycastTarget = false;
         }
     }
 

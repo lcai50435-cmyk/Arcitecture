@@ -951,10 +951,26 @@ public class UIRootManager : MonoBehaviour
 
         IllustratedUISceneLoader.Open(
             RuntimeModalOpenSource.None,
-            IllustratedHandbookPage.PersonalInformation,
+            ResolveHandbookHotkeyPage(),
             null,
             interactTipUI != null ? interactTipUI.gameObject : null,
             ResolveRuntimePlayerObject());
+    }
+
+    private static IllustratedHandbookPage ResolveHandbookHotkeyPage()
+    {
+#if UNITY_WEBGL && !UNITY_EDITOR
+        return ResolveHandbookHotkeyPage(false);
+#else
+        return ResolveHandbookHotkeyPage(PhotoAlbumRepository.HasEntries());
+#endif
+    }
+
+    private static IllustratedHandbookPage ResolveHandbookHotkeyPage(bool hasPhotoEntries)
+    {
+        return hasPhotoEntries
+            ? IllustratedHandbookPage.PhotoAlbum
+            : IllustratedHandbookPage.PersonalInformation;
     }
 
     private static GameObject ResolveRuntimePlayerObject()

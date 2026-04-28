@@ -25,6 +25,7 @@ public class BaseHubAlbumPanel : MonoBehaviour
     [SerializeField] private Button closeButton;
     [SerializeField] private Button previousPageButton;
     [SerializeField] private Button nextPageButton;
+    [SerializeField] private Button deleteSelectedButton;
     [SerializeField] private TextMeshProUGUI pageIndicatorText;
     [SerializeField] private TextMeshProUGUI previewTitleText;
     [SerializeField] private TextMeshProUGUI previewMetaText;
@@ -46,6 +47,7 @@ public class BaseHubAlbumPanel : MonoBehaviour
         Button close,
         Button previousPage,
         Button nextPage,
+        Button deleteSelected,
         TextMeshProUGUI pageIndicator,
         TextMeshProUGUI previewTitle,
         TextMeshProUGUI previewMeta,
@@ -57,6 +59,7 @@ public class BaseHubAlbumPanel : MonoBehaviour
         closeButton = close;
         previousPageButton = previousPage;
         nextPageButton = nextPage;
+        deleteSelectedButton = deleteSelected;
         pageIndicatorText = pageIndicator;
         previewTitleText = previewTitle;
         previewMetaText = previewMeta;
@@ -72,6 +75,9 @@ public class BaseHubAlbumPanel : MonoBehaviour
 
         nextPageButton?.onClick.RemoveAllListeners();
         nextPageButton?.onClick.AddListener(SelectNextPage);
+
+        deleteSelectedButton?.onClick.RemoveAllListeners();
+        deleteSelectedButton?.onClick.AddListener(DeleteSelectedEntry);
     }
 
     public void RegisterSlot(BaseHubAlbumSlotView slotView)
@@ -164,6 +170,35 @@ public class BaseHubAlbumPanel : MonoBehaviour
         selectedEntryIndex = globalIndex;
         RefreshSelectionState();
         RefreshPreview();
+    }
+
+    private void DeleteSelectedEntry()
+    {
+        if (selectedEntryIndex < 0 || selectedEntryIndex >= entries.Count)
+        {
+            return;
+        }
+
+        int deletedIndex = selectedEntryIndex;
+        if (!PhotoAlbumRepository.DeleteEntry(entries[selectedEntryIndex]))
+        {
+            return;
+        }
+
+        entries.Clear();
+        entries.AddRange(PhotoAlbumRepository.LoadEntries());
+        if (entries.Count == 0)
+        {
+            selectedEntryIndex = -1;
+            currentPageIndex = 0;
+        }
+        else
+        {
+            selectedEntryIndex = Mathf.Clamp(deletedIndex, 0, entries.Count - 1);
+            currentPageIndex = Mathf.Clamp(selectedEntryIndex / EntriesPerPage, 0, Mathf.Max(0, GetPageCount() - 1));
+        }
+
+        RefreshView();
     }
 
     private void RefreshView()
@@ -326,6 +361,11 @@ public class BaseHubAlbumPanel : MonoBehaviour
         if (nextPageButton != null)
         {
             nextPageButton.interactable = currentPageIndex < pageCount - 1;
+        }
+
+        if (deleteSelectedButton != null)
+        {
+            deleteSelectedButton.interactable = selectedEntryIndex >= 0 && selectedEntryIndex < entries.Count;
         }
     }
 

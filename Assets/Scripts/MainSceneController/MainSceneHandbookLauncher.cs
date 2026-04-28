@@ -56,7 +56,8 @@ public sealed class MainSceneHandbookLauncher : MonoBehaviour
             IllustratedHandbookPage.IllustratedHandbook,
             hideTargets,
             null,
-            null);
+            null,
+            false);
     }
 
     private void EnsureRuntimeDependencies()
