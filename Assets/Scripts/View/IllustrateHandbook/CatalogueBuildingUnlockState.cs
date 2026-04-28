@@ -5,7 +5,7 @@ using UnityEngine.UI;
 /// 单个建筑图鉴条目的完成状态判断
 /// 条件：
 /// 1. 该建筑自己的进度条达到 100
-/// 2. 该建筑下 3 个槽位全部点亮
+/// 2. 点击未解锁图标确认完成
 /// </summary>
 public class CatalogueBuildingUnlockState : MonoBehaviour
 {
@@ -24,6 +24,12 @@ public class CatalogueBuildingUnlockState : MonoBehaviour
     [Header("未完成时显示的物体（可选）")]
     public GameObject lockedBuildingVisual;
 
+    [Header("点击未解锁图标完成建筑（可选）")]
+    public Button lockedBuildingButton;
+
+    [Header("奖励弹窗（可选）")]
+    public Dialog dialogUI;
+
     [Header("运行时状态观察")]
     public bool isSliderComplete;
     public bool areAllSlotsUnlocked;
@@ -31,14 +37,18 @@ public class CatalogueBuildingUnlockState : MonoBehaviour
 
     public CatalogueBuildingId BuildingId => buildingId;
 
+    private Button boundLockedButton;
+
     private void Start()
     {
+        BindLockedButton();
         RefreshState();
     }
 
     private void OnEnable()
     {
         RuntimeProgressState.EnsureInstance().OnStateChanged += RefreshState;
+        BindLockedButton();
         RefreshState();
     }
 
@@ -50,9 +60,15 @@ public class CatalogueBuildingUnlockState : MonoBehaviour
         }
     }
 
+    private void OnDestroy()
+    {
+        UnbindLockedButton();
+    }
+
     public void RefreshState()
     {
         ResolveBuildingIdIfNeeded();
+        BindLockedButton();
 
         RuntimeProgressState runtimeState = RuntimeProgressState.EnsureInstance();
         BuildingDefinition definition = BuildingDefinitionLibrary.Get(buildingId);
@@ -66,7 +82,8 @@ public class CatalogueBuildingUnlockState : MonoBehaviour
         }
 
         isSliderComplete = state.progress >= definition.requiredProgress;
-        areAllSlotsUnlocked = runtimeState.GetUnlockedSlotCount(buildingId) >= definition.slotDefinitions.Length;
+        int slotCount = definition.slotDefinitions != null ? definition.slotDefinitions.Length : 0;
+        areAllSlotsUnlocked = runtimeState.GetUnlockedSlotCount(buildingId) >= slotCount;
         isBuildingUnlocked = runtimeState.IsBuildingUnlocked(buildingId);
 
         if (unlockedBuildingVisual != null)
@@ -77,6 +94,11 @@ public class CatalogueBuildingUnlockState : MonoBehaviour
         if (lockedBuildingVisual != null)
         {
             lockedBuildingVisual.SetActive(!isBuildingUnlocked);
+        }
+
+        if (boundLockedButton != null)
+        {
+            boundLockedButton.interactable = !isBuildingUnlocked && isSliderComplete;
         }
 
         if (slotButtons != null)
@@ -90,6 +112,81 @@ public class CatalogueBuildingUnlockState : MonoBehaviour
             }
         }
 
+    }
+
+    private void HandleLockedBuildingClicked()
+    {
+        ResolveBuildingIdIfNeeded();
+
+        RuntimeProgressState runtimeState = RuntimeProgressState.EnsureInstance();
+        if (!runtimeState.TryUnlockBuilding(buildingId, out BuildingRewardDefinition completionReward))
+        {
+            RefreshState();
+            return;
+        }
+
+        RefreshState();
+        ShowCompletionReward(completionReward);
+    }
+
+    private void BindLockedButton()
+    {
+        Button nextButton = lockedBuildingButton;
+        if (nextButton == null && lockedBuildingVisual != null)
+        {
+            nextButton = lockedBuildingVisual.GetComponent<Button>();
+            if (nextButton == null)
+            {
+                nextButton = lockedBuildingVisual.AddComponent<Button>();
+            }
+
+            Image lockedImage = lockedBuildingVisual.GetComponent<Image>();
+            if (nextButton.targetGraphic == null && lockedImage != null)
+            {
+                nextButton.targetGraphic = lockedImage;
+            }
+        }
+
+        if (boundLockedButton == nextButton)
+        {
+            return;
+        }
+
+        UnbindLockedButton();
+        boundLockedButton = nextButton;
+        lockedBuildingButton = nextButton;
+
+        if (boundLockedButton != null)
+        {
+            boundLockedButton.onClick.AddListener(HandleLockedBuildingClicked);
+        }
+    }
+
+    private void UnbindLockedButton()
+    {
+        if (boundLockedButton != null)
+        {
+            boundLockedButton.onClick.RemoveListener(HandleLockedBuildingClicked);
+            boundLockedButton = null;
+        }
+    }
+
+    private void ShowCompletionReward(BuildingRewardDefinition completionReward)
+    {
+        if (completionReward == null)
+        {
+            return;
+        }
+
+        if (dialogUI == null)
+        {
+            dialogUI = FindObjectOfType<Dialog>(true);
+        }
+
+        if (dialogUI != null)
+        {
+            dialogUI.ShowClickCloseDialog($"{completionReward.title}\n{completionReward.description}");
+        }
     }
 
     private void ResolveBuildingIdIfNeeded()

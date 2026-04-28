@@ -40,13 +40,27 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
     private const string BookContentName = "Content";
     private const string BookPageContentPrefix = "PageContent_";
     private const string PageTagName = "PageTag";
+    // 场景资源中第四个书签沿用 Mission 命名但显示为“设置”，Setting 命名对应红色关闭按钮。
+    private const string SceneAuthoredSettingTabName = "Mission";
+    private const string SceneAuthoredCloseButtonName = "Setting";
+    private const string SceneBookmarkHitAreaName = "SceneBookmarkHitArea";
     private const string PersonalPortraitNodeName = "PersonalImage";
     private const string PersonalBackpackSlotNamePrefix = "Slot_";
     private const string PersonalBackpackSlotIconName = "ItemIcon";
+    private const string PersonalBackpackSelectionVisualName = "Image";
+    private const string PersonalInkRootName = "Weapon";
+    private const string PersonalInkOptionNamePrefix = "Image_";
+    private const string PersonalInkSelectionVisualName = "Circle";
+    private const string PersonalInkSelectionBadgeName = "Designation";
+    private const string PersonalInkUsedName = "Used";
+    private const string PersonalInkButtonName = "Button";
+    private const string PersonalInkDescriptionPanelName = "Image";
+    private const string PersonalSelectionBorderName = "SelectedBorder";
     private const string TitleName = "Title";
     private const string SubtitleName = "Subtitle";
     private const string BodyName = "Body";
     private const string FooterName = "Footer";
+    private const string SceneAuthoredBookmarkRootName = "BookMark";
 
     private static readonly Color PageBackgroundColor = new Color(0.20f, 0.15f, 0.10f, 0.76f);
     private static readonly Color SelectedButtonColor = new Color(0.78f, 0.62f, 0.33f, 0.98f);
@@ -84,11 +98,20 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
     private const float HandbookCardCenterX = 230f;
     private const float HandbookCardStartY = 140f;
     private const float HandbookCardVerticalSpacing = 226f;
+    private const float SceneAuthoredHandbookCardGap = 14f;
+    private const float SceneAuthoredHandbookCardMinSpacing = 64f;
+    private const float SceneAuthoredHandbookCardMaxSpacing = 92f;
+    private const float SceneAuthoredHandbookPointerTravelX = 3f;
+    private const float SceneAuthoredHandbookPointerCycleDuration = 0.72f;
     private const float HandbookRightPageTextX = 790f;
     private const float HandbookRightPageTextWidth = 600f;
     private const string HandbookCardNamePrefix = "ArcitectureImage_";
     private const string LegacyFujianTulouButtonName = "FuJianTuLouButton";
     private const string LegacyHandbookLeftPanelName = "LeftPanel";
+    private const string SceneAuthoredRightIntroductionName = "RightIntroduction";
+    private const string SceneAuthoredBuildingImageName = "BuildingImage";
+    private const string SceneAuthoredProprietaryMaterialName = "ProprietaryMaterial";
+    private const string SceneAuthoredGeneralMaterialName = "MaterialForGeneralPurpose";
 
     [SerializeField] private UIManager owner;
 
@@ -125,16 +148,44 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         new Dictionary<RectTransform, Coroutine>();
     private readonly List<GameObject> legacyHandbookContentObjects =
         new List<GameObject>();
+    private readonly List<SceneAuthoredHandbookCardBinding> sceneHandbookCardBindings =
+        new List<SceneAuthoredHandbookCardBinding>();
 
     private static readonly Dictionary<IllustratedHandbookPage, Sprite> BookmarkSpriteCache =
         new Dictionary<IllustratedHandbookPage, Sprite>();
     private static readonly Dictionary<string, Sprite> BookmarkAssetCache =
         new Dictionary<string, Sprite>(StringComparer.Ordinal);
+    private static readonly WeaponType[] PersonalInkOptionWeaponTypes =
+    {
+        WeaponType.DirectInk,
+        WeaponType.BurstInk,
+        WeaponType.PierceInk,
+        WeaponType.FlowInk
+    };
+    private static readonly Color SceneHandbookSlotUnlockedColor = new Color(1f, 1f, 1f, 1f);
+    private static readonly Color SceneHandbookSlotLockedColor = new Color(0.74f, 0.70f, 0.62f, 0.72f);
+
+    private sealed class SceneAuthoredHandbookCardBinding
+    {
+        public GameObject cardObject;
+        public CatalogueBuildingId buildingId;
+        public GameObject selectionFrame;
+        public RectTransform selectionPointer;
+        public Vector2 selectionPointerBasePosition;
+        public BuildingDetailData detailData;
+        public Image previewImage;
+        public TMP_Text titleText;
+        public TMP_Text descriptionText;
+    }
 
     private ScrollRect sharedBookScrollRect;
     private RectTransform sharedBookContentRoot;
     private IllustratedPhotoAlbumPageBinder scenePhotoAlbumBinder;
+    private LegacySettingsToggleBinder sceneSettingsToggleBinder;
     private BackpackMananger subscribedBackpack;
+    private int selectedPersonalBackpackSlotIndex;
+    private GameObject selectedSceneHandbookCardObject;
+    private float sceneHandbookPointerTime;
     private bool initialized;
     private bool usesSceneAuthoredPages;
 
@@ -206,6 +257,13 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
             RefreshGeneratedPageContent();
             SetActiveGeneratedPage(resolvedPage);
             RefreshSceneAuthoredPhotoAlbum(resolvedPage);
+            RefreshSceneAuthoredSettings(resolvedPage);
+            if (resolvedPage == IllustratedHandbookPage.IllustratedHandbook)
+            {
+                RefreshSceneAuthoredHandbookSelection();
+                RefreshSceneAuthoredRightIntroduction();
+            }
+
             UpdateSceneAuthoredBookmarkState(resolvedPage);
             ResetScrollPosition();
             return;
@@ -226,6 +284,11 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
     public void ResetToDefaultPage()
     {
         SwitchToPage(defaultPage);
+    }
+
+    private void Update()
+    {
+        UpdateSceneAuthoredSelectionPointerAnimation(Time.unscaledDeltaTime);
     }
 
     private void OnDisable()
@@ -250,12 +313,14 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
 
         sceneBookmarkAnimations.Clear();
         scenePhotoAlbumBinder?.Release();
+        sceneSettingsToggleBinder?.Release();
         UnsubscribeBackpackInventoryEvents();
     }
 
     private void OnDestroy()
     {
         scenePhotoAlbumBinder?.Release();
+        sceneSettingsToggleBinder?.Release();
         UnsubscribeBackpackInventoryEvents();
     }
 
@@ -430,11 +495,11 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
     private static bool HasSceneAuthoredBookmarkTabs(Transform root)
     {
         return root != null &&
-               FindTransformByName(root, GetSceneTabButtonName(IllustratedHandbookPage.IllustratedHandbook)) != null &&
-               FindTransformByName(root, GetSceneTabButtonName(IllustratedHandbookPage.PersonalInformation)) != null &&
-               FindTransformByName(root, GetSceneTabButtonName(IllustratedHandbookPage.PhotoAlbum)) != null &&
-               FindTransformByName(root, GetSceneTabButtonName(IllustratedHandbookPage.Mission)) != null &&
-               FindTransformByName(root, GetSceneTabButtonName(IllustratedHandbookPage.Setting)) != null;
+               FindSceneBookmarkVisual(root, IllustratedHandbookPage.IllustratedHandbook) != null &&
+               FindSceneBookmarkVisual(root, IllustratedHandbookPage.PersonalInformation) != null &&
+               FindSceneBookmarkVisual(root, IllustratedHandbookPage.PhotoAlbum) != null &&
+               FindSceneBookmarkVisual(root, IllustratedHandbookPage.Setting) != null &&
+               FindSceneBookmarkVisual(root, SceneAuthoredCloseButtonName) != null;
     }
 
     private static GameObject ResolveScenePageRoot(Transform root, IllustratedHandbookPage page)
@@ -856,7 +921,7 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
 
         NormalizeHandbookCardIdentities(cardRects);
         EnsureMinimumHandbookCards(cardRects, container);
-        cardRects.Sort((left, right) => GetHandbookCardOrder(left).CompareTo(GetHandbookCardOrder(right)));
+        SortHandbookCardsForSceneLayout(cardRects);
         for (int i = 0; i < cardRects.Count; i++)
         {
             RectTransform cardRect = cardRects[i];
@@ -931,6 +996,9 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
 
     private void EnsureSceneAuthoredHandbookCardsLayout()
     {
+        ResetSceneAuthoredSelectionPointers();
+        sceneHandbookCardBindings.Clear();
+
         if (illustratedHandbookCanvas == null)
         {
             return;
@@ -956,7 +1024,10 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         Vector2 templateSize = template.sizeDelta;
         Vector2 templatePivot = template.pivot;
         Vector2 startPosition = template.anchoredPosition;
-        float verticalSpacing = Mathf.Max(templateSize.y + 8f, 86f);
+        float verticalSpacing = Mathf.Clamp(
+            templateSize.y + SceneAuthoredHandbookCardGap,
+            SceneAuthoredHandbookCardMinSpacing,
+            SceneAuthoredHandbookCardMaxSpacing);
 
         NormalizeHandbookCardIdentities(cardRects);
         for (int i = cardRects.Count; i < HandbookCardTargetCount; i++)
@@ -988,6 +1059,688 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
             cardRect.localScale = Vector3.one;
             cardRect.localRotation = Quaternion.identity;
             cardRect.gameObject.SetActive(visible);
+            EnsureSceneAuthoredCardStatusVisuals(cardRect, template);
+            ConfigureSceneAuthoredBuildingCard(cardRect.gameObject, i);
+            ConfigureSceneAuthoredSelectionCard(cardRect.gameObject, i);
+        }
+
+        HideLooseSceneAuthoredStatusVisuals(leftPanel);
+        EnsureSelectedSceneAuthoredHandbookCard();
+        RefreshSceneAuthoredHandbookSelection();
+        RefreshSceneAuthoredRightIntroduction();
+    }
+
+    private static void EnsureSceneAuthoredCardStatusVisuals(RectTransform cardRect, RectTransform template)
+    {
+        if (cardRect == null || template == null)
+        {
+            return;
+        }
+
+        EnsureSceneAuthoredCardStatusVisual(cardRect, template, "Lock");
+        EnsureSceneAuthoredCardStatusVisual(cardRect, template, "Unlock");
+    }
+
+    private static void EnsureSceneAuthoredCardStatusVisual(RectTransform cardRect, RectTransform template, string childName)
+    {
+        if (FindDirectChild(cardRect, childName) != null)
+        {
+            return;
+        }
+
+        Transform templateVisual = FindDirectChild(template, childName);
+        if (templateVisual == null)
+        {
+            return;
+        }
+
+        GameObject visualObject = Instantiate(templateVisual.gameObject, cardRect, false);
+        visualObject.name = childName;
+    }
+
+    private static void ConfigureSceneAuthoredBuildingCard(GameObject cardObject, int zeroBasedIndex)
+    {
+        if (cardObject == null)
+        {
+            return;
+        }
+
+        CatalogueBuildingId buildingId = ResolveCatalogueBuildingId(cardObject, zeroBasedIndex);
+
+        CatalogueBuildingUnlockState unlockState = cardObject.GetComponent<CatalogueBuildingUnlockState>();
+        if (unlockState == null)
+        {
+            unlockState = cardObject.AddComponent<CatalogueBuildingUnlockState>();
+        }
+
+        unlockState.buildingId = buildingId;
+        unlockState.buildingSlider = ResolveSceneAuthoredBuildingSlider(cardObject.transform);
+        unlockState.lockedBuildingVisual = ResolveSceneAuthoredStatusVisual(cardObject.transform, "Lock");
+        unlockState.unlockedBuildingVisual = ResolveSceneAuthoredStatusVisual(cardObject.transform, "Unlock");
+        unlockState.lockedBuildingButton = unlockState.lockedBuildingVisual != null
+            ? unlockState.lockedBuildingVisual.GetComponent<Button>()
+            : null;
+        unlockState.RefreshState();
+    }
+
+    private void ConfigureSceneAuthoredSelectionCard(GameObject cardObject, int zeroBasedIndex)
+    {
+        if (cardObject == null)
+        {
+            return;
+        }
+
+        CatalogueBuildingId buildingId = ResolveCatalogueBuildingId(cardObject, zeroBasedIndex);
+        SceneAuthoredHandbookCardSelection selection = cardObject.GetComponent<SceneAuthoredHandbookCardSelection>();
+        if (selection == null)
+        {
+            selection = cardObject.AddComponent<SceneAuthoredHandbookCardSelection>();
+        }
+
+        selection.Bind(this);
+
+        Button button = cardObject.GetComponent<Button>();
+        if (button != null)
+        {
+            EnsureButtonRaycastTarget(button);
+        }
+
+        GameObject selectionFrame = ResolveSceneAuthoredSelectionFrame(cardObject.transform);
+        if (selectionFrame != null)
+        {
+            Graphic frameGraphic = selectionFrame.GetComponent<Graphic>();
+            if (frameGraphic != null)
+            {
+                frameGraphic.raycastTarget = false;
+            }
+        }
+
+        Image previewImage = ResolveSceneAuthoredCardPreviewImage(cardObject.transform, selectionFrame);
+        RectTransform selectionPointer = ResolveSceneAuthoredSelectionPointer(
+            cardObject.transform,
+            selectionFrame,
+            previewImage);
+        if (selectionPointer != null)
+        {
+            Graphic pointerGraphic = selectionPointer.GetComponent<Graphic>();
+            if (pointerGraphic != null)
+            {
+                pointerGraphic.raycastTarget = false;
+            }
+        }
+
+        sceneHandbookCardBindings.Add(new SceneAuthoredHandbookCardBinding
+        {
+            cardObject = cardObject,
+            buildingId = buildingId,
+            selectionFrame = selectionFrame,
+            selectionPointer = selectionPointer,
+            selectionPointerBasePosition = selectionPointer != null
+                ? selectionPointer.anchoredPosition
+                : Vector2.zero,
+            detailData = cardObject.GetComponent<BuildingDetailData>() ??
+                         cardObject.GetComponentInChildren<BuildingDetailData>(true),
+            previewImage = previewImage,
+            titleText = ResolveSceneAuthoredCardTitleText(cardObject.transform),
+            descriptionText = ResolveSceneAuthoredCardDescriptionText(cardObject.transform)
+        });
+    }
+
+    public void SelectSceneAuthoredHandbookCard(GameObject cardObject)
+    {
+        if (cardObject == null)
+        {
+            return;
+        }
+
+        for (int i = 0; i < sceneHandbookCardBindings.Count; i++)
+        {
+            SceneAuthoredHandbookCardBinding binding = sceneHandbookCardBindings[i];
+            if (binding == null || binding.cardObject != cardObject)
+            {
+                continue;
+            }
+
+            if (selectedSceneHandbookCardObject != cardObject)
+            {
+                sceneHandbookPointerTime = 0f;
+            }
+
+            selectedSceneHandbookCardObject = cardObject;
+            RefreshSceneAuthoredHandbookSelection();
+            RefreshSceneAuthoredRightIntroduction();
+            return;
+        }
+    }
+
+    private void EnsureSelectedSceneAuthoredHandbookCard()
+    {
+        if (sceneHandbookCardBindings.Count == 0)
+        {
+            selectedSceneHandbookCardObject = null;
+            return;
+        }
+
+        if (selectedSceneHandbookCardObject != null)
+        {
+            for (int i = 0; i < sceneHandbookCardBindings.Count; i++)
+            {
+                SceneAuthoredHandbookCardBinding binding = sceneHandbookCardBindings[i];
+                if (binding != null &&
+                    binding.cardObject == selectedSceneHandbookCardObject &&
+                    binding.cardObject.activeInHierarchy)
+                {
+                    return;
+                }
+            }
+        }
+
+        for (int i = 0; i < sceneHandbookCardBindings.Count; i++)
+        {
+            SceneAuthoredHandbookCardBinding binding = sceneHandbookCardBindings[i];
+            if (binding?.cardObject == null || !binding.cardObject.activeInHierarchy)
+            {
+                continue;
+            }
+
+            selectedSceneHandbookCardObject = binding.cardObject;
+            return;
+        }
+
+        selectedSceneHandbookCardObject = null;
+    }
+
+    private void RefreshSceneAuthoredHandbookSelection()
+    {
+        EnsureSelectedSceneAuthoredHandbookCard();
+
+        for (int i = 0; i < sceneHandbookCardBindings.Count; i++)
+        {
+            SceneAuthoredHandbookCardBinding binding = sceneHandbookCardBindings[i];
+            if (binding == null)
+            {
+                continue;
+            }
+
+            if (binding.selectionFrame != null)
+            {
+                binding.selectionFrame.SetActive(binding.cardObject == selectedSceneHandbookCardObject);
+            }
+
+            RefreshSceneAuthoredSelectionPointer(binding);
+        }
+    }
+
+    private void RefreshSceneAuthoredSelectionPointer(SceneAuthoredHandbookCardBinding binding)
+    {
+        if (binding?.selectionPointer == null)
+        {
+            return;
+        }
+
+        bool selected = binding.cardObject == selectedSceneHandbookCardObject;
+        binding.selectionPointer.gameObject.SetActive(selected);
+        if (!selected)
+        {
+            binding.selectionPointer.anchoredPosition = binding.selectionPointerBasePosition;
+        }
+    }
+
+    private void ResetSceneAuthoredSelectionPointers()
+    {
+        for (int i = 0; i < sceneHandbookCardBindings.Count; i++)
+        {
+            SceneAuthoredHandbookCardBinding binding = sceneHandbookCardBindings[i];
+            if (binding?.selectionPointer == null)
+            {
+                continue;
+            }
+
+            binding.selectionPointer.anchoredPosition = binding.selectionPointerBasePosition;
+        }
+    }
+
+    private void UpdateSceneAuthoredSelectionPointerAnimation(float deltaTime)
+    {
+        if (!usesSceneAuthoredPages || sceneHandbookCardBindings.Count == 0)
+        {
+            return;
+        }
+
+        SceneAuthoredHandbookCardBinding binding = ResolveSelectedSceneAuthoredHandbookBinding();
+        if (binding?.selectionPointer == null ||
+            binding.cardObject == null ||
+            !binding.cardObject.activeInHierarchy)
+        {
+            return;
+        }
+
+        sceneHandbookPointerTime += Mathf.Max(0f, deltaTime);
+        float normalizedTime = Mathf.PingPong(
+            sceneHandbookPointerTime / SceneAuthoredHandbookPointerCycleDuration,
+            1f);
+        float curvedTime = Mathf.SmoothStep(0f, 1f, normalizedTime);
+        float offsetX = Mathf.Lerp(
+            -SceneAuthoredHandbookPointerTravelX,
+            SceneAuthoredHandbookPointerTravelX,
+            curvedTime);
+
+        binding.selectionPointer.anchoredPosition =
+            binding.selectionPointerBasePosition + new Vector2(offsetX, 0f);
+    }
+
+    private void RefreshSceneAuthoredRightIntroduction()
+    {
+        if (!usesSceneAuthoredPages || illustratedHandbookCanvas == null)
+        {
+            return;
+        }
+
+        SceneAuthoredHandbookCardBinding binding = ResolveSelectedSceneAuthoredHandbookBinding();
+        if (binding == null)
+        {
+            return;
+        }
+
+        Transform rightRoot = FindTransformByName(illustratedHandbookCanvas.transform, SceneAuthoredRightIntroductionName);
+        if (rightRoot == null)
+        {
+            return;
+        }
+
+        BuildingDefinition definition = BuildingDefinitionLibrary.Get(binding.buildingId);
+        TMP_Text titleText = FindTmpText(rightRoot, "Name");
+        if (titleText != null)
+        {
+            titleText.text = ResolveSceneAuthoredRightTitle(binding, definition);
+        }
+
+        Transform buildingImageRoot = FindTransformByName(rightRoot, SceneAuthoredBuildingImageName);
+        Image buildingImage = buildingImageRoot != null ? buildingImageRoot.GetComponent<Image>() : null;
+        Sprite previewSprite = ResolveSceneAuthoredRightSprite(binding);
+        if (buildingImage != null)
+        {
+            buildingImage.sprite = previewSprite;
+            buildingImage.enabled = previewSprite != null;
+            buildingImage.preserveAspect = true;
+        }
+
+        TMP_Text introductionText = buildingImageRoot != null
+            ? buildingImageRoot.GetComponentInChildren<TMP_Text>(true)
+            : null;
+        if (introductionText != null)
+        {
+            introductionText.text = ResolveSceneAuthoredRightDescription(binding, definition);
+            introductionText.color = BodyColor;
+            introductionText.fontSize = Mathf.Min(introductionText.fontSize, 20f);
+            introductionText.enableWordWrapping = true;
+            introductionText.overflowMode = TextOverflowModes.Ellipsis;
+            introductionText.alignment = TextAlignmentOptions.TopLeft;
+            introductionText.raycastTarget = false;
+        }
+
+        RefreshSceneAuthoredRightProgress(binding.buildingId, rightRoot, definition);
+    }
+
+    private SceneAuthoredHandbookCardBinding ResolveSelectedSceneAuthoredHandbookBinding()
+    {
+        EnsureSelectedSceneAuthoredHandbookCard();
+        if (selectedSceneHandbookCardObject == null)
+        {
+            return null;
+        }
+
+        for (int i = 0; i < sceneHandbookCardBindings.Count; i++)
+        {
+            SceneAuthoredHandbookCardBinding binding = sceneHandbookCardBindings[i];
+            if (binding?.cardObject == selectedSceneHandbookCardObject)
+            {
+                return binding;
+            }
+        }
+
+        return null;
+    }
+
+    private static string ResolveSceneAuthoredRightTitle(
+        SceneAuthoredHandbookCardBinding binding,
+        BuildingDefinition definition)
+    {
+        if (binding?.detailData != null && !string.IsNullOrWhiteSpace(binding.detailData.buildingName))
+        {
+            return binding.detailData.buildingName;
+        }
+
+        if (binding?.titleText != null && !string.IsNullOrWhiteSpace(binding.titleText.text))
+        {
+            return binding.titleText.text;
+        }
+
+        if (!string.IsNullOrWhiteSpace(definition.detailTitle))
+        {
+            return definition.detailTitle;
+        }
+
+        return definition.displayName;
+    }
+
+    private static Sprite ResolveSceneAuthoredRightSprite(SceneAuthoredHandbookCardBinding binding)
+    {
+        if (binding?.detailData != null && binding.detailData.detailSprite1 != null)
+        {
+            return binding.detailData.detailSprite1;
+        }
+
+        return binding?.previewImage != null ? binding.previewImage.sprite : null;
+    }
+
+    private static string ResolveSceneAuthoredRightDescription(
+        SceneAuthoredHandbookCardBinding binding,
+        BuildingDefinition definition)
+    {
+        if (binding?.detailData != null && !string.IsNullOrWhiteSpace(binding.detailData.introduction1))
+        {
+            return binding.detailData.introduction1;
+        }
+
+        if (!string.IsNullOrWhiteSpace(definition.detailDescription))
+        {
+            return definition.detailDescription;
+        }
+
+        return binding?.descriptionText != null ? binding.descriptionText.text : string.Empty;
+    }
+
+    private static void RefreshSceneAuthoredRightProgress(
+        CatalogueBuildingId buildingId,
+        Transform rightRoot,
+        BuildingDefinition definition)
+    {
+        if (rightRoot == null || definition == null)
+        {
+            return;
+        }
+
+        RuntimeProgressState runtimeState = RuntimeProgressState.Instance;
+        int slotCount = definition.slotDefinitions != null ? definition.slotDefinitions.Length : 0;
+        int unlockedSlotCount = runtimeState != null ? runtimeState.GetUnlockedSlotCount(buildingId) : 0;
+
+        TMP_Text specialProgressText = FindTmpTextContaining(rightRoot, "专用进度");
+        if (specialProgressText != null)
+        {
+            specialProgressText.text = $"专用进度（{unlockedSlotCount}/{slotCount}）";
+        }
+
+        Transform proprietaryRoot = FindTransformByName(rightRoot, SceneAuthoredProprietaryMaterialName);
+        if (proprietaryRoot != null)
+        {
+            Button[] slotButtons = proprietaryRoot.GetComponentsInChildren<Button>(true);
+            Array.Sort(slotButtons, (left, right) => string.CompareOrdinal(left.name, right.name));
+            for (int i = 0; i < slotButtons.Length && i < slotCount; i++)
+            {
+                Image slotImage = slotButtons[i].GetComponent<Image>();
+                if (slotImage == null)
+                {
+                    continue;
+                }
+
+                bool unlocked = runtimeState != null && runtimeState.IsSlotUnlocked(buildingId, i);
+                slotImage.color = unlocked ? SceneHandbookSlotUnlockedColor : SceneHandbookSlotLockedColor;
+            }
+        }
+
+        Transform generalRoot = FindTransformByName(rightRoot, SceneAuthoredGeneralMaterialName);
+        Slider generalSlider = generalRoot != null ? generalRoot.GetComponentInChildren<Slider>(true) : null;
+        if (generalSlider == null)
+        {
+            return;
+        }
+
+        int progress = runtimeState != null ? runtimeState.GetBuildingProgress(buildingId) : 0;
+        generalSlider.minValue = 0f;
+        generalSlider.maxValue = Mathf.Max(1, definition.requiredProgress);
+        generalSlider.wholeNumbers = true;
+        generalSlider.SetValueWithoutNotify(progress);
+    }
+
+    private static CatalogueBuildingId ResolveCatalogueBuildingId(GameObject cardObject, int zeroBasedIndex)
+    {
+        if (cardObject != null &&
+            TryResolveCatalogueBuildingIdFromTitle(
+                ResolveSceneAuthoredCardTitleText(cardObject.transform)?.text,
+                out CatalogueBuildingId titleBuildingId))
+        {
+            return titleBuildingId;
+        }
+
+        CatalogueBuildingUnlockState unlockState = cardObject != null
+            ? cardObject.GetComponent<CatalogueBuildingUnlockState>()
+            : null;
+        if (unlockState != null)
+        {
+            return unlockState.buildingId;
+        }
+
+        return (CatalogueBuildingId)Mathf.Clamp(
+            zeroBasedIndex,
+            0,
+            Enum.GetValues(typeof(CatalogueBuildingId)).Length - 1);
+    }
+
+    private static bool TryResolveCatalogueBuildingIdFromTitle(string title, out CatalogueBuildingId buildingId)
+    {
+        if (!string.IsNullOrWhiteSpace(title))
+        {
+            if (title.Contains("土楼") || title.Contains("福建"))
+            {
+                buildingId = CatalogueBuildingId.Building1;
+                return true;
+            }
+
+            if (title.Contains("赵州") || title.Contains("桥"))
+            {
+                buildingId = CatalogueBuildingId.Building2;
+                return true;
+            }
+
+            if (title.Contains("水乡") || title.Contains("民居") || title.Contains("安徽") || title.Contains("苏浙"))
+            {
+                buildingId = CatalogueBuildingId.Building3;
+                return true;
+            }
+        }
+
+        buildingId = CatalogueBuildingId.Building1;
+        return false;
+    }
+
+    private static Slider ResolveSceneAuthoredBuildingSlider(Transform cardTransform)
+    {
+        Transform sliderTransform = FindDirectChild(cardTransform, "Slider");
+        return sliderTransform != null
+            ? sliderTransform.GetComponent<Slider>()
+            : cardTransform.GetComponentInChildren<Slider>(true);
+    }
+
+    private static GameObject ResolveSceneAuthoredStatusVisual(Transform cardTransform, string childName)
+    {
+        Transform child = FindDirectChild(cardTransform, childName);
+        return child != null ? child.gameObject : null;
+    }
+
+    private static GameObject ResolveSceneAuthoredSelectionFrame(Transform cardTransform)
+    {
+        RectTransform cardRect = cardTransform as RectTransform;
+        if (cardRect == null)
+        {
+            return null;
+        }
+
+        Vector2 cardSize = ResolveRectSize(cardRect);
+        for (int i = 0; i < cardTransform.childCount; i++)
+        {
+            Transform child = cardTransform.GetChild(i);
+            Image image = child != null ? child.GetComponent<Image>() : null;
+            RectTransform imageRect = child as RectTransform;
+            if (image == null || imageRect == null)
+            {
+                continue;
+            }
+
+            Vector2 imageSize = ResolveRectSize(imageRect);
+            if (imageSize.x >= cardSize.x * 0.78f && imageSize.y >= cardSize.y * 0.78f)
+            {
+                return child.gameObject;
+            }
+        }
+
+        return null;
+    }
+
+    private static Image ResolveSceneAuthoredCardPreviewImage(Transform cardTransform, GameObject selectionFrame)
+    {
+        Transform picture = FindDirectChild(cardTransform, "Picture");
+        Image pictureImage = picture != null ? picture.GetComponent<Image>() : null;
+        if (pictureImage != null)
+        {
+            return pictureImage;
+        }
+
+        RectTransform cardRect = cardTransform as RectTransform;
+        Vector2 cardSize = cardRect != null ? ResolveRectSize(cardRect) : Vector2.zero;
+        for (int i = 0; i < cardTransform.childCount; i++)
+        {
+            Transform child = cardTransform.GetChild(i);
+            if (child == null || child.gameObject == selectionFrame)
+            {
+                continue;
+            }
+
+            Image image = child.GetComponent<Image>();
+            RectTransform imageRect = child as RectTransform;
+            if (image == null || imageRect == null)
+            {
+                continue;
+            }
+
+            Vector2 imageSize = ResolveRectSize(imageRect);
+            if (imageSize.x >= 20f && imageSize.y >= 20f &&
+                (cardSize == Vector2.zero || imageSize.x < cardSize.x * 0.78f))
+            {
+                return image;
+            }
+        }
+
+        return null;
+    }
+
+    private static RectTransform ResolveSceneAuthoredSelectionPointer(
+        Transform cardTransform,
+        GameObject selectionFrame,
+        Image previewImage)
+    {
+        RectTransform cardRect = cardTransform as RectTransform;
+        if (cardRect == null)
+        {
+            return null;
+        }
+
+        Vector2 cardSize = ResolveRectSize(cardRect);
+        RectTransform pointer = null;
+        float pointerX = float.MaxValue;
+        for (int i = 0; i < cardTransform.childCount; i++)
+        {
+            Transform child = cardTransform.GetChild(i);
+            if (child == null ||
+                child.gameObject == selectionFrame ||
+                IsSceneAuthoredStatusVisualName(child.name) ||
+                (previewImage != null && child.gameObject == previewImage.gameObject))
+            {
+                continue;
+            }
+
+            Image image = child.GetComponent<Image>();
+            RectTransform imageRect = child as RectTransform;
+            if (image == null || imageRect == null)
+            {
+                continue;
+            }
+
+            Vector2 imageSize = ResolveRectSize(imageRect);
+            bool isSmallPointer = imageSize.x <= Mathf.Max(32f, cardSize.x * 0.22f) &&
+                                  imageSize.y <= Mathf.Max(32f, cardSize.y * 0.65f);
+            if (!isSmallPointer || imageRect.anchoredPosition.x >= pointerX)
+            {
+                continue;
+            }
+
+            pointer = imageRect;
+            pointerX = imageRect.anchoredPosition.x;
+        }
+
+        return pointer;
+    }
+
+    private static TMP_Text ResolveSceneAuthoredCardTitleText(Transform cardTransform)
+    {
+        Transform title = FindDirectChild(cardTransform, "Name");
+        return title != null ? title.GetComponent<TMP_Text>() : null;
+    }
+
+    private static TMP_Text ResolveSceneAuthoredCardDescriptionText(Transform cardTransform)
+    {
+        if (cardTransform == null)
+        {
+            return null;
+        }
+
+        for (int i = 0; i < cardTransform.childCount; i++)
+        {
+            Transform child = cardTransform.GetChild(i);
+            TMP_Text text = child != null ? child.GetComponent<TMP_Text>() : null;
+            if (text == null || string.Equals(child.name, "Name", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            return text;
+        }
+
+        return null;
+    }
+
+    private static Vector2 ResolveRectSize(RectTransform rectTransform)
+    {
+        if (rectTransform == null)
+        {
+            return Vector2.zero;
+        }
+
+        Vector2 size = rectTransform.rect.size;
+        if (size.x <= 0.001f || size.y <= 0.001f)
+        {
+            size = rectTransform.sizeDelta;
+        }
+
+        return new Vector2(Mathf.Abs(size.x), Mathf.Abs(size.y));
+    }
+
+    private static void HideLooseSceneAuthoredStatusVisuals(Transform leftPanel)
+    {
+        if (leftPanel == null)
+        {
+            return;
+        }
+
+        for (int i = 0; i < leftPanel.childCount; i++)
+        {
+            Transform child = leftPanel.GetChild(i);
+            if (child == null || !IsSceneAuthoredStatusVisualName(child.name))
+            {
+                continue;
+            }
+
+            child.gameObject.SetActive(false);
         }
     }
 
@@ -1350,7 +2103,7 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
             return null;
         }
 
-        Transform closeVisualRoot = FindTransformByName(pageRoot.transform, "Setting");
+        Transform closeVisualRoot = FindSceneBookmarkVisual(pageRoot.transform, SceneAuthoredCloseButtonName);
         if (closeVisualRoot != null)
         {
             Graphic closeGraphic = closeVisualRoot.GetComponent<Graphic>();
@@ -1369,7 +2122,7 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
             }
         }
 
-        Button sceneCloseButton = FindButtonByName(pageRoot.transform, "Setting");
+        Button sceneCloseButton = GetOrCreateBookmarkHitAreaButton(closeVisualRoot);
         if (sceneCloseButton == null)
         {
             return null;
@@ -1397,7 +2150,7 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
             }
 
             string sceneTabName = GetSceneTabButtonName(targetPage);
-            Transform visualRoot = FindTransformByName(pageRoot.transform, sceneTabName);
+            Transform visualRoot = FindSceneBookmarkVisual(pageRoot.transform, sceneTabName);
             if (visualRoot != null)
             {
                 RectTransform visualRect = visualRoot as RectTransform;
@@ -1427,7 +2180,7 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
                 }
             }
 
-            Button button = FindButtonByName(pageRoot.transform, sceneTabName);
+            Button button = GetOrCreateBookmarkHitAreaButton(visualRoot);
             if (button == null)
             {
                 continue;
@@ -1465,7 +2218,7 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
             case IllustratedHandbookPage.Mission:
                 return "Mission";
             case IllustratedHandbookPage.Setting:
-                return "Setting";
+                return SceneAuthoredSettingTabName;
             default:
                 return string.Empty;
         }
@@ -1516,7 +2269,7 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
                 continue;
             }
 
-            Transform visualRoot = FindTransformByName(pageRoot, GetSceneTabButtonName(page));
+            Transform visualRoot = FindSceneBookmarkVisual(pageRoot, page);
             RectTransform visualRect = visualRoot as RectTransform;
             if (visualRect == null)
             {
@@ -1566,7 +2319,7 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
                 continue;
             }
 
-            Transform visualRoot = FindTransformByName(chromeRoot, GetSceneTabButtonName(page));
+            Transform visualRoot = FindSceneBookmarkVisual(chromeRoot, page);
             if (visualRoot == null)
             {
                 continue;
@@ -1587,7 +2340,7 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         restoreOrder.Sort((left, right) => left.Value.CompareTo(right.Value));
         for (int i = 0; i < restoreOrder.Count; i++)
         {
-            Transform visualRoot = FindTransformByName(chromeRoot, GetSceneTabButtonName(restoreOrder[i].Key));
+            Transform visualRoot = FindSceneBookmarkVisual(chromeRoot, restoreOrder[i].Key);
             if (visualRoot == null || visualRoot.parent == null)
             {
                 continue;
@@ -1619,14 +2372,14 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
                 continue;
             }
 
-            Transform visualRoot = FindTransformByName(chromeRoot, GetSceneTabButtonName(page));
+            Transform visualRoot = FindSceneBookmarkVisual(chromeRoot, page);
             if (visualRoot != null)
             {
                 visualRoot.SetAsLastSibling();
             }
         }
 
-        Transform selectedRoot = FindTransformByName(chromeRoot, GetSceneTabButtonName(activePage));
+        Transform selectedRoot = FindSceneBookmarkVisual(chromeRoot, activePage);
         if (selectedRoot != null)
         {
             selectedRoot.SetAsLastSibling();
@@ -1800,13 +2553,33 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         }
 
         if (string.Equals(transform.name, LegacyFujianTulouButtonName, StringComparison.Ordinal) ||
-            transform.name.StartsWith(HandbookCardNamePrefix, StringComparison.Ordinal))
+            transform.name.StartsWith(HandbookCardNamePrefix, StringComparison.Ordinal) ||
+            IsSceneAuthoredHandbookCard(transform))
         {
             return true;
         }
 
         return transform.GetComponent<CatalogueBuildingUnlockState>() != null ||
                transform.GetComponent<BuildingProgressController>() != null;
+    }
+
+    private static bool IsSceneAuthoredHandbookCard(Transform transform)
+    {
+        if (transform == null ||
+            !transform.name.EndsWith("Button", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        return FindDirectChild(transform, "Name") != null &&
+               FindDirectChild(transform, "Slider") != null &&
+               (FindDirectChild(transform, "Picture") != null || FindDirectChild(transform, "Image") != null);
+    }
+
+    private static bool IsSceneAuthoredStatusVisualName(string objectName)
+    {
+        return string.Equals(objectName, "Lock", StringComparison.Ordinal) ||
+               string.Equals(objectName, "Unlock", StringComparison.Ordinal);
     }
 
     private void ResetScrollPosition()
@@ -1889,6 +2662,7 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
     {
         RefreshSceneAuthoredPersonalPortrait();
         RefreshSceneAuthoredPersonalBackpack();
+        RefreshSceneAuthoredPersonalInkOptions();
         UpdateTextPage(IllustratedHandbookPage.IllustratedHandbook, BuildIllustratedHandbookBody(), BuildIllustratedHandbookFooter());
         UpdateTextPage(IllustratedHandbookPage.PersonalInformation, BuildPersonalInformationBody(), BuildPersonalInformationFooter());
         UpdateTextPage(IllustratedHandbookPage.PhotoAlbum, BuildPhotoAlbumBody(), BuildPhotoAlbumFooter());
@@ -1923,6 +2697,33 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
 #endif
     }
 
+    private void RefreshSceneAuthoredSettings(IllustratedHandbookPage activePage)
+    {
+        if (sceneSettingsToggleBinder != null && activePage != IllustratedHandbookPage.Setting)
+        {
+            sceneSettingsToggleBinder.Release();
+        }
+
+        if (!usesSceneAuthoredPages ||
+            activePage != IllustratedHandbookPage.Setting ||
+            settingCanvas == null)
+        {
+            return;
+        }
+
+        if (sceneSettingsToggleBinder == null)
+        {
+            sceneSettingsToggleBinder = settingCanvas.GetComponent<LegacySettingsToggleBinder>();
+            if (sceneSettingsToggleBinder == null)
+            {
+                sceneSettingsToggleBinder = settingCanvas.AddComponent<LegacySettingsToggleBinder>();
+            }
+        }
+
+        sceneSettingsToggleBinder.Bind();
+        sceneSettingsToggleBinder.Refresh();
+    }
+
     private void RefreshSceneAuthoredPersonalPortrait()
     {
         if (!usesSceneAuthoredPages || personalInformationCanvas == null)
@@ -1949,25 +2750,67 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
     private static Sprite ResolveRuntimePlayerPortraitSprite()
     {
         PlayerProfileData profile = FindObjectOfType<PlayerProfileData>(true);
-        if (profile != null && profile.avatar != null)
+        GameObject playerObject = ResolveRuntimePlayerObject(profile);
+        Sprite frontSprite = ResolveFrontFacingPlayerSprite(playerObject);
+        if (frontSprite != null)
         {
-            return profile.avatar;
+            if (profile != null)
+            {
+                profile.avatar = frontSprite;
+            }
+
+            return frontSprite;
         }
 
-        GameObject playerObject = ResolveRuntimePlayerObject(profile);
+        return profile != null ? profile.avatar : null;
+    }
+
+    private static Sprite ResolveFrontFacingPlayerSprite(GameObject playerObject)
+    {
         SpriteRenderer spriteRenderer = playerObject != null ? playerObject.GetComponent<SpriteRenderer>() : null;
         if (spriteRenderer == null && playerObject != null)
         {
             spriteRenderer = playerObject.GetComponentInChildren<SpriteRenderer>(true);
         }
 
-        Sprite fallbackSprite = spriteRenderer != null ? spriteRenderer.sprite : null;
-        if (profile != null && fallbackSprite != null)
+        Sprite currentSprite = spriteRenderer != null ? spriteRenderer.sprite : null;
+        return ResolveLoadedFrontFacingSprite(currentSprite) ?? currentSprite;
+    }
+
+    private static Sprite ResolveLoadedFrontFacingSprite(Sprite currentSprite)
+    {
+        if (currentSprite == null || currentSprite.texture == null)
         {
-            profile.avatar = fallbackSprite;
+            return null;
         }
 
-        return fallbackSprite;
+        if (IsLikelyFrontFacingPlayerSprite(currentSprite))
+        {
+            return currentSprite;
+        }
+
+        Sprite[] loadedSprites = Resources.FindObjectsOfTypeAll<Sprite>();
+        for (int i = 0; i < loadedSprites.Length; i++)
+        {
+            Sprite candidate = loadedSprites[i];
+            if (candidate == null ||
+                candidate.texture != currentSprite.texture ||
+                !IsLikelyFrontFacingPlayerSprite(candidate))
+            {
+                continue;
+            }
+
+            return candidate;
+        }
+
+        return null;
+    }
+
+    private static bool IsLikelyFrontFacingPlayerSprite(Sprite sprite)
+    {
+        return sprite != null &&
+               !string.IsNullOrWhiteSpace(sprite.name) &&
+               sprite.name.EndsWith("_1", StringComparison.Ordinal);
     }
 
     private static GameObject ResolveRuntimePlayerObject(PlayerProfileData profile)
@@ -2016,8 +2859,29 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
             Image iconImage = EnsurePersonalBackpackSlotIcon(slotRect);
             ArchitecturalCrystal? item = backpack != null ? backpack.GetItem(slotIndex) : null;
             ApplyPersonalBackpackSlotIcon(iconImage, item);
+            SetSceneAuthoredSelectionVisual(slotRect, PersonalBackpackSelectionVisualName, slotIndex == selectedPersonalBackpackSlotIndex);
             hoverHandler.RefreshHover();
         }
+    }
+
+    private void SelectPersonalBackpackSlot(int slotIndex)
+    {
+        int resolvedIndex = Mathf.Clamp(slotIndex, 0, 5);
+        if (selectedPersonalBackpackSlotIndex == resolvedIndex)
+        {
+            RefreshSceneAuthoredPersonalBackpack();
+            return;
+        }
+
+        selectedPersonalBackpackSlotIndex = resolvedIndex;
+        BackpackUI backpackUI = FindObjectOfType<BackpackUI>(true);
+        if (backpackUI != null)
+        {
+            backpackUI.SelectSlot(resolvedIndex);
+        }
+
+        RefreshSceneAuthoredPersonalBackpack();
+        MusicManager.PlaySfx(SfxCueId.SlotSwitch);
     }
 
     private void EnsureBackpackInventorySubscription(BackpackMananger backpack)
@@ -2094,7 +2958,7 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         return true;
     }
 
-    private static PersonalBackpackSlotHoverHandler EnsurePersonalBackpackSlotHover(RectTransform slotRect, int slotIndex)
+    private PersonalBackpackSlotHoverHandler EnsurePersonalBackpackSlotHover(RectTransform slotRect, int slotIndex)
     {
         Graphic slotGraphic = slotRect != null ? slotRect.GetComponent<Graphic>() : null;
         if (slotGraphic != null)
@@ -2102,7 +2966,7 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
             slotGraphic.raycastTarget = true;
         }
 
-        PersonalBackpackSlotHoverHandler hoverHandler = EnsurePersonalBackpackSlotHoverHandler(slotRect.gameObject, slotIndex);
+        PersonalBackpackSlotHoverHandler hoverHandler = EnsurePersonalBackpackSlotHoverHandler(slotRect.gameObject, this, slotIndex);
         Button[] childButtons = slotRect.GetComponentsInChildren<Button>(true);
         for (int i = 0; i < childButtons.Length; i++)
         {
@@ -2118,13 +2982,16 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
                 targetGraphic.raycastTarget = true;
             }
 
-            EnsurePersonalBackpackSlotHoverHandler(button.gameObject, slotIndex);
+            EnsurePersonalBackpackSlotHoverHandler(button.gameObject, this, slotIndex);
         }
 
         return hoverHandler;
     }
 
-    private static PersonalBackpackSlotHoverHandler EnsurePersonalBackpackSlotHoverHandler(GameObject targetObject, int slotIndex)
+    private static PersonalBackpackSlotHoverHandler EnsurePersonalBackpackSlotHoverHandler(
+        GameObject targetObject,
+        IllustratedHandbookTabsController owner,
+        int slotIndex)
     {
         PersonalBackpackSlotHoverHandler hoverHandler = targetObject.GetComponent<PersonalBackpackSlotHoverHandler>();
         if (hoverHandler == null)
@@ -2132,7 +2999,7 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
             hoverHandler = targetObject.AddComponent<PersonalBackpackSlotHoverHandler>();
         }
 
-        hoverHandler.Bind(slotIndex);
+        hoverHandler.Bind(owner, slotIndex);
         return hoverHandler;
     }
 
@@ -2218,15 +3085,280 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         return RuntimeSpriteDisplaySanitizer.GetDisplaySprite(displaySprite);
     }
 
-    private sealed class PersonalBackpackSlotHoverHandler : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, IPointerMoveHandler
+    private void RefreshSceneAuthoredPersonalInkOptions()
     {
+        if (!usesSceneAuthoredPages || personalInformationCanvas == null)
+        {
+            return;
+        }
+
+        List<RectTransform> optionRects = new List<RectTransform>();
+        CollectPersonalInkOptionRects(personalInformationCanvas.transform, optionRects);
+        if (optionRects.Count == 0)
+        {
+            return;
+        }
+
+        optionRects.Sort((left, right) => left.anchoredPosition.x.CompareTo(right.anchoredPosition.x));
+
+        WeaponType selectedWeaponType = PlayerLoadoutRuntime.CurrentWeaponType;
+        if (!IsPersonalInkOptionWeaponType(selectedWeaponType))
+        {
+            selectedWeaponType = WeaponType.DirectInk;
+            PlayerLoadoutRuntime.CurrentWeaponType = selectedWeaponType;
+        }
+
+        int optionCount = Mathf.Min(optionRects.Count, PersonalInkOptionWeaponTypes.Length);
+        for (int i = 0; i < optionCount; i++)
+        {
+            RectTransform optionRect = optionRects[i];
+            WeaponType optionWeaponType = PersonalInkOptionWeaponTypes[i];
+            EnsurePersonalInkOptionBehaviour(optionRect, optionWeaponType);
+            bool selected = optionWeaponType == selectedWeaponType;
+            SetPersonalInkSelectionVisual(optionRect, selected);
+        }
+
+        RefreshPersonalInkDescription(selectedWeaponType);
+    }
+
+    private void SelectPersonalInkWeapon(WeaponType weaponType)
+    {
+        PlayerLoadoutRuntime.CurrentWeaponType = weaponType;
+
+        PlayerProfileData profile = FindObjectOfType<PlayerProfileData>(true);
+        if (profile != null)
+        {
+            profile.currentWeaponType = weaponType;
+            profile.currentInkType = weaponType.ToInkType();
+            profile.SetEffectiveWeapon(weaponType);
+        }
+
+        PlayerAttributeManager attributeManager = PlayerAttributeManager.Instance != null
+            ? PlayerAttributeManager.Instance
+            : FindObjectOfType<PlayerAttributeManager>(true);
+        if (attributeManager != null)
+        {
+            attributeManager.ApplyAllBonus();
+        }
+
+        PlayerAttack playerAttack = FindObjectOfType<PlayerAttack>(true);
+        if (playerAttack != null)
+        {
+            playerAttack.RefreshInkUI();
+        }
+
+        GameProgressPersistence.SaveIfReady();
+        RefreshSceneAuthoredPersonalInkOptions();
+        MusicManager.PlaySfx(SfxCueId.SlotSwitch);
+    }
+
+    private static void CollectPersonalInkOptionRects(Transform root, List<RectTransform> optionRects)
+    {
+        if (root == null || optionRects == null)
+        {
+            return;
+        }
+
+        Transform weaponRoot = FindTransformByName(root, PersonalInkRootName);
+        if (weaponRoot == null)
+        {
+            return;
+        }
+
+        for (int i = 0; i < weaponRoot.childCount; i++)
+        {
+            Transform child = weaponRoot.GetChild(i);
+            if (child is not RectTransform optionRect ||
+                !child.name.StartsWith(PersonalInkOptionNamePrefix, StringComparison.Ordinal) ||
+                FindDirectChild(child, PersonalInkButtonName) == null ||
+                FindDirectChild(child, PersonalInkUsedName) == null)
+            {
+                continue;
+            }
+
+            optionRects.Add(optionRect);
+        }
+    }
+
+    private void EnsurePersonalInkOptionBehaviour(RectTransform optionRect, WeaponType weaponType)
+    {
+        if (optionRect == null)
+        {
+            return;
+        }
+
+        Graphic optionGraphic = optionRect.GetComponent<Graphic>();
+        if (optionGraphic != null)
+        {
+            optionGraphic.raycastTarget = true;
+        }
+
+        EnsurePersonalInkClickHandler(optionRect.gameObject, weaponType);
+
+        Graphic[] childGraphics = optionRect.GetComponentsInChildren<Graphic>(true);
+        for (int i = 0; i < childGraphics.Length; i++)
+        {
+            Graphic childGraphic = childGraphics[i];
+            if (childGraphic == null)
+            {
+                continue;
+            }
+
+            childGraphic.raycastTarget = true;
+            EnsurePersonalInkClickHandler(childGraphic.gameObject, weaponType);
+        }
+
+        Transform buttonTransform = FindDirectChild(optionRect, PersonalInkButtonName);
+        Button button = buttonTransform != null ? buttonTransform.GetComponent<Button>() : null;
+        if (button != null)
+        {
+            button.transition = Selectable.Transition.None;
+            EnsurePersonalInkClickHandler(button.gameObject, weaponType);
+        }
+    }
+
+    private void EnsurePersonalInkClickHandler(GameObject targetObject, WeaponType weaponType)
+    {
+        if (targetObject == null)
+        {
+            return;
+        }
+
+        PersonalInkOptionClickHandler handler = targetObject.GetComponent<PersonalInkOptionClickHandler>();
+        if (handler == null)
+        {
+            handler = targetObject.AddComponent<PersonalInkOptionClickHandler>();
+        }
+
+        handler.Bind(this, weaponType);
+    }
+
+    private static void SetPersonalInkUsedVisual(RectTransform optionRect, bool selected)
+    {
+        Transform usedTransform = FindDirectChild(optionRect, PersonalInkUsedName);
+        if (usedTransform == null)
+        {
+            return;
+        }
+
+        usedTransform.gameObject.SetActive(selected);
+    }
+
+    private static void SetPersonalInkSelectionVisual(RectTransform optionRect, bool selected)
+    {
+        SetSceneAuthoredSelectionVisual(optionRect, PersonalInkSelectionVisualName, selected);
+        SetSceneAuthoredSelectionVisual(optionRect, PersonalInkSelectionBadgeName, selected);
+        SetPersonalInkUsedVisual(optionRect, selected);
+    }
+
+    private void RefreshPersonalInkDescription(WeaponType selectedWeaponType)
+    {
+        if (personalInformationCanvas == null)
+        {
+            return;
+        }
+
+        Transform weaponRoot = FindTransformByName(personalInformationCanvas.transform, PersonalInkRootName);
+        Transform descriptionPanel = FindDirectChild(weaponRoot, PersonalInkDescriptionPanelName);
+        TMP_Text descriptionText = descriptionPanel != null
+            ? descriptionPanel.GetComponentInChildren<TMP_Text>(true)
+            : null;
+        if (descriptionText == null)
+        {
+            return;
+        }
+
+        descriptionText.text = GetPersonalInkDescription(selectedWeaponType);
+        descriptionText.enableWordWrapping = true;
+        descriptionText.overflowMode = TextOverflowModes.Ellipsis;
+        descriptionText.alignment = TextAlignmentOptions.TopLeft;
+    }
+
+    private static string GetPersonalInkDescription(WeaponType weaponType)
+    {
+        switch (weaponType)
+        {
+            case WeaponType.BurstInk:
+                return "墨在接触的一瞬间会爆开……像扩散开的痕迹一样。\n它能同时影响周围的一切，但力量会被分散。";
+            case WeaponType.PierceInk:
+                return "这股力量不会停下……它会一直向前延伸。\n像一笔到底的线，不会被轻易阻断。";
+            case WeaponType.FlowInk:
+                return "墨不会立刻消散……它会停留一段时间，慢慢侵蚀。\n即使敌人离开，也会留下痕迹。";
+            case WeaponType.DirectInk:
+            default:
+                return "这是最基础的墨水……它会将力量集中在一点，直接命中目标。\n简单、稳定，但也最依赖你的判断。";
+        }
+    }
+
+    private static void SetSceneAuthoredSelectionVisual(RectTransform target, string visualName, bool selected)
+    {
+        if (target == null)
+        {
+            return;
+        }
+
+        Transform generatedBorder = FindDirectChild(target, PersonalSelectionBorderName);
+        if (generatedBorder != null)
+        {
+            generatedBorder.gameObject.SetActive(false);
+        }
+
+        Transform selectionVisual = FindDirectChild(target, visualName);
+        if (selectionVisual == null)
+        {
+            return;
+        }
+
+        selectionVisual.gameObject.SetActive(selected);
+        Graphic graphic = selectionVisual.GetComponent<Graphic>();
+        if (graphic != null)
+        {
+            graphic.raycastTarget = false;
+        }
+
+        CanvasGroup canvasGroup = selectionVisual.GetComponent<CanvasGroup>();
+        if (canvasGroup != null)
+        {
+            canvasGroup.alpha = selected ? 1f : 0f;
+            canvasGroup.interactable = false;
+            canvasGroup.blocksRaycasts = false;
+        }
+
+        if (selected)
+        {
+            selectionVisual.SetAsLastSibling();
+        }
+    }
+
+    private static bool IsPersonalInkOptionWeaponType(WeaponType weaponType)
+    {
+        for (int i = 0; i < PersonalInkOptionWeaponTypes.Length; i++)
+        {
+            if (PersonalInkOptionWeaponTypes[i] == weaponType)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private sealed class PersonalBackpackSlotHoverHandler : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, IPointerMoveHandler, IPointerClickHandler
+    {
+        private IllustratedHandbookTabsController owner;
         private int slotIndex = -1;
         private bool isHovered;
         private Vector2 lastScreenPosition;
 
-        public void Bind(int index)
+        public void Bind(IllustratedHandbookTabsController controller, int index)
         {
+            owner = controller;
             slotIndex = index;
+        }
+
+        public void OnPointerClick(PointerEventData eventData)
+        {
+            owner?.SelectPersonalBackpackSlot(slotIndex);
         }
 
         public void OnPointerEnter(PointerEventData eventData)
@@ -2283,6 +3415,23 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
             {
                 RuntimeBackpackHoverHud.Instance.HideForOwner(this);
             }
+        }
+    }
+
+    private sealed class PersonalInkOptionClickHandler : MonoBehaviour, IPointerClickHandler
+    {
+        private IllustratedHandbookTabsController owner;
+        private WeaponType weaponType = WeaponType.DirectInk;
+
+        public void Bind(IllustratedHandbookTabsController controller, WeaponType type)
+        {
+            owner = controller;
+            weaponType = type;
+        }
+
+        public void OnPointerClick(PointerEventData eventData)
+        {
+            owner?.SelectPersonalInkWeapon(weaponType);
         }
     }
 
@@ -2506,11 +3655,17 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
             $"显示模式：{(settings.displayMode == GameDisplayMode.Fullscreen ? "全屏" : "窗口")}",
             $"视野缩放：{GameSettingsStore.GetViewZoomLabel(settings.viewZoomIndex)}",
             $"音量：主 {Mathf.RoundToInt(settings.masterVolume * 100f)}% / 音乐 {Mathf.RoundToInt(settings.musicVolume * 100f)}% / 音效 {Mathf.RoundToInt(settings.sfxVolume * 100f)}%",
+            $"声音开关：静音 {FormatAudioToggle(settings.muteMode)} / 淡入淡出 {FormatAudioToggle(settings.musicCrossfade)} / 动态范围 {FormatAudioToggle(settings.sfxDynamicRange)} / 空间音效 {FormatAudioToggle(settings.spatialAudio)}",
             $"攻击：{settings.attackKey}    交互：{settings.interactKey}",
             $"地图：{settings.openMapKey}    暂停：{settings.pauseKey}    拍照：{settings.photoCaptureKey}"
         };
 
         return string.Join("\n", lines);
+    }
+
+    private static string FormatAudioToggle(bool enabled)
+    {
+        return enabled ? "开" : "关";
     }
 
     private string BuildSettingFooter()
@@ -2595,7 +3750,7 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         return page == IllustratedHandbookPage.IllustratedHandbook ||
                page == IllustratedHandbookPage.PersonalInformation ||
                page == IllustratedHandbookPage.PhotoAlbum ||
-               page == IllustratedHandbookPage.Mission;
+               page == IllustratedHandbookPage.Setting;
     }
 
     private static void NormalizePageRoot(GameObject pageRoot)
@@ -2919,6 +4074,98 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
             new Vector2(0.5f, 0.5f));
     }
 
+    private static Transform FindSceneBookmarkVisual(Transform pageRoot, IllustratedHandbookPage page)
+    {
+        return FindSceneBookmarkVisual(pageRoot, GetSceneTabButtonName(page));
+    }
+
+    private static Transform FindSceneBookmarkVisual(Transform pageRoot, string bookmarkName)
+    {
+        if (pageRoot == null || string.IsNullOrEmpty(bookmarkName))
+        {
+            return null;
+        }
+
+        Transform bookmarkRoot = FindDirectChild(pageRoot, SceneAuthoredBookmarkRootName) ??
+                                 FindTransformByName(pageRoot, SceneAuthoredBookmarkRootName);
+        if (bookmarkRoot == null)
+        {
+            return null;
+        }
+
+        return FindDirectChild(bookmarkRoot, bookmarkName) ??
+               FindTransformByName(bookmarkRoot, bookmarkName);
+    }
+
+    private static Button GetOrCreateBookmarkHitAreaButton(Transform visualRoot)
+    {
+        if (visualRoot == null)
+        {
+            return null;
+        }
+
+        RectTransform visualRect = visualRoot as RectTransform;
+        if (visualRect == null)
+        {
+            return null;
+        }
+
+        Transform existing = FindDirectChild(visualRoot, SceneBookmarkHitAreaName);
+        GameObject hitObject;
+        RectTransform hitRect;
+        Image hitImage;
+        Button hitButton;
+
+        if (existing != null)
+        {
+            hitObject = existing.gameObject;
+            hitRect = existing as RectTransform;
+            hitImage = hitObject.GetComponent<Image>();
+            hitButton = hitObject.GetComponent<Button>();
+        }
+        else
+        {
+            hitObject = new GameObject(SceneBookmarkHitAreaName, typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button));
+            hitObject.layer = visualRoot.gameObject.layer;
+            hitRect = hitObject.GetComponent<RectTransform>();
+            hitRect.SetParent(visualRoot, false);
+            hitImage = hitObject.GetComponent<Image>();
+            hitButton = hitObject.GetComponent<Button>();
+        }
+
+        if (hitRect == null)
+        {
+            return null;
+        }
+
+        hitRect.anchorMin = Vector2.zero;
+        hitRect.anchorMax = Vector2.one;
+        hitRect.offsetMin = new Vector2(-12f, -8f);
+        hitRect.offsetMax = new Vector2(12f, 8f);
+        hitRect.pivot = new Vector2(0.5f, 0.5f);
+        hitRect.localScale = Vector3.one;
+        hitRect.SetAsLastSibling();
+
+        if (hitImage == null)
+        {
+            hitImage = hitObject.AddComponent<Image>();
+        }
+
+        hitImage.color = new Color(1f, 1f, 1f, 0.001f);
+        hitImage.raycastTarget = true;
+        hitImage.canvasRenderer.cullTransparentMesh = false;
+
+        if (hitButton == null)
+        {
+            hitButton = hitObject.AddComponent<Button>();
+        }
+
+        hitButton.targetGraphic = hitImage;
+        hitButton.transition = Selectable.Transition.None;
+        hitButton.interactable = true;
+        return hitButton;
+    }
+
     private static Button FindButtonByName(Transform parent, string childName)
     {
         if (parent == null)
@@ -3037,6 +4284,26 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
             }
 
             return children[i].GetComponent<TMP_Text>();
+        }
+
+        return null;
+    }
+
+    private static TMP_Text FindTmpTextContaining(Transform parent, string text)
+    {
+        if (parent == null || string.IsNullOrEmpty(text))
+        {
+            return null;
+        }
+
+        TMP_Text[] texts = parent.GetComponentsInChildren<TMP_Text>(true);
+        for (int i = 0; i < texts.Length; i++)
+        {
+            TMP_Text candidate = texts[i];
+            if (candidate != null && candidate.text != null && candidate.text.Contains(text))
+            {
+                return candidate;
+            }
         }
 
         return null;
@@ -3212,5 +4479,70 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         }
 
         return "时间未记录";
+    }
+}
+
+[RequireComponent(typeof(Button))]
+internal sealed class SceneAuthoredHandbookCardSelection : MonoBehaviour
+{
+    private IllustratedHandbookTabsController owner;
+    private Button button;
+    private bool subscribed;
+
+    public void Bind(IllustratedHandbookTabsController nextOwner)
+    {
+        owner = nextOwner;
+        EnsureButton();
+        Subscribe();
+    }
+
+    private void OnEnable()
+    {
+        Subscribe();
+    }
+
+    private void OnDisable()
+    {
+        Unsubscribe();
+    }
+
+    private void OnDestroy()
+    {
+        Unsubscribe();
+    }
+
+    private void EnsureButton()
+    {
+        if (button == null)
+        {
+            button = GetComponent<Button>();
+        }
+    }
+
+    private void Subscribe()
+    {
+        EnsureButton();
+        if (button == null || subscribed)
+        {
+            return;
+        }
+
+        button.onClick.AddListener(HandleClick);
+        subscribed = true;
+    }
+
+    private void Unsubscribe()
+    {
+        if (button != null && subscribed)
+        {
+            button.onClick.RemoveListener(HandleClick);
+        }
+
+        subscribed = false;
+    }
+
+    private void HandleClick()
+    {
+        owner?.SelectSceneAuthoredHandbookCard(gameObject);
     }
 }
