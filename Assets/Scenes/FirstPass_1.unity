@@ -218960,7 +218960,6 @@ GameObject:
   - component: {fileID: 1611582313}
   - component: {fileID: 1611582312}
   - component: {fileID: 1611582311}
-  - component: {fileID: 1611582310}
   - component: {fileID: 1611582309}
   - component: {fileID: 1611582308}
   - component: {fileID: 1611582307}
@@ -219037,18 +219036,6 @@ Animator:
   m_AllowConstantClipSamplingOptimization: 1
   m_KeepAnimatorStateOnDisable: 0
   m_WriteDefaultValuesOnDisable: 0
---- !u!114 &1611582310
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1611582305}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 0}
-  m_Name: 
-  m_EditorClassIdentifier: 
 --- !u!114 &1611582311
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -219748,7 +219735,6 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1971953842}
-  - component: {fileID: 1971953844}
   - component: {fileID: 1971953843}
   m_Layer: 2
   m_Name: ProjectedShadow
@@ -219824,18 +219810,6 @@ SpriteRenderer:
   m_WasSpriteAssigned: 1
   m_MaskInteraction: 0
   m_SpriteSortPoint: 0
---- !u!114 &1971953844
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1971953841}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 0}
-  m_Name: 
-  m_EditorClassIdentifier: 
 --- !u!1 &2102991456
 GameObject:
   m_ObjectHideFlags: 0

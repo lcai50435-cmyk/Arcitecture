@@ -9,6 +9,7 @@ public class GameplayStageDefinition
     public string mapTitle;
     public string displayName;
     public string sceneName;
+    public string[] sceneAliases;
     public CatalogueBuildingId stageBuildingId;
     public CatalogueBuildingId gatingBuildingId;
     public string lockedHint;
@@ -25,7 +26,8 @@ public static class GameplayStageCatalog
             stageLabel = "第一关",
             mapTitle = "福建土楼",
             displayName = "第一关 · 福建土楼",
-            sceneName = "GameScene",
+            sceneName = "FirstPass_1",
+            sceneAliases = new[] { "GameScene" },
             stageBuildingId = CatalogueBuildingId.Building1,
             gatingBuildingId = CatalogueBuildingId.Building1,
             lockedHint = "默认开放"
@@ -117,13 +119,42 @@ public static class GameplayStageCatalog
         for (int i = 0; i < StageDefinitions.Length; i++)
         {
             GameplayStageDefinition definition = StageDefinitions[i];
-            if (!definition.isPlaceholder && definition.sceneName == sceneName)
+            if (!definition.isPlaceholder && MatchesSceneName(definition, sceneName))
             {
                 return definition;
             }
         }
 
         return null;
+    }
+
+    private static bool MatchesSceneName(GameplayStageDefinition definition, string sceneName)
+    {
+        if (definition == null)
+        {
+            return false;
+        }
+
+        if (string.Equals(definition.sceneName, sceneName, StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        string[] aliases = definition.sceneAliases;
+        if (aliases == null)
+        {
+            return false;
+        }
+
+        for (int i = 0; i < aliases.Length; i++)
+        {
+            if (string.Equals(aliases[i], sceneName, StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public static bool IsGameplayScene(string sceneName)
