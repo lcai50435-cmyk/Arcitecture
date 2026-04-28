@@ -15,6 +15,7 @@ public class InkTypeDefinition
 {
     public InkType inkType;
     public string displayName;
+    public string effectDescription;
     public Color displayColor = Color.white;
     public float baseDamage = 20f;
     public float attackInterval = 1f;
@@ -48,6 +49,7 @@ public static class InkTypeCatalog
                 {
                     inkType = InkType.DirectInk,
                     displayName = "直墨",
+                    effectDescription = "没有额外效果，单体单次攻击。",
                     displayColor = new Color(0.26f, 0.72f, 0.90f, 1f),
                     projectileStretch = new Vector2(1f, 1f),
                     impactPulseScale = 0.85f,
@@ -60,6 +62,7 @@ public static class InkTypeCatalog
                 {
                     inkType = InkType.BurstInk,
                     displayName = "爆墨",
+                    effectDescription = "命中目标后，在目标点爆炸，造成范围伤害。",
                     displayColor = new Color(0.90f, 0.38f, 0.24f, 1f),
                     projectileStretch = new Vector2(1.15f, 1.15f),
                     explodeOnHit = true,
@@ -75,6 +78,7 @@ public static class InkTypeCatalog
                 {
                     inkType = InkType.PierceInk,
                     displayName = "贯墨",
+                    effectDescription = "贯穿目标并造成伤害。",
                     displayColor = new Color(0.94f, 0.78f, 0.28f, 1f),
                     baseHitCount = 3,
                     projectileStretch = new Vector2(1.8f, 0.55f),
@@ -88,6 +92,7 @@ public static class InkTypeCatalog
                 {
                     inkType = InkType.FlowInk,
                     displayName = "流墨",
+                    effectDescription = "命中目标后，让目标持续掉血。",
                     displayColor = new Color(0.24f, 0.78f, 0.56f, 1f),
                     hasDamageOverTime = true,
                     dotDuration = 3f,
@@ -118,6 +123,16 @@ public static class InkTypeCatalog
     public static string GetDisplayName(WeaponType weaponType)
     {
         return GetDisplayName(weaponType.ToInkType());
+    }
+
+    public static string GetEffectDescription(InkType inkType)
+    {
+        return Get(inkType).effectDescription;
+    }
+
+    public static string GetEffectDescription(WeaponType weaponType)
+    {
+        return GetEffectDescription(weaponType.ToInkType());
     }
 
     public static Color GetDisplayColor(InkType inkType)

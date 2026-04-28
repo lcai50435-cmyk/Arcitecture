@@ -3,12 +3,12 @@ using UnityEngine;
 
 public enum InkModifierType
 {
-    ProjectileCount,
-    HitCount,
-    ProjectileScale,
-    SlowDebuff,
-    KnockbackDebuff,
-    SpeedAndRange
+    FanShot,
+    BurstWave,
+    ProjectileScaleAndCost,
+    SpeedAndRange,
+    ProjectileScaleAndDamage,
+    AttackSpeed
 }
 
 public struct InkDebuffRuntimeConfig
@@ -27,12 +27,15 @@ public struct InkDebuffRuntimeConfig
 
 public struct InkAttackRuntimeConfig
 {
+    public const float MinimumAttackInterval = 0.4f;
+
     public InkType inkType;
     public Color displayColor;
     public int projectileCount;
     public int burstShotCount;
     public int maxHitCount;
     public float projectileScale;
+    public float damageMultiplier;
     public Vector2 projectileStretch;
     public float speedMultiplier;
     public float lifetimeMultiplier;
@@ -42,7 +45,9 @@ public struct InkAttackRuntimeConfig
     public float baseProjectileSpeed;
     public float baseProjectileLifetime;
     public float attackInterval;
+    public float attackIntervalMultiplier;
     public int inkCost;
+    public float inkCostMultiplier;
     public bool explodeOnHit;
     public float explosionRadius;
     public float explosionDamageMultiplier;
@@ -69,6 +74,7 @@ public struct InkAttackRuntimeConfig
         burstShotCount = 1,
         maxHitCount = 1,
         projectileScale = 1f,
+        damageMultiplier = 1f,
         projectileStretch = Vector2.one,
         speedMultiplier = 1f,
         lifetimeMultiplier = 1f,
@@ -78,7 +84,9 @@ public struct InkAttackRuntimeConfig
         baseProjectileSpeed = 6f,
         baseProjectileLifetime = 5f / 6f,
         attackInterval = 1f,
+        attackIntervalMultiplier = 1f,
         inkCost = 1,
+        inkCostMultiplier = 1f,
         explodeOnHit = false,
         explosionRadius = 1.35f,
         explosionDamageMultiplier = 1f,
@@ -101,24 +109,17 @@ public struct InkAttackRuntimeConfig
 
 public static class InkModifierRuntimeConfig
 {
-    private const float TileScaleBonus = 0.28f;
-    private const float BeamSpeedAndRangeBonus = 0.14f;
-    private const float MortiseStretchBonus = 0.55f;
-    private const float MortiseHeightCompression = 0.12f;
-    private const float BracketDualShotAngleBonus = 14f;
-    private const float BracketTripleFanAngleBonus = 22f;
-    private const float BracketQuintFanAngleBonus = 30f;
-    private const float SlowPerModifier = 0.2f;
-    private const float MaxSlowRatio = 0.5f;
-    private const float BaseSlowDuration = 2f;
-    private const float ExtraSlowDuration = 0.5f;
-    private const float BaseKnockbackForce = 1.5f;
-    private const float ExtraKnockbackForce = 0.5f;
-    private const float GroundMassProjectileScaleBonus = 0.14f;
+    private const int MaxFanProjectileCount = 6;
+    private const int MaxBurstWaveCount = 3;
+    private const float TileScaleBonus = 0.22f;
+    private const float TileInkCostReduction = 0.15f;
+    private const float MinInkCostMultiplier = 0.5f;
+    private const float StructureSpeedAndRangeBonus = 0.14f;
+    private const float BeamAttackIntervalReduction = 0.12f;
+    private const float GroundMassProjectileScaleBonus = 0.18f;
+    private const float GroundMassDamageBonus = 0.16f;
     private const float GroundMassImpactPulseBonus = 0.28f;
     private const float GroundMassHeavyShockwaveBonus = 0.22f;
-    private const float SlowResidueScaleBonus = 0.2f;
-    private const float SlowResidueDurationBonus = 0.18f;
 
     public static InkAttackRuntimeConfig BuildFromBackpack(BackpackMananger backpack)
     {
@@ -156,36 +157,32 @@ public static class InkModifierRuntimeConfig
 
             switch (modifierType)
             {
-                case InkModifierType.ProjectileCount:
+                case InkModifierType.BurstWave:
                     bracketCount++;
                     break;
-                case InkModifierType.HitCount:
+                case InkModifierType.FanShot:
                     mortiseCount++;
                     break;
-                case InkModifierType.ProjectileScale:
+                case InkModifierType.ProjectileScaleAndCost:
                     tileCount++;
                     break;
-                case InkModifierType.SlowDebuff:
+                case InkModifierType.SpeedAndRange:
                     tampedEarthCount++;
                     break;
-                case InkModifierType.KnockbackDebuff:
+                case InkModifierType.ProjectileScaleAndDamage:
                     groundMassCount++;
                     break;
-                case InkModifierType.SpeedAndRange:
+                case InkModifierType.AttackSpeed:
                     beamFrameCount++;
                     break;
             }
         }
 
-        config.maxHitCount += mortiseCount;
-        config.projectileStretch.x += mortiseCount * MortiseStretchBonus;
-        config.projectileStretch.y *= Mathf.Max(0.62f, 1f - mortiseCount * MortiseHeightCompression);
-        config.projectileScale += tileCount * TileScaleBonus;
-        config.speedMultiplier += beamFrameCount * BeamSpeedAndRangeBonus;
-        config.lifetimeMultiplier += beamFrameCount * BeamSpeedAndRangeBonus;
-
         if (mortiseCount > 0)
         {
+            config.projectileCount = Mathf.Max(
+                config.projectileCount,
+                Mathf.Min(1 + mortiseCount, MaxFanProjectileCount));
             config.enableTrailAfterImage = true;
             config.trailSpawnInterval = Mathf.Min(config.trailSpawnInterval, 0.045f);
             config.trailLifetime = Mathf.Max(config.trailLifetime, 0.22f + (mortiseCount - 1) * 0.04f);
@@ -193,38 +190,26 @@ public static class InkModifierRuntimeConfig
             config.trailAlpha = Mathf.Clamp01(config.trailAlpha + mortiseCount * 0.08f);
         }
 
-        if (bracketCount == 1)
+        if (bracketCount > 0)
         {
-            config.projectileCount = Mathf.Max(config.projectileCount, 2);
-            config.fanAngleBonus += BracketDualShotAngleBonus;
-        }
-        else if (bracketCount == 2)
-        {
-            config.projectileCount = Mathf.Max(config.projectileCount, 3);
-            config.fanAngleBonus += BracketTripleFanAngleBonus;
-        }
-        else if (bracketCount >= 3)
-        {
-            config.projectileCount = Mathf.Max(config.projectileCount, 5);
-            config.fanAngleBonus += BracketQuintFanAngleBonus;
-            config.burstShotCount = 2;
-            config.burstInterval = 0.07f;
+            config.burstShotCount = Mathf.Max(
+                config.burstShotCount,
+                Mathf.Min(1 + bracketCount, MaxBurstWaveCount));
+            config.burstInterval = 0.08f;
         }
 
-        if (tampedEarthCount > 0)
+        if (tileCount > 0)
         {
-            config.debuff.slowRatio = Mathf.Min(tampedEarthCount * SlowPerModifier, MaxSlowRatio);
-            config.debuff.slowDuration = BaseSlowDuration + (tampedEarthCount - 1) * ExtraSlowDuration;
-            config.enableSlowResidue = true;
-            config.slowResidueScale += tampedEarthCount * SlowResidueScaleBonus;
-            config.slowResidueDuration += (tampedEarthCount - 1) * SlowResidueDurationBonus;
-            config.impactPulseScale += tampedEarthCount * 0.08f;
+            config.projectileScale += tileCount * TileScaleBonus;
+            config.inkCostMultiplier = Mathf.Min(
+                config.inkCostMultiplier,
+                Mathf.Max(MinInkCostMultiplier, 1f - tileCount * TileInkCostReduction));
         }
 
         if (groundMassCount > 0)
         {
-            config.debuff.knockbackForce = BaseKnockbackForce + (groundMassCount - 1) * ExtraKnockbackForce;
             config.projectileScale += groundMassCount * GroundMassProjectileScaleBonus;
+            config.damageMultiplier += groundMassCount * GroundMassDamageBonus;
             config.impactPulseScale += groundMassCount * GroundMassImpactPulseBonus;
             config.impactPulseDuration += groundMassCount * 0.03f;
             config.enableHeavyShockwave = true;
@@ -232,12 +217,21 @@ public static class InkModifierRuntimeConfig
             config.heavyShockwaveDurationMultiplier += groundMassCount * 0.08f;
         }
 
-        if (beamFrameCount > 0)
+        if (tampedEarthCount > 0)
         {
+            config.speedMultiplier += tampedEarthCount * StructureSpeedAndRangeBonus;
+            config.lifetimeMultiplier += tampedEarthCount * StructureSpeedAndRangeBonus;
             config.enableTrailAfterImage = true;
             config.trailSpawnInterval = Mathf.Min(config.trailSpawnInterval, 0.034f);
-            config.trailLifetime = Mathf.Max(config.trailLifetime, 0.18f + (beamFrameCount - 1) * 0.03f);
-            config.trailAlpha = Mathf.Clamp01(config.trailAlpha + beamFrameCount * 0.05f);
+            config.trailLifetime = Mathf.Max(config.trailLifetime, 0.18f + (tampedEarthCount - 1) * 0.03f);
+            config.trailAlpha = Mathf.Clamp01(config.trailAlpha + tampedEarthCount * 0.05f);
+        }
+
+        if (beamFrameCount > 0)
+        {
+            config.attackIntervalMultiplier = Mathf.Min(
+                config.attackIntervalMultiplier,
+                Mathf.Max(0.01f, 1f - beamFrameCount * BeamAttackIntervalReduction));
         }
 
         return config;
@@ -248,25 +242,25 @@ public static class InkModifierRuntimeConfig
         switch (type)
         {
             case ArchitecturalType.Brackets:
-                modifierType = InkModifierType.ProjectileCount;
+                modifierType = InkModifierType.BurstWave;
                 return true;
             case ArchitecturalType.MortiseAndTenonJoint:
-                modifierType = InkModifierType.HitCount;
+                modifierType = InkModifierType.FanShot;
                 return true;
             case ArchitecturalType.Tile:
-                modifierType = InkModifierType.ProjectileScale;
+                modifierType = InkModifierType.ProjectileScaleAndCost;
                 return true;
             case ArchitecturalType.TampedEarth:
-                modifierType = InkModifierType.SlowDebuff;
-                return true;
-            case ArchitecturalType.GroundMass:
-                modifierType = InkModifierType.KnockbackDebuff;
-                return true;
-            case ArchitecturalType.BeamFrame:
                 modifierType = InkModifierType.SpeedAndRange;
                 return true;
+            case ArchitecturalType.GroundMass:
+                modifierType = InkModifierType.ProjectileScaleAndDamage;
+                return true;
+            case ArchitecturalType.BeamFrame:
+                modifierType = InkModifierType.AttackSpeed;
+                return true;
             default:
-                modifierType = InkModifierType.ProjectileCount;
+                modifierType = InkModifierType.FanShot;
                 return false;
         }
     }
@@ -291,9 +285,9 @@ public static class InkModifierRuntimeConfig
 
     public static string GetAttackPatternLabel(InkAttackRuntimeConfig config)
     {
-        if (config.projectileCount >= 5 && config.burstShotCount > 1)
+        if (config.projectileCount > 1 && config.burstShotCount > 1)
         {
-            return $"{config.projectileCount}发扇形连击";
+            return $"{config.projectileCount}发扇形 / {config.burstShotCount}波";
         }
 
         if (config.projectileCount >= 3)
@@ -303,12 +297,12 @@ public static class InkModifierRuntimeConfig
 
         if (config.projectileCount == 2)
         {
-            return "双弹齐射";
+            return "2发扇形";
         }
 
         if (config.burstShotCount > 1)
         {
-            return $"{config.burstShotCount}连击";
+            return $"{config.burstShotCount}波攻击";
         }
 
         return "单发";
@@ -335,6 +329,16 @@ public static class InkModifierRuntimeConfig
             parts.Add($"大墨团 x{config.projectileScale:0.00}");
         }
 
+        if (config.damageMultiplier > 1.01f)
+        {
+            parts.Add($"伤害 x{config.damageMultiplier:0.00}");
+        }
+
+        if (config.inkCostMultiplier < 0.99f)
+        {
+            parts.Add($"省墨 x{config.inkCostMultiplier:0.00}");
+        }
+
         if (config.debuff.slowRatio > 0f)
         {
             parts.Add($"滞留减速 {config.debuff.slowRatio:P0}");
@@ -355,6 +359,12 @@ public static class InkModifierRuntimeConfig
             parts.Add($"长程 x{config.lifetimeMultiplier:0.00}");
         }
 
+        if (config.attackInterval <= InkAttackRuntimeConfig.MinimumAttackInterval + 0.001f ||
+            config.attackIntervalMultiplier < 0.99f)
+        {
+            parts.Add($"攻速 {config.attackInterval:0.00}秒");
+        }
+
         return parts.Count > 0 ? string.Join(" / ", parts) : "当前无临时构筑效果";
     }
 
@@ -372,22 +382,22 @@ public static class InkModifierRuntimeConfig
         switch (crystal.type)
         {
             case ArchitecturalType.Brackets:
-                effectLine = $"已生效：{GetAttackPatternLabel(config)}";
+                effectLine = $"已生效：{config.burstShotCount}波攻击";
                 break;
             case ArchitecturalType.MortiseAndTenonJoint:
-                effectLine = $"已生效：贯穿墨矛 x{config.maxHitCount}";
+                effectLine = $"已生效：{GetAttackPatternLabel(config)}";
                 break;
             case ArchitecturalType.Tile:
-                effectLine = $"已生效：大墨团 x{config.projectileScale:0.00}";
+                effectLine = $"已生效：大墨团 x{config.projectileScale:0.00} / 消耗 {config.inkCost}";
                 break;
             case ArchitecturalType.TampedEarth:
-                effectLine = $"已生效：滞留减速 {config.debuff.slowRatio:P0}";
+                effectLine = $"已生效：疾射 x{config.speedMultiplier:0.00} / 长程 x{config.lifetimeMultiplier:0.00}";
                 break;
             case ArchitecturalType.GroundMass:
-                effectLine = $"已生效：重击冲波 / 击退 {config.debuff.knockbackForce:0.0}";
+                effectLine = $"已生效：大墨团 x{config.projectileScale:0.00} / 伤害 x{config.damageMultiplier:0.00}";
                 break;
             case ArchitecturalType.BeamFrame:
-                effectLine = $"已生效：疾射 x{config.speedMultiplier:0.00} / 长程 x{config.lifetimeMultiplier:0.00}";
+                effectLine = $"已生效：攻速 {config.attackInterval:0.00}秒";
                 break;
             default:
                 effectLine = "已生效";

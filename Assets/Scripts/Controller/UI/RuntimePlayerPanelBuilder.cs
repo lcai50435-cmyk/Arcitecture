@@ -147,10 +147,10 @@ public static class RuntimePlayerPanelBuilder
         layout.childForceExpandWidth = true;
         layout.padding = new RectOffset(4, 4, 6, 6);
 
-        CreateWeaponOption(list.transform, weaponPanel, WeaponType.DirectInk, "直墨", "标准墨迹，稳定直射，适合作为通用基型。");
-        CreateWeaponOption(list.transform, weaponPanel, WeaponType.BurstInk, "爆墨", "命中后爆散成片，擅长处理聚集敌人。");
-        CreateWeaponOption(list.transform, weaponPanel, WeaponType.PierceInk, "贯墨", "初始可连续命中 3 次，更适合打穿一列目标。");
-        CreateWeaponOption(list.transform, weaponPanel, WeaponType.FlowInk, "流墨", "命中后附带持续 3 秒的流墨侵蚀。");
+        CreateWeaponOption(list.transform, weaponPanel, WeaponType.DirectInk, "直墨", InkTypeCatalog.GetEffectDescription(WeaponType.DirectInk));
+        CreateWeaponOption(list.transform, weaponPanel, WeaponType.BurstInk, "爆墨", InkTypeCatalog.GetEffectDescription(WeaponType.BurstInk));
+        CreateWeaponOption(list.transform, weaponPanel, WeaponType.PierceInk, "贯墨", InkTypeCatalog.GetEffectDescription(WeaponType.PierceInk));
+        CreateWeaponOption(list.transform, weaponPanel, WeaponType.FlowInk, "流墨", InkTypeCatalog.GetEffectDescription(WeaponType.FlowInk));
     }
 
     private static void CreateWeaponOption(
