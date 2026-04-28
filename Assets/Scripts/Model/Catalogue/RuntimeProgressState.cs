@@ -146,7 +146,6 @@ public class RuntimeProgressState : MonoBehaviour
             return false;
         }
 
-        completionReward = TryGrantCompletionReward(buildingId);
         NotifyStateChanged();
         return true;
     }
@@ -211,7 +210,6 @@ public class RuntimeProgressState : MonoBehaviour
         state.unlockedSlots[slotIndex] = true;
         state.grantedSlotRewards[slotIndex] = true;
         slotReward = definition.slotDefinitions[slotIndex].reward;
-        completionReward = TryGrantCompletionReward(buildingId);
         NotifyStateChanged();
         return true;
     }
@@ -252,12 +250,40 @@ public class RuntimeProgressState : MonoBehaviour
         return GetBuildingState(buildingId).isBuildingUnlocked;
     }
 
+    public bool CanUnlockBuilding(CatalogueBuildingId buildingId)
+    {
+        BuildingDefinition definition = BuildingDefinitionLibrary.Get(buildingId);
+        BuildingRuntimeStateData state = GetBuildingState(buildingId);
+        return !state.isBuildingUnlocked && state.progress >= definition.requiredProgress;
+    }
+
+    public bool TryUnlockBuilding(
+        CatalogueBuildingId buildingId,
+        out BuildingRewardDefinition completionReward)
+    {
+        completionReward = null;
+
+        if (!CanUnlockBuilding(buildingId))
+        {
+            return false;
+        }
+
+        BuildingDefinition definition = BuildingDefinitionLibrary.Get(buildingId);
+        BuildingRuntimeStateData state = GetBuildingState(buildingId);
+        state.grantedCompletionReward = true;
+        state.isBuildingUnlocked = true;
+        completionReward = definition.completionReward;
+        NotifyStateChanged();
+        return true;
+    }
+
     public bool IsBuildingRepairReady(CatalogueBuildingId buildingId)
     {
         BuildingDefinition definition = BuildingDefinitionLibrary.Get(buildingId);
         BuildingRuntimeStateData state = GetBuildingState(buildingId);
         state.EnsureSlotCapacity(definition.slotDefinitions != null ? definition.slotDefinitions.Length : 0);
-        return state.progress >= definition.requiredProgress &&
+        return state.isBuildingUnlocked &&
+               state.progress >= definition.requiredProgress &&
                GetUnlockedSlotCountInternal(state) >= state.unlockedSlots.Length;
     }
 
@@ -390,40 +416,8 @@ public class RuntimeProgressState : MonoBehaviour
 
             state.EnsureSlotCapacity(definition.slotDefinitions != null ? definition.slotDefinitions.Length : 0);
             state.progress = Mathf.Clamp(state.progress, 0, definition.requiredProgress);
-            state.isBuildingUnlocked = state.grantedCompletionReward ||
-                (state.progress >= definition.requiredProgress && GetUnlockedSlotCountInternal(state) >= state.unlockedSlots.Length);
+            state.isBuildingUnlocked = state.grantedCompletionReward;
         }
-    }
-
-    private BuildingRewardDefinition TryGrantCompletionReward(CatalogueBuildingId buildingId)
-    {
-        BuildingDefinition definition = BuildingDefinitionLibrary.Get(buildingId);
-        BuildingRuntimeStateData state = GetBuildingState(buildingId);
-
-        bool allSlotsUnlocked = state.unlockedSlots != null && state.unlockedSlots.Length > 0;
-        if (allSlotsUnlocked)
-        {
-            for (int i = 0; i < state.unlockedSlots.Length; i++)
-            {
-                if (!state.unlockedSlots[i])
-                {
-                    allSlotsUnlocked = false;
-                    break;
-                }
-            }
-        }
-
-        bool ready = state.progress >= definition.requiredProgress && allSlotsUnlocked;
-        state.isBuildingUnlocked = ready || state.grantedCompletionReward;
-
-        if (!ready || state.grantedCompletionReward || definition.completionReward == null)
-        {
-            return null;
-        }
-
-        state.grantedCompletionReward = true;
-        state.isBuildingUnlocked = true;
-        return definition.completionReward;
     }
 
     private int GetUnlockedSlotCountInternal(BuildingRuntimeStateData state)

@@ -12,6 +12,7 @@ public class GameplayStageDefinition
     public CatalogueBuildingId stageBuildingId;
     public CatalogueBuildingId gatingBuildingId;
     public string lockedHint;
+    public bool isPlaceholder;
 }
 
 public static class GameplayStageCatalog
@@ -50,6 +51,30 @@ public static class GameplayStageCatalog
             stageBuildingId = CatalogueBuildingId.Building3,
             gatingBuildingId = CatalogueBuildingId.Building2,
             lockedHint = "修复赵州桥后开放"
+        },
+        new GameplayStageDefinition
+        {
+            stageId = "stage_04",
+            stageLabel = "第四关",
+            mapTitle = "未开放",
+            displayName = "第四关 · 未开放",
+            sceneName = string.Empty,
+            stageBuildingId = CatalogueBuildingId.Building3,
+            gatingBuildingId = CatalogueBuildingId.Building3,
+            lockedHint = "后续版本开放",
+            isPlaceholder = true
+        },
+        new GameplayStageDefinition
+        {
+            stageId = "stage_05",
+            stageLabel = "第五关",
+            mapTitle = "未开放",
+            displayName = "第五关 · 未开放",
+            sceneName = string.Empty,
+            stageBuildingId = CatalogueBuildingId.Building3,
+            gatingBuildingId = CatalogueBuildingId.Building3,
+            lockedHint = "后续版本开放",
+            isPlaceholder = true
         }
     };
 
@@ -92,7 +117,7 @@ public static class GameplayStageCatalog
         for (int i = 0; i < StageDefinitions.Length; i++)
         {
             GameplayStageDefinition definition = StageDefinitions[i];
-            if (definition.sceneName == sceneName)
+            if (!definition.isPlaceholder && definition.sceneName == sceneName)
             {
                 return definition;
             }
@@ -121,7 +146,7 @@ public static class GameplayStageCatalog
 
     public static bool IsStageUnlocked(GameplayStageDefinition definition, RuntimeProgressState runtimeState = null)
     {
-        if (definition == null)
+        if (definition == null || definition.isPlaceholder)
         {
             return false;
         }
