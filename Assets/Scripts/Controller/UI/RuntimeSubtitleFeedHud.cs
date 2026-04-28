@@ -599,7 +599,7 @@ public sealed class RuntimeSubtitleFeedHud : MonoBehaviour
     {
         if (crystal.IsSpecialStructure)
         {
-            return "拾取了专用结构材料";
+            return "拾取了专用结构";
         }
 
         if (crystal.IsInkSupply)

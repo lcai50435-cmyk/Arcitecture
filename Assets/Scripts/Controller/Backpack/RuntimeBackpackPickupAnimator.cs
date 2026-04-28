@@ -27,7 +27,7 @@ public sealed class RuntimeBackpackPickupAnimator : MonoBehaviour
         Vector3 worldPosition,
         Sprite travelSprite)
     {
-        if (!crystal.IsCommonStructure && !crystal.IsRepairMaterial)
+        if (!crystal.IsCommonStructure && !crystal.IsSpecialStructure && !crystal.IsRepairMaterial)
         {
             return false;
         }

@@ -4,8 +4,9 @@ using UnityEngine.UI;
 /// <summary>
 /// 单个建筑图鉴条目的完成状态判断
 /// 条件：
-/// 1. 该建筑自己的进度条达到 100
-/// 2. 点击未解锁图标确认完成
+/// 1. 通用材料最多推进到 70% 解锁度
+/// 2. 3 个专用槽位点亮后补足剩余 30%
+/// 3. 点击未解锁图标确认完成
 /// </summary>
 public class CatalogueBuildingUnlockState : MonoBehaviour
 {
@@ -41,7 +42,6 @@ public class CatalogueBuildingUnlockState : MonoBehaviour
     public CatalogueBuildingId BuildingId => buildingId;
 
     private Button boundLockedButton;
-    private Button boundUnlockedButton;
 
     private void Start()
     {
@@ -102,12 +102,7 @@ public class CatalogueBuildingUnlockState : MonoBehaviour
 
         if (boundLockedButton != null)
         {
-            boundLockedButton.interactable = isBuildingUnlocked || isSliderComplete;
-        }
-
-        if (boundUnlockedButton != null)
-        {
-            boundUnlockedButton.interactable = isBuildingUnlocked;
+            boundLockedButton.interactable = runtimeState.CanUnlockBuilding(buildingId);
         }
 
         if (slotButtons != null)
@@ -131,24 +126,22 @@ public class CatalogueBuildingUnlockState : MonoBehaviour
         if (runtimeState.IsBuildingUnlocked(buildingId))
         {
             RefreshState();
-            ShowBuildingIntroduction();
             return;
         }
 
-        if (!runtimeState.TryUnlockBuilding(buildingId, out BuildingRewardDefinition completionReward))
+        if (!runtimeState.TryUnlockBuilding(buildingId, out _))
         {
             RefreshState();
             return;
         }
 
         RefreshState();
-        ShowCompletionReward(completionReward);
+        ShowBuildingIntroduction();
     }
 
     private void BindBuildingButtons()
     {
         BindLockedButton();
-        BindUnlockedButton();
     }
 
     private void BindLockedButton()
@@ -174,36 +167,9 @@ public class CatalogueBuildingUnlockState : MonoBehaviour
         }
     }
 
-    private void BindUnlockedButton()
-    {
-        Button nextButton = unlockedBuildingVisual != null
-            ? EnsureButtonOnVisual(unlockedBuildingVisual)
-            : null;
-
-        if (nextButton == boundLockedButton)
-        {
-            UnbindUnlockedButton();
-            return;
-        }
-
-        if (boundUnlockedButton == nextButton)
-        {
-            return;
-        }
-
-        UnbindUnlockedButton();
-        boundUnlockedButton = nextButton;
-
-        if (boundUnlockedButton != null)
-        {
-            boundUnlockedButton.onClick.AddListener(HandleBuildingButtonClicked);
-        }
-    }
-
     private void UnbindBuildingButtons()
     {
         UnbindLockedButton();
-        UnbindUnlockedButton();
     }
 
     private void UnbindLockedButton()
@@ -212,15 +178,6 @@ public class CatalogueBuildingUnlockState : MonoBehaviour
         {
             boundLockedButton.onClick.RemoveListener(HandleBuildingButtonClicked);
             boundLockedButton = null;
-        }
-    }
-
-    private void UnbindUnlockedButton()
-    {
-        if (boundUnlockedButton != null)
-        {
-            boundUnlockedButton.onClick.RemoveListener(HandleBuildingButtonClicked);
-            boundUnlockedButton = null;
         }
     }
 
@@ -314,21 +271,6 @@ public class CatalogueBuildingUnlockState : MonoBehaviour
 
         buildingDetailData = GetComponentInChildren<BuildingDetailData>(true);
         return buildingDetailData;
-    }
-
-    private void ShowCompletionReward(BuildingRewardDefinition completionReward)
-    {
-        if (completionReward == null)
-        {
-            return;
-        }
-
-        dialogUI = Dialog.EnsureTopmostRuntimeInstance();
-
-        if (dialogUI != null)
-        {
-            dialogUI.ShowClickCloseDialog($"{completionReward.title}\n{completionReward.description}");
-        }
     }
 
     private void ResolveBuildingIdIfNeeded()

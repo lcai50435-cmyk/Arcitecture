@@ -50,7 +50,7 @@ public class PlayerGetArchitectural : MonoBehaviour
         }
 
         Debug.Log(
-            $"自动提交完成：专用结构 {result.specialStructureCount}，补给 {result.inkSupplyCount}，剩余普通结构 {result.remainingCommonStructureCount}");
+            $"自动提交完成：保留专用结构 {result.remainingSpecialStructureCount}，补给 {result.inkSupplyCount}，剩余普通结构 {result.remainingCommonStructureCount}");
     }
 
     public void SubmitSingleItem(int index)
@@ -60,7 +60,12 @@ public class PlayerGetArchitectural : MonoBehaviour
 
     public bool ConsumeOneUnlockMaterial()
     {
-        return RuntimeProgressState.EnsureInstance().TryConsumeSpecialStructureInventory(1);
+        if (!ResolveRuntimeDependencies() || backpack == null)
+        {
+            return false;
+        }
+
+        return backpack.TryConsumeFirstSpecialStructureMaterial(out _);
     }
 
     public void SubmitSingleItemToBuilding(int index, CatalogueBuildingId buildingId)

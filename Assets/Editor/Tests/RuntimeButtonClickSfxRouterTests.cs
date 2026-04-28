@@ -1,5 +1,6 @@
 using System.IO;
 using System.Reflection;
+using TMPro;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.UI;
@@ -59,7 +60,7 @@ public sealed class PlayerLoadoutRuntimeTests
     }
 
     [Test]
-    public void BackpackStructureControlsEffectiveWeaponWhenNoDebugOverride()
+    public void BackpackStructureDoesNotOverrideSelectedWeapon()
     {
         PlayerLoadoutRuntime.CurrentWeaponType = WeaponType.FlowInk;
         GameObject backpackObject = new GameObject("BackpackManager");
@@ -73,7 +74,12 @@ public sealed class PlayerLoadoutRuntimeTests
                 runtimePickupOrder = 10
             };
 
-            Assert.AreEqual(WeaponType.BurstInk, RuntimeWeaponTypeResolver.ResolveEffectiveWeaponType(backpack));
+            Assert.AreEqual(WeaponType.FlowInk, RuntimeWeaponTypeResolver.ResolveEffectiveWeaponType(backpack));
+            Assert.IsFalse(RuntimeWeaponTypeResolver.TryGetActiveWeaponOverride(
+                backpack,
+                out ArchitecturalCrystal _,
+                out WeaponType _,
+                out int _));
         }
         finally
         {
@@ -82,7 +88,7 @@ public sealed class PlayerLoadoutRuntimeTests
     }
 
     [Test]
-    public void BackpackStructureOverridesDebugWeaponFallback()
+    public void DebugWeaponOverrideControlsEffectiveWeaponEvenWithBackpackStructure()
     {
         PlayerLoadoutRuntime.CurrentWeaponType = WeaponType.DirectInk;
         PlayerLoadoutRuntime.SetDebugWeaponOverride(WeaponType.FlowInk);
@@ -97,7 +103,12 @@ public sealed class PlayerLoadoutRuntimeTests
                 runtimePickupOrder = 10
             };
 
-            Assert.AreEqual(WeaponType.PierceInk, RuntimeWeaponTypeResolver.ResolveEffectiveWeaponType(backpack));
+            Assert.AreEqual(WeaponType.FlowInk, RuntimeWeaponTypeResolver.ResolveEffectiveWeaponType(backpack));
+            Assert.IsFalse(RuntimeWeaponTypeResolver.TryGetActiveWeaponOverride(
+                backpack,
+                out ArchitecturalCrystal _,
+                out WeaponType _,
+                out int _));
         }
         finally
         {
@@ -173,6 +184,16 @@ public sealed class GameDebugPageBootstrapperAttributeTests
             Object.DestroyImmediate(playerObject);
         }
 
+        if (RuntimeProgressState.Instance != null)
+        {
+            Object.DestroyImmediate(RuntimeProgressState.Instance.gameObject);
+        }
+
+        if (BackpackMananger.Instance != null)
+        {
+            Object.DestroyImmediate(BackpackMananger.Instance.gameObject);
+        }
+
         GameObject hudCanvas = GameObject.Find("GameplayStatusHudCanvas");
         if (hudCanvas != null)
         {
@@ -198,6 +219,30 @@ public sealed class GameDebugPageBootstrapperAttributeTests
     }
 
     [Test]
+    public void StructureGaugeTracksSpecialStructuresInBackpack()
+    {
+        BackpackMananger backpack = new GameObject("RuntimeBackpackManager").AddComponent<BackpackMananger>();
+        GameplayStatusHudRuntime.EnsureHealthGauge(null);
+
+        Assert.IsTrue(backpack.PickItem(ArchitecturalCrystalFactory.CreateSpecialStructureMaterial()));
+        Assert.IsTrue(backpack.PickItem(ArchitecturalCrystalFactory.CreateSpecialStructureMaterial()));
+
+        GameplayStatusHudRuntime.RefreshStructureProgressText();
+
+        GameObject structureRow = GameObject.Find("StructureRow");
+        Assert.IsNotNull(structureRow);
+
+        Slider structureSlider = structureRow.GetComponentInChildren<Slider>(true);
+        TextMeshProUGUI valueText = structureRow.GetComponentInChildren<TextMeshProUGUI>(true);
+
+        Assert.IsNotNull(structureSlider);
+        Assert.IsNotNull(valueText);
+        Assert.AreEqual(BackpackMananger.MaxSpecialStructureMaterialCount, structureSlider.maxValue);
+        Assert.AreEqual(2f, structureSlider.value);
+        Assert.AreEqual("2/3", valueText.text);
+    }
+
+    [Test]
     public void DebugPageCanCreateInAnyNamedScene()
     {
         Assert.IsTrue(InvokePrivateStaticBool("CanCreateInScene", "MainScene"));
@@ -206,9 +251,9 @@ public sealed class GameDebugPageBootstrapperAttributeTests
     }
 
     [Test]
-    public void DebugPanelHotkeyCannotOpenWhileBlockingGameplayUiIsOpen()
+    public void DebugPanelHotkeyCanOpenOverBlockingGameplayUi()
     {
-        Assert.IsFalse(InvokePrivateStaticBool("CanOpenPanelFromHotkey", true));
+        Assert.IsTrue(InvokePrivateStaticBool("CanOpenPanelFromHotkey", true));
         Assert.IsTrue(InvokePrivateStaticBool("CanOpenPanelFromHotkey", false));
     }
 
@@ -280,6 +325,44 @@ public sealed class GameDebugPageBootstrapperAttributeTests
             {
                 Directory.Delete(tempAlbumDirectory, true);
             }
+        }
+    }
+
+    [Test]
+    public void SkillDebugRowAddsSpecialStructureBackpackItems()
+    {
+        RuntimeProgressState runtimeState = RuntimeProgressState.EnsureInstance();
+        runtimeState.ResetProgress(false);
+        BackpackMananger backpack = new GameObject("RuntimeBackpackManager").AddComponent<BackpackMananger>();
+
+        GameDebugPageBootstrapper debugPage = CreateDebugPage();
+        GameObject contentObject = new GameObject("DebugContent", typeof(RectTransform));
+
+        try
+        {
+            InvokePrivate(debugPage, "BuildSkillSection", contentObject.transform);
+
+            Transform section = contentObject.transform.Find("临时构筑");
+            Assert.NotNull(section);
+            Assert.IsNull(section.Find("通用材料"));
+
+            Transform row = section.Find("专用结构");
+            Assert.NotNull(row);
+
+            Button[] buttons = row.GetComponentsInChildren<Button>(true);
+            Assert.GreaterOrEqual(buttons.Length, 2);
+
+            buttons[0].onClick.Invoke();
+            Assert.AreEqual(1, backpack.GetSpecialStructureMaterialCount());
+            Assert.AreEqual(0, runtimeState.AvailableSpecialStructureInventory);
+
+            buttons[1].onClick.Invoke();
+            Assert.AreEqual(3, backpack.GetSpecialStructureMaterialCount());
+            Assert.AreEqual(0, runtimeState.AvailableSpecialStructureInventory);
+        }
+        finally
+        {
+            Object.DestroyImmediate(contentObject);
         }
     }
 

@@ -101,41 +101,9 @@ public class CatalogueUnlockSlotButton : MonoBehaviour
             return;
         }
 
-        int remainingInventory = RuntimeProgressState.EnsureInstance().AvailableSpecialStructureInventory;
-        if (remainingInventory <= 0)
-        {
-            pendingUnlockArmed = false;
-            RefreshVisual();
-            ShowUnlockRequirementPrompt(buildingId, resolvedSlotIndex);
-            return;
-        }
-
-        float now = Time.unscaledTime;
-        bool isDoubleClick = pendingUnlockArmed && now - lastLockedClickTime <= DoubleClickWindow;
-        if (!isDoubleClick)
-        {
-            pendingUnlockArmed = true;
-            lastLockedClickTime = now;
-            RefreshVisual();
-            return;
-        }
-
         pendingUnlockArmed = false;
-        lastLockedClickTime = -10f;
-        bool success = RuntimeProgressState.EnsureInstance().TryUnlockSlot(
-            buildingId,
-            resolvedSlotIndex,
-            out BuildingRewardDefinition slotReward,
-            out BuildingRewardDefinition completionReward);
-
-        if (!success)
-        {
-            ShowUnlockRequirementPrompt(buildingId, resolvedSlotIndex);
-            return;
-        }
-
         RefreshVisual();
-        ShowRewardDialog(slotReward, completionReward);
+        ShowUnlockRequirementPrompt(buildingId, resolvedSlotIndex);
         buildingState?.RefreshState();
     }
 
@@ -333,9 +301,12 @@ public class CatalogueUnlockSlotButton : MonoBehaviour
 
     private void ShowUnlockRequirementPrompt(CatalogueBuildingId buildingId, int resolvedSlotIndex)
     {
-        int remainingInventory = RuntimeProgressState.EnsureInstance().AvailableSpecialStructureInventory;
+        BackpackMananger backpack = BackpackMananger.Instance != null
+            ? BackpackMananger.Instance
+            : FindObjectOfType<BackpackMananger>(true);
+        int remainingInventory = backpack != null ? backpack.GetSpecialStructureMaterialCount() : 0;
         string slotName = ResolveSlotName(buildingId, resolvedSlotIndex);
-        string content = $"点亮 {slotName} 需要 1 个专用结构材料。\n当前库存：{remainingInventory}";
+        string content = $"点亮 {slotName} 需要拖动 1 个专用结构到该槽位。\n当前背包专用结构：{remainingInventory}";
 
         if (!ResolveDialogReference())
         {

@@ -131,8 +131,8 @@ public static class GameplayStatusHudRuntime
         BackpackMananger backpack = BackpackMananger.Instance ?? Object.FindObjectOfType<BackpackMananger>(true);
         EnsureBackpackSubscription(backpack);
 
-        float max = BackpackMananger.MaxCommonMaterialCount;
-        float current = backpack != null ? Mathf.Clamp(backpack.GetCommonMaterialCount(), 0f, max) : 0f;
+        float max = BackpackMananger.MaxSpecialStructureMaterialCount;
+        float current = backpack != null ? Mathf.Clamp(backpack.GetSpecialStructureMaterialCount(), 0f, max) : 0f;
 
         if (structureGauge != null)
         {

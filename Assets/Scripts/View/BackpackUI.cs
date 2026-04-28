@@ -23,7 +23,7 @@ public class BackpackUI : MonoBehaviour
     private const float RuntimeFallbackSurfaceBottom = 24f;
     private const float RuntimeFallbackItemPanelWidth = 550f;
     private const float RuntimeFallbackItemPanelHeight = 124f;
-    private const float RuntimeSceneAuthoredLayoutBottom = 64f;
+    private const float RuntimeSceneAuthoredLayoutBottom = 12f;
     private const float RuntimeSceneAuthoredLayoutWidth = 920f;
     private const float RuntimeSceneAuthoredLayoutHeight = 220f;
     private const float RuntimeFallbackAttackPanelX = 459f;
@@ -463,6 +463,11 @@ public class BackpackUI : MonoBehaviour
         RectTransform attackPanel = FindBackpackPanel(runtimeCanvasRoot, RuntimeAttackPanelName);
         if (attackPanel == null)
         {
+            attackPanel = FindMergedAttackSlot(itemPanel);
+        }
+
+        if (attackPanel == null)
+        {
             attackPanel = CreateFallbackAttackPanel(runtimeCanvasRoot);
         }
 
@@ -565,26 +570,74 @@ public class BackpackUI : MonoBehaviour
     {
         RectTransform[] rectTransforms = FindObjectsOfType<RectTransform>(true);
         Scene activeScene = SceneManager.GetActiveScene();
-        RectTransform fallback = null;
+        RectTransform activeSceneCandidate = null;
+        int activeSceneScore = int.MinValue;
+        RectTransform fallbackCandidate = null;
+        int fallbackScore = int.MinValue;
 
         for (int i = 0; i < rectTransforms.Length; i++)
         {
             RectTransform rect = rectTransforms[i];
             if (rect != null && string.Equals(rect.gameObject.name, RuntimeCanvasRootName))
             {
+                int score = GetRuntimeCanvasRootScore(rect);
                 if (rect.gameObject.scene == activeScene)
                 {
-                    return rect;
+                    if (score > activeSceneScore)
+                    {
+                        activeSceneCandidate = rect;
+                        activeSceneScore = score;
+                    }
+
+                    continue;
                 }
 
-                if (fallback == null && !IllustratedUISceneLoader.IsIllustratedUiScene(rect.gameObject.scene))
+                if (!IllustratedUISceneLoader.IsIllustratedUiScene(rect.gameObject.scene) &&
+                    score > fallbackScore)
                 {
-                    fallback = rect;
+                    fallbackCandidate = rect;
+                    fallbackScore = score;
                 }
             }
         }
 
-        return fallback;
+        return activeSceneCandidate != null ? activeSceneCandidate : fallbackCandidate;
+    }
+
+    private static int GetRuntimeCanvasRootScore(RectTransform rect)
+    {
+        int score = 0;
+        if (rect == null)
+        {
+            return score;
+        }
+
+        if (rect.gameObject.activeInHierarchy)
+        {
+            score += 100;
+        }
+        else if (rect.gameObject.activeSelf)
+        {
+            score += 40;
+        }
+
+        if (FindNamedChildRecursive(rect, RuntimeItemPanelName) != null)
+        {
+            score += 20;
+        }
+
+        if (FindNamedChildRecursive(rect, RuntimeAttackPanelName) != null ||
+            FindNamedChildRecursive(rect, $"{RuntimeSlotPrefix}{RuntimeSlotCount + 1}") != null)
+        {
+            score += 10;
+        }
+
+        if (rect.GetComponent<BackpackUI>() != null)
+        {
+            score += 5;
+        }
+
+        return score;
     }
 
     private static bool IsPreferredRuntimeCanvasRoot(RectTransform rect)
@@ -794,6 +847,30 @@ public class BackpackUI : MonoBehaviour
     {
         string slotName = $"{RuntimeSlotPrefix}{slotIndex + 1}";
         Transform directChild = itemPanel != null ? itemPanel.Find(slotName) : null;
+        if (directChild is RectTransform directRect)
+        {
+            directRect.gameObject.SetActive(true);
+            return directRect;
+        }
+
+        RectTransform nestedRect = FindNamedChildRecursive(itemPanel, slotName);
+        if (nestedRect != null)
+        {
+            nestedRect.gameObject.SetActive(true);
+        }
+
+        return nestedRect;
+    }
+
+    private static RectTransform FindMergedAttackSlot(Transform itemPanel)
+    {
+        if (itemPanel == null)
+        {
+            return null;
+        }
+
+        string slotName = $"{RuntimeSlotPrefix}{RuntimeSlotCount + 1}";
+        Transform directChild = itemPanel.Find(slotName);
         if (directChild is RectTransform directRect)
         {
             directRect.gameObject.SetActive(true);
