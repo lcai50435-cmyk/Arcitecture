@@ -15,7 +15,7 @@ public class Dialog : MonoBehaviour
     private const string RuntimeDialogFontResourcePath = "UI/NotoSansSC-Black";
     private const string RuntimeTextAreaSpritePath = "Assets/File/UIResources/TextArea.png";
     private const string RuntimeDialogFontPath = "Assets/File/Fonts/NotoSansSC-Black.ttf";
-    private const int RuntimeDialogSortingOrder = 12000;
+    public const int TopmostRuntimeDialogSortingOrder = 32000;
     private const float DefaultRevealDurationPerWeight = 0.03f;
     private const float MinimumRevealDuration = 0.2f;
     private const float MaximumRevealDuration = 1.8f;
@@ -102,8 +102,9 @@ public class Dialog : MonoBehaviour
         for (int i = 0; i < dialogs.Length; i++)
         {
             Dialog dialog = dialogs[i];
-            if (dialog != null && dialog.IsRuntimeDialog())
+            if (IsUsableRuntimeDialog(dialog))
             {
+                dialog.gameObject.SetActive(true);
                 return dialog;
             }
         }
@@ -113,7 +114,29 @@ public class Dialog : MonoBehaviour
 
     public static Dialog EnsureTopmostRuntimeInstance()
     {
-        return EnsureGameplayRuntimeInstance();
+        Dialog dialog = EnsureGameplayRuntimeInstance();
+        dialog?.EnsureRuntimePanelInputSurface();
+        return dialog;
+    }
+
+    public static bool IsTopmostRuntimeDialogPanel(GameObject target)
+    {
+        if (target == null || !string.Equals(target.name, RuntimeDialogPanelName, System.StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        Dialog owner = target.GetComponentInParent<Dialog>(true);
+        return owner != null && owner.IsRuntimeDialog();
+    }
+
+    private static bool IsUsableRuntimeDialog(Dialog dialog)
+    {
+        return dialog != null &&
+               dialog.IsRuntimeDialog() &&
+               dialog.dialogPanel != null &&
+               dialog.descriptionText != null &&
+               dialog.clickCloseButton != null;
     }
 
     private void Start()
@@ -139,6 +162,14 @@ public class Dialog : MonoBehaviour
     private void Update()
     {
         TrySubscribeBackpack();
+    }
+
+    private void LateUpdate()
+    {
+        if (dialogPanel != null && dialogPanel.activeInHierarchy && IsRuntimeDialog())
+        {
+            EnsureRuntimePanelInputSurface();
+        }
     }
 
     private void TrySubscribeBackpack()
@@ -283,12 +314,6 @@ public class Dialog : MonoBehaviour
     {
         if (!waitingForClickClose) return;
 
-        if (isRevealPlaying)
-        {
-            CompleteRevealImmediately();
-            return;
-        }
-
         CloseDialog();
     }
 
@@ -430,7 +455,7 @@ public class Dialog : MonoBehaviour
         Canvas canvas = panelObject.GetComponent<Canvas>();
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;
         canvas.overrideSorting = true;
-        canvas.sortingOrder = RuntimeDialogSortingOrder;
+        canvas.sortingOrder = TopmostRuntimeDialogSortingOrder;
 
         CanvasScaler scaler = panelObject.GetComponent<CanvasScaler>();
         scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
@@ -510,7 +535,7 @@ public class Dialog : MonoBehaviour
         Canvas canvas = panelObject.GetComponent<Canvas>();
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;
         canvas.overrideSorting = true;
-        canvas.sortingOrder = RuntimeDialogSortingOrder;
+        canvas.sortingOrder = TopmostRuntimeDialogSortingOrder;
 
         CanvasScaler scaler = panelObject.GetComponent<CanvasScaler>();
         scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
@@ -524,7 +549,7 @@ public class Dialog : MonoBehaviour
         group.blocksRaycasts = false;
 
         Image backdrop = panelObject.GetComponent<Image>();
-        backdrop.color = Color.clear;
+        backdrop.color = new Color(0f, 0f, 0f, 0.42f);
 
         Button backdropButton = panelObject.GetComponent<Button>();
         backdropButton.transition = Selectable.Transition.None;
@@ -532,13 +557,13 @@ public class Dialog : MonoBehaviour
         GameObject cardObject = new GameObject("RuntimeDialogTextArea", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
         cardObject.transform.SetParent(panelObject.transform, false);
         RectTransform cardRect = cardObject.GetComponent<RectTransform>();
-        SetRect(cardRect, Vector2.zero, new Vector2(1800f, 640f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f));
+        SetRect(cardRect, Vector2.zero, new Vector2(840f, 330f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f));
 
         Image cardImage = cardObject.GetComponent<Image>();
         cardImage.sprite = panelSprite;
         cardImage.type = Image.Type.Sliced;
         cardImage.preserveAspect = false;
-        cardImage.color = new Color(0.03f, 0.03f, 0.025f, 0.78f);
+        cardImage.color = new Color(0.13f, 0.11f, 0.09f, 0.96f);
 
         GameObject textObject = new GameObject("Description", typeof(RectTransform), typeof(CanvasRenderer), typeof(Text));
         textObject.transform.SetParent(cardObject.transform, false);
@@ -548,17 +573,17 @@ public class Dialog : MonoBehaviour
             description.font = dialogFont;
         }
 
-        description.fontSize = 54;
-        description.lineSpacing = 1.08f;
+        description.fontSize = 28;
+        description.lineSpacing = 1.12f;
         description.color = new Color(1f, 0.96f, 0.88f, 1f);
         description.alignment = TextAnchor.UpperLeft;
         description.horizontalOverflow = HorizontalWrapMode.Wrap;
         description.verticalOverflow = VerticalWrapMode.Truncate;
-        StretchRectWithOffsets(description.rectTransform, 96f, 82f, 420f, 150f);
+        StretchRectWithOffsets(description.rectTransform, 52f, 42f, 52f, 92f);
 
         Button closeButton = CreateRuntimeButton(cardObject.transform);
         RectTransform closeRect = closeButton.GetComponent<RectTransform>();
-        SetRect(closeRect, new Vector2(-104f, 76f), new Vector2(220f, 86f), new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(1f, 0f));
+        SetRect(closeRect, new Vector2(-54f, 40f), new Vector2(138f, 52f), new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(1f, 0f));
 
         Image closeImage = closeButton.GetComponent<Image>();
         if (closeImage != null)
@@ -577,7 +602,7 @@ public class Dialog : MonoBehaviour
                 closeLabel.font = dialogFont;
             }
 
-            closeLabel.fontSize = 44;
+            closeLabel.fontSize = 24;
             closeLabel.color = new Color(1f, 0.96f, 0.88f, 1f);
         }
 
@@ -646,27 +671,93 @@ public class Dialog : MonoBehaviour
             return;
         }
 
+        EnsureRuntimePanelInputSurface();
         dialogPanel.SetActive(true);
         dialogPanel.transform.SetAsLastSibling();
+    }
+
+    private void EnsureRuntimePanelInputSurface()
+    {
+        if (dialogPanel == null || !IsRuntimeDialog())
+        {
+            return;
+        }
+
+        RectTransform panelRect = dialogPanel.GetComponent<RectTransform>();
+        if (panelRect != null)
+        {
+            StretchRect(panelRect);
+        }
 
         Canvas canvas = dialogPanel.GetComponent<Canvas>();
         if (canvas == null)
         {
-            canvas = dialogPanel.GetComponentInParent<Canvas>();
+            canvas = dialogPanel.AddComponent<Canvas>();
         }
 
-        if (canvas != null)
+        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        canvas.overrideSorting = true;
+        canvas.sortingOrder = TopmostRuntimeDialogSortingOrder;
+
+        if (dialogPanel.GetComponent<GraphicRaycaster>() == null)
         {
-            canvas.overrideSorting = true;
-            canvas.sortingOrder = RuntimeDialogSortingOrder;
+            dialogPanel.AddComponent<GraphicRaycaster>();
         }
 
         CanvasGroup group = dialogPanel.GetComponent<CanvasGroup>();
-        if (group != null)
+        if (group == null)
         {
-            group.alpha = 1f;
-            group.interactable = true;
-            group.blocksRaycasts = true;
+            group = dialogPanel.AddComponent<CanvasGroup>();
+        }
+
+        group.alpha = 1f;
+        group.interactable = true;
+        group.blocksRaycasts = true;
+
+        Image backdropImage = dialogPanel.GetComponent<Image>();
+        if (backdropImage == null)
+        {
+            backdropImage = dialogPanel.AddComponent<Image>();
+            backdropImage.color = Color.clear;
+        }
+
+        backdropImage.raycastTarget = true;
+        DisableNonInteractiveRuntimeRaycasts(dialogPanel.transform);
+
+        Button backdropButton = dialogPanel.GetComponent<Button>();
+        if (backdropButton == null)
+        {
+            backdropButton = dialogPanel.AddComponent<Button>();
+        }
+
+        backdropButton.transition = Selectable.Transition.None;
+        backdropButton.onClick.RemoveListener(OnClickCloseDialog);
+        backdropButton.onClick.AddListener(OnClickCloseDialog);
+        backdropCloseButton = backdropButton;
+    }
+
+    private static void DisableNonInteractiveRuntimeRaycasts(Transform root)
+    {
+        if (root == null)
+        {
+            return;
+        }
+
+        Graphic[] graphics = root.GetComponentsInChildren<Graphic>(true);
+        for (int i = 0; i < graphics.Length; i++)
+        {
+            Graphic graphic = graphics[i];
+            if (graphic == null || graphic.transform == root)
+            {
+                continue;
+            }
+
+            if (graphic.GetComponentInParent<Button>(true) != null)
+            {
+                continue;
+            }
+
+            graphic.raycastTarget = false;
         }
     }
 
@@ -791,23 +882,6 @@ public class Dialog : MonoBehaviour
 
         descriptionText.text = activeDialogContent;
         UpdateDescriptionPresentation(1f);
-    }
-
-    private void CompleteRevealImmediately()
-    {
-        if (currentCoroutine != null)
-        {
-            StopCoroutine(currentCoroutine);
-            currentCoroutine = null;
-        }
-
-        isRevealPlaying = false;
-
-        if (descriptionText != null)
-        {
-            descriptionText.text = activeDialogContent;
-            UpdateDescriptionPresentation(1f);
-        }
     }
 
     private void PrepareDescriptionForReveal()

@@ -811,7 +811,9 @@ public class UIRootManager : MonoBehaviour
         if (binding.Canvas != null)
         {
             binding.Canvas.overrideSorting = true;
-            binding.Canvas.sortingOrder = RuntimeModalStyle.ModalSortingOrder;
+            binding.Canvas.sortingOrder = Dialog.IsTopmostRuntimeDialogPanel(binding.CanvasGroup.gameObject)
+                ? Dialog.TopmostRuntimeDialogSortingOrder
+                : RuntimeModalStyle.ModalSortingOrder;
         }
 
         binding.CanvasGroup.alpha = 1f;
@@ -1165,7 +1167,9 @@ public class UIRootManager : MonoBehaviour
         }
 
         canvas.overrideSorting = true;
-        canvas.sortingOrder = RuntimeModalStyle.ModalSortingOrder;
+        canvas.sortingOrder = Dialog.IsTopmostRuntimeDialogPanel(target)
+            ? Dialog.TopmostRuntimeDialogSortingOrder
+            : RuntimeModalStyle.ModalSortingOrder;
 
         if (ReferenceEquals(canvas.gameObject, target) &&
             target.GetComponent<GraphicRaycaster>() == null)
@@ -1210,7 +1214,7 @@ public static class TmpRuntimeFontFallback
     };
 
     private const string RequiredCharacters =
-        "按住或轻点查看大地图松开预览收起继续游戏设置返回基地关卡暂停分辨率显示模式窗口全屏比例当前地图交互攻击点击继续返回总音量音乐音量控制全部游戏声音背景音乐单独强度分辨率显示模式当前比例屏幕适配自动根据窗口大小匹配视野生命构筑建筑结构图鉴背包专用材料普通结构解锁消耗数量剩余详情说明近战远程耐久防御速度倍率0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-+/():.% x";
+        "按住或轻点查看大地图松开预览收起继续游戏设置返回基地关卡暂停分辨率显示模式窗口全屏比例当前地图交互攻击点击继续返回总音量音乐音量控制全部游戏声音背景音乐单独强度分辨率显示模式当前比例屏幕适配自动根据窗口大小匹配视野生命构筑建筑结构图鉴背包专用结构普通材料解锁消耗数量剩余详情说明近战远程耐久防御速度倍率0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-+/():.% x";
 
     private static readonly string[] RuntimeFontNames =
     {

@@ -67,6 +67,29 @@ public sealed class DialogRuntimeInteractionTests
     }
 
     [Test]
+    public void ResourceBackedRuntimeDialogUsesCompactIntroductionLayout()
+    {
+        DestroyRuntimeDialogs();
+
+        Dialog dialog = Dialog.EnsureRuntimeInstance();
+
+        Transform card = dialog.dialogPanel.transform.Find("RuntimeDialogTextArea");
+        Assert.IsNotNull(card);
+
+        RectTransform cardRect = card.GetComponent<RectTransform>();
+        Assert.IsNotNull(cardRect);
+        Assert.LessOrEqual(cardRect.sizeDelta.x, 900f);
+        Assert.LessOrEqual(cardRect.sizeDelta.y, 360f);
+
+        Assert.LessOrEqual(dialog.descriptionText.fontSize, 32);
+
+        RectTransform buttonRect = dialog.clickCloseButton.GetComponent<RectTransform>();
+        Assert.IsNotNull(buttonRect);
+        Assert.LessOrEqual(buttonRect.sizeDelta.x, 160f);
+        Assert.LessOrEqual(buttonRect.sizeDelta.y, 60f);
+    }
+
+    [Test]
     public void EnsureRuntimeInstanceIgnoresDialogWhosePanelParentIsInactive()
     {
         DestroyRuntimeDialogs();
@@ -102,6 +125,60 @@ public sealed class DialogRuntimeInteractionTests
 
         Assert.AreNotSame(sceneDialog, dialog);
         Assert.AreEqual("RuntimeDialogController", dialog.gameObject.name);
+    }
+
+    [Test]
+    public void TopmostRuntimeDialogBlocksRaycastsAndBackdropClickClosesPanel()
+    {
+        DestroyRuntimeDialogs();
+
+        Dialog dialog = Dialog.EnsureTopmostRuntimeInstance();
+        dialog.ShowClickCloseDialog("建筑介绍");
+
+        Assert.IsTrue(dialog.dialogPanel.activeSelf);
+
+        Canvas canvas = dialog.dialogPanel.GetComponent<Canvas>();
+        Assert.IsNotNull(canvas);
+        Assert.IsTrue(canvas.overrideSorting);
+        Assert.Greater(canvas.sortingOrder, RuntimeModalStyle.ModalSortingOrder);
+
+        CanvasGroup canvasGroup = dialog.dialogPanel.GetComponent<CanvasGroup>();
+        Assert.IsNotNull(canvasGroup);
+        Assert.IsTrue(canvasGroup.interactable);
+        Assert.IsTrue(canvasGroup.blocksRaycasts);
+
+        Image backdropImage = dialog.dialogPanel.GetComponent<Image>();
+        Assert.IsNotNull(backdropImage);
+        Assert.IsTrue(backdropImage.raycastTarget);
+
+        Button backdropButton = dialog.dialogPanel.GetComponent<Button>();
+        Assert.IsNotNull(backdropButton);
+
+        backdropButton.onClick.Invoke();
+
+        Assert.IsFalse(dialog.dialogPanel.activeSelf);
+    }
+
+    [Test]
+    public void UIRootManagerModalRegistrationDoesNotLowerTopmostRuntimeDialog()
+    {
+        DestroyRuntimeDialogs();
+
+        Dialog dialog = Dialog.EnsureTopmostRuntimeInstance();
+        Canvas canvas = dialog.dialogPanel.GetComponent<Canvas>();
+        Assert.IsNotNull(canvas);
+        Assert.AreEqual(Dialog.TopmostRuntimeDialogSortingOrder, canvas.sortingOrder);
+
+        MethodInfo ensureModalCanvas = typeof(UIRootManager).GetMethod(
+            "EnsureModalCanvas",
+            BindingFlags.Static | BindingFlags.NonPublic);
+        Assert.IsNotNull(ensureModalCanvas);
+
+        Canvas registeredCanvas = (Canvas)ensureModalCanvas.Invoke(null, new object[] { dialog.dialogPanel });
+
+        Assert.AreSame(canvas, registeredCanvas);
+        Assert.AreEqual(Dialog.TopmostRuntimeDialogSortingOrder, canvas.sortingOrder);
+        Assert.Greater(canvas.sortingOrder, RuntimeModalStyle.ModalSortingOrder);
     }
 
     [Test]
