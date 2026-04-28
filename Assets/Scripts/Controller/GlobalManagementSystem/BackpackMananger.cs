@@ -9,6 +9,7 @@ public class BackpackMananger : MonoBehaviour
     public List<ArchitecturalCrystal?> backpackItems = new List<ArchitecturalCrystal?>();
 
     private const int MaxCapacity = 6;
+    public const int MaxCommonMaterialCount = 3;
     private const int MaxSpecialStructureMaterials = 3;
     private readonly HashSet<ArchitecturalType> alreadyPickedCommonTypes = new HashSet<ArchitecturalType>();
     private readonly HashSet<int> reservedSlots = new HashSet<int>();
@@ -65,9 +66,32 @@ public class BackpackMananger : MonoBehaviour
         return count;
     }
 
+    public int GetCommonMaterialCount()
+    {
+        EnsureCapacity();
+
+        int count = 0;
+        for (int i = 0; i < backpackItems.Count; i++)
+        {
+            ArchitecturalCrystal? item = backpackItems[i];
+            if (item.HasValue && item.Value.IsGenericCommonMaterial)
+            {
+                count++;
+            }
+        }
+
+        return count;
+    }
+
     public bool PickItem(ArchitecturalCrystal crystal)
     {
         EnsureCapacity();
+
+        if (!CanStoreCommonMaterial(crystal))
+        {
+            Debug.LogWarning($"通用材料已达上限 {MaxCommonMaterialCount}，无法继续添加");
+            return false;
+        }
 
         if (TryHandleImmediatePickup(crystal, out bool immediatePickupSucceeded))
         {
@@ -119,6 +143,11 @@ public class BackpackMananger : MonoBehaviour
         EnsureCapacity();
 
         if (!reservedSlots.Remove(slotIndex))
+        {
+            return false;
+        }
+
+        if (!CanStoreCommonMaterial(crystal))
         {
             return false;
         }
@@ -213,6 +242,11 @@ public class BackpackMananger : MonoBehaviour
         reservedSlots.Clear();
 
         Debug.Log("背包已清空");
+    }
+
+    private bool CanStoreCommonMaterial(ArchitecturalCrystal crystal)
+    {
+        return !crystal.IsGenericCommonMaterial || GetCommonMaterialCount() < MaxCommonMaterialCount;
     }
 
     private void EnsureCapacity()

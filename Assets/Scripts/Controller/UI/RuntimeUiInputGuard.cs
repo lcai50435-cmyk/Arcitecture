@@ -10,6 +10,11 @@ public static class RuntimeUiInputGuard
             return true;
         }
 
+        if (!BackpackUI.IsRuntimeAttackSlotSelected())
+        {
+            return true;
+        }
+
         return IsMouseKey(attackKey) && IsPointerOverUi();
     }
 

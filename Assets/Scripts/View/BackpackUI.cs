@@ -7,6 +7,7 @@ using UnityEngine.UI;
 
 public class BackpackUI : MonoBehaviour
 {
+    private static BackpackUI currentRuntimeInstance;
     private static bool AllowManualCollapseToggle => false;
     private const string RuntimeCanvasRootName = "PackBagCanvas";
     private const string RuntimeSurfaceName = "RuntimeBackpackSurface";
@@ -77,10 +78,15 @@ public class BackpackUI : MonoBehaviour
     private CanvasGroup[] runtimeSelectionGroups;
     private GameObject[] runtimeHoverShadeObjects;
     private readonly List<RaycastResult> pointerRaycastResults = new List<RaycastResult>(16);
-    private int selectedSlotIndex;
+    private int selectedSlotIndex = RuntimeAttackSelectionIndex;
 
     public int SelectedSlotIndex => selectedSlotIndex;
     public bool IsAttackSlotSelected => selectedSlotIndex == RuntimeAttackSelectionIndex;
+
+    public static bool IsRuntimeAttackSlotSelected()
+    {
+        return currentRuntimeInstance == null || currentRuntimeInstance.IsAttackSlotSelected;
+    }
 
     public static BackpackUI EnsureRuntimeInstance(bool refreshLayout = true)
     {
@@ -106,6 +112,7 @@ public class BackpackUI : MonoBehaviour
             view.ConfigureRuntimeLayout();
         }
 
+        currentRuntimeInstance = view;
         return view;
     }
 
@@ -116,6 +123,7 @@ public class BackpackUI : MonoBehaviour
             return;
         }
 
+        currentRuntimeInstance = this;
         ConfigureRuntimeLayout();
         ResolveBackpackManager();
         EnsureCanvasGroup();
@@ -130,6 +138,7 @@ public class BackpackUI : MonoBehaviour
             return;
         }
 
+        currentRuntimeInstance = this;
         ConfigureRuntimeLayout();
         ResolveBackpackManager();
         SubscribeRuntimeEvents();
@@ -140,6 +149,11 @@ public class BackpackUI : MonoBehaviour
 
     private void OnDisable()
     {
+        if (currentRuntimeInstance == this)
+        {
+            currentRuntimeInstance = null;
+        }
+
         HideFollowTogglePrompt();
         UnsubscribeRuntimeEvents();
     }
@@ -498,7 +512,9 @@ public class BackpackUI : MonoBehaviour
 
     private RectTransform ResolveRuntimeCanvasRoot()
     {
-        if (transform is RectTransform selfRect && string.Equals(gameObject.name, RuntimeCanvasRootName))
+        if (transform is RectTransform selfRect &&
+            string.Equals(gameObject.name, RuntimeCanvasRootName) &&
+            IsPreferredRuntimeCanvasRoot(selfRect))
         {
             return selfRect;
         }
@@ -548,16 +564,43 @@ public class BackpackUI : MonoBehaviour
     private static RectTransform FindRuntimeCanvasRoot()
     {
         RectTransform[] rectTransforms = FindObjectsOfType<RectTransform>(true);
+        Scene activeScene = SceneManager.GetActiveScene();
+        RectTransform fallback = null;
+
         for (int i = 0; i < rectTransforms.Length; i++)
         {
             RectTransform rect = rectTransforms[i];
             if (rect != null && string.Equals(rect.gameObject.name, RuntimeCanvasRootName))
             {
-                return rect;
+                if (rect.gameObject.scene == activeScene)
+                {
+                    return rect;
+                }
+
+                if (fallback == null && !IllustratedUISceneLoader.IsIllustratedUiScene(rect.gameObject.scene))
+                {
+                    fallback = rect;
+                }
             }
         }
 
-        return null;
+        return fallback;
+    }
+
+    private static bool IsPreferredRuntimeCanvasRoot(RectTransform rect)
+    {
+        if (rect == null)
+        {
+            return false;
+        }
+
+        Scene activeScene = SceneManager.GetActiveScene();
+        if (rect.gameObject.scene == activeScene)
+        {
+            return true;
+        }
+
+        return !IllustratedUISceneLoader.IsIllustratedUiScene(rect.gameObject.scene);
     }
 
     private static RectTransform CreateRuntimeCanvasRoot()

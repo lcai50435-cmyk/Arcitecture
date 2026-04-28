@@ -14,7 +14,7 @@ public class GameDebugPageBootstrapper : MonoBehaviour
     private const int DebugCanvasSortingOrder = 13050;
     private const float RefreshInterval = 0.2f;
     private const float ManualScrollStep = 0.08f;
-    private const string RequiredDebugCharacters = "调试面板按住显示当前场景基地允许攻击生命上限耐久攻击力移动速度防御建筑结构材料武器墨水属性技能关闭开关预留版本穿透效果命中图鉴进度专用福建土楼赵州桥安徽水乡民居槽位完成总召唤怪物随机火石只TabEsc";
+    private const string RequiredDebugCharacters = "调试面板按住显示当前场景基地允许攻击生命上限耐久攻击力移动速度防御建筑结构通用材料武器墨水属性技能关闭开关预留版本穿透效果命中图鉴进度专用福建土楼赵州桥安徽水乡民居槽位完成总召唤怪物随机火石只已满相册留念一键清空TabEsc";
     private static readonly string[] DebugFontNames =
     {
         "Arial Unicode MS",
@@ -88,7 +88,14 @@ public class GameDebugPageBootstrapper : MonoBehaviour
 
         if (Input.GetKeyDown(KeyCode.Tab))
         {
-            SetPanelVisible(!panelRoot.activeSelf);
+            if (panelRoot.activeSelf)
+            {
+                SetPanelVisible(false);
+            }
+            else if (CanOpenPanelFromHotkey(RuntimeUiInputGuard.IsBlockingGameplayUiOpen()))
+            {
+                SetPanelVisible(true);
+            }
         }
 
         if (panelRoot.activeSelf && Input.GetKeyDown(KeyCode.Escape))
@@ -183,6 +190,7 @@ public class GameDebugPageBootstrapper : MonoBehaviour
         BuildStatusSection(content);
         BuildLoadoutSection(content);
         BuildProgressSection(content);
+        BuildAlbumSection(content);
 
         if (IsBaseScene())
         {
@@ -209,6 +217,11 @@ public class GameDebugPageBootstrapper : MonoBehaviour
         {
             RefreshStatus();
         }
+    }
+
+    private static bool CanOpenPanelFromHotkey(bool blockingGameplayUiOpen)
+    {
+        return !blockingGameplayUiOpen;
     }
 
     private void BuildStatusSection(Transform parent)
@@ -253,6 +266,7 @@ public class GameDebugPageBootstrapper : MonoBehaviour
     private void BuildSkillSection(Transform parent)
     {
         GameObject section = CreateSection(parent, "临时构筑");
+        CreateActionRow(section.transform, "通用材料", ("加1个", () => AddCommonMaterial(1)), ("加3个", () => AddCommonMaterial(3)), ("清空背包", ClearBackpack));
         CreateActionRow(section.transform, "斗拱", ("加1个", () => AddSkill(ArchitecturalType.Brackets, 1)), ("加2个", () => AddSkill(ArchitecturalType.Brackets, 2)), ("清空背包", ClearBackpack));
         CreateActionRow(section.transform, "榫卯", ("加1个", () => AddSkill(ArchitecturalType.MortiseAndTenonJoint, 1)), ("加2个", () => AddSkill(ArchitecturalType.MortiseAndTenonJoint, 2)));
         CreateActionRow(section.transform, "瓦", ("加1个", () => AddSkill(ArchitecturalType.Tile, 1)), ("加2个", () => AddSkill(ArchitecturalType.Tile, 2)));
@@ -268,6 +282,12 @@ public class GameDebugPageBootstrapper : MonoBehaviour
         CreateActionRow(section.transform, "赵州桥", ("+25", () => AddBuildingProgress(CatalogueBuildingId.Building2, 25)), ("+100", () => AddBuildingProgress(CatalogueBuildingId.Building2, 100)));
         CreateActionRow(section.transform, "安徽民居", ("+25", () => AddBuildingProgress(CatalogueBuildingId.Building3, 25)), ("+100", () => AddBuildingProgress(CatalogueBuildingId.Building3, 100)));
         CreateActionRow(section.transform, "专用材料", ("+1", () => AddSpecialStructureMaterial(1)), ("+3", () => AddSpecialStructureMaterial(3)));
+    }
+
+    private void BuildAlbumSection(Transform parent)
+    {
+        GameObject section = CreateSection(parent, "相册调试");
+        CreateActionRow(section.transform, "留念相册", ("一键清空", ClearPhotoAlbum));
     }
 
     private void BuildTimeSection(Transform parent)
@@ -337,7 +357,7 @@ public class GameDebugPageBootstrapper : MonoBehaviour
                 ? $"墨水：{attack.ink:0}    弹道：{inkConfig.projectileCount}    命中上限：{inkConfig.maxHitCount}    尺寸：{inkConfig.projectileScale:0.00}"
                 : "攻击组件：未找到 PlayerAttack");
             builder.AppendLine(backpack != null
-                ? $"背包：{backpack.GetOccupiedCount()}/{backpack.backpackItems.Count}    减速：{inkConfig.debuff.slowRatio:P0}    击退：{inkConfig.debuff.knockbackForce:0.0}"
+                ? $"背包：{backpack.GetOccupiedCount()}/{backpack.backpackItems.Count}    通用材料：{backpack.GetCommonMaterialCount()}/{BackpackMananger.MaxCommonMaterialCount}    减速：{inkConfig.debuff.slowRatio:P0}    击退：{inkConfig.debuff.knockbackForce:0.0}"
                 : "背包：未找到 BackpackMananger");
             builder.AppendLine(countdown != null
                 ? $"倒计时：{countdown.GetRemainTime():0.0}秒    暂停：{(countdown.isInBase ? "是" : "否")}"
@@ -499,12 +519,37 @@ public class GameDebugPageBootstrapper : MonoBehaviour
         RefreshStatus();
     }
 
+    private void AddCommonMaterial(int count)
+    {
+        BackpackMananger backpack = EnsureBackpackManager();
+        if (backpack == null) return;
+
+        for (int i = 0; i < count; i++)
+        {
+            if (!backpack.PickItem(CreateDebugCommonMaterial()))
+            {
+                Debug.LogWarning("通用材料已满或背包已满，无法继续添加");
+                break;
+            }
+        }
+
+        RefreshBackpackUI();
+        GameplayStatusHudRuntime.RefreshStructureProgressText();
+        RefreshStatus();
+    }
+
     private ArchitecturalCrystal CreateDebugCrystal(ArchitecturalType type)
     {
         Sprite icon = GetSkillIcon(type);
         ArchitecturalCrystal crystal = ArchitecturalCrystalFactory.CreateCommonStructure(type, icon, icon);
         crystal.textDescription = GetSkillDescription(type);
         return crystal;
+    }
+
+    private ArchitecturalCrystal CreateDebugCommonMaterial()
+    {
+        Sprite icon = GetSkillIcon(ArchitecturalType.Green);
+        return ArchitecturalCrystalFactory.CreateGenericCommonMaterial(icon, icon);
     }
 
     private void AddBuildingProgress(CatalogueBuildingId buildingId, int value)
@@ -538,6 +583,24 @@ public class GameDebugPageBootstrapper : MonoBehaviour
         RefreshBackpackUI();
         RefreshEffectiveWeaponState();
         RefreshStatus();
+    }
+
+    private void ClearPhotoAlbum()
+    {
+        PhotoAlbumRepository.ClearAll();
+        RefreshOpenAlbumPanels();
+    }
+
+    private static void RefreshOpenAlbumPanels()
+    {
+        BaseHubAlbumPanel[] albumPanels = FindObjectsOfType<BaseHubAlbumPanel>(true);
+        for (int i = 0; i < albumPanels.Length; i++)
+        {
+            if (albumPanels[i] != null && albumPanels[i].gameObject.activeInHierarchy)
+            {
+                albumPanels[i].Open();
+            }
+        }
     }
 
     private void SetCountdownPaused(bool paused)

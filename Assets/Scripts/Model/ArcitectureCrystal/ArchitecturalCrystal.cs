@@ -88,6 +88,7 @@ public struct ArchitecturalCrystal
     public bool IsSpecialStructure => Category == ArchitecturalResourceCategory.SpecialStructure;
     public bool IsInkSupply => Category == ArchitecturalResourceCategory.InkSupply;
     public bool IsRepairMaterial => Category == ArchitecturalResourceCategory.RepairMaterial;
+    public bool IsGenericCommonMaterial => IsCommonStructure && IsGenericCommonMaterialType(type);
 
     public string DisplayName
     {
@@ -103,8 +104,20 @@ public struct ArchitecturalCrystal
                 return "专用结构材料";
             }
 
+            if (IsGenericCommonMaterial)
+            {
+                return "通用材料";
+            }
+
             return ArchitecturalCrystalFactory.GetDisplayName(type);
         }
+    }
+
+    public static bool IsGenericCommonMaterialType(ArchitecturalType type)
+    {
+        return type == ArchitecturalType.Green ||
+               type == ArchitecturalType.Gold ||
+               type == ArchitecturalType.White;
     }
 
     public ArchitecturalCrystal(
@@ -325,6 +338,19 @@ public static class ArchitecturalCrystalFactory
             true,
             ArchitecturalResourceCategory.SpecialStructure,
             0);
+    }
+
+    public static ArchitecturalCrystal CreateGenericCommonMaterial(
+        Sprite icon = null,
+        Sprite backIcon = null)
+    {
+        ArchitecturalCrystal crystal = CreateCommonStructure(
+            ArchitecturalType.Green,
+            icon,
+            backIcon,
+            MaximumBuildProgressPercent);
+        crystal.textDescription = "通用材料，可带回基地提交到建筑录。";
+        return crystal;
     }
 
     public static ArchitecturalCrystal CreateRepairMaterial(
