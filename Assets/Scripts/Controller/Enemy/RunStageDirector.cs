@@ -465,6 +465,11 @@ public class RunStageDirector : MonoBehaviour
             return;
         }
 
+        if (RuntimeTestStoneMonsterSpawner.TryPreserveHealthOverride(enemyObject))
+        {
+            return;
+        }
+
         CharacterCore core = enemyObject.GetComponent<CharacterCore>();
         if (core == null)
         {
