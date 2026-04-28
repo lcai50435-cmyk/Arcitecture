@@ -5,76 +5,77 @@ public class FireMonAttack : EnemyAttack
     private DirectionTracker directionTracker;
     private Animator animator;
 
-    [Header("»ğÇò¹¥»÷ÉèÖÃ")]
-    public GameObject fireballPrefab; // »ğÇòÔ¤ÖÆÌå
-    public Transform firePoint;       // »ğÇò·¢Éäµã
+    [Header("ç«çƒæ”»å‡»è®¾ç½®")]
+    public GameObject fireballPrefab; // ç«çƒé¢„åˆ¶ä½“
+    public Transform firePoint;       // ç«çƒå‘å°„ç‚¹
 
     protected override void Awake()
     {
-        // ³õÊ¼»¯×ÔÉíÒÀÀµµÄ×é¼ş
+        // åˆå§‹åŒ–è‡ªèº«ä¾èµ–çš„ç»„ä»¶
         directionTracker = GetComponent<DirectionTracker>();
         animator = GetComponent<Animator>();
 
-        // Ö´ĞĞ¸¸ÀàµÄ Awake Âß¼­
+        // æ‰§è¡Œçˆ¶ç±»çš„ Awake é€»è¾‘
         base.Awake();
 
-        // ·ÀÖ¹Ã»¹Ò DirectionTracker£¬×Ô¶¯Ìí¼Ó
+        // é˜²æ­¢æ²¡æŒ‚ DirectionTrackerï¼Œè‡ªåŠ¨æ·»åŠ 
         if (directionTracker == null)
         {
             directionTracker = gameObject.AddComponent<DirectionTracker>();
-            Debug.LogWarning("×Ô¶¯Îª FireMon Ìí¼ÓÁË DirectionTracker ×é¼ş", this);
+            Debug.LogWarning("è‡ªåŠ¨ä¸º FireMon æ·»åŠ äº† DirectionTracker ç»„ä»¶", this);
         }
     }
 
-    // ÖØĞ´ EnemyAttack µÄ TryAttack ·½·¨
+    // é‡å†™ EnemyAttack çš„ TryAttack æ–¹æ³•
     protected override void TryAttack()
     {
-        // ¹¥»÷Ê±¼äÀäÈ´
+        // æ”»å‡»æ—¶é—´å†·å´
         if (attackInterval > 0f && Time.time - lastAttackTime < attackInterval)
         {
-            return; // ÀäÈ´Ã»ºÃ
+            return; // å†·å´æ²¡å¥½
         }
 
-        // ÏÈÖ´ĞĞ¸¸ÀàµÄ¹¥»÷ÀäÈ´¼ì²â
+        // å…ˆæ‰§è¡Œçˆ¶ç±»çš„æ”»å‡»å†·å´æ£€æµ‹
         base.TryAttack();
 
-        // Ö´ĞĞ»ğÇò¹¥»÷Âß¼­
+        // æ‰§è¡Œç«çƒæ”»å‡»é€»è¾‘
         TriggerFireballAttack();
     }
 
     /// <summary>
-    /// ´¥·¢»ğÇò¹¥»÷£¨·â×°¹¥»÷Âß¼­£©
+    /// è§¦å‘ç«çƒæ”»å‡»ï¼ˆå°è£…æ”»å‡»é€»è¾‘ï¼‰
     /// </summary>
     private void TriggerFireballAttack()
     {
         if (fireballPrefab == null || firePoint == null)
         {
-            Debug.LogError("»ğÇòÔ¤ÖÆÌå»ò·¢ÉäµãÎ´ÅäÖÃ", this);
+            Debug.LogError("ç«çƒé¢„åˆ¶ä½“æˆ–å‘å°„ç‚¹æœªé…ç½®", this);
             return;
         }
 
-        // ´¥·¢ CharacterAttack µÄºËĞÄ¹¥»÷Âß¼­£¨Í£Ö¹ÒÆ¶¯¡¢²¥·Å¶¯»­µÈ£©
+        // è§¦å‘ CharacterAttack çš„æ ¸å¿ƒæ”»å‡»é€»è¾‘ï¼ˆåœæ­¢ç§»åŠ¨ã€æ’­æ”¾åŠ¨ç”»ç­‰ï¼‰
         base.TriggerAttack();
+        MusicManager.PlaySfx(SfxCueId.FireMonsterCast);
 
         if (player == null)
         {
-            Debug.LogError("Íæ¼Ò¶ÔÏóÎª¿Õ£¬ÎŞ·¨¼ÆËã»ğÇò·½Ïò", this);
+            Debug.LogError("ç©å®¶å¯¹è±¡ä¸ºç©ºï¼Œæ— æ³•è®¡ç®—ç«çƒæ–¹å‘", this);
             return;
         }
 
-        // ¼ÆËã¹ÖÎï£¨·¢Éäµã£©µ½Íæ¼ÒµÄÏòÁ¿
+        // è®¡ç®—æ€ªç‰©ï¼ˆå‘å°„ç‚¹ï¼‰åˆ°ç©å®¶çš„å‘é‡
         Vector2 fireToPlayerDir = player.position - firePoint.position;
         fireToPlayerDir = fireToPlayerDir.normalized;
 
-        //// »ñÈ¡µĞÈËÃæ³¯·½Ïò£¨DirectionTracker ¼ÇÂ¼µÄ·½Ïò£©
+        //// è·å–æ•Œäººé¢æœæ–¹å‘ï¼ˆDirectionTracker è®°å½•çš„æ–¹å‘ï¼‰
         //Vector2 faceDir = directionTracker.LastDirection;
 
-        // Éú³É»ğÇò²¢ÉèÖÃ³¯Ïò
+        // ç”Ÿæˆç«çƒå¹¶è®¾ç½®æœå‘
         GameObject fireball = Instantiate(fireballPrefab, firePoint.position, Quaternion.identity);
-        fireball.transform.right = fireToPlayerDir; // »ğÇò³¯Ïò = µĞÈËÃæ³¯·½Ïò
+        fireball.transform.right = fireToPlayerDir; // ç«çƒæœå‘ = æ•Œäººé¢æœæ–¹å‘
 
       
 
-        Debug.Log("»ğÑæ¹Ö·¢Éä»ğÇò£¬³¯Ïò£º" + fireToPlayerDir);
+        Debug.Log("ç«ç„°æ€ªå‘å°„ç«çƒï¼Œæœå‘ï¼š" + fireToPlayerDir);
     }
 }

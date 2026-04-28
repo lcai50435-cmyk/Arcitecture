@@ -4,13 +4,16 @@ using UnityEngine;
 
 public class CatagloueAreaTrigger2D : MonoBehaviour
 {
-    // Ö»Ê¶±ğÍæ¼Ò
+    // åªè¯†åˆ«ç©å®¶
     private void OnTriggerEnter2D(Collider2D other)
     {
         if (other.CompareTag("Player"))
         {
-            GameCountDownManager.Instance.SetInBaseState(true);
-            Debug.Log("½øÈë»ùµØ ¡ú µ¹¼ÆÊ±ÔİÍ£");
+            if (GameCountDownManager.Instance != null)
+            {
+                GameCountDownManager.Instance.SetInBaseState(true);
+            }
+            Debug.Log("è¿›å…¥åŸºåœ° â†’ å€’è®¡æ—¶æš‚åœ");
         }
     }
 
@@ -18,8 +21,11 @@ public class CatagloueAreaTrigger2D : MonoBehaviour
     {
         if (other.CompareTag("Player"))
         {
-            GameCountDownManager.Instance.SetInBaseState(false);
-            Debug.Log("Àë¿ª»ùµØ ¡ú µ¹¼ÆÊ±¿ªÊ¼");
+            if (GameCountDownManager.Instance != null)
+            {
+                GameCountDownManager.Instance.SetInBaseState(false);
+            }
+            Debug.Log("ç¦»å¼€åŸºåœ° â†’ å€’è®¡æ—¶å¼€å§‹");
         }
     }
 }

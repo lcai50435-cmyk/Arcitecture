@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// 伤害管理系统
+/// 浼ゅ绠＄悊绯荤粺
 /// </summary>
 public class DamageManager : MonoBehaviour
 {

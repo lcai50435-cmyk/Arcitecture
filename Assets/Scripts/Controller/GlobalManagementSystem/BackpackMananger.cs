@@ -1,24 +1,23 @@
 using System.Collections.Generic;
-using UnityEditorInternal.Profiling.Memory.Experimental;
 using UnityEngine;
 
-/// <summary>
-/// ¹ÜÀí´æ´¢½¨ÖşµÀ¾ßÊı¾İµÄ±³°ü
-/// ¹Ì¶¨6¸ñ£¬½ûÖ¹Ê¹ÓÃ RemoveAt ·½·¨
-/// </summary>
 public class BackpackMananger : MonoBehaviour
 {
     public static BackpackMananger Instance;
 
     [HideInInspector]
-    // ¹Ø¼üĞŞ¸Ä£º¸ÄÎª¿É¿Õ½á¹¹ÌåÀàĞÍ
     public List<ArchitecturalCrystal?> backpackItems = new List<ArchitecturalCrystal?>();
 
-    private int maxCapacity = 6;
-    private HashSet<ArchitecturalType> alreadyPickedTypes = new HashSet<ArchitecturalType>(); // ÊÇ·ñµÚÒ»´ÎÊ°È¡¸ÃµÀ¾ß
+    private const int MaxCapacity = 6;
+    private const int MaxSpecialStructureMaterials = 3;
+    private readonly HashSet<ArchitecturalType> alreadyPickedCommonTypes = new HashSet<ArchitecturalType>();
+    private readonly HashSet<int> reservedSlots = new HashSet<int>();
+    private int nextRuntimePickupOrder = 1;
 
     public delegate void FirstPickTipEvent(ArchitecturalCrystal crystal);
     public event FirstPickTipEvent OnFirstTimePickItemType;
+    public event System.Action<ArchitecturalCrystal> OnItemPicked;
+    public event System.Action OnInventoryChanged;
 
     private void Awake()
     {
@@ -26,12 +25,7 @@ public class BackpackMananger : MonoBehaviour
         {
             Instance = this;
             DontDestroyOnLoad(gameObject);
-
-            // ³õÊ¼»¯¹Ì¶¨6¸ñ£¨³õÊ¼ÖµÎª null£©
-            while (backpackItems.Count < maxCapacity)
-            {
-                backpackItems.Add(null); // ¿É¿Õ½á¹¹ÌåÖ§³Ö null ¸³Öµ
-            }
+            EnsureCapacity();
         }
         else
         {
@@ -39,56 +33,269 @@ public class BackpackMananger : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// µ±Ç°Êµ¼ÊÕ¼ÓÃÊıÁ¿
-    /// </summary>
+    private void OnEnable()
+    {
+        if (Instance == null)
+        {
+            Instance = this;
+        }
+
+        EnsureCapacity();
+    }
+
+    private void OnDestroy()
+    {
+        if (Instance == this)
+        {
+            Instance = null;
+        }
+    }
+
     public int GetOccupiedCount()
     {
         int count = 0;
         for (int i = 0; i < backpackItems.Count; i++)
         {
-            // ¹Ø¼üĞŞ¸Ä£ºÅĞ¶Ï¿É¿ÕÀàĞÍÊÇ·ñÓĞÖµ
             if (backpackItems[i].HasValue)
             {
                 count++;
             }
         }
+
         return count;
     }
 
-    /// <summary>
-    /// Ê°È¡µÀ¾ß²¢·ÅÈë±³°üµÚÒ»¸ö¿ÕÎ»ÖÃ
-    /// </summary>
     public bool PickItem(ArchitecturalCrystal crystal)
     {
-        int emptyIndex = -1;
+        EnsureCapacity();
 
-        for (int i = 0; i < backpackItems.Count; i++)
+        if (TryHandleImmediatePickup(crystal, out bool immediatePickupSucceeded))
         {
-            // ¹Ø¼üĞŞ¸Ä£ºÅĞ¶ÏÊÇ·ñÎª null£¨¿ÕÎ»ÖÃ£©
-            if (backpackItems[i] == null)
-            {
-                emptyIndex = i;
-                break;
-            }
+            return immediatePickupSucceeded;
         }
 
+        int emptyIndex = FindEmptyIndex();
         if (emptyIndex == -1)
         {
-            Debug.LogWarning("±³°üÒÑÂúÎŞ·¨Ê°È¡");
+            Debug.LogWarning("èƒŒåŒ…å·²æ»¡ï¼Œæ— æ³•æ‹¾å–");
             return false;
         }
 
-        bool isFirstPick = !alreadyPickedTypes.Contains(crystal.type);
+        return StoreBackpackItem(crystal, emptyIndex);
+    }
 
-        if (isFirstPick)
+    public bool TryReserveSlotForPickup(ArchitecturalCrystal crystal, out int slotIndex)
+    {
+        EnsureCapacity();
+        slotIndex = -1;
+
+        if (!crystal.IsCommonStructure && !crystal.IsRepairMaterial)
         {
-            alreadyPickedTypes.Add(crystal.type);
-            Debug.Log($"µÚÒ»´ÎÊ°È¡{crystal.type}µÀ¾ß");
-            OnFirstTimePickItemType?.Invoke(crystal);
+            return false;
         }
 
-        ArchitecturalCrystal newItem = new ArchitecturalCrystal(
+        slotIndex = FindEmptyIndex();
+        if (slotIndex == -1)
+        {
+            return false;
+        }
+
+        reservedSlots.Add(slotIndex);
+        return true;
+    }
+
+    public void CancelReservedSlot(int slotIndex)
+    {
+        if (slotIndex < 0)
+        {
+            return;
+        }
+
+        reservedSlots.Remove(slotIndex);
+    }
+
+    public bool CommitReservedPickup(ArchitecturalCrystal crystal, int slotIndex)
+    {
+        EnsureCapacity();
+
+        if (!reservedSlots.Remove(slotIndex))
+        {
+            return false;
+        }
+
+        if (slotIndex < 0 || slotIndex >= backpackItems.Count || backpackItems[slotIndex].HasValue)
+        {
+            return false;
+        }
+
+        return StoreBackpackItem(crystal, slotIndex);
+    }
+
+    public void RemoveItem(int index)
+    {
+        if (index < 0 || index >= backpackItems.Count) return;
+        if (!backpackItems[index].HasValue) return;
+
+        backpackItems[index] = null;
+        RefreshPlayerTemporaryAttributes();
+        OnInventoryChanged?.Invoke();
+        Debug.Log($"æ¸…ç©ºç¬¬ {index} ä¸ªèƒŒåŒ…ç‰©å“");
+    }
+
+    public ArchitecturalCrystal? GetItem(int index)
+    {
+        if (index >= 0 && index < backpackItems.Count)
+        {
+            return backpackItems[index];
+        }
+
+        return null;
+    }
+
+    public bool HasRepairMaterial(CatalogueBuildingId buildingId)
+    {
+        EnsureCapacity();
+
+        for (int i = 0; i < backpackItems.Count; i++)
+        {
+            ArchitecturalCrystal? item = backpackItems[i];
+            if (item.HasValue && item.Value.IsRepairMaterial && item.Value.repairBuildingId == buildingId)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public bool TryConsumeRepairMaterial(CatalogueBuildingId buildingId)
+    {
+        EnsureCapacity();
+
+        for (int i = 0; i < backpackItems.Count; i++)
+        {
+            ArchitecturalCrystal? item = backpackItems[i];
+            if (!item.HasValue || !item.Value.IsRepairMaterial || item.Value.repairBuildingId != buildingId)
+            {
+                continue;
+            }
+
+            backpackItems[i] = null;
+            RefreshPlayerTemporaryAttributes();
+            OnInventoryChanged?.Invoke();
+            Debug.Log($"æ¶ˆè€— {item.Value.DisplayName}ï¼ŒèƒŒåŒ…æ ¼å­ {i} å·²æ¸…ç©º");
+            return true;
+        }
+
+        return false;
+    }
+
+    public void ClearAllItems()
+    {
+        bool removedAnyItem = false;
+        for (int i = 0; i < backpackItems.Count; i++)
+        {
+            if (!backpackItems[i].HasValue)
+            {
+                continue;
+            }
+
+            backpackItems[i] = null;
+            removedAnyItem = true;
+        }
+
+        if (removedAnyItem)
+        {
+            RefreshPlayerTemporaryAttributes();
+            OnInventoryChanged?.Invoke();
+        }
+
+        reservedSlots.Clear();
+
+        Debug.Log("èƒŒåŒ…å·²æ¸…ç©º");
+    }
+
+    private void EnsureCapacity()
+    {
+        while (backpackItems.Count < MaxCapacity)
+        {
+            backpackItems.Add(null);
+        }
+    }
+
+    private int FindEmptyIndex()
+    {
+        for (int i = 0; i < backpackItems.Count; i++)
+        {
+            if (!backpackItems[i].HasValue && !reservedSlots.Contains(i))
+            {
+                return i;
+            }
+        }
+
+        return -1;
+    }
+
+    private bool TryHandleImmediatePickup(ArchitecturalCrystal crystal, out bool success)
+    {
+        if (crystal.IsInkSupply)
+        {
+            ApplyInkSupply(crystal);
+            OnItemPicked?.Invoke(crystal);
+            Debug.Log($"æ‹¾å– {crystal.DisplayName}ï¼Œæ¢å¤å¢¨ç¬”è€ä¹… {crystal.inkRestoreValue}");
+            success = true;
+            return true;
+        }
+
+        if (crystal.IsSpecialStructure)
+        {
+            RuntimeProgressState progressState = RuntimeProgressState.EnsureInstance();
+            if (progressState.AvailableSpecialStructureInventory >= MaxSpecialStructureMaterials)
+            {
+                Debug.LogWarning($"ææ–™åº“å­˜å·²è¾¾è·å¾—ä¸Šé™ {MaxSpecialStructureMaterials}ï¼Œæ— æ³•ç»§ç»­æ‹¾å–");
+                success = false;
+                return true;
+            }
+
+            progressState.AddSpecialStructureInventory(1);
+            OnItemPicked?.Invoke(crystal);
+            OnInventoryChanged?.Invoke();
+            Debug.Log($"æ‹¾å– {crystal.DisplayName}ï¼Œå·²åŠ å…¥ä¸“ç”¨ææ–™åº“å­˜");
+            success = true;
+            return true;
+        }
+
+        success = false;
+        return false;
+    }
+
+    private bool StoreBackpackItem(ArchitecturalCrystal crystal, int slotIndex)
+    {
+        bool shouldShowFirstPick = crystal.IsCommonStructure && !alreadyPickedCommonTypes.Contains(crystal.type);
+        if (shouldShowFirstPick)
+        {
+            alreadyPickedCommonTypes.Add(crystal.type);
+        }
+
+        ArchitecturalCrystal storedItem = CreateStoredBackpackItem(crystal);
+        backpackItems[slotIndex] = storedItem;
+        RefreshPlayerTemporaryAttributes();
+
+        if (shouldShowFirstPick)
+        {
+            OnFirstTimePickItemType?.Invoke(storedItem);
+        }
+
+        OnItemPicked?.Invoke(storedItem);
+        OnInventoryChanged?.Invoke();
+
+        Debug.Log($"æ‹¾å– {storedItem.DisplayName}ï¼Œæ”¾å…¥èƒŒåŒ…æ ¼å­ {slotIndex}");
+        return true;
+    }
+
+    private ArchitecturalCrystal CreateStoredBackpackItem(ArchitecturalCrystal crystal)
+    {
+        ArchitecturalCrystal storedItem = new ArchitecturalCrystal(
             crystal.type,
             crystal.expValue,
             crystal.icon,
@@ -98,81 +305,36 @@ public class BackpackMananger : MonoBehaviour
             crystal.bonusValue,
             crystal.subBonusType,
             crystal.subBonusValue,
-            crystal.isUnlockMaterial
-        );
-
-        backpackItems[emptyIndex] = newItem; // ¿É¿ÕÀàĞÍ½ÓÊÕ½á¹¹ÌåÖµ
-
-        // Ê°È¡µÀ¾ßÊ±Á¢¼´Ìí¼Ó¶ÔÓ¦µÄÊôĞÔ¼Ó³É
-        if (PlayerAttributeManager.Instance != null)
-        {
-            PlayerAttributeManager.Instance.AddBonus(
-                newItem.bonusType,
-                newItem.bonusValue,
-                newItem.subBonusType,
-                newItem.subBonusValue
-            );
-        }
-
-        Debug.Log($"Ê°È¡{newItem.type}·ÅÈë±³°üÎ»ÖÃ£º{emptyIndex}");
-        return true;
+            crystal.isUnlockMaterial,
+            crystal.resourceCategory,
+            crystal.inkRestoreValue,
+            crystal.buildProgressPercent,
+            crystal.repairBuildingId);
+        storedItem.runtimePickupOrder = nextRuntimePickupOrder++;
+        return storedItem;
     }
 
-    /// <summary>
-    /// É¾³ıÖ¸¶¨Ë÷ÒıÎ»ÖÃµÄµÀ¾ß£¨ÖÃÎª¿Õ£¬²»ÊÇÒÆ³ı£©
-    /// </summary>
-    public void RemoveItem(int index)
+    private void ApplyInkSupply(ArchitecturalCrystal crystal)
     {
-        if (index >= 0 && index < backpackItems.Count)
+        PlayerAttack playerAttack = FindObjectOfType<PlayerAttack>();
+        if (playerAttack == null)
         {
-            // ¹Ø¼üĞŞ¸Ä£ºÏÈÅĞ¶ÏÊÇ·ñÓĞÖµ£¬ÔÙÒÆ³ıÊôĞÔ¼Ó³É
-            if (backpackItems[index].HasValue && PlayerAttributeManager.Instance != null)
-            {
-                var item = backpackItems[index].Value; // È¡¿É¿ÕÀàĞÍµÄÊµ¼ÊÖµ
-                PlayerAttributeManager.Instance.RemoveBonus(
-                    item.bonusType,
-                    item.bonusValue,
-                    item.subBonusType,
-                    item.subBonusValue);
-            }
-
-            backpackItems[index] = null; // ÖÃÎª null ±ê¼Ç¿ÕÎ»ÖÃ
-            Debug.Log($"ÒÆ³ıÁË{index}Î»ÖÃµÄµÀ¾ß");
+            Debug.LogWarning("æ‹¾å–å¢¨æ°´è¡¥ç»™æ—¶æœªæ‰¾åˆ° PlayerAttackï¼Œæœªæ‰§è¡Œæ¢å¤");
+            return;
         }
+
+        playerAttack.AddInk(crystal.inkRestoreValue);
     }
 
-    /// <summary>
-    /// »ñÈ¡Ö¸¶¨Ë÷ÒıÎ»ÖÃµÄµÀ¾ß
-    /// </summary>
-    /// <returns>ÓĞÖµÔò·µ»Ø½á¹¹Ìå£¬ÎŞÖµ·µ»Ø null</returns>
-    public ArchitecturalCrystal? GetItem(int index)
+    private void RefreshPlayerTemporaryAttributes()
     {
-        if (index >= 0 && index < backpackItems.Count)
-        {
-            return backpackItems[index]; // Ö±½Ó·µ»Ø¿É¿ÕÀàĞÍ
-        }
-        return null;
-    }
+        PlayerAttributeManager attributeManager = PlayerAttributeManager.Instance != null
+            ? PlayerAttributeManager.Instance
+            : FindObjectOfType<PlayerAttributeManager>();
 
-    /// <summary>
-    /// Çå¿ÕËùÓĞµÀ¾ß
-    /// </summary>
-    public void ClearAllItems()
-    {
-        for (int i = 0; i < backpackItems.Count; i++)
+        if (attributeManager != null)
         {
-            // Çå¿ÕÊ±Ò²ÒªÒÆ³ıÊôĞÔ¼Ó³É
-            if (backpackItems[i].HasValue && PlayerAttributeManager.Instance != null)
-            {
-                var item = backpackItems[i].Value;
-                PlayerAttributeManager.Instance.RemoveBonus(
-                    item.bonusType,
-                    item.bonusValue,
-                    item.subBonusType,
-                    item.subBonusValue);
-            }
-            backpackItems[i] = null;
+            attributeManager.ApplyAllBonus();
         }
-        Debug.Log("±³°üÒÑÇå¿Õ");
     }
 }

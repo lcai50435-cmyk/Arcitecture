@@ -2,10 +2,10 @@ using UnityEngine;
 
 public class IllustratedHandbookCloseButton : MonoBehaviour
 {
-    [Header("Í¼¼øÖ÷Ò³")]
+    [Header("å›¾é‰´ä¸»é¡µ")]
     public GameObject illustratedHandbookPanel;
 
-    [Header("ÏêÏ¸ĞÅÏ¢Ò³")]
+    [Header("è¯¦ç»†ä¿¡æ¯é¡µ")]
     public GameObject detailedInformationPanel;
 
     public void CloseHandbook()
@@ -16,6 +16,12 @@ public class IllustratedHandbookCloseButton : MonoBehaviour
         if (detailedInformationPanel != null)
             detailedInformationPanel.SetActive(false);
 
-        UIManager.Instance?.RestoreUI();
+        if (UIManager.Instance != null)
+        {
+            UIManager.Instance.CloseIllustratedHandbook();
+            return;
+        }
+
+        IllustratedUISceneLoader.Close();
     }
 }

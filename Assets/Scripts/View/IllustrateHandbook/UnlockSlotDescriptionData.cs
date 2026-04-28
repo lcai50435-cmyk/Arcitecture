@@ -2,10 +2,10 @@ using UnityEngine;
 
 public class UnlockSlotDescriptionData : MonoBehaviour
 {
-    [Header("Ğ¡Í¼±êÃû³Æ")]
+    [Header("å°å›¾æ ‡åç§°")]
     public string slotName;
 
-    [Header("½éÉÜÎÄ±¾")]
+    [Header("ä»‹ç»æ–‡æœ¬")]
     [TextArea(2, 6)]
     public string description;
 }

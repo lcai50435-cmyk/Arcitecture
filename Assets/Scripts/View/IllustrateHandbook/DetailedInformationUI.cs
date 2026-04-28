@@ -3,13 +3,13 @@ using UnityEngine.UI;
 
 public class DetailedInformationUI : MonoBehaviour
 {
-    [Header("Í¼¼øÖ÷½çÃæ")]
+    [Header("å›¾é‰´ä¸»ç•Œé¢")]
     public GameObject illustratedHandbookPanel;
 
-    [Header("ÏêÏ¸ĞÅÏ¢×Ü½çÃæ")]
+    [Header("è¯¦ç»†ä¿¡æ¯æ€»ç•Œé¢")]
     public GameObject detailedInformationPanel;
 
-    [Header("µÚÒ»Ò³")]
+    [Header("ç¬¬ä¸€é¡µ")]
     public GameObject backGround1;
     public Image page1Image;
     public Text page1NameText;
@@ -17,7 +17,7 @@ public class DetailedInformationUI : MonoBehaviour
     public Button nextPageButton;
     public Button closeButton1;
 
-    [Header("µÚ¶şÒ³")]
+    [Header("ç¬¬äºŒé¡µ")]
     public GameObject backGround2;
     public Image page2Image;
     public Text page2IntroductionText;
@@ -27,6 +27,8 @@ public class DetailedInformationUI : MonoBehaviour
 
     private void Start()
     {
+        ApplyRuntimeFonts();
+
         if (nextPageButton != null)
             nextPageButton.onClick.AddListener(ShowPage2);
 
@@ -58,7 +60,7 @@ public class DetailedInformationUI : MonoBehaviour
     }
 
     /// <summary>
-    /// ÏÔÊ¾½¨ÖşÏêÏ¸ĞÅÏ¢
+    /// æ˜¾ç¤ºå»ºç­‘è¯¦ç»†ä¿¡æ¯
     /// </summary>
     public void ShowDetail(BuildingDetailData data)
     {
@@ -88,36 +90,44 @@ public class DetailedInformationUI : MonoBehaviour
         if (page2FinallyIntroductionText != null)
             page2FinallyIntroductionText.text = data.finalIntroduction;
 
-        // ´ò¿ªÏêÏ¸Ò³µÚÒ»Ò³
+        if (detailedInformationPanel != null)
+            detailedInformationPanel.SetActive(true);
+
         if (UIRootManager.Instance != null)
         {
-            UIRootManager.Instance.OpenDetailViewPage1();
+            UIRootManager.Instance.OpenModal(RuntimeModalType.DetailPage1, RuntimeModalOpenSource.None, true);
         }
 
         ShowPage1Only();
     }
 
     /// <summary>
-    /// ÏÔÊ¾µÚÒ»Ò³
+    /// æ˜¾ç¤ºç¬¬ä¸€é¡µ
     /// </summary>
     public void ShowPage1()
     {
+        if (detailedInformationPanel != null)
+            detailedInformationPanel.SetActive(true);
+
         if (UIRootManager.Instance != null)
         {
-            UIRootManager.Instance.OpenDetailViewPage1();
+            UIRootManager.Instance.OpenModal(RuntimeModalType.DetailPage1, RuntimeModalOpenSource.None, true);
         }
 
         ShowPage1Only();
     }
 
     /// <summary>
-    /// ÏÔÊ¾µÚ¶şÒ³
+    /// æ˜¾ç¤ºç¬¬äºŒé¡µ
     /// </summary>
     public void ShowPage2()
     {
+        if (detailedInformationPanel != null)
+            detailedInformationPanel.SetActive(true);
+
         if (UIRootManager.Instance != null)
         {
-            UIRootManager.Instance.OpenDetailViewPage2();
+            UIRootManager.Instance.OpenModal(RuntimeModalType.DetailPage2, RuntimeModalOpenSource.None, true);
         }
 
         if (backGround1 != null)
@@ -128,7 +138,7 @@ public class DetailedInformationUI : MonoBehaviour
     }
 
     /// <summary>
-    /// Ö»ÏÔÊ¾µÚÒ»Ò³£¨±¾µØÒ³Ãæ×´Ì¬£©
+    /// åªæ˜¾ç¤ºç¬¬ä¸€é¡µï¼ˆæœ¬åœ°é¡µé¢çŠ¶æ€ï¼‰
     /// </summary>
     private void ShowPage1Only()
     {
@@ -140,30 +150,35 @@ public class DetailedInformationUI : MonoBehaviour
     }
 
     /// <summary>
-    /// ¹Ø±ÕÕû¸öÍ¼¼øÏµÍ³
+    /// å…³é—­æ•´ä¸ªå›¾é‰´ç³»ç»Ÿ
     /// </summary>
     public void CloseAllUI()
     {
-        if (UIRootManager.Instance != null)
-        {
-            UIRootManager.Instance.CloseAllBookUI();
-        }
-
         ShowPage1Only();
-        UIManager.Instance?.RestoreUI();
+        UIManager.Instance?.CloseIllustratedHandbook();
     }
 
     /// <summary>
-    /// ´ÓÏêÏ¸Ò³»Øµ½Í¼¼øÖ÷Ò³
+    /// ä»è¯¦æƒ…é¡µå›åˆ°å›¾é‰´ä¸»é¡µ
     /// </summary>
     public void CloseDetailOnlyReturnHandbook()
     {
+        if (detailedInformationPanel != null)
+            detailedInformationPanel.SetActive(false);
+
         if (UIRootManager.Instance != null)
         {
-            UIRootManager.Instance.HideAllDetail();
-            UIRootManager.Instance.ShowHandbook();
+            UIRootManager.Instance.OpenModal(RuntimeModalType.Handbook, RuntimeModalOpenSource.None, true);
         }
 
         ShowPage1Only();
+    }
+
+    private void ApplyRuntimeFonts()
+    {
+        RuntimeTextFontRepair.RepairLegacyText(page1NameText);
+        RuntimeTextFontRepair.RepairLegacyText(page1IntroductionText);
+        RuntimeTextFontRepair.RepairLegacyText(page2IntroductionText);
+        RuntimeTextFontRepair.RepairLegacyText(page2FinallyIntroductionText);
     }
 }

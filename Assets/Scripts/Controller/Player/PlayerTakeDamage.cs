@@ -1,17 +1,17 @@
 using UnityEngine;
 
 /// <summary>
-/// Íæ¼Ò²¥·ÅÊÜ»÷¶¯»­
-/// ½ûÓÃ/ÆôÓÃÒÆ¶¯
+/// ç©å®¶æ’­æ”¾å—å‡»åŠ¨ç”»
+/// ç¦ç”¨/å¯ç”¨ç§»åŠ¨
 /// </summary>
 public class PlayerTakeDamage : MonoBehaviour
 {
-    [Header("×é¼şÒıÓÃ")]
+    [Header("ç»„ä»¶å¼•ç”¨")]
     public Animator playerAnim;
-    public PlayerMove playerMovement; // ÍÏ×§¸³ÖµÒÆ¶¯½Å±¾
-    [Header("ÊÜ»÷¶¯»­²ÎÊı")]
+    public PlayerMove playerMovement; // æ‹–æ‹½èµ‹å€¼ç§»åŠ¨è„šæœ¬
+    [Header("å—å‡»åŠ¨ç”»å‚æ•°")]
     public string hurtAnimParam = "IsHurt";
-    [Header("ÑªÌõ½Å±¾")]
+    [Header("è¡€æ¡è„šæœ¬")]
     public ValueTrans healthTrans; 
 
     private CharacterCore characterCore;
@@ -19,49 +19,62 @@ public class PlayerTakeDamage : MonoBehaviour
     private void Awake()
     {
         characterCore = GetComponent<CharacterCore>();
-        // healthTrans = GetComponent<HealthTrans>();
+        healthTrans = GameplayStatusHudRuntime.EnsureHealthGauge(healthTrans);
+        PlayerCriticalStateFeedback.Ensure(gameObject);
 
-        characterCore.OnTakeDamage += PlayHurtAnimation;
+        if (characterCore != null)
+        {
+            characterCore.OnTakeDamage += PlayHurtAnimation;
+        }
 
-        // °²È«Ğ£Ñé£ºÈ·±£ÒÆ¶¯½Å±¾ÒıÓÃ²»Îª¿Õ
+        // å®‰å…¨æ ¡éªŒï¼šç¡®ä¿ç§»åŠ¨è„šæœ¬å¼•ç”¨ä¸ä¸ºç©º
         if (playerMovement == null)
         {
             playerMovement = GetComponent<PlayerMove>();
         }
 
-        healthTrans.SetMaxValue(characterCore.stats.maxHp);
+        RefreshHealthUi();
+    }
+
+    private void Start()
+    {
+        healthTrans = GameplayStatusHudRuntime.EnsureHealthGauge(healthTrans);
+        RefreshHealthUi();
     }
 
     /// <summary>
-    /// ²¥·ÅÊÜ»÷¶¯»­²¢½ûÓÃÒÆ¶¯
+    /// æ’­æ”¾å—å‡»åŠ¨ç”»å¹¶ç¦ç”¨ç§»åŠ¨
     /// </summary>
     private void PlayHurtAnimation()
     {
-        if (playerAnim == null || playerMovement == null) return;
+        RefreshHealthUi();
 
-        // ÊÜ»÷Ê±½ûÖ¹ÒÆ¶¯
-        playerMovement.canMove = false;
-        // Çå¿Õ¸ÕÌåËÙ¶È£¬Á¢¼´Í£Ö¹Î»ÒÆ
-        if (playerMovement.rb != null)
+        if (playerAnim != null)
         {
-            playerMovement.rb.velocity = Vector2.zero;
+            if (playerMovement != null)
+            {
+                // å—å‡»æ—¶ç¦æ­¢ç§»åŠ¨
+                playerMovement.canMove = false;
+                // æ¸…ç©ºåˆšä½“é€Ÿåº¦ï¼Œç«‹å³åœæ­¢ä½ç§»
+                if (playerMovement.rb != null)
+                {
+                    playerMovement.rb.velocity = Vector2.zero;
+                }
+            }
+
+            // è§¦å‘å—å‡»åŠ¨ç”»
+            playerAnim.SetTrigger(hurtAnimParam);
         }
-
-        // ´¥·¢ÊÜ»÷¶¯»­
-        playerAnim.SetTrigger(hurtAnimParam);
-
-        // ÑªÌõ¼õÉÙ
-        healthTrans.SetValue(characterCore.currentHp);
     }
 
     /// <summary>
-    /// ¶¯»­ÊÂ¼ş»Øµ÷£ºÊÜ»÷¶¯»­²¥·ÅÍê³ÉºóÆôÓÃÒÆ¶¯
+    /// åŠ¨ç”»äº‹ä»¶å›è°ƒï¼šå—å‡»åŠ¨ç”»æ’­æ”¾å®Œæˆåå¯ç”¨ç§»åŠ¨
     /// </summary>
     public void OnHurtAnimationEnd()
     {
         if (playerMovement != null)
         {
-            playerMovement.canMove = true; // Ö»¹ØÒÆ¶¯
+            playerMovement.canMove = true; // åªå…³ç§»åŠ¨
         }
     }
 
@@ -71,5 +84,23 @@ public class PlayerTakeDamage : MonoBehaviour
         {
             characterCore.OnTakeDamage -= PlayHurtAnimation;
         }
+    }
+
+    private void RefreshHealthUi()
+    {
+        if (characterCore == null || characterCore.stats == null)
+        {
+            return;
+        }
+
+        healthTrans = GameplayStatusHudRuntime.EnsureHealthGauge(healthTrans);
+        if (healthTrans == null)
+        {
+            return;
+        }
+
+        healthTrans.SetMaxValue(characterCore.stats.maxHp);
+        healthTrans.SetValue(characterCore.currentHp);
+        GameplayStatusHudRuntime.RefreshHealthText(characterCore.currentHp, characterCore.stats.maxHp);
     }
 }

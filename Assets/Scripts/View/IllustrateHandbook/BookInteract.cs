@@ -2,22 +2,34 @@ using UnityEngine;
 
 public class BookInteract : MonoBehaviour, IInteractable
 {
-    [Header("Í¼¼ø½çÃæ")]
+    [Header("å›¾é‰´é¢æ¿")]
     public GameObject illustratedHandbook;
 
-    public string InteractionTip => "´ò¿ªÍ¼¼ø";
+    public string InteractionTip => GameSceneBaseReturnBootstrapper.IsGameSceneActive()
+        ? "è¿”å›åŸºåœ°"
+        : "æ‰“å¼€å›¾é‰´";
 
     public void OnInteract()
     {
-        Debug.Log("Êé±¾±»½»»¥£¡");  // µ÷ÊÔÈÕÖ¾
+        if (GameSceneBaseReturnBootstrapper.IsGameSceneActive())
+        {
+            GameSceneBaseReturnBootstrapper.SubmitCatalogueAndReturnToBase();
+            return;
+        }
+
+        if (IllustratedUISceneLoader.Open(
+                RuntimeModalOpenSource.Interact,
+                IllustratedHandbookPage.IllustratedHandbook))
+        {
+            return;
+        }
 
         if (illustratedHandbook != null)
         {
-            UIManager.Instance?.OpenIllustratedHandbook();
+            UIManager.Instance?.OpenIllustratedHandbook(RuntimeModalOpenSource.Interact);
+            return;
         }
-        else
-        {
-            Debug.LogError("Í¼¼ø½çÃæÎ´¸³Öµ£¡");
-        }
+
+        Debug.LogError("å›¾é‰´é¢æ¿æœªèµ‹å€¼");
     }
 }

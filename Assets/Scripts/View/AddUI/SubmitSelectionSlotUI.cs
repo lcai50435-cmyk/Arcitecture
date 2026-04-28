@@ -1,18 +1,28 @@
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
-public class SubmitSelectionSlotUI : MonoBehaviour
+public class SubmitSelectionSlotUI : MonoBehaviour, IPointerClickHandler
 {
-    [Header("²ÛÎ»Ë÷Òı£¨ÊÖ¶¯ÌîĞ´£©")]
+    private static readonly Color SelectionBorderColor = new Color(0.98f, 0.85f, 0.48f, 0.95f);
+    private static readonly Color SelectionTintColor = new Color(1f, 0.97f, 0.87f, 1f);
+
+    [Header("æ§½ä½ç´¢å¼•ï¼ˆæ‰‹åŠ¨å¡«å†™ï¼‰")]
     public int slotIndex;
 
-    [Header("°´Å¥")]
+    [Header("æŒ‰é’®")]
     public Button button;
 
-    [Header("Í¼±êÍ¼Æ¬£¨ÍÏ Slot_X/Icon£©")]
+    [Header("æ§½ä½åº•å›¾ï¼ˆå¯é€‰ï¼‰")]
+    public Image backgroundImage;
+
+    [Header("å›¾æ ‡å›¾ç‰‡ï¼ˆæ‹– Slot_X/Iconï¼‰")]
     public Image iconImage;
 
     private SubmitSelectionPanelUI owner;
+    private Outline selectionOutline;
+    private Color defaultBackgroundColor = Color.white;
+    private bool backgroundColorInitialized;
 
     public void Init(SubmitSelectionPanelUI panelOwner)
     {
@@ -23,31 +33,35 @@ public class SubmitSelectionSlotUI : MonoBehaviour
             button = GetComponent<Button>();
         }
 
-        if (button != null)
+        if (backgroundImage == null)
         {
-            button.onClick.RemoveAllListeners();
-            button.onClick.AddListener(OnClickSlot);
+            backgroundImage = button != null
+                ? button.targetGraphic as Image
+                : GetComponent<Image>();
         }
+
+        EnsureSelectionVisual();
     }
 
-    public void Refresh(ArchitecturalCrystal item, bool hasValidItem)
+    public void Refresh(ArchitecturalCrystal item, bool hasValidItem, bool isSelected)
     {
-        if (hasValidItem) // Ìæ´úÔ­ÓĞµÄ if (item != null)
+        if (hasValidItem)
         {
             if (iconImage != null)
             {
-                iconImage.sprite = item.backIcon;
+                iconImage.sprite = item.backIcon != null
+                    ? item.backIcon
+                    : (item.icon != null ? item.icon : RuntimeCrystalDropFactory.ResolveSprite(item));
                 iconImage.enabled = true;
                 iconImage.color = Color.white;
             }
 
             if (button != null)
             {
-                // ÌØÊâµÄÎïÆ·ÅĞ¶¨£ºÈç¹ûÊÇ½âËø²ÄÁÏÔò°´Å¥²»¿Éµã»÷
-                button.interactable = !item.isUnlockMaterial;
+                button.interactable = item.IsCommonStructure;
             }
         }
-        else // Ìæ´úÔ­ÓĞµÄ else (item == null)
+        else
         {
             if (iconImage != null)
             {
@@ -60,12 +74,64 @@ public class SubmitSelectionSlotUI : MonoBehaviour
                 button.interactable = false;
             }
         }
+
+        ApplySelectionVisual(hasValidItem && isSelected);
     }
 
-
-    private void OnClickSlot()
+    public void OnPointerClick(PointerEventData eventData)
     {
-        Debug.Log($"µã»÷ÁË´°¿Ú¸ñ×Ó£¬slotIndex = {slotIndex}£¬ÎïÌåÃû = {gameObject.name}");
-        owner?.OnSlotClicked(slotIndex);
+        if (eventData == null || eventData.button != PointerEventData.InputButton.Left)
+        {
+            return;
+        }
+
+        if (button != null && !button.interactable)
+        {
+            return;
+        }
+
+        owner?.OnSlotPressed(slotIndex, Mathf.Max(1, eventData.clickCount));
+    }
+
+    private void EnsureSelectionVisual()
+    {
+        if (backgroundImage == null)
+        {
+            return;
+        }
+
+        if (!backgroundColorInitialized)
+        {
+            defaultBackgroundColor = backgroundImage.color;
+            backgroundColorInitialized = true;
+        }
+
+        selectionOutline = backgroundImage.GetComponent<Outline>();
+        if (selectionOutline == null)
+        {
+            selectionOutline = backgroundImage.gameObject.AddComponent<Outline>();
+        }
+
+        selectionOutline.effectColor = SelectionBorderColor;
+        selectionOutline.effectDistance = new Vector2(4f, 4f);
+        selectionOutline.useGraphicAlpha = true;
+        selectionOutline.enabled = false;
+    }
+
+    private void ApplySelectionVisual(bool isSelected)
+    {
+        EnsureSelectionVisual();
+
+        if (backgroundImage != null)
+        {
+            backgroundImage.color = isSelected
+                ? Color.Lerp(defaultBackgroundColor, SelectionTintColor, 0.28f)
+                : defaultBackgroundColor;
+        }
+
+        if (selectionOutline != null)
+        {
+            selectionOutline.enabled = isSelected;
+        }
     }
 }

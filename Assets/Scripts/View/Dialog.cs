@@ -1,32 +1,52 @@
 using System.Collections;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 public class Dialog : MonoBehaviour
 {
-    [Header("UI×é¼ş")]
+    private const string GameplayPauseReason = "RuntimeDialog";
+    private const float DefaultRevealDurationPerWeight = 0.03f;
+    private const float MinimumRevealDuration = 0.2f;
+    private const float MaximumRevealDuration = 1.8f;
+    private const float TextFadeInDuration = 0.22f;
+    private const float TextFloatDistance = 10f;
+    private const float TextStartScaleFactor = 0.985f;
+    private const float TextPopStrength = 0.018f;
+
+    [Header("UI ç»„ä»¶")]
     public GameObject dialogPanel;
     public Text descriptionText;
 
-    [Header("µã»÷ÈÎÒâ´¦¹Ø±ÕÓÃ°´Å¥")]
+    [Header("ç‚¹å‡»å…³é—­æŒ‰é’®")]
     public Button clickCloseButton;
 
-    [Header("ĞèÒªÒş²ØµÄÆäËûUI")]
+    [Header("éœ€è¦éšè—çš„å…¶ä»– UI")]
     public GameObject[] uiToHide;
 
-    [Header("×Ô¶¯¹Ø±ÕÊ±¼ä")]
+    [Header("è‡ªåŠ¨å…³é—­æ—¶é—´")]
     public float displayDuration = 4f;
 
-    [Header("ÊÇ·ñÔÊĞíÆÕÍ¨µ¯´°ÏÔÊ¾")]
+    [Header("æ˜¯å¦å…è®¸æ™®é€šå¼¹çª—æ˜¾ç¤º")]
     public bool canShow = true;
 
     private BackpackMananger backpackManager;
     private Coroutine currentCoroutine;
-    private bool waitingForClickClose = false;
+    private bool waitingForClickClose;
+    private bool isClosingDialog;
+    private bool isRevealPlaying;
+    private bool requestedGameplayPause;
+    private string activeDialogContent = string.Empty;
+    private RectTransform descriptionRectTransform;
+    private Vector2 descriptionTextOrigin;
+    private Vector3 descriptionTextScaleOrigin;
+    private bool cachedDescriptionTransform;
 
     private void Start()
     {
         backpackManager = BackpackMananger.Instance;
+        RuntimeTextFontRepair.RepairLegacyText(descriptionText);
+        CacheDescriptionTransform();
 
         if (backpackManager != null)
         {
@@ -54,59 +74,63 @@ public class Dialog : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Ê×´ÎÊ°È¡ÎïÆ·Ê±ÏÔÊ¾µ¯´°
-    /// </summary>
     private void ShowDialogByCrystal(ArchitecturalCrystal crystal)
     {
-        // ĞŞ¸´µã£ºÓÃÎ¨Ò»±êÊ¶ÅĞ¶ÏÊÇ·ñÎª¡°¿Õ¡±£¨Ê¾Àı£º¼ÙÉè type ÊÇÃ¶¾Ù£¬Ä¬ÈÏÖµÎª 0/None£©
-        if (crystal.type == default) return;
+        if (crystal.isUnlockMaterial) return;
 
-        string desc = string.IsNullOrEmpty(crystal.textDescription)
-            ? $"»ñµÃ {crystal.type}£¡\n¾­ÑéÖµ +{crystal.expValue}"
-            : crystal.textDescription;
-
-        ShowAutoDialog(desc);
+        string desc = BuildSpiritIntro(crystal);
+        InternalShow(desc, false);
     }
 
-
-    /// <summary>
-    /// ×Ô¶¯¹Ø±Õµ¯´°£¨Ê°È¡ÌáÊ¾ÓÃ£©
-    /// </summary>
     public void ShowAutoDialog(string desc)
     {
         if (!canShow) return;
         InternalShow(desc, true);
     }
 
-    /// <summary>
-    /// µã»÷¹Ø±Õµ¯´°£¨Ğ¡Í¼±ê½éÉÜÓÃ£©
-    /// </summary>
+    public void ShowAutoDialogForce(string desc)
+    {
+        InternalShow(desc, true);
+    }
+
     public void ShowClickCloseDialog(string desc)
     {
         InternalShow(desc, false);
     }
 
-    /// <summary>
-    /// ÄÚ²¿Í³Ò»ÏÔÊ¾Âß¼­
-    /// </summary>
-    private void InternalShow(string desc, bool autoClose)
+    private bool InternalShow(string desc, bool autoClose)
     {
+        if (!gameObject.activeInHierarchy)
+        {
+            Debug.LogWarning("Dialog æ‰€åœ¨å¯¹è±¡æœªæ¿€æ´»ï¼Œæ— æ³•æ˜¾ç¤ºå¼¹çª—");
+            return false;
+        }
+
+        activeDialogContent = desc ?? string.Empty;
+
         if (descriptionText != null)
         {
-            descriptionText.text = desc;
+            PrepareDescriptionForReveal();
         }
 
-        // Òş²ØÆäËûUI
         HideOtherUI(true);
+        isClosingDialog = false;
+        PauseGameForFirstPickDialog();
 
-        // ´ò¿ªDialogÃæ°å
         if (UIRootManager.Instance != null)
         {
-            UIRootManager.Instance.ShowDialog();
+            if (dialogPanel != null)
+            {
+                dialogPanel.SetActive(true);
+            }
+
+            UIRootManager.Instance.OpenModal(RuntimeModalType.Dialog, RuntimeModalOpenSource.None);
+        }
+        else if (dialogPanel != null)
+        {
+            dialogPanel.SetActive(true);
         }
 
-        // Çåµô¾ÉĞ­³Ì
         if (currentCoroutine != null)
         {
             StopCoroutine(currentCoroutine);
@@ -114,40 +138,73 @@ public class Dialog : MonoBehaviour
         }
 
         waitingForClickClose = !autoClose;
+        isRevealPlaying = descriptionText != null && activeDialogContent.Length > 0;
 
         if (clickCloseButton != null)
         {
             clickCloseButton.gameObject.SetActive(waitingForClickClose);
         }
 
-        // ×Ô¶¯¹Ø±ÕÄ£Ê½
-        if (autoClose)
-        {
-            currentCoroutine = StartCoroutine(HideAfterDelay());
-        }
+        currentCoroutine = StartCoroutine(PlayDialogSequence(autoClose));
+
+        return true;
     }
 
-    /// <summary>
-    /// ×Ô¶¯µÈ´ıºó¹Ø±Õ
-    /// </summary>
-    private IEnumerator HideAfterDelay()
+    private IEnumerator PlayDialogSequence(bool autoClose)
     {
-        yield return new WaitForSeconds(displayDuration);
-        ForceHideImmediately();
+        yield return RevealDialogText();
+
+        isRevealPlaying = false;
+
+        if (!autoClose)
+        {
+            currentCoroutine = null;
+            yield break;
+        }
+
+        yield return new WaitForSecondsRealtime(displayDuration);
+        currentCoroutine = null;
+        CloseDialog();
     }
 
-    /// <summary>
-    /// µã»÷¹Ø±Õ°´Å¥
-    /// </summary>
     private void OnClickCloseDialog()
     {
         if (!waitingForClickClose) return;
-        ForceHideImmediately();
+
+        if (isRevealPlaying)
+        {
+            CompleteRevealImmediately();
+            return;
+        }
+
+        CloseDialog();
     }
 
-    /// <summary>
-    /// Ç¿ÖÆÁ¢¼´¹Ø±Õµ¯´°
-    /// </summary>
+    public void CloseDialog()
+    {
+        if (isClosingDialog)
+        {
+            return;
+        }
+
+        if (currentCoroutine != null)
+        {
+            StopCoroutine(currentCoroutine);
+            currentCoroutine = null;
+        }
+
+        waitingForClickClose = false;
+        isClosingDialog = true;
+
+        if (UIRootManager.Instance != null && UIRootManager.Instance.ActiveModalType == RuntimeModalType.Dialog)
+        {
+            UIRootManager.Instance.CloseModalFlow(CompleteCloseDialog);
+            return;
+        }
+
+        CompleteCloseDialog();
+    }
+
     public void ForceHideImmediately()
     {
         if (currentCoroutine != null)
@@ -157,10 +214,23 @@ public class Dialog : MonoBehaviour
         }
 
         waitingForClickClose = false;
+        isClosingDialog = false;
+        isRevealPlaying = false;
+        activeDialogContent = string.Empty;
 
         if (clickCloseButton != null)
         {
             clickCloseButton.gameObject.SetActive(false);
+        }
+
+        if (descriptionText != null)
+        {
+            RestoreDescriptionPresentation(clearText: true);
+        }
+
+        if (dialogPanel != null)
+        {
+            dialogPanel.SetActive(false);
         }
 
         if (UIRootManager.Instance != null)
@@ -169,19 +239,318 @@ public class Dialog : MonoBehaviour
         }
 
         HideOtherUI(false);
+        ResumeGameAfterFirstPickDialog();
     }
 
-    /// <summary>
-    /// ´ò¿ªµ¯´°Ê±Òş²ØÆäËûUI£¬¹Ø±Õµ¯´°Ê±»Ö¸´
-    /// </summary>
+    private void CompleteCloseDialog()
+    {
+        if (clickCloseButton != null)
+        {
+            clickCloseButton.gameObject.SetActive(false);
+        }
+
+        if (dialogPanel != null)
+        {
+            dialogPanel.SetActive(false);
+        }
+
+        HideOtherUI(false);
+        ResumeGameAfterFirstPickDialog();
+        isClosingDialog = false;
+        isRevealPlaying = false;
+        RestoreDescriptionPresentation(clearText: true);
+    }
+
+    private void PauseGameForFirstPickDialog()
+    {
+        if (requestedGameplayPause || !GameplayStageCatalog.IsGameplayScene(SceneManager.GetActiveScene().name))
+        {
+            return;
+        }
+
+        RuntimeGameplayPauseController.RequestPause(GameplayPauseReason);
+        requestedGameplayPause = true;
+    }
+
+    private void ResumeGameAfterFirstPickDialog()
+    {
+        if (!requestedGameplayPause)
+        {
+            return;
+        }
+
+        RuntimeGameplayPauseController.ReleasePause(GameplayPauseReason);
+        requestedGameplayPause = false;
+    }
+
+    private string BuildSpiritIntro(ArchitecturalCrystal crystal)
+    {
+        string desc = string.IsNullOrEmpty(crystal.textDescription)
+            ? $"å‘ç°äº† {crystal.DisplayName}ã€‚å®ƒèƒ½æ¨è¿›å»ºç­‘å½•ä¿®å¤ï¼Œå¹¶ç«‹å³æä¾›å½“å‰ç»“æ„æ•ˆæœã€‚"
+            : crystal.textDescription;
+
+        return $"ç²¾çµï¼š\nå‘ç°äº† {crystal.DisplayName}ã€‚\n{desc}\n\nç‚¹å‡»æŒ‰é’®åç»§ç»­æ¢ç´¢ã€‚";
+    }
+
     private void HideOtherUI(bool hide)
     {
+        if (uiToHide == null) return;
+
         foreach (GameObject ui in uiToHide)
         {
             if (ui != null)
             {
                 ui.SetActive(!hide);
             }
+        }
+    }
+
+    private IEnumerator RevealDialogText()
+    {
+        if (descriptionText == null)
+        {
+            yield break;
+        }
+
+        if (string.IsNullOrEmpty(activeDialogContent))
+        {
+            RestoreDescriptionPresentation(clearText: true);
+            yield break;
+        }
+
+        float[] cumulativeWeights = BuildCumulativeWeights(activeDialogContent);
+        float totalWeight = cumulativeWeights[cumulativeWeights.Length - 1];
+        float revealDuration = Mathf.Clamp(totalWeight * DefaultRevealDurationPerWeight, MinimumRevealDuration, MaximumRevealDuration);
+        float elapsed = 0f;
+        int lastVisibleCount = -1;
+
+        while (elapsed < revealDuration)
+        {
+            float progress = Mathf.Clamp01(elapsed / revealDuration);
+            float easedProgress = Mathf.SmoothStep(0f, 1f, progress);
+            float visibleWeight = totalWeight * easedProgress;
+            int visibleCount = ResolveVisibleCharacterCount(cumulativeWeights, visibleWeight);
+
+            if (visibleCount != lastVisibleCount)
+            {
+                descriptionText.text = BuildRevealText(visibleCount);
+                lastVisibleCount = visibleCount;
+            }
+
+            UpdateDescriptionPresentation(progress);
+            elapsed += Time.unscaledDeltaTime;
+            yield return null;
+        }
+
+        descriptionText.text = activeDialogContent;
+        UpdateDescriptionPresentation(1f);
+    }
+
+    private void CompleteRevealImmediately()
+    {
+        if (currentCoroutine != null)
+        {
+            StopCoroutine(currentCoroutine);
+            currentCoroutine = null;
+        }
+
+        isRevealPlaying = false;
+
+        if (descriptionText != null)
+        {
+            descriptionText.text = activeDialogContent;
+            UpdateDescriptionPresentation(1f);
+        }
+    }
+
+    private void PrepareDescriptionForReveal()
+    {
+        if (descriptionText == null)
+        {
+            return;
+        }
+
+        CacheDescriptionTransform();
+        descriptionText.supportRichText = true;
+        descriptionText.canvasRenderer.SetAlpha(0f);
+        descriptionText.text = BuildRevealText(0);
+
+        if (descriptionRectTransform != null)
+        {
+            descriptionRectTransform.anchoredPosition = descriptionTextOrigin + Vector2.down * TextFloatDistance;
+            descriptionRectTransform.localScale = MultiplyScale(descriptionTextScaleOrigin, TextStartScaleFactor);
+        }
+    }
+
+    private void RestoreDescriptionPresentation(bool clearText)
+    {
+        if (descriptionText == null)
+        {
+            return;
+        }
+
+        CacheDescriptionTransform();
+        descriptionText.canvasRenderer.SetAlpha(1f);
+        descriptionText.text = clearText ? string.Empty : activeDialogContent;
+
+        if (descriptionRectTransform != null)
+        {
+            descriptionRectTransform.anchoredPosition = descriptionTextOrigin;
+            descriptionRectTransform.localScale = descriptionTextScaleOrigin;
+        }
+    }
+
+    private void UpdateDescriptionPresentation(float progress)
+    {
+        if (descriptionText == null)
+        {
+            return;
+        }
+
+        CacheDescriptionTransform();
+
+        float clampedProgress = Mathf.Clamp01(progress);
+        float alphaProgress = Mathf.Clamp01(clampedProgress / TextFadeInDuration);
+        float easedAlpha = Mathf.SmoothStep(0f, 1f, alphaProgress);
+        float easedMotion = 1f - Mathf.Pow(1f - clampedProgress, 3f);
+        float pop = Mathf.Sin(easedMotion * Mathf.PI) * TextPopStrength;
+        float scaleFactor = Mathf.Lerp(TextStartScaleFactor, 1f, easedMotion) + pop;
+
+        descriptionText.canvasRenderer.SetAlpha(easedAlpha);
+
+        if (descriptionRectTransform != null)
+        {
+            descriptionRectTransform.anchoredPosition = Vector2.LerpUnclamped(
+                descriptionTextOrigin + Vector2.down * TextFloatDistance,
+                descriptionTextOrigin,
+                easedMotion);
+            descriptionRectTransform.localScale = MultiplyScale(descriptionTextScaleOrigin, scaleFactor);
+        }
+    }
+
+    private string BuildRevealText(int visibleCount)
+    {
+        if (string.IsNullOrEmpty(activeDialogContent))
+        {
+            return string.Empty;
+        }
+
+        int clampedVisibleCount = Mathf.Clamp(visibleCount, 0, activeDialogContent.Length);
+        if (clampedVisibleCount >= activeDialogContent.Length)
+        {
+            return activeDialogContent;
+        }
+
+        string visibleContent = clampedVisibleCount > 0
+            ? activeDialogContent.Substring(0, clampedVisibleCount)
+            : string.Empty;
+        string hiddenContent = activeDialogContent.Substring(clampedVisibleCount);
+
+        return $"{visibleContent}{WrapHiddenText(hiddenContent)}";
+    }
+
+    // ç”¨é€æ˜å¯Œæ–‡æœ¬ä¿ç•™å®Œæ•´æ’ç‰ˆï¼Œé¿å… reveal è¿‡ç¨‹ä¸­å‡ºç°æ¢è¡ŒæŠ–åŠ¨ã€‚
+    private string WrapHiddenText(string hiddenContent)
+    {
+        if (string.IsNullOrEmpty(hiddenContent))
+        {
+            return string.Empty;
+        }
+
+        Color hiddenColor = descriptionText != null ? descriptionText.color : Color.white;
+        hiddenColor.a = 0f;
+        string hiddenColorHex = ColorUtility.ToHtmlStringRGBA(hiddenColor);
+        return $"<color=#{hiddenColorHex}>{hiddenContent}</color>";
+    }
+
+    private void CacheDescriptionTransform()
+    {
+        if (cachedDescriptionTransform || descriptionText == null)
+        {
+            return;
+        }
+
+        descriptionRectTransform = descriptionText.rectTransform;
+        if (descriptionRectTransform == null)
+        {
+            return;
+        }
+
+        descriptionTextOrigin = descriptionRectTransform.anchoredPosition;
+        descriptionTextScaleOrigin = descriptionRectTransform.localScale;
+        cachedDescriptionTransform = true;
+    }
+
+    private static Vector3 MultiplyScale(Vector3 originalScale, float factor)
+    {
+        return new Vector3(
+            originalScale.x * factor,
+            originalScale.y * factor,
+            originalScale.z * factor);
+    }
+
+    private static float[] BuildCumulativeWeights(string content)
+    {
+        float[] cumulativeWeights = new float[content.Length];
+        float total = 0f;
+
+        for (int i = 0; i < content.Length; i++)
+        {
+            total += GetRevealWeight(content[i]);
+            cumulativeWeights[i] = total;
+        }
+
+        return cumulativeWeights;
+    }
+
+    private static int ResolveVisibleCharacterCount(float[] cumulativeWeights, float visibleWeight)
+    {
+        if (cumulativeWeights == null || cumulativeWeights.Length == 0)
+        {
+            return 0;
+        }
+
+        for (int i = 0; i < cumulativeWeights.Length; i++)
+        {
+            if (cumulativeWeights[i] > visibleWeight)
+            {
+                return i;
+            }
+        }
+
+        return cumulativeWeights.Length;
+    }
+
+    private static float GetRevealWeight(char character)
+    {
+        if (character == '\n' || character == '\r')
+        {
+            return 0.7f;
+        }
+
+        if (char.IsWhiteSpace(character))
+        {
+            return 0.35f;
+        }
+
+        switch (character)
+        {
+            case 'ï¼Œ':
+            case 'ã€‚':
+            case 'ï¼':
+            case 'ï¼Ÿ':
+            case 'ï¼›':
+            case 'ï¼š':
+            case 'ã€':
+            case ',':
+            case '.':
+            case '!':
+            case '?':
+            case ';':
+            case ':':
+                return 1.65f;
+            default:
+                return 1f;
         }
     }
 }

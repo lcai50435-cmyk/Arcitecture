@@ -1,117 +1,254 @@
 ﻿using TMPro;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 public class PlayerInteraction : MonoBehaviour
 {
+    private const string InteractPromptId = "player_interact";
+
     [Header("交互提示UI")]
     public GameObject fImage;
     public GameObject boxPanel;
     public TextMeshProUGUI boxText;
 
     [Header("最大交互距离")]
-    public float interactDistance = 2.2f;
+    public float interactDistance = 1.2f;
 
     private IInteractable currentInteractable;
-    private Transform currentInteractableTransform;
+    private Collider2D currentInteractableCollider;
+    private bool suppressInteractUi;
+    private PlayerMove playerMove;
+
+    private void Awake()
+    {
+        playerMove = GetComponent<PlayerMove>();
+        ResolveRuntimeReferences();
+    }
 
     void Start()
+    {
+        ResolveRuntimeReferences();
+        HideInteractUI();
+    }
+
+    private void OnDisable()
     {
         HideInteractUI();
     }
 
     void Update()
     {
-        // 每帧检查当前交互对象是否还在有效距离内
-        ValidateCurrentInteractable();
-
-        if (Input.GetKeyDown(KeyCode.F))
+        if (suppressInteractUi)
         {
+            HideInteractUI();
+            return;
+        }
+
+        if (IsGameplayUiBlockingInteraction())
+        {
+            ClearCurrentInteractable();
+            return;
+        }
+
+        if (ShouldHoldFloatingPromptUntilPlayerIsControllable())
+        {
+            ClearCurrentInteractable();
+            return;
+        }
+
+        UpdateCurrentInteractable();
+
+        if (Input.GetKeyDown(GameSettingsStore.GetKeyBinding(GameInputAction.Interact)))
+        {
+            if (UIRootManager.Instance != null && UIRootManager.Instance.ShouldSuppressInteractionInput())
+            {
+                return;
+            }
+
             TryInteract();
         }
     }
 
-    private void OnTriggerStay2D(Collider2D col)
+    private void UpdateCurrentInteractable()
     {
-        if (!col.TryGetComponent(out IInteractable interactable))
-            return;
+        Collider2D[] hits = Physics2D.OverlapCircleAll(transform.position, interactDistance);
 
-        float distance = Vector2.Distance(transform.position, col.transform.position);
+        IInteractable nearestInteractable = null;
+        Collider2D nearestCollider = null;
+        float nearestDistance = float.MaxValue;
 
-        // 超出真实交互距离，不记录
-        if (distance > interactDistance)
-            return;
-
-        currentInteractable = interactable;
-        currentInteractableTransform = col.transform;
-
-        ShowInteractUI(currentInteractable.InteractionTip);
-    }
-
-    private void OnTriggerExit2D(Collider2D col)
-    {
-        if (!col.TryGetComponent(out IInteractable interactable))
-            return;
-
-        if (interactable == currentInteractable)
+        for (int i = 0; i < hits.Length; i++)
         {
-            ClearCurrentInteractable();
+            Collider2D hit = hits[i];
+            if (hit == null) continue;
+            if (hit.gameObject == gameObject) continue;
+
+            if (hit.TryGetComponent(out IInteractable interactable))
+            {
+                Vector2 closestPoint = hit.ClosestPoint(transform.position);
+                float distance = Vector2.Distance(transform.position, closestPoint);
+
+                if (distance <= interactDistance && distance < nearestDistance)
+                {
+                    nearestDistance = distance;
+                    nearestInteractable = interactable;
+                    nearestCollider = hit;
+                }
+            }
+        }
+
+        currentInteractable = nearestInteractable;
+        currentInteractableCollider = nearestCollider;
+
+        if (currentInteractable != null)
+        {
+            ShowInteractUI(currentInteractable.InteractionTip);
+        }
+        else
+        {
+            HideInteractUI();
         }
     }
 
     private void TryInteract()
     {
-        // 再做一次交互前校验
-        if (!IsCurrentInteractableValid())
+        if (currentInteractable == null || currentInteractableCollider == null)
         {
             ClearCurrentInteractable();
             return;
         }
 
-        if (currentInteractable != null)
-        {
-            currentInteractable.OnInteract();
-        }
-    }
+        Vector2 closestPoint = currentInteractableCollider.ClosestPoint(transform.position);
+        float distance = Vector2.Distance(transform.position, closestPoint);
 
-    private void ValidateCurrentInteractable()
-    {
-        if (!IsCurrentInteractableValid())
+        if (distance > interactDistance)
         {
             ClearCurrentInteractable();
+            return;
         }
-    }
 
-    private bool IsCurrentInteractableValid()
-    {
-        if (currentInteractable == null || currentInteractableTransform == null)
-            return false;
-
-        float distance = Vector2.Distance(transform.position, currentInteractableTransform.position);
-        return distance <= interactDistance;
+        currentInteractable.OnInteract();
     }
 
     private void ShowInteractUI(string tip)
     {
+        if (suppressInteractUi || ShouldHoldFloatingPromptUntilPlayerIsControllable())
+        {
+            return;
+        }
+
+        ResolveRuntimeReferences();
+
+        if (UseFloatingPromptStyle())
+        {
+            HideLegacyPromptVisual();
+            RuntimeFollowPromptHud.ShowOrUpdate(
+                InteractPromptId,
+                transform,
+                RuntimeFollowPromptHud.FormatCompactKey(GameSettingsStore.GetKeyBinding(GameInputAction.Interact)),
+                tip,
+                0);
+            return;
+        }
+
         if (fImage != null)
+        {
             fImage.SetActive(true);
+        }
 
         if (boxPanel != null)
+        {
             boxPanel.SetActive(true);
+        }
 
         if (boxText != null)
+        {
             boxText.text = tip;
+        }
     }
 
     public void HideInteractUI()
     {
-        if (fImage != null) fImage.SetActive(false);
-        if (boxPanel != null) boxPanel.SetActive(false);
+        RuntimeFollowPromptHud.Hide(InteractPromptId);
+        HideLegacyPromptVisual();
     }
 
     public void ClearCurrentInteractable()
     {
         currentInteractable = null;
-        currentInteractableTransform = null;
+        currentInteractableCollider = null;
         HideInteractUI();
+    }
+
+    public void SetInteractUiSuppressed(bool suppressed)
+    {
+        suppressInteractUi = suppressed;
+        if (suppressed)
+        {
+            HideInteractUI();
+        }
+    }
+
+    private static bool IsGameplayUiBlockingInteraction()
+    {
+        if (UIRootManager.Instance != null && UIRootManager.Instance.IsAnyGameplayBlockingUIOpen())
+        {
+            return true;
+        }
+
+        return UIManager.Instance != null && UIManager.Instance.IsHandbookOpen;
+    }
+
+    private void OnDrawGizmosSelected()
+    {
+        Gizmos.color = Color.yellow;
+        Gizmos.DrawWireSphere(transform.position, interactDistance);
+    }
+
+    private void ResolveRuntimeReferences()
+    {
+        if (boxText == null && boxPanel != null)
+        {
+            boxText = boxPanel.GetComponentInChildren<TextMeshProUGUI>(true);
+        }
+
+        if (UseFloatingPromptStyle())
+        {
+            HideLegacyPromptVisual();
+        }
+    }
+
+    private void HideLegacyPromptVisual()
+    {
+        if (fImage != null)
+        {
+            fImage.SetActive(false);
+        }
+
+        if (boxPanel != null)
+        {
+            boxPanel.SetActive(false);
+        }
+    }
+
+    private static bool UseFloatingPromptStyle()
+    {
+        return GameplayStageCatalog.IsGameplayScene(SceneManager.GetActiveScene().name);
+    }
+
+    private bool ShouldHoldFloatingPromptUntilPlayerIsControllable()
+    {
+        if (!UseFloatingPromptStyle())
+        {
+            return false;
+        }
+
+        if (GameplayStageIntroDirector.IsIntroActive)
+        {
+            return true;
+        }
+
+        playerMove ??= GetComponent<PlayerMove>();
+        return playerMove != null && (!playerMove.enabled || !playerMove.canMove);
     }
 }

@@ -1,12 +1,12 @@
 using UnityEngine;
 
 /// <summary>
-/// ÔÆ¶äÒÆ¶¯Âß¼­
+/// äº‘æœµç§»åŠ¨é€»è¾‘
 /// </summary>
 public class SeamlessScroll : MonoBehaviour
 {
-    public float speed = 2f;           // ¹ö¶¯ËÙ¶È£¨¸ºÊıÏò×ó£¬ÕıÊıÏòÓÒ£©
-    public bool horizontal = true;     // true=Ë®Æ½¹ö¶¯£¬false=´¹Ö±
+    public float speed = 2f;           // æ»šåŠ¨é€Ÿåº¦ï¼ˆè´Ÿæ•°å‘å·¦ï¼Œæ­£æ•°å‘å³ï¼‰
+    public bool horizontal = true;     // true=æ°´å¹³æ»šåŠ¨ï¼Œfalse=å‚ç›´
 
     private Transform bg1, bg2;
     private float size;
@@ -17,12 +17,12 @@ public class SeamlessScroll : MonoBehaviour
         bg1 = transform.GetChild(0);
         bg2 = transform.GetChild(1);
 
-        // »ñÈ¡³ß´ç
+        // è·å–å°ºå¯¸
         var sr = bg1.GetComponent<SpriteRenderer>();
         size = horizontal ? sr.bounds.size.x : sr.bounds.size.y;
         startPos = bg1.position;
 
-        // ÉèÖÃbg2Î»ÖÃ
+        // è®¾ç½®bg2ä½ç½®
         bg2.position = startPos + (horizontal ? Vector3.right : Vector3.up) * size;
     }
 
@@ -32,7 +32,7 @@ public class SeamlessScroll : MonoBehaviour
         bg1.position += move;
         bg2.position += move;
 
-        // Ñ­»·¼ì²â
+        // å¾ªç¯æ£€æµ‹
         float dist = horizontal ? bg1.position.x - startPos.x : bg1.position.y - startPos.y;
         if (Mathf.Abs(dist) >= size)
             bg1.position = bg2.position - move.normalized * size;

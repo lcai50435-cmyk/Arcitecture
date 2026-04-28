@@ -70,6 +70,11 @@ public class EnemyAttack : CharacterAttack
 
     private void Update()
     {
+        if (core != null && core.IsDead)
+        {
+            return;
+        }
+
         if (statsManager == null || player == null)
         {
             // 自动获取玩家目标
@@ -138,6 +143,11 @@ public class EnemyAttack : CharacterAttack
 
     protected virtual void TryAttack()
     {
+        if (core != null && core.IsDead)
+        {
+            return;
+        }
+
         // 攻击时间冷却
         if (attackInterval > 0f && Time.time - lastAttackTime < attackInterval)
         {

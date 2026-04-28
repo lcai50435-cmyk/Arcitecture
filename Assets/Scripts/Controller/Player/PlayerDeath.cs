@@ -11,7 +11,7 @@ public class PlayerDeath :  CharacterDeathBase
 
     protected override void OnCharacterDie()
     {
-        // 触发动画机的死亡Trigger
+        // 瑙﹀彂鍔ㄧ敾鏈虹殑姝讳骸Trigger
         OnDestroy();
     }
 

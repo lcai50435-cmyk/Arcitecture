@@ -4,22 +4,43 @@ using UnityEngine.UI;
 [RequireComponent(typeof(Button))]
 public class CatalogueUnlockSlotButton : MonoBehaviour
 {
-    [Header("≤€ŒªŒ®“ªID")]
+    private const float DoubleClickWindow = 0.32f;
+    private static readonly Color LockedColor = new Color(0.5f, 0.5f, 0.5f, 1f);
+    private static readonly Color ArmedColor = new Color(0.82f, 0.78f, 0.62f, 1f);
+    private static readonly Color ArmedOutlineColor = new Color(0.98f, 0.86f, 0.48f, 0.95f);
+
+    [Header("ÊßΩ‰ΩçÂîØ‰∏ÄID")]
     public string slotId;
 
-    [Header("“™øÿ÷∆—’…´µƒÕº∆¨£®Õœ∏∏ŒÔÃÂ Progress_X µƒ Image£©")]
+    [Header("ËøêË°åÊó∂ÊßΩ‰ΩçÁ¥¢Âºï")]
+    public int slotIndex = -1;
+
+    [Header("Ë¶ÅÊéßÂà∂È¢úËâ≤ÁöÑÂõæÁâáÔºàÊãñÁà∂Áâ©‰Ωì Progress_X ÁöÑ ImageÔºâ")]
     public Image targetImage;
 
-    [Header("Àµ√˜ ˝æ›")]
+    [Header("ËØ¥ÊòéÊï∞ÊçÆ")]
     public UnlockSlotDescriptionData descriptionData;
 
-    [Header("µØ¥∞“˝”√")]
+    [Header("ÂºπÁ™óÂºïÁî®")]
     public Dialog dialogUI;
 
     private Button button;
-    private bool isUnlocked = false;
+    private Outline armedOutline;
+    private bool pendingUnlockArmed;
+    private float lastLockedClickTime = -10f;
 
-    public bool IsUnlocked => isUnlocked;
+    public bool IsUnlocked
+    {
+        get
+        {
+            if (!TryResolveRuntimeSlotContext(out _, out _, out CatalogueBuildingId buildingId, out int resolvedSlotIndex))
+            {
+                return false;
+            }
+
+            return RuntimeProgressState.EnsureInstance().IsSlotUnlocked(buildingId, resolvedSlotIndex);
+        }
+    }
 
     private void Awake()
     {
@@ -33,11 +54,24 @@ public class CatalogueUnlockSlotButton : MonoBehaviour
             button.onClick.AddListener(OnClickSlot);
         }
 
-        if (dialogUI == null)
+        ResolveDialogReference();
+
+        RefreshVisual();
+    }
+
+    private void Update()
+    {
+        if (!pendingUnlockArmed)
         {
-            dialogUI = FindObjectOfType<Dialog>();
+            return;
         }
 
+        if (Time.unscaledTime - lastLockedClickTime <= DoubleClickWindow)
+        {
+            return;
+        }
+
+        pendingUnlockArmed = false;
         RefreshVisual();
     }
 
@@ -51,48 +85,195 @@ public class CatalogueUnlockSlotButton : MonoBehaviour
 
     private void OnClickSlot()
     {
-        // “—Ω‚À¯£∫œ‘ æΩÈ…‹
-        if (isUnlocked)
+        if (!TryResolveRuntimeSlotContext(
+                out CatalogueBuildingUnlockState buildingState,
+                out _,
+                out CatalogueBuildingId buildingId,
+                out int resolvedSlotIndex))
         {
-            ShowDescription();
             return;
         }
 
-        // Œ¥Ω‚À¯£∫≥¢ ‘œ˚∫ƒ“ª∏ˆ◊®”√µ„¡¡µ¿æﬂ
-        PlayerGetArchitectural player = FindObjectOfType<PlayerGetArchitectural>();
-        if (player == null)
+        if (RuntimeProgressState.EnsureInstance().IsSlotUnlocked(buildingId, resolvedSlotIndex))
         {
-            Debug.LogError("√ª”–’“µΩ PlayerGetArchitectural");
+            pendingUnlockArmed = false;
+            ShowDescription(buildingId, resolvedSlotIndex);
             return;
         }
 
-        bool success = player.ConsumeOneUnlockMaterial();
+        int remainingInventory = RuntimeProgressState.EnsureInstance().AvailableSpecialStructureInventory;
+        if (remainingInventory <= 0)
+        {
+            pendingUnlockArmed = false;
+            RefreshVisual();
+            ShowUnlockRequirementPrompt(buildingId, resolvedSlotIndex);
+            return;
+        }
+
+        float now = Time.unscaledTime;
+        bool isDoubleClick = pendingUnlockArmed && now - lastLockedClickTime <= DoubleClickWindow;
+        if (!isDoubleClick)
+        {
+            pendingUnlockArmed = true;
+            lastLockedClickTime = now;
+            RefreshVisual();
+            return;
+        }
+
+        pendingUnlockArmed = false;
+        lastLockedClickTime = -10f;
+        bool success = RuntimeProgressState.EnsureInstance().TryUnlockSlot(
+            buildingId,
+            resolvedSlotIndex,
+            out BuildingRewardDefinition slotReward,
+            out BuildingRewardDefinition completionReward);
+
         if (!success)
         {
-            Debug.Log("√ª”–◊®”√µ„¡¡µ¿æﬂ£¨Œﬁ∑®µ„¡¡∏√–°Õº±Í");
+            ShowUnlockRequirementPrompt(buildingId, resolvedSlotIndex);
             return;
         }
 
-        // µ„¡¡≥…π¶
-        isUnlocked = true;
         RefreshVisual();
-
-        CatalogueBuildingUnlockState buildingState = GetComponentInParent<CatalogueBuildingUnlockState>();
-        if (buildingState != null)
-        {
-            buildingState.RefreshState();
-        }
+        ShowRewardDialog(slotReward, completionReward);
+        buildingState?.RefreshState();
     }
 
-    private void ShowDescription()
+    private void ShowDescription(CatalogueBuildingId buildingId, int resolvedSlotIndex)
     {
-        if (dialogUI == null)
+        if (!ResolveDialogReference())
         {
-            Debug.LogWarning("Dialog Œ¥∞Û∂®");
+            Debug.LogWarning("Dialog Êú™ÁªëÂÆö");
             return;
         }
 
-        string content = "‘›ŒﬁΩÈ…‹";
+        string content = BuildDescriptionContent(buildingId, resolvedSlotIndex);
+        dialogUI.ShowClickCloseDialog(content);
+    }
+
+    public void RefreshVisual()
+    {
+        if (button == null)
+        {
+            button = GetComponent<Button>();
+        }
+
+        if (button != null)
+        {
+            button.enabled = true;
+            button.interactable = true;
+        }
+
+        if (targetImage != null)
+        {
+            targetImage.raycastTarget = true;
+            targetImage.color = IsUnlocked
+                ? new Color(1f, 1f, 1f, 1f)
+                : (pendingUnlockArmed ? ArmedColor : LockedColor);
+        }
+
+        RefreshArmedOutline();
+    }
+
+    private bool TryResolveRuntimeSlotContext(
+        out CatalogueBuildingUnlockState buildingState,
+        out CatalogueBuildingUnlockState parentBuildingState,
+        out CatalogueBuildingId buildingId,
+        out int resolvedSlotIndex)
+    {
+        buildingState = GetComponentInParent<CatalogueBuildingUnlockState>();
+        parentBuildingState = buildingState;
+        buildingId = CatalogueBuildingId.Building1;
+        resolvedSlotIndex = slotIndex;
+
+        if (buildingState == null)
+        {
+            return TryResolveBySlotId(out buildingId, out resolvedSlotIndex);
+        }
+
+        buildingId = buildingState.BuildingId;
+
+        if (buildingState.slotButtons != null)
+        {
+            for (int i = 0; i < buildingState.slotButtons.Length; i++)
+            {
+                if (buildingState.slotButtons[i] == this)
+                {
+                    resolvedSlotIndex = i;
+                    slotIndex = i;
+                    break;
+                }
+            }
+        }
+
+        // ËøêË°åÊó∂‰ºòÂÖà‰ø°‰ªªÁà∂Âª∫Á≠ëÈÖçÁΩÆÈáåÁöÑÊßΩ‰ΩçÈ°∫Â∫èÔºåÂÖºÂÆπ prefab Èáå‰ªç‰øùÁïôÊóß slotId ÁöÑÊÉÖÂÜµ„ÄÇ
+        if (IsResolvedSlotIndexValid(buildingId, resolvedSlotIndex))
+        {
+            return true;
+        }
+
+        bool resolvedBySlotId = TryResolveBySlotId(out buildingId, out resolvedSlotIndex);
+        if (resolvedBySlotId)
+        {
+            slotIndex = resolvedSlotIndex;
+        }
+
+        return resolvedBySlotId;
+    }
+
+    private static bool IsResolvedSlotIndexValid(CatalogueBuildingId buildingId, int resolvedSlotIndex)
+    {
+        if (resolvedSlotIndex < 0)
+        {
+            return false;
+        }
+
+        BuildingDefinition definition = BuildingDefinitionLibrary.Get(buildingId);
+        if (definition.slotDefinitions == null || resolvedSlotIndex >= definition.slotDefinitions.Length)
+        {
+            return false;
+        }
+
+        return definition.slotDefinitions[resolvedSlotIndex] != null;
+    }
+
+    private bool TryResolveBySlotId(out CatalogueBuildingId buildingId, out int resolvedSlotIndex)
+    {
+        buildingId = CatalogueBuildingId.Building1;
+        resolvedSlotIndex = -1;
+
+        if (string.IsNullOrEmpty(slotId))
+        {
+            return false;
+        }
+
+        foreach (BuildingDefinition definition in BuildingDefinitionLibrary.GetAll())
+        {
+            if (definition.slotDefinitions == null)
+            {
+                continue;
+            }
+
+            for (int i = 0; i < definition.slotDefinitions.Length; i++)
+            {
+                BuildingSlotDefinition slotDefinition = definition.slotDefinitions[i];
+                if (slotDefinition == null || slotDefinition.slotId != slotId)
+                {
+                    continue;
+                }
+
+                buildingId = definition.buildingId;
+                resolvedSlotIndex = i;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private string BuildDescriptionContent(CatalogueBuildingId buildingId, int resolvedSlotIndex)
+    {
+        string content = "ÊöÇÊó†‰ªãÁªç";
 
         if (descriptionData != null)
         {
@@ -106,21 +287,110 @@ public class CatalogueUnlockSlotButton : MonoBehaviour
             }
         }
 
+        BuildingDefinition definition = BuildingDefinitionLibrary.Get(buildingId);
+        if (definition.slotDefinitions != null &&
+            resolvedSlotIndex >= 0 &&
+            resolvedSlotIndex < definition.slotDefinitions.Length)
+        {
+            BuildingSlotDefinition slotDefinition = definition.slotDefinitions[resolvedSlotIndex];
+            if (slotDefinition != null)
+            {
+                if (string.IsNullOrEmpty(content) || content == "ÊöÇÊó†‰ªãÁªç")
+                {
+                    content = !string.IsNullOrEmpty(slotDefinition.description)
+                        ? slotDefinition.description
+                        : slotDefinition.slotName;
+                }
+
+                if (slotDefinition.reward != null && !string.IsNullOrEmpty(slotDefinition.reward.description))
+                {
+                    content += $"\n\nÊ∞∏‰πÖÊïàÊûúÔºö{slotDefinition.reward.description}";
+                }
+            }
+        }
+
+        return content;
+    }
+
+    private void ShowRewardDialog(BuildingRewardDefinition slotReward, BuildingRewardDefinition completionReward)
+    {
+        if (!ResolveDialogReference())
+        {
+            return;
+        }
+
+        string content = slotReward != null
+            ? $"{slotReward.title}\n{slotReward.description}"
+            : "ÊßΩ‰ΩçÂ∑≤ÁÇπ‰∫Æ„ÄÇ";
+
+        if (completionReward != null)
+        {
+            content += $"\n\n{completionReward.title}\n{completionReward.description}";
+        }
+
         dialogUI.ShowClickCloseDialog(content);
     }
 
-    public void RefreshVisual()
+    private void ShowUnlockRequirementPrompt(CatalogueBuildingId buildingId, int resolvedSlotIndex)
     {
-        if (targetImage != null)
+        int remainingInventory = RuntimeProgressState.EnsureInstance().AvailableSpecialStructureInventory;
+        string slotName = ResolveSlotName(buildingId, resolvedSlotIndex);
+        string content = $"ÁÇπ‰∫Æ {slotName} ÈúÄË¶Å 1 ‰∏™‰∏ìÁî®ÁªìÊûÑÊùêÊñô„ÄÇ\nÂΩìÂâçÂ∫ìÂ≠òÔºö{remainingInventory}";
+
+        if (!ResolveDialogReference())
         {
-            if (isUnlocked)
-            {
-                targetImage.color = new Color(1f, 1f, 1f, 1f);
-            }
-            else
-            {
-                targetImage.color = new Color(0.5f, 0.5f, 0.5f, 1f);
-            }
+            Debug.Log(content);
+            return;
         }
+
+        dialogUI.ShowAutoDialogForce(content);
+    }
+
+    private static string ResolveSlotName(CatalogueBuildingId buildingId, int resolvedSlotIndex)
+    {
+        BuildingDefinition definition = BuildingDefinitionLibrary.Get(buildingId);
+        if (definition.slotDefinitions == null ||
+            resolvedSlotIndex < 0 ||
+            resolvedSlotIndex >= definition.slotDefinitions.Length ||
+            definition.slotDefinitions[resolvedSlotIndex] == null)
+        {
+            return "ËØ•ÊßΩ‰Ωç";
+        }
+
+        string slotName = definition.slotDefinitions[resolvedSlotIndex].slotName;
+        return string.IsNullOrWhiteSpace(slotName) ? "ËØ•ÊßΩ‰Ωç" : slotName;
+    }
+
+    private bool ResolveDialogReference()
+    {
+        if (dialogUI != null)
+        {
+            return true;
+        }
+
+        dialogUI = FindObjectOfType<Dialog>(true);
+        return dialogUI != null;
+    }
+
+    private void RefreshArmedOutline()
+    {
+        Image outlineTarget = targetImage != null
+            ? targetImage
+            : (button != null ? button.targetGraphic as Image : null);
+        if (outlineTarget == null)
+        {
+            return;
+        }
+
+        armedOutline = outlineTarget.GetComponent<Outline>();
+        if (armedOutline == null)
+        {
+            armedOutline = outlineTarget.gameObject.AddComponent<Outline>();
+        }
+
+        armedOutline.effectColor = ArmedOutlineColor;
+        armedOutline.effectDistance = new Vector2(4f, 4f);
+        armedOutline.useGraphicAlpha = true;
+        armedOutline.enabled = pendingUnlockArmed && !IsUnlocked;
     }
 }

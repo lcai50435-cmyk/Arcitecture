@@ -1,0 +1,29 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 13b75c95f34a00d4e8c04f76b73312e6, type: 3}
+  m_Name: Portal
+  m_EditorClassIdentifier: 
+  m_AnimatedSprites:
+  - {fileID: -278007122, guid: bf1fa4ba449b4b942a440aef64f7d0d5, type: 3}
+  - {fileID: 860307069, guid: bf1fa4ba449b4b942a440aef64f7d0d5, type: 3}
+  - {fileID: 948770981, guid: bf1fa4ba449b4b942a440aef64f7d0d5, type: 3}
+  - {fileID: 281428835, guid: bf1fa4ba449b4b942a440aef64f7d0d5, type: 3}
+  - {fileID: 376046007, guid: bf1fa4ba449b4b942a440aef64f7d0d5, type: 3}
+  - {fileID: -985661569, guid: bf1fa4ba449b4b942a440aef64f7d0d5, type: 3}
+  - {fileID: 2094350825, guid: bf1fa4ba449b4b942a440aef64f7d0d5, type: 3}
+  - {fileID: 1336644817, guid: bf1fa4ba449b4b942a440aef64f7d0d5, type: 3}
+  m_MinSpeed: 8
+  m_MaxSpeed: 8
+  m_AnimationStartTime: 0
+  m_AnimationStartFrame: 0
+  m_TileColliderType: 0
+  m_TileAnimationFlags: 0

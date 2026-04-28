@@ -11,6 +11,7 @@
 /[Ll]ogs/
 /[Uu]ser[Ss]ettings/
 *.log
+.DS_Store
 
 # By default unity supports Blender asset imports, *.blend1 blender files do not need to be commited to version control.
 *.blend1
@@ -33,6 +34,9 @@
 
 # Visual Studio cache directory
 .vs/
+.vscode/
+.serena/
+.spec-workflow/
 
 # Gradle cache directory
 .gradle/
@@ -82,6 +86,11 @@ InitTestScene*.unity*
 # Addressables default ignores, before user customizations
 /ServerData
 /[Aa]ssets/StreamingAssets/aa*
+/Assets/StreamingAssets/runtime-build-info.json
+/Assets/StreamingAssets/runtime-build-info.json.meta
+/Assets/StreamingAssets.meta
+/[Aa]ssets/Resources/RuntimeBuildInfo/
+/[Aa]ssets/Resources/RuntimeBuildInfo.meta
 /[Aa]ssets/AddressableAssetsData/link.xml*
 /[Aa]ssets/Addressables_Temp*
 # By default, Addressables content builds will generate addressables_content_state.bin

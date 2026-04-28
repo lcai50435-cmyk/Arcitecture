@@ -1,76 +1,145 @@
 using UnityEngine;
 
 /// <summary>
-/// UI¹ÜÀíÆ÷ - ¿ØÖÆÍ¼¼ø¿ª¹Ø¡¢ÆäËûUIÒş²Ø¡¢Íæ¼ÒÒÆ¶¯¿ØÖÆ
+/// UI ç®¡ç†å™¨ï¼Œè´Ÿè´£å›¾é‰´å¼€å…³ã€å…¶ä»– UI æ˜¾éšä¸ç©å®¶ç§»åŠ¨é”å®šã€‚
 /// </summary>
 public class UIManager : MonoBehaviour
 {
     public static UIManager Instance;
 
-    [Header("½çÃæ")]
+    [Header("å›¾é‰´")]
     public GameObject illustratedHandbook;
     public GameObject detailedInformation;
 
-    [Header("ĞèÒªÒş²ØµÄÆäËûUI")]
+    [Header("æ‰“å¼€å›¾é‰´æ—¶éœ€è¦éšè—çš„ UI")]
     public GameObject[] uiToHide;
 
-    [Header("½»»¥ÌáÊ¾UI")]
+    [Header("äº¤äº’æç¤º UI")]
     public GameObject interactTipUI;
 
-    [Header("Íæ¼Ò¿ØÖÆ")]
+    [Header("ç©å®¶æ§åˆ¶")]
     public GameObject player;
     public string playerMovementScriptName = "PlayerController";
 
-    private bool isHandbookOpen = false;
+    private bool isHandbookOpen;
+    private bool isClosingHandbook;
     private MonoBehaviour playerMovementScript;
     private bool wasPlayerEnabled = true;
-
     private Dialog dialogUI;
+    private IllustratedHandbookTabsController tabsController;
 
-    void Awake()
+    public bool IsHandbookOpen => isHandbookOpen;
+
+    private void Awake()
     {
-        if (Instance == null)
+        bool sceneOwnsIllustratedUi = IllustratedUISceneLoader.IsIllustratedUiScene(gameObject.scene);
+        bool currentOwnsIllustratedUi = Instance != null &&
+                                        IllustratedUISceneLoader.IsIllustratedUiScene(Instance.gameObject.scene);
+
+        if (Instance == null || (sceneOwnsIllustratedUi && !currentOwnsIllustratedUi))
         {
             Instance = this;
-            DontDestroyOnLoad(gameObject);
-        }
-        else
-        {
-            Destroy(gameObject);
         }
     }
 
-    void Start()
+    private void OnDestroy()
     {
-        dialogUI = FindObjectOfType<Dialog>();
-
-        if (player != null)
+        if (Instance == this)
         {
-            playerMovementScript = player.GetComponent(playerMovementScriptName) as MonoBehaviour;
-            if (playerMovementScript == null)
+            Instance = null;
+            UIManager[] managers = FindObjectsOfType<UIManager>(true);
+            for (int i = 0; i < managers.Length; i++)
             {
-                playerMovementScript = player.GetComponent<PlayerMove>();
-                if (playerMovementScript == null)
+                UIManager manager = managers[i];
+                if (manager == null || manager == this)
                 {
-                    Debug.LogWarning("Î´ÕÒµ½Íæ¼ÒÒÆ¶¯½Å±¾£¬Çë¼ì²é½Å±¾Ãû³ÆÊÇ·ñÕıÈ·");
+                    continue;
+                }
+
+                if (Instance == null ||
+                    IllustratedUISceneLoader.IsIllustratedUiScene(manager.gameObject.scene))
+                {
+                    Instance = manager;
+                    if (IllustratedUISceneLoader.IsIllustratedUiScene(manager.gameObject.scene))
+                    {
+                        break;
+                    }
                 }
             }
         }
-        else
-        {
-            Debug.LogWarning("UIManager: Î´ÍÏÈëÍæ¼ÒÎïÌå£¬ÎŞ·¨¿ØÖÆÍæ¼ÒÒÆ¶¯");
-        }
     }
 
-    /// <summary>
-    /// ´ò¿ªÍ¼¼ø
-    /// </summary>
-    public void OpenIllustratedHandbook()
+    private void Start()
     {
-        if (isHandbookOpen) return;
+        EnsureTabsController();
+
+        if (IllustratedUISceneLoader.IsIllustratedUiScene(gameObject.scene))
+        {
+            RefreshRuntimeBindings();
+            return;
+        }
+
+        if (illustratedHandbook != null)
+            illustratedHandbook.SetActive(false);
+
+        if (detailedInformation != null)
+            detailedInformation.SetActive(false);
+
+        if (UIRootManager.Instance != null)
+        {
+            UIRootManager.Instance.CloseAllBookUI();
+        }
+
+        isHandbookOpen = false;
+        isClosingHandbook = false;
+        RefreshRuntimeBindings();
+    }
+
+    public void ConfigureForRuntime(
+        GameObject handbook,
+        GameObject detail,
+        GameObject[] hideTargets,
+        GameObject interactTip,
+        GameObject playerObject)
+    {
+        illustratedHandbook = handbook;
+        detailedInformation = detail;
+        uiToHide = hideTargets;
+        interactTipUI = interactTip;
+        player = playerObject;
+
+        EnsureTabsController();
+
+        if (illustratedHandbook != null)
+            illustratedHandbook.SetActive(false);
+
+        if (detailedInformation != null)
+            detailedInformation.SetActive(false);
+
+        isHandbookOpen = false;
+        isClosingHandbook = false;
+        RefreshRuntimeBindings();
+    }
+
+    public void OpenIllustratedHandbook(RuntimeModalOpenSource source = RuntimeModalOpenSource.None)
+    {
+        OpenIllustratedHandbook(source, IllustratedHandbookPage.IllustratedHandbook);
+    }
+
+    public void OpenIllustratedHandbook(
+        RuntimeModalOpenSource source,
+        IllustratedHandbookPage initialPage)
+    {
+        EnsureTabsController();
+
+        if (isHandbookOpen || isClosingHandbook)
+        {
+            tabsController?.OpenPage(initialPage);
+            Debug.Log("å›¾é‰´å·²æ‰“å¼€ï¼Œå¿½ç•¥é‡å¤æ‰“å¼€");
+            return;
+        }
 
         isHandbookOpen = true;
-
         DisablePlayerMovement();
         HideOtherUI(true);
 
@@ -92,48 +161,72 @@ public class UIManager : MonoBehaviour
             dialogUI.canShow = false;
         }
 
+        tabsController?.OpenPage(initialPage);
+
         if (UIRootManager.Instance != null)
         {
-            UIRootManager.Instance.OpenHandbookView();
+            UIRootManager.Instance.OpenModal(RuntimeModalType.Handbook, source);
+        }
+        else
+        {
+            if (illustratedHandbook != null)
+                illustratedHandbook.SetActive(true);
+
+            if (detailedInformation != null)
+                detailedInformation.SetActive(false);
         }
 
-        Debug.Log("´ò¿ªÍ¼¼ø£¬Íæ¼ÒÒÆ¶¯ÒÑ½ûÓÃ");
+        if (interactTipUI != null)
+        {
+            interactTipUI.SetActive(false);
+        }
     }
 
-    /// <summary>
-    /// ¹Ø±ÕÍ¼¼ø
-    /// </summary>
     public void CloseIllustratedHandbook()
     {
-        if (!isHandbookOpen) return;
+        if (!isHandbookOpen || isClosingHandbook)
+        {
+            Debug.Log("å›¾é‰´å½“å‰å·²å¤„äºå…³é—­çŠ¶æ€");
+            return;
+        }
 
         if (UIRootManager.Instance != null)
         {
-            UIRootManager.Instance.CloseAllBookUI();
+            isClosingHandbook = true;
+            UIRootManager.Instance.CloseModalFlow(CompleteCloseIllustratedHandbook);
+            return;
         }
 
-        HideOtherUI(false);
-        EnablePlayerMovement();
-
-        if (dialogUI == null)
-            dialogUI = FindObjectOfType<Dialog>();
-
-        if (dialogUI != null)
-        {
-            dialogUI.canShow = true;
-            dialogUI.ForceHideImmediately();
-        }
-
-        isHandbookOpen = false;
-
-        Debug.Log("¹Ø±ÕÍ¼¼ø£¬Íæ¼ÒÒÆ¶¯ÒÑ»Ö¸´");
+        CompleteCloseIllustratedHandbook();
     }
 
-    /// <summary>
-    /// »Ö¸´ËùÓĞUIºÍÍæ¼Ò¿ØÖÆ
-    /// </summary>
     public void RestoreUI()
     {
+        if (isClosingHandbook)
+        {
+            return;
+        }
+
+        if (UIRootManager.Instance != null && UIRootManager.Instance.IsModalFlowOpen)
+        {
+            isClosingHandbook = true;
+            UIRootManager.Instance.CloseModalFlow(CompleteCloseIllustratedHandbook);
+            return;
+        }
+
+        CompleteCloseIllustratedHandbook();
+    }
+
+    private void CompleteCloseIllustratedHandbook()
+    {
+        if (illustratedHandbook != null)
+            illustratedHandbook.SetActive(false);
+
+        if (detailedInformation != null)
+            detailedInformation.SetActive(false);
+
+        tabsController?.ResetToDefaultPage();
+
         HideOtherUI(false);
         EnablePlayerMovement();
 
@@ -151,12 +244,15 @@ public class UIManager : MonoBehaviour
             UIRootManager.Instance.CloseAllBookUI();
         }
 
+        if (interactTipUI != null)
+        {
+            interactTipUI.SetActive(true);
+        }
+
         isHandbookOpen = false;
+        isClosingHandbook = false;
     }
 
-    /// <summary>
-    /// ½ûÓÃÍæ¼ÒÒÆ¶¯
-    /// </summary>
     private void DisablePlayerMovement()
     {
         if (playerMovementScript != null)
@@ -176,9 +272,6 @@ public class UIManager : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// »Ö¸´Íæ¼ÒÒÆ¶¯
-    /// </summary>
     private void EnablePlayerMovement()
     {
         if (playerMovementScript != null)
@@ -196,17 +289,64 @@ public class UIManager : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Òş²Ø/»Ö¸´ÆäËûUI
-    /// </summary>
     private void HideOtherUI(bool hide)
     {
+        if (uiToHide == null) return;
+
         foreach (GameObject ui in uiToHide)
         {
             if (ui != null)
             {
                 ui.SetActive(!hide);
             }
+        }
+    }
+
+    private void RefreshRuntimeBindings()
+    {
+        dialogUI = FindObjectOfType<Dialog>();
+
+        if (player != null)
+        {
+            playerMovementScript = player.GetComponent(playerMovementScriptName) as MonoBehaviour;
+            if (playerMovementScript == null)
+            {
+                playerMovementScript = player.GetComponent<PlayerMove>();
+                if (playerMovementScript == null)
+                {
+                    Debug.LogWarning("æœªæ‰¾åˆ°ç©å®¶ç§»åŠ¨è„šæœ¬ï¼Œè¯·æ£€æŸ¥ playerMovementScriptName æˆ– PlayerMove ç»„ä»¶ã€‚");
+                }
+            }
+        }
+        else
+        {
+            playerMovementScript = null;
+        }
+    }
+
+    private void EnsureTabsController()
+    {
+        if (illustratedHandbook == null)
+        {
+            return;
+        }
+
+        if (tabsController != null && tabsController.gameObject == illustratedHandbook)
+        {
+            return;
+        }
+
+        IllustratedHandbookTabsController previousController = tabsController;
+        tabsController = IllustratedHandbookTabsController.EnsureInstalled(this);
+        if (tabsController != null)
+        {
+            illustratedHandbook = tabsController.gameObject;
+            if (tabsController != previousController)
+            {
+                tabsController.ResetToDefaultPage();
+            }
+
+            UIRootManager.Instance?.RefreshRuntimeBindings();
         }
     }
 }

@@ -5,92 +5,122 @@ using UnityEngine;
 using UnityEngine.SocialPlatforms.Impl;
 
 /// <summary>
-/// ·â×°½ÇÉ«¹¥»÷µÄÍ¨ÓÃÂß¼­
-/// ¹¥»÷ÆÚ¼ä²»µÃÔÙ´Î¹¥»÷
-/// ¹¥»÷ÆÚ¼ä²»µÃÒÆ¶¯
+/// å°è£…è§’è‰²æ”»å‡»çš„é€šç”¨é€»è¾‘
+/// æ”»å‡»æœŸé—´ä¸å¾—å†æ¬¡æ”»å‡»
+/// æ”»å‡»æœŸé—´ä¸å¾—ç§»åŠ¨
 /// </summary>
 public abstract class CharacterAttack : MonoBehaviour
 {
-    [Header("¹¥»÷»ù´¡ÅäÖÃ [¶¯»­/ÒÆ¶¯½Å±¾]")]
+    [Header("æ”»å‡»åŸºç¡€é…ç½® [åŠ¨ç”»/ç§»åŠ¨è„šæœ¬]")]
     public Animator anim;
-    public MonoBehaviour moveScript; // ¹ÒÔØ½ÇÉ«ÒÆ¶¯µÄ½Å±¾
+    public MonoBehaviour moveScript; // æŒ‚è½½è§’è‰²ç§»åŠ¨çš„è„šæœ¬
 
-    // ¹¥»÷×´Ì¬ÅĞ¶Ï
+    // æ”»å‡»çŠ¶æ€åˆ¤æ–­
     protected bool isAttacking = false;
     protected CharacterCore core;
+    private Vector3 initialLocalScale;
 
-    // ¹¥»÷À©Õ¹ÊÂ¼ş£¨¿É¹ÒÔØ¹¥»÷ÌØĞ§/ÒôĞ§µÈÂß¼­£©
+    // æ”»å‡»æ‰©å±•äº‹ä»¶ï¼ˆå¯æŒ‚è½½æ”»å‡»ç‰¹æ•ˆ/éŸ³æ•ˆç­‰é€»è¾‘ï¼‰
     public event Action OnAttackStarted;
     public event Action OnAttackFinished;
 
     public delegate void AttackHitEvent(GameObject attacker, GameObject target, float damage);
-    public static event AttackHitEvent OnAttackHit; // ¹¥»÷ÃüÖĞÊ±´¥·¢
+    public static event AttackHitEvent OnAttackHit; // æ”»å‡»å‘½ä¸­æ—¶è§¦å‘
 
     protected PlayerMove playerMove;
 
+    protected virtual bool ShouldMirrorRootForAttack => true;
+
     protected virtual void Awake()
     {
+        initialLocalScale = transform.localScale;
         core = GetComponent<CharacterCore>();
-        playerMove = moveScript.GetComponent<PlayerMove>();
+        if (moveScript != null)
+        {
+            playerMove = moveScript.GetComponent<PlayerMove>();
+        }
 
         if (core == null)
         {
-            Debug.LogError($"[{gameObject.name}] Î´¹ÒÔØ CharacterCore ×é¼ş£¡", this);
+            Debug.LogError($"[{gameObject.name}] æœªæŒ‚è½½ CharacterCore ç»„ä»¶ï¼", this);
         }
     }
 
-    #region ½ÇÉ«¹¥»÷£¨¸´ÓÃºËĞÄÂß¼­£ºÃæ³¯·½Ïò + ÒÆ¶¯½ûÓÃ + ¶¯»­´¥·¢£©
+    protected virtual void OnEnable()
+    {
+        if (core == null)
+        {
+            return;
+        }
+
+        core.OnDeath -= HandleOwnerDeath;
+        core.OnDeath += HandleOwnerDeath;
+    }
+
+    #region è§’è‰²æ”»å‡»ï¼ˆå¤ç”¨æ ¸å¿ƒé€»è¾‘ï¼šé¢æœæ–¹å‘ + ç§»åŠ¨ç¦ç”¨ + åŠ¨ç”»è§¦å‘ï¼‰
     public virtual void TriggerAttack()
     {
-        if (isAttacking || core == null) return; // ¹¥»÷ÖĞ»òÕßÎŞºËĞÄ×é¼şÔòÀ¹½Ø
+        if (isAttacking || core == null || core.IsDead) return; // æ”»å‡»ä¸­æˆ–è€…å·²æ­»äº¡åˆ™æ‹¦æˆª
 
-        // ¸ù¾İ×îºóÃæ³¯·½Ïò¸üĞÂ¹¥»÷³¯Ïò
+        // æ ¹æ®æœ€åé¢æœæ–¹å‘æ›´æ–°æ”»å‡»æœå‘
         UpdateAttackFacingDirection();  
 
-        // Í¨ÓÃ¹¥»÷×´Ì¬ÇĞ»»
+        // é€šç”¨æ”»å‡»çŠ¶æ€åˆ‡æ¢
         isAttacking = true;
-        if (anim != null) anim.SetBool("IsMoving", false); // Í£Ö¹ÒÆ¶¯¶¯»­
+        AnimatorParameterUtility.SetBoolIfPresent(anim, "IsMoving", false); // åœæ­¢ç§»åŠ¨åŠ¨ç”»
         if (playerMove != null)
         {   
-            // ½ûÓÃÒÆ¶¯
+            // ç¦ç”¨ç§»åŠ¨
             playerMove.canMove = false;
-            // ËÙ¶ÈÇåÁã
+            // é€Ÿåº¦æ¸…é›¶
             if (playerMove.rb != null)
             {
                 playerMove.rb.velocity = Vector2.zero;
             }
         }     
-        if (anim != null) anim.SetBool("IsAttacking", true); // ´¥·¢¹¥»÷¶¯»­
+        AnimatorParameterUtility.SetBoolIfPresent(anim, "IsAttacking", true); // è§¦å‘æ”»å‡»åŠ¨ç”»
 
-        // ´¥·¢¹¥»÷¿ªÊ¼ÊÂ¼ş
+        // è§¦å‘æ”»å‡»å¼€å§‹äº‹ä»¶
         OnAttackStarted?.Invoke();
     }
 
     /// <summary>
-    /// ¸üĞÂ¹¥»÷µÄÃæ³¯·½Ïò£¨Íæ¼Ò/µĞÈËÍ¨ÓÃ£©
+    /// æ›´æ–°æ”»å‡»çš„é¢æœæ–¹å‘ï¼ˆç©å®¶/æ•Œäººé€šç”¨ï¼‰
     /// </summary>
     private void UpdateAttackFacingDirection()
     {
-        // »ñÈ¡CharacterCoreÖĞÎ¬»¤µÄ¡¸×îºóÃæ³¯·½Ïò¡¹
+        // è·å–CharacterCoreä¸­ç»´æŠ¤çš„ã€Œæœ€åé¢æœæ–¹å‘ã€
         Vector2 lastFacingDir = core.lastFacingDirection;
-
-        // ¸üĞÂ½ÇÉ«Transform³¯Ïò
-        if (lastFacingDir.x != 0) // ×óÓÒ³¯Ïò
+        if (lastFacingDir.sqrMagnitude > 0.0001f)
         {
+            Vector2 normalizedFacingDir = lastFacingDir.normalized;
+            AnimatorParameterUtility.SetFloatIfPresent(anim, "InputX", normalizedFacingDir.x);
+            AnimatorParameterUtility.SetFloatIfPresent(anim, "InputY", normalizedFacingDir.y);
+        }
+
+        // æ›´æ–°è§’è‰²Transformæœå‘
+        if (ShouldMirrorRootForAttack && lastFacingDir.x != 0) // å·¦å³æœå‘
+        {
+            float scaleX = Mathf.Abs(initialLocalScale.x);
+            if (scaleX <= Mathf.Epsilon)
+            {
+                scaleX = Mathf.Abs(transform.localScale.x);
+            }
+
             transform.localScale = new Vector3(
-                Mathf.Sign(lastFacingDir.x),
+                Mathf.Sign(lastFacingDir.x) * scaleX,
                 transform.localScale.y,
                 transform.localScale.z
             );
         }
-        // ÈôÓĞÉÏÏÂ¹¥»÷ĞèÇó£¬¿ÉÀ©Õ¹£º
+        // è‹¥æœ‰ä¸Šä¸‹æ”»å‡»éœ€æ±‚ï¼Œå¯æ‰©å±•ï¼š
         // else if (lastFacingDir.y != 0) 
         // {
-        //     // ÉÏÏÂ³¯ÏòÂß¼­£¨ÈçĞı×ª/¶¯»­²ÎÊı£©
+        //     // ä¸Šä¸‹æœå‘é€»è¾‘ï¼ˆå¦‚æ—‹è½¬/åŠ¨ç”»å‚æ•°ï¼‰
         //     anim?.SetFloat("AttackUpDown", lastFacingDir.y);
         // }
 
-        // ¿ÉÑ¡£º¸ø¶¯»­²ã´«µİ³¯Ïò²ÎÊı£¨±ãÓÚ¶¯»­ÊÊÅä²»Í¬·½Ïò¹¥»÷£©
+        // å¯é€‰ï¼šç»™åŠ¨ç”»å±‚ä¼ é€’æœå‘å‚æ•°ï¼ˆä¾¿äºåŠ¨ç”»é€‚é…ä¸åŒæ–¹å‘æ”»å‡»ï¼‰
         // if (anim != null)
         // {
         //     anim.SetFloat("FacingX", lastFacingDir.x);
@@ -99,36 +129,69 @@ public abstract class CharacterAttack : MonoBehaviour
     }
 
     /// <summary>
-    /// ¹¥»÷½áÊøÍ³Ò»Âß¼­£¨¶¯»­Ö¡ÊÂ¼şµ÷ÓÃ£©
+    /// æ”»å‡»ç»“æŸç»Ÿä¸€é€»è¾‘ï¼ˆåŠ¨ç”»å¸§äº‹ä»¶è°ƒç”¨ï¼‰
     /// </summary>
     public virtual void OnAttackEnd()
     {
         isAttacking = false;
 
-        // »Ö¸´ÒÆ¶¯ÄÜÁ¦
-        if (playerMove != null) playerMove.canMove = true;
-        if (anim != null) anim.SetBool("IsAttacking", false);
+        if (core != null && core.IsDead)
+        {
+            AnimatorParameterUtility.SetBoolIfPresent(anim, "IsAttacking", false);
+            return;
+        }
 
-        // ´¥·¢¹¥»÷½áÊøÊÂ¼ş£¨À©Õ¹Âß¼­£ºÈç¹¥»÷ºóÒ¡¡¢ÖØÖÃ³¯Ïò£©
+        // æ¢å¤ç§»åŠ¨èƒ½åŠ›
+        if (playerMove != null) playerMove.canMove = true;
+        AnimatorParameterUtility.SetBoolIfPresent(anim, "IsAttacking", false);
+
+        // è§¦å‘æ”»å‡»ç»“æŸäº‹ä»¶ï¼ˆæ‰©å±•é€»è¾‘ï¼šå¦‚æ”»å‡»åæ‘‡ã€é‡ç½®æœå‘ï¼‰
         OnAttackFinished?.Invoke();
     }
     #endregion
 
-    // ·ÀÖ¹ÊÂ¼şÄÚ´æĞ¹Â©
+    // é˜²æ­¢äº‹ä»¶å†…å­˜æ³„æ¼
     protected virtual void OnDisable()
     {
+        if (core != null)
+        {
+            core.OnDeath -= HandleOwnerDeath;
+        }
+
         OnAttackStarted = null;
         OnAttackFinished = null;
     }
 
+    public void HandleOwnerDeathImmediate()
+    {
+        isAttacking = false;
+
+        if (playerMove != null)
+        {
+            playerMove.canMove = false;
+            if (playerMove.rb != null)
+            {
+                playerMove.rb.velocity = Vector2.zero;
+            }
+        }
+
+        AnimatorParameterUtility.SetBoolIfPresent(anim, "IsAttacking", false);
+        enabled = false;
+    }
+
     /// <summary>
-    /// ¹¥»÷ÃüÖĞ¿ÛÑª
+    /// æ”»å‡»å‘½ä¸­æ‰£è¡€
     /// </summary>
-    /// <param name="target">±»ÃüÖĞµÄÄ¿±ê</param>
+    /// <param name="target">è¢«å‘½ä¸­çš„ç›®æ ‡</param>
     public void HitTarget(GameObject target)
     {
         if (core == null) return;
         float dmg = core.stats.attackDamage;
         OnAttackHit?.Invoke(gameObject, target, dmg);
+    }
+
+    private void HandleOwnerDeath()
+    {
+        HandleOwnerDeathImmediate();
     }
 }

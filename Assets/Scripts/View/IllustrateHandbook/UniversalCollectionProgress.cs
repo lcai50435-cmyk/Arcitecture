@@ -2,48 +2,34 @@ using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
-/// Í¼¼ø×Ü½ø¶ÈUI
-/// Èı¸ö½ø¶ÈÌõ°´Ë³ĞòÔö³¤£ºÏÈÂúµÚÒ»Ìõ£¬ÔÙ¼ÓµÚ¶şÌõ£¬ÔÙ¼ÓµÚÈıÌõ
+/// å›¾é‰´æ€»è¿›åº¦ UIã€‚
+/// ä¸‰ä¸ªè¿›åº¦æ¡æŒ‰é¡ºåºå¢é•¿ï¼šå…ˆæ»¡ç¬¬ä¸€æ¡ï¼Œå†åŠ ç¬¬äºŒæ¡ï¼Œå†åŠ ç¬¬ä¸‰æ¡ã€‚
 /// </summary>
-public class HandbookTotalProgressUI : MonoBehaviour
+public class UniversalCollectionProgress : MonoBehaviour
 {
-    [Header("Êı¾İÀ´Ô´")]
-    public CatalogueAddExp catalogue;
-
-    [Header("Èı¸ö×Ü½ø¶ÈÌõ£¨°´Ë³ĞòÍÏÈë£©")]
+    [Header("ä¸‰ä¸ªæ€»è¿›åº¦æ¡ï¼ˆæŒ‰é¡ºåºæ‹–å…¥ï¼‰")]
     public Slider progressSlider1;
     public Slider progressSlider2;
     public Slider progressSlider3;
 
-    [Header("Ã¿¸ö½ø¶ÈÌõ×î´óÖµ")]
+    [Header("æ¯ä¸ªè¿›åº¦æ¡æœ€å¤§å€¼")]
     public int maxValuePerBar = 100;
 
     private void Start()
     {
-        if (catalogue == null)
-        {
-            catalogue = FindObjectOfType<CatalogueAddExp>();
-        }
-
-        if (catalogue == null)
-        {
-            Debug.LogError("Î´ÕÒµ½ CatalogueAddExp£¬ÎŞ·¨Ë¢ĞÂÍ¼¼ø×Ü½ø¶È£¡");
-            return;
-        }
-
         InitSlider(progressSlider1);
         InitSlider(progressSlider2);
         InitSlider(progressSlider3);
 
-        catalogue.OnProgressChanged += RefreshUI;
+        RuntimeProgressState.EnsureInstance().OnStateChanged += RefreshUI;
         RefreshUI();
     }
 
     private void OnDestroy()
     {
-        if (catalogue != null)
+        if (RuntimeProgressState.Instance != null)
         {
-            catalogue.OnProgressChanged -= RefreshUI;
+            RuntimeProgressState.Instance.OnStateChanged -= RefreshUI;
         }
     }
 
@@ -56,14 +42,10 @@ public class HandbookTotalProgressUI : MonoBehaviour
         slider.interactable = false;
     }
 
-    /// <summary>
-    /// Ë¢ĞÂÈı¸ö×Ü½ø¶ÈÌõ
-    /// </summary>
     public void RefreshUI()
     {
-        if (catalogue == null) return;
-
-        int totalProgress = catalogue.GetTotalProgress();
+        RuntimeProgressState runtimeState = RuntimeProgressState.EnsureInstance();
+        int totalProgress = runtimeState.GetTotalProgress();
 
         int bar1 = Mathf.Clamp(totalProgress, 0, maxValuePerBar);
         int bar2 = Mathf.Clamp(totalProgress - maxValuePerBar, 0, maxValuePerBar);
@@ -84,6 +66,5 @@ public class HandbookTotalProgressUI : MonoBehaviour
             progressSlider3.value = bar3;
         }
 
-        Debug.Log($"×Ü½ø¶È£º{totalProgress} | µÚÒ»Ìõ:{bar1}/100 µÚ¶şÌõ:{bar2}/100 µÚÈıÌõ:{bar3}/100");
     }
 }
