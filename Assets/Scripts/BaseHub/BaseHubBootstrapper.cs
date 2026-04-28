@@ -11,7 +11,7 @@ public class BaseHubBootstrapper : MonoBehaviour
 {
     private const string BaseHubMapResourcePath = "BaseHub/base_hub_map";
     private const string DefaultHandbookPrefabPath = "Assets/Scripts/View/Prefab/CatagloueUI.prefab";
-    private const string RequiredRuntimeCharacters = "图鉴精灵河狸关卡入口打开查看属性武器攻击基地允许生命上限耐久攻击力移动速度防御调试面板按住显示关闭点击装备相册留念拍照本地保存时间场景分辨率暂无上一页下一页删除选中修复工作台材料第一二三四五未开放后续版本↑↓";
+    private const string RequiredRuntimeCharacters = "图鉴精灵河狸关卡入口打开查看属性武器攻击基地允许生命上限耐久攻击力移动速度防御调试面板按住显示关闭点击装备相册留念拍照本地保存时间场景分辨率暂无上一页下一页删除选中修复工作台材料第一二三四五未开放后续版本榫卯斗拱梁架石基夯土瓦片扇形波次消耗射程攻速伤害没有额外效果单体单次命中目标范围贯穿并造成持续掉血↑↓";
     private static readonly string[] RuntimeFontNames =
     {
         "Arial Unicode MS",
@@ -898,7 +898,7 @@ public class BaseHubBootstrapper : MonoBehaviour
         TextMeshProUGUI emptyState = CreateText(
             "EmptyState",
             leftPanel.transform,
-            "还没有留念。\n进入关卡后按下拍照键，就会自动保存到这里。",
+            "还没有留念。\n在基地或关卡按下拍照键，就会自动保存到这里。",
             22,
             new Color(0.82f, 0.78f, 0.70f, 1f),
             TextAlignmentOptions.Center);
@@ -1315,10 +1315,10 @@ public class BaseHubBootstrapper : MonoBehaviour
         layout.childForceExpandWidth = true;
         layout.padding = new RectOffset(4, 4, 10, 10);
 
-        CreateWeaponOption(list.transform, weaponPanel, WeaponType.DirectInk, "直墨", "标准墨迹，稳定直射，适合作为通用基型。");
-        CreateWeaponOption(list.transform, weaponPanel, WeaponType.BurstInk, "爆墨", "命中后爆散成片，擅长处理聚集敌人。");
-        CreateWeaponOption(list.transform, weaponPanel, WeaponType.PierceInk, "贯墨", "初始可连续命中 3 次，更适合打穿一列目标。");
-        CreateWeaponOption(list.transform, weaponPanel, WeaponType.FlowInk, "流墨", "命中后附带持续 3 秒的流墨侵蚀。");
+        CreateWeaponOption(list.transform, weaponPanel, WeaponType.DirectInk, "直墨", InkTypeCatalog.GetEffectDescription(WeaponType.DirectInk));
+        CreateWeaponOption(list.transform, weaponPanel, WeaponType.BurstInk, "爆墨", InkTypeCatalog.GetEffectDescription(WeaponType.BurstInk));
+        CreateWeaponOption(list.transform, weaponPanel, WeaponType.PierceInk, "贯墨", InkTypeCatalog.GetEffectDescription(WeaponType.PierceInk));
+        CreateWeaponOption(list.transform, weaponPanel, WeaponType.FlowInk, "流墨", InkTypeCatalog.GetEffectDescription(WeaponType.FlowInk));
     }
 
     private void CreateWeaponOption(

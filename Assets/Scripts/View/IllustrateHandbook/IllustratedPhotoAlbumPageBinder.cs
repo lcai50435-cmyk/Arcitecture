@@ -14,6 +14,7 @@ public sealed class IllustratedPhotoAlbumPageBinder
     private const string RuntimeNextButtonName = "RuntimePhotoAlbumNextPage";
     private const string RuntimeDeleteButtonName = "RuntimePhotoAlbumDeleteSelected";
     private const float DeleteButtonShareGap = 8f;
+    private const float ScenePagingButtonMaxHorizontalDistance = 160f;
 
     private readonly Func<IReadOnlyList<PhotoAlbumEntry>> entryLoader;
     private readonly Func<PhotoAlbumEntry, Texture2D> textureLoader;
@@ -82,8 +83,15 @@ public sealed class IllustratedPhotoAlbumPageBinder
             return;
         }
 
+        ClearVisuals();
+        ResolveTargets();
         LoadEntries();
         ClampSelection();
+        RefreshCurrentSnapshot();
+    }
+
+    private void RefreshCurrentSnapshot()
+    {
         RefreshPageSlots();
         RefreshPreview();
         RefreshPageControls();
@@ -133,8 +141,8 @@ public sealed class IllustratedPhotoAlbumPageBinder
             BindSlotClick(slotRects[i], i);
         }
 
-        titleText = FindTextByName(root, "Name");
-        descriptionText = FindTextByContent(root, "New Text");
+        titleText = FindTextByName(root, "PhotoName") ?? FindTextByName(root, "Name");
+        descriptionText = FindTextByName(root, "Introduction") ?? FindTextByContent(root, "New Text");
         timeText = FindTextContaining(root, "拍摄时间");
         sceneText = FindTextContaining(root, "拍摄地点");
         unlockText = FindTextContaining(root, "解锁条件");
@@ -192,7 +200,7 @@ public sealed class IllustratedPhotoAlbumPageBinder
         for (int i = 0; i < slotImages.Count; i++)
         {
             int entryIndex = pageStartIndex + i;
-            bool hasEntry = entryIndex >= 0 && entryIndex < entries.Count;
+            bool hasEntry = entryIndex >= 0 && entryIndex < entries.Count && entries[entryIndex] != null;
             RawImage slotImage = slotImages[i];
             if (slotImage != null)
             {
@@ -211,11 +219,14 @@ public sealed class IllustratedPhotoAlbumPageBinder
 
     private void RefreshPreview()
     {
-        if (entries.Count == 0 || selectedEntryIndex < 0 || selectedEntryIndex >= entries.Count)
+        if (entries.Count == 0 ||
+            selectedEntryIndex < 0 ||
+            selectedEntryIndex >= entries.Count ||
+            entries[selectedEntryIndex] == null)
         {
             SetTexture(previewImage, null);
             SetText(titleText, "暂无留念");
-            SetText(descriptionText, "进入战斗场景拍照并确认保存后，照片会展示在这里。");
+            SetText(descriptionText, "在基地或关卡拍照并确认保存后，照片会展示在这里。");
             SetText(timeText, "拍摄时间 : --");
             SetText(sceneText, "拍摄地点 : --");
             SetText(unlockText, "解锁条件 : 保存一张留念照片");
@@ -241,17 +252,20 @@ public sealed class IllustratedPhotoAlbumPageBinder
 
         if (previousPageButton != null)
         {
-            previousPageButton.interactable = entries.Count > 0 && currentPageIndex > 0;
+            previousPageButton.interactable = pageCount > 0 && currentPageIndex > 0;
         }
 
         if (nextPageButton != null)
         {
-            nextPageButton.interactable = entries.Count > 0 && currentPageIndex < pageCount - 1;
+            nextPageButton.interactable = pageCount > 0 && currentPageIndex < pageCount - 1;
         }
 
         if (deleteSelectedButton != null)
         {
-            deleteSelectedButton.interactable = selectedEntryIndex >= 0 && selectedEntryIndex < entries.Count;
+            deleteSelectedButton.interactable =
+                selectedEntryIndex >= 0 &&
+                selectedEntryIndex < entries.Count &&
+                entries[selectedEntryIndex] != null;
         }
     }
 
@@ -275,31 +289,45 @@ public sealed class IllustratedPhotoAlbumPageBinder
             string value = text.text ?? string.Empty;
             if (value.Contains("风景"))
             {
-                text.text = $"风景   {entries.Count}/{entries.Count}";
+                int activeEntryCount = GetActiveEntryCount();
+                text.text = $"风景   {activeEntryCount}/{activeEntryCount}";
             }
             else if (value.Contains("建筑"))
             {
                 text.text = "建筑   0/0";
             }
-            else if (value.Contains("000%") || value.Contains("相册收集进度"))
+            else if (IsAlbumProgressValue(value))
             {
-                text.text = entries.Count == 0
-                    ? "00/000（000%）"
-                    : $"{entries.Count:00}/{entries.Count:000}（100%）";
+                text.text = BuildAlbumProgressValue();
             }
         }
+    }
+
+    private string BuildAlbumProgressValue()
+    {
+        int activeEntryCount = GetActiveEntryCount();
+        return activeEntryCount == 0
+            ? "00/000（000%）"
+            : $"{activeEntryCount:00}/{activeEntryCount:000}（100%）";
+    }
+
+    private static bool IsAlbumProgressValue(string value)
+    {
+        return !string.IsNullOrWhiteSpace(value) &&
+               value.Contains("/") &&
+               value.Contains("%");
     }
 
     private void SelectEntry(int slotIndex)
     {
         int entryIndex = currentPageIndex * EntriesPerPage + slotIndex;
-        if (entryIndex < 0 || entryIndex >= entries.Count)
+        if (entryIndex < 0 || entryIndex >= entries.Count || entries[entryIndex] == null)
         {
             return;
         }
 
         selectedEntryIndex = entryIndex;
-        Refresh();
+        RefreshCurrentSnapshot();
     }
 
     private void SelectPreviousPage()
@@ -310,8 +338,8 @@ public sealed class IllustratedPhotoAlbumPageBinder
         }
 
         currentPageIndex--;
-        selectedEntryIndex = currentPageIndex * EntriesPerPage;
-        Refresh();
+        selectedEntryIndex = FindFirstEntryIndexOnPage(currentPageIndex);
+        RefreshCurrentSnapshot();
     }
 
     private void SelectNextPage()
@@ -322,8 +350,8 @@ public sealed class IllustratedPhotoAlbumPageBinder
         }
 
         currentPageIndex++;
-        selectedEntryIndex = currentPageIndex * EntriesPerPage;
-        Refresh();
+        selectedEntryIndex = FindFirstEntryIndexOnPage(currentPageIndex);
+        RefreshCurrentSnapshot();
     }
 
     private void DeleteSelectedEntry()
@@ -334,19 +362,25 @@ public sealed class IllustratedPhotoAlbumPageBinder
         }
 
         int deletedIndex = selectedEntryIndex;
-        if (!entryDeleter(entries[selectedEntryIndex]))
+        PhotoAlbumEntry deletedEntry = entries[selectedEntryIndex];
+        if (deletedEntry == null || !entryDeleter(deletedEntry))
         {
             return;
         }
 
-        int expectedCount = Mathf.Max(0, entries.Count - 1);
-        selectedEntryIndex = expectedCount == 0
-            ? -1
-            : Mathf.Clamp(deletedIndex, 0, expectedCount - 1);
-        currentPageIndex = selectedEntryIndex < 0
-            ? 0
-            : selectedEntryIndex / EntriesPerPage;
-        Refresh();
+        entries[deletedIndex] = null;
+        if (GetActiveEntryCount() == 0)
+        {
+            entries.Clear();
+            selectedEntryIndex = -1;
+            currentPageIndex = 0;
+        }
+        else
+        {
+            selectedEntryIndex = FindNearestEntryIndexOnPage(currentPageIndex, deletedIndex);
+        }
+
+        RefreshCurrentSnapshot();
     }
 
     private Texture2D LoadEntryTexture(PhotoAlbumEntry entry)
@@ -365,6 +399,59 @@ public sealed class IllustratedPhotoAlbumPageBinder
         return entries.Count == 0
             ? 0
             : Mathf.CeilToInt(entries.Count / (float)EntriesPerPage);
+    }
+
+    private int GetActiveEntryCount()
+    {
+        int count = 0;
+        for (int i = 0; i < entries.Count; i++)
+        {
+            if (entries[i] != null)
+            {
+                count++;
+            }
+        }
+
+        return count;
+    }
+
+    private int FindFirstEntryIndexOnPage(int pageIndex)
+    {
+        int pageStart = Mathf.Max(0, pageIndex) * EntriesPerPage;
+        int pageEnd = Mathf.Min(entries.Count, pageStart + EntriesPerPage);
+        for (int i = pageStart; i < pageEnd; i++)
+        {
+            if (entries[i] != null)
+            {
+                return i;
+            }
+        }
+
+        return -1;
+    }
+
+    private int FindNearestEntryIndexOnPage(int pageIndex, int preferredIndex)
+    {
+        int pageStart = Mathf.Max(0, pageIndex) * EntriesPerPage;
+        int pageEnd = Mathf.Min(entries.Count, pageStart + EntriesPerPage);
+        int clampedPreferredIndex = Mathf.Clamp(preferredIndex, pageStart, Mathf.Max(pageStart, pageEnd - 1));
+        for (int i = clampedPreferredIndex; i < pageEnd; i++)
+        {
+            if (entries[i] != null)
+            {
+                return i;
+            }
+        }
+
+        for (int i = clampedPreferredIndex - 1; i >= pageStart; i--)
+        {
+            if (entries[i] != null)
+            {
+                return i;
+            }
+        }
+
+        return -1;
     }
 
     private void ClearVisuals()
@@ -426,8 +513,8 @@ public sealed class IllustratedPhotoAlbumPageBinder
 
         RectTransform pageNumberRect = pageNumberText.rectTransform;
         Transform parent = pageNumberRect.parent;
-        previousPageButton = EnsurePagingButton(parent, RuntimePreviousButtonName, pageNumberRect, new Vector2(-76f, 0f));
-        nextPageButton = EnsurePagingButton(parent, RuntimeNextButtonName, pageNumberRect, new Vector2(76f, 0f));
+        previousPageButton = ResolvePagingButton(parent, RuntimePreviousButtonName, pageNumberRect, false, new Vector2(-76f, 0f));
+        nextPageButton = ResolvePagingButton(parent, RuntimeNextButtonName, pageNumberRect, true, new Vector2(76f, 0f));
 
         previousPageButton.onClick.RemoveAllListeners();
         previousPageButton.onClick.AddListener(SelectPreviousPage);
@@ -478,6 +565,91 @@ public sealed class IllustratedPhotoAlbumPageBinder
 
         deleteSelectedButton.onClick.RemoveAllListeners();
         deleteSelectedButton.onClick.AddListener(DeleteSelectedEntry);
+    }
+
+    private static Button ResolvePagingButton(
+        Transform parent,
+        string runtimeName,
+        RectTransform pageNumberRect,
+        bool next,
+        Vector2 fallbackOffset)
+    {
+        Button sceneButton = FindSceneAuthoredPagingButton(parent, pageNumberRect, next);
+        if (sceneButton != null)
+        {
+            return sceneButton;
+        }
+
+        Button runtimeButton = FindDirectButton(parent, runtimeName);
+        return runtimeButton != null
+            ? runtimeButton
+            : EnsurePagingButton(parent, runtimeName, pageNumberRect, fallbackOffset);
+    }
+
+    private static Button FindSceneAuthoredPagingButton(Transform parent, RectTransform pageNumberRect, bool next)
+    {
+        if (parent == null || pageNumberRect == null)
+        {
+            return null;
+        }
+
+        Vector2 pagePosition = pageNumberRect.anchoredPosition;
+        Vector2 pageSize = GetRectSize(pageNumberRect);
+        float maxVerticalDistance = Mathf.Max(32f, pageSize.y * 1.5f);
+        Button bestButton = null;
+        float bestHorizontalDistance = float.MaxValue;
+
+        for (int i = 0; i < parent.childCount; i++)
+        {
+            Transform child = parent.GetChild(i);
+            RectTransform rect = child as RectTransform;
+            Button button = child != null ? child.GetComponent<Button>() : null;
+            if (rect == null ||
+                button == null ||
+                child == pageNumberRect.transform ||
+                IsRuntimePhotoAlbumButtonName(child.name))
+            {
+                continue;
+            }
+
+            float horizontalDistance = rect.anchoredPosition.x - pagePosition.x;
+            if ((next && horizontalDistance <= 0f) || (!next && horizontalDistance >= 0f))
+            {
+                continue;
+            }
+
+            if (Mathf.Abs(rect.anchoredPosition.y - pagePosition.y) > maxVerticalDistance ||
+                Mathf.Abs(horizontalDistance) > ScenePagingButtonMaxHorizontalDistance)
+            {
+                continue;
+            }
+
+            float absHorizontalDistance = Mathf.Abs(horizontalDistance);
+            if (absHorizontalDistance < bestHorizontalDistance)
+            {
+                bestHorizontalDistance = absHorizontalDistance;
+                bestButton = button;
+            }
+        }
+
+        return bestButton;
+    }
+
+    private static Button FindDirectButton(Transform parent, string name)
+    {
+        if (parent == null || string.IsNullOrWhiteSpace(name))
+        {
+            return null;
+        }
+
+        Transform child = parent.Find(name);
+        return child != null ? child.GetComponent<Button>() : null;
+    }
+
+    private static bool IsRuntimePhotoAlbumButtonName(string name)
+    {
+        return !string.IsNullOrWhiteSpace(name) &&
+               name.StartsWith("RuntimePhotoAlbum", StringComparison.Ordinal);
     }
 
     private static Button EnsurePagingButton(
@@ -660,7 +832,8 @@ public sealed class IllustratedPhotoAlbumPageBinder
 
     private static void CollectSlotTargets(Transform root, Transform previewTarget, List<RectTransform> results)
     {
-        if (TryCollectRightPanelSlots(root, results))
+        if (TryCollectNamedPanelSlots(root, "LeftPanel", results) ||
+            TryCollectNamedPanelSlots(root, "RightPanel", results))
         {
             return;
         }
@@ -677,36 +850,67 @@ public sealed class IllustratedPhotoAlbumPageBinder
         }
     }
 
-    private static bool TryCollectRightPanelSlots(Transform root, List<RectTransform> results)
+    private static bool TryCollectNamedPanelSlots(Transform root, string panelName, List<RectTransform> results)
     {
-        Transform rightPanel = FindTransformByName(root, "RightPanel");
-        if (rightPanel == null)
+        if (root == null || string.IsNullOrWhiteSpace(panelName))
         {
             return false;
         }
 
+        List<RectTransform> bestCandidates = null;
+        Transform[] transforms = root.GetComponentsInChildren<Transform>(true);
+        for (int i = 0; i < transforms.Length; i++)
+        {
+            Transform panel = transforms[i];
+            if (panel == null || !string.Equals(panel.name, panelName, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            List<RectTransform> candidates = CollectOrderedPanelSlots(panel);
+            if (candidates.Count > (bestCandidates != null ? bestCandidates.Count : 0))
+            {
+                bestCandidates = candidates;
+            }
+        }
+
+        if (bestCandidates == null || bestCandidates.Count == 0)
+        {
+            return false;
+        }
+
+        int count = Mathf.Min(EntriesPerPage, bestCandidates.Count);
+        for (int i = 0; i < count; i++)
+        {
+            results.Add(bestCandidates[i]);
+        }
+
+        return true;
+    }
+
+    private static List<RectTransform> CollectOrderedPanelSlots(Transform panel)
+    {
         List<RectTransform> candidates = new List<RectTransform>();
-        RectTransform[] descendants = rightPanel.GetComponentsInChildren<RectTransform>(true);
+        RectTransform panelRect = panel as RectTransform;
+        RectTransform[] descendants = panel.GetComponentsInChildren<RectTransform>(true);
         for (int i = 0; i < descendants.Length; i++)
         {
             RectTransform rect = descendants[i];
             Image image = rect != null ? rect.GetComponent<Image>() : null;
+            Vector2 size = rect != null ? GetRectSize(rect) : Vector2.zero;
             if (rect == null ||
-                rect == rightPanel ||
+                rect == panelRect ||
                 image == null ||
                 !image.enabled ||
                 image.color.a < 0.2f ||
-                !TryGetSceneSlotOrder(rect.name, out _))
+                !TryGetSceneSlotOrder(rect.name, out _) ||
+                size.x < 30f ||
+                size.y < 20f)
             {
                 continue;
             }
 
             candidates.Add(rect);
-        }
-
-        if (candidates.Count == 0)
-        {
-            return false;
         }
 
         candidates.Sort((left, right) =>
@@ -715,14 +919,7 @@ public sealed class IllustratedPhotoAlbumPageBinder
             TryGetSceneSlotOrder(right.name, out int rightOrder);
             return leftOrder.CompareTo(rightOrder);
         });
-
-        int count = Mathf.Min(EntriesPerPage, candidates.Count);
-        for (int i = 0; i < count; i++)
-        {
-            results.Add(candidates[i]);
-        }
-
-        return true;
+        return candidates;
     }
 
     private static bool TryGetSceneSlotOrder(string name, out int order)
@@ -762,6 +959,11 @@ public sealed class IllustratedPhotoAlbumPageBinder
         }
 
         Vector2 size = GetRectSize(rect);
+        if (TryGetSceneSlotOrder(rect.name, out _))
+        {
+            return size.x >= 30f && size.y >= 20f;
+        }
+
         if (size.x < 42f || size.y < 42f)
         {
             return false;
@@ -786,9 +988,8 @@ public sealed class IllustratedPhotoAlbumPageBinder
                 name.Contains("PageNumber") ||
                 name.Contains("RuntimePhotoAlbum") ||
                 name.Contains("PhotoPos") ||
-                name == "Photo" ||
-                name == "BackGround" ||
-                name == "Background")
+                (current == transform && name == "Photo") ||
+                (current == transform && (name == "BackGround" || name == "Background")))
             {
                 return true;
             }
@@ -814,6 +1015,18 @@ public sealed class IllustratedPhotoAlbumPageBinder
     {
         slots.Sort((left, right) =>
         {
+            bool leftHasOrder = TryGetSceneSlotOrder(left.name, out int leftOrder);
+            bool rightHasOrder = TryGetSceneSlotOrder(right.name, out int rightOrder);
+            if (leftHasOrder && rightHasOrder)
+            {
+                return leftOrder.CompareTo(rightOrder);
+            }
+
+            if (leftHasOrder != rightHasOrder)
+            {
+                return leftHasOrder ? -1 : 1;
+            }
+
             Vector3 leftPosition = left.TransformPoint(left.rect.center);
             Vector3 rightPosition = right.TransformPoint(right.rect.center);
             if (Mathf.Abs(leftPosition.y - rightPosition.y) > 8f)
@@ -881,6 +1094,11 @@ public sealed class IllustratedPhotoAlbumPageBinder
         if (stage != null && !string.IsNullOrWhiteSpace(stage.displayName))
         {
             return stage.displayName;
+        }
+
+        if (entry != null && string.Equals(entry.sceneName, "NewBase", StringComparison.Ordinal))
+        {
+            return "基地";
         }
 
         return entry != null && !string.IsNullOrWhiteSpace(entry.sceneName)

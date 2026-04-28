@@ -314,7 +314,7 @@ public class BaseHubAlbumPanel : MonoBehaviour
 
             if (previewMetaText != null)
             {
-                previewMetaText.text = "回到战斗里按下拍照键，新的留念会自动保存在这里。";
+                previewMetaText.text = "在基地或关卡里按下拍照键，新的留念会自动保存在这里。";
             }
 
             return;
@@ -462,10 +462,7 @@ public class BaseHubAlbumPanel : MonoBehaviour
             return "留念";
         }
 
-        GameplayStageDefinition stageDefinition = GameplayStageCatalog.GetStageById(entry.stageId);
-        string stageLabel = stageDefinition != null
-            ? stageDefinition.displayName
-            : (string.IsNullOrWhiteSpace(entry.stageId) ? entry.sceneName : entry.stageId);
+        string stageLabel = ResolveEntryLocationLabel(entry);
         if (string.IsNullOrWhiteSpace(stageLabel))
         {
             stageLabel = $"留念 {globalIndex + 1}";
@@ -482,16 +479,38 @@ public class BaseHubAlbumPanel : MonoBehaviour
         }
 
         string savedTime = FormatSavedTime(entry.savedAtUtc, "yyyy-MM-dd HH:mm:ss");
-        GameplayStageDefinition stageDefinition = GameplayStageCatalog.GetStageById(entry.stageId);
-        string stageText = stageDefinition != null
-            ? stageDefinition.displayName
-            : (string.IsNullOrWhiteSpace(entry.stageId) ? "未记录" : entry.stageId);
+        string stageText = ResolveEntryLocationLabel(entry);
+        if (string.IsNullOrWhiteSpace(stageText))
+        {
+            stageText = "未记录";
+        }
         string sceneText = string.IsNullOrWhiteSpace(entry.sceneName) ? "未记录" : entry.sceneName;
         string resolutionText = entry.width > 0 && entry.height > 0
             ? $"{entry.width} x {entry.height}"
             : "未知";
         string statusText = hasTexture ? "文件状态：正常" : "文件状态：读取失败";
         return $"保存时间：{savedTime}\n场景：{sceneText}\n关卡：{stageText}\n分辨率：{resolutionText}\n{statusText}";
+    }
+
+    private static string ResolveEntryLocationLabel(PhotoAlbumEntry entry)
+    {
+        if (entry == null)
+        {
+            return string.Empty;
+        }
+
+        GameplayStageDefinition stageDefinition = GameplayStageCatalog.GetStageById(entry.stageId);
+        if (stageDefinition != null)
+        {
+            return stageDefinition.displayName;
+        }
+
+        if (string.Equals(entry.sceneName, "NewBase", StringComparison.Ordinal))
+        {
+            return "基地";
+        }
+
+        return string.IsNullOrWhiteSpace(entry.stageId) ? entry.sceneName : entry.stageId;
     }
 
     private static string FormatSavedTime(string savedAtUtc, string format)

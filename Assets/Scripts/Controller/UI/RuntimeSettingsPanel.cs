@@ -725,7 +725,7 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
         CreateBindingCard(pageRoot, GameInputAction.Interact, "交互", "靠近对象时触发交互", 164f);
         CreateBindingCard(pageRoot, GameInputAction.OpenMap, "地图", "查看和展开地图", 284f);
         CreateBindingCard(pageRoot, GameInputAction.Pause, "暂停", "打开或关闭暂停菜单", 404f);
-        CreateBindingCard(pageRoot, GameInputAction.PhotoCapture, "拍照", "定格当前战斗画面并保存留念", 524f);
+        CreateBindingCard(pageRoot, GameInputAction.PhotoCapture, "拍照", "定格当前画面并保存留念", 524f);
     }
 
     private void CreateDataPage(Transform parent)
