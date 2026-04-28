@@ -149,12 +149,6 @@ public sealed class DialogRuntimeInteractionTests
 
     private static void DestroyRuntimeDialogs()
     {
-        GameObject prefabRoot = GameObject.Find("RuntimeDialogPrefabRoot");
-        if (prefabRoot != null)
-        {
-            Object.DestroyImmediate(prefabRoot);
-        }
-
         Dialog[] dialogs = Object.FindObjectsOfType<Dialog>(true);
         for (int i = 0; i < dialogs.Length; i++)
         {

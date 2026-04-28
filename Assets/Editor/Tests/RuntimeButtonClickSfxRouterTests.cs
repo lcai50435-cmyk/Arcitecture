@@ -1,3 +1,4 @@
+using System.IO;
 using System.Reflection;
 using NUnit.Framework;
 using UnityEngine;
@@ -105,6 +106,55 @@ public sealed class PlayerLoadoutRuntimeTests
     }
 }
 
+public sealed class PhotoAlbumRepositoryTests
+{
+    [Test]
+    public void DeleteEntryRemovesPhotoFileAndIndexEntry()
+    {
+        string tempAlbumDirectory = Path.Combine(
+            Path.GetTempPath(),
+            "ArcitecturePhotoAlbumTests",
+            System.Guid.NewGuid().ToString("N"));
+
+        try
+        {
+            using (PhotoAlbumRepository.UseAlbumDirectoryForTests(tempAlbumDirectory))
+            {
+                PhotoAlbumEntry first = PhotoAlbumRepository.SaveCapture(
+                    new byte[] { 1, 2, 3 },
+                    160,
+                    90,
+                    "GameScene",
+                    "stage_01");
+                PhotoAlbumEntry second = PhotoAlbumRepository.SaveCapture(
+                    new byte[] { 4, 5, 6 },
+                    160,
+                    90,
+                    "GameScene",
+                    "stage_02");
+
+                Assert.IsTrue(File.Exists(PhotoAlbumRepository.GetPhotoPath(first)));
+
+                Assert.IsTrue(PhotoAlbumRepository.DeleteEntry(first));
+
+                Assert.IsFalse(File.Exists(Path.Combine(tempAlbumDirectory, first.fileName)));
+                Assert.IsTrue(File.Exists(Path.Combine(tempAlbumDirectory, second.fileName)));
+
+                var entries = PhotoAlbumRepository.LoadEntries();
+                Assert.AreEqual(1, entries.Count);
+                Assert.AreEqual(second.id, entries[0].id);
+            }
+        }
+        finally
+        {
+            if (Directory.Exists(tempAlbumDirectory))
+            {
+                Directory.Delete(tempAlbumDirectory, true);
+            }
+        }
+    }
+}
+
 public sealed class GameDebugPageBootstrapperAttributeTests
 {
     private GameObject debugObject;
@@ -156,6 +206,13 @@ public sealed class GameDebugPageBootstrapperAttributeTests
     }
 
     [Test]
+    public void DebugPanelHotkeyCannotOpenWhileBlockingGameplayUiIsOpen()
+    {
+        Assert.IsFalse(InvokePrivateStaticBool("CanOpenPanelFromHotkey", true));
+        Assert.IsTrue(InvokePrivateStaticBool("CanOpenPanelFromHotkey", false));
+    }
+
+    [Test]
     public void RuntimeSceneSystemsArePreparedOnlyForGameplayScopes()
     {
         Assert.IsFalse(InvokePrivateStaticBool("ShouldEnsureBackpackForScene", "MainScene"));
@@ -188,6 +245,41 @@ public sealed class GameDebugPageBootstrapperAttributeTests
         finally
         {
             Object.DestroyImmediate(scrollObject);
+        }
+    }
+
+    [Test]
+    public void ClearPhotoAlbumRemovesAlbumData()
+    {
+        string tempAlbumDirectory = Path.Combine(
+            Path.GetTempPath(),
+            "ArcitectureDebugAlbumTests",
+            System.Guid.NewGuid().ToString("N"));
+
+        try
+        {
+            using (PhotoAlbumRepository.UseAlbumDirectoryForTests(tempAlbumDirectory))
+            {
+                PhotoAlbumRepository.SaveCapture(
+                    new byte[] { 1, 2, 3 },
+                    160,
+                    90,
+                    "GameScene",
+                    "stage_01");
+                Assert.IsTrue(PhotoAlbumRepository.HasEntries());
+
+                GameDebugPageBootstrapper debugPage = CreateDebugPage();
+                InvokePrivate(debugPage, "ClearPhotoAlbum");
+
+                Assert.IsFalse(PhotoAlbumRepository.HasEntries());
+            }
+        }
+        finally
+        {
+            if (Directory.Exists(tempAlbumDirectory))
+            {
+                Directory.Delete(tempAlbumDirectory, true);
+            }
         }
     }
 
@@ -229,6 +321,15 @@ public sealed class GameDebugPageBootstrapperAttributeTests
             BindingFlags.Static | BindingFlags.NonPublic);
         Assert.NotNull(method);
         return (bool)method.Invoke(null, new object[] { sceneName });
+    }
+
+    private static bool InvokePrivateStaticBool(string methodName, bool value)
+    {
+        MethodInfo method = typeof(GameDebugPageBootstrapper).GetMethod(
+            methodName,
+            BindingFlags.Static | BindingFlags.NonPublic);
+        Assert.NotNull(method);
+        return (bool)method.Invoke(null, new object[] { value });
     }
 
     private static void InvokePrivateStatic(string methodName, params object[] args)

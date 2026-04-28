@@ -1,11 +1,21 @@
 using System.Collections.Generic;
 using NUnit.Framework;
+using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 public sealed class BackpackUITests
 {
     private GameObject rootObject;
+    private readonly List<Scene> createdScenes = new List<Scene>();
+    private Scene originalActiveScene;
+
+    [SetUp]
+    public void SetUp()
+    {
+        originalActiveScene = SceneManager.GetActiveScene();
+    }
 
     [TearDown]
     public void TearDown()
@@ -14,6 +24,52 @@ public sealed class BackpackUITests
         {
             Object.DestroyImmediate(rootObject);
         }
+
+        if (originalActiveScene.IsValid() && originalActiveScene.isLoaded)
+        {
+            SceneManager.SetActiveScene(originalActiveScene);
+        }
+
+        for (int i = createdScenes.Count - 1; i >= 0; i--)
+        {
+            Scene scene = createdScenes[i];
+            if (scene.IsValid() && scene.isLoaded)
+            {
+                EditorSceneManager.CloseScene(scene, true);
+            }
+        }
+
+        createdScenes.Clear();
+    }
+
+    [Test]
+    public void RuntimeBackpackStartsWithAttackSlotSelected()
+    {
+        rootObject = new GameObject("PackBagCanvas", typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
+        rootObject.AddComponent<BackpackUI>().ConfigureRuntimeLayout();
+
+        BackpackUI backpackUi = rootObject.GetComponent<BackpackUI>();
+
+        Assert.IsTrue(backpackUi.IsAttackSlotSelected);
+        Assert.IsFalse(RuntimeUiInputGuard.ShouldBlockGameplayAttack(KeyCode.Space));
+    }
+
+    [Test]
+    public void SelectingBackpackSlotBlocksAttackUntilAttackSlotIsSelectedAgain()
+    {
+        rootObject = new GameObject("PackBagCanvas", typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
+        BackpackUI backpackUi = rootObject.AddComponent<BackpackUI>();
+        backpackUi.ConfigureRuntimeLayout();
+
+        backpackUi.SelectSlot(0);
+
+        Assert.IsFalse(backpackUi.IsAttackSlotSelected);
+        Assert.IsTrue(RuntimeUiInputGuard.ShouldBlockGameplayAttack(KeyCode.Space));
+
+        backpackUi.SelectAttackSlot();
+
+        Assert.IsTrue(backpackUi.IsAttackSlotSelected);
+        Assert.IsFalse(RuntimeUiInputGuard.ShouldBlockGameplayAttack(KeyCode.Space));
     }
 
     [Test]
@@ -96,6 +152,56 @@ public sealed class BackpackUITests
         Assert.That(attackCorners[0].y, Is.GreaterThan(0f));
     }
 
+    [Test]
+    public void GenericCommonMaterialsOccupyOnlyThreeBackpackSlotsWithoutAttackOverride()
+    {
+        rootObject = new GameObject("RuntimeBackpackManager");
+        BackpackMananger backpack = rootObject.AddComponent<BackpackMananger>();
+        ArchitecturalCrystal genericMaterial = ArchitecturalCrystalFactory.CreateCommonStructure(
+            ArchitecturalType.Green,
+            buildProgressPercent: 100);
+
+        Assert.IsTrue(backpack.PickItem(genericMaterial));
+        Assert.IsTrue(backpack.PickItem(genericMaterial));
+        Assert.IsTrue(backpack.PickItem(genericMaterial));
+        Assert.IsFalse(backpack.PickItem(genericMaterial));
+        Assert.AreEqual(3, backpack.GetOccupiedCount());
+        Assert.AreEqual(3, backpack.GetCommonMaterialCount());
+
+        InkAttackRuntimeConfig config = InkModifierRuntimeConfig.BuildFromBackpack(backpack);
+        Assert.AreEqual(1, config.projectileCount);
+        Assert.AreEqual(1, config.maxHitCount);
+        Assert.AreEqual(1f, config.projectileScale);
+
+        Assert.IsFalse(RuntimeWeaponTypeResolver.TryGetActiveWeaponOverride(
+            backpack,
+            out ArchitecturalCrystal _,
+            out WeaponType _,
+            out int _));
+    }
+
+    [Test]
+    public void EnsureRuntimeInstancePrefersActiveScenePackBagCanvasOverAdditiveUiScene()
+    {
+        Scene gameplayScene = CreateScene("GameScene");
+        Scene illustratedScene = CreateScene("IllustratedUIScene");
+
+        GameObject illustratedRoot = new GameObject("PackBagCanvas", typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
+        SceneManager.MoveGameObjectToScene(illustratedRoot, illustratedScene);
+        illustratedRoot.SetActive(false);
+
+        GameObject gameplayRoot = new GameObject("PackBagCanvas", typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
+        SceneManager.MoveGameObjectToScene(gameplayRoot, gameplayScene);
+        Assert.IsTrue(SceneManager.SetActiveScene(gameplayScene));
+        rootObject = gameplayRoot;
+
+        BackpackUI backpackUi = BackpackUI.EnsureRuntimeInstance(false);
+
+        Assert.IsNotNull(backpackUi);
+        Assert.AreEqual(gameplayScene, backpackUi.gameObject.scene);
+        Assert.IsNull(illustratedRoot.GetComponent<BackpackUI>());
+    }
+
     private static RectTransform CreateRect(Transform parent, string name, Vector2 anchoredPosition, Vector2 size)
     {
         GameObject rectObject = new GameObject(name, typeof(RectTransform), typeof(Image));
@@ -112,6 +218,13 @@ public sealed class BackpackUITests
         image.color = Color.clear;
 
         return rectTransform;
+    }
+
+    private Scene CreateScene(string sceneName)
+    {
+        Scene scene = SceneManager.CreateScene(sceneName);
+        createdScenes.Add(scene);
+        return scene;
     }
 }
 
