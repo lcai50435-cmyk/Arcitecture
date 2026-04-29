@@ -90,6 +90,8 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
     private const float SceneHandbookBackpackTrayBottom = 12f;
     private const float SceneHandbookBackpackTrayPaddingX = 12f;
     private const float SceneHandbookBackpackSlotIconScale = 0.72f;
+    private const float PersonalInkNormalScale = 1f;
+    private const float PersonalInkHoverScale = 1.08f;
 
     private const float BookSafeLeft = 96f;
     private const float BookSafeRight = 760f;
@@ -170,6 +172,8 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         new Dictionary<IllustratedHandbookPage, Sprite>();
     private static readonly Dictionary<string, Sprite> BookmarkAssetCache =
         new Dictionary<string, Sprite>(StringComparer.Ordinal);
+    private static readonly Dictionary<string, Sprite> SceneHandbookSlotSpriteCache =
+        new Dictionary<string, Sprite>(StringComparer.Ordinal);
     private static readonly WeaponType[] PersonalInkOptionWeaponTypes =
     {
         WeaponType.DirectInk,
@@ -201,6 +205,8 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
     private int selectedPersonalBackpackSlotIndex;
     private GameObject selectedSceneHandbookCardObject;
     private float sceneHandbookPointerTime;
+    private bool hasHoveredPersonalInkWeapon;
+    private WeaponType hoveredPersonalInkWeaponType;
     private bool initialized;
     private bool usesSceneAuthoredPages;
     private bool personalInformationPageAvailable = true;
@@ -353,6 +359,7 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         sceneBookmarkAnimations.Clear();
         scenePhotoAlbumBinder?.Release();
         sceneSettingsToggleBinder?.Release();
+        hasHoveredPersonalInkWeapon = false;
         UnsubscribeBackpackInventoryEvents();
     }
 
@@ -1166,6 +1173,7 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
 
         unlockState.buildingId = buildingId;
         unlockState.buildingSlider = ResolveSceneAuthoredBuildingSlider(cardObject.transform);
+        ConfigureSliderReadOnlyDisplay(unlockState.buildingSlider);
         unlockState.lockedBuildingVisual = ResolveSceneAuthoredStatusVisual(cardObject.transform, "Lock");
         unlockState.unlockedBuildingVisual = ResolveSceneAuthoredStatusVisual(cardObject.transform, "Unlock");
         unlockState.lockedBuildingButton = unlockState.lockedBuildingVisual != null
@@ -1525,19 +1533,14 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         Transform proprietaryRoot = FindTransformByName(rightRoot, SceneAuthoredProprietaryMaterialName);
         if (proprietaryRoot != null)
         {
-            Button[] slotButtons = proprietaryRoot.GetComponentsInChildren<Button>(true);
-            Array.Sort(slotButtons, CompareSceneHandbookSlotButtons);
-            for (int i = 0; i < slotButtons.Length && i < slotCount; i++)
+            List<Transform> slotRoots = CollectSceneHandbookProprietarySlotRoots(proprietaryRoot);
+            for (int i = 0; i < slotRoots.Count && i < slotCount; i++)
             {
-                BindSceneHandbookProprietaryDropTarget(slotButtons[i], buildingId, i);
-                Image slotImage = slotButtons[i].GetComponent<Image>();
-                if (slotImage == null)
-                {
-                    continue;
-                }
-
+                BuildingSlotDefinition slotDefinition = definition.slotDefinitions[i];
                 bool unlocked = runtimeState != null && runtimeState.IsSlotUnlocked(buildingId, i);
-                slotImage.color = unlocked ? SceneHandbookSlotUnlockedColor : SceneHandbookSlotLockedColor;
+                ApplySceneHandbookProprietarySlotContent(slotRoots[i], slotDefinition);
+                BindSceneHandbookProprietaryDropTarget(slotRoots[i], buildingId, i);
+                ApplySceneHandbookProprietarySlotVisual(slotRoots[i], unlocked);
             }
         }
 
@@ -1555,13 +1558,70 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         generalSlider.maxValue = Mathf.Max(1, definition.requiredProgress);
         generalSlider.wholeNumbers = true;
         generalSlider.SetValueWithoutNotify(progress);
+        ConfigureSliderReadOnlyDisplay(generalSlider);
         RefreshSceneAuthoredHandbookBackpack(rightRoot);
     }
 
-    private static int CompareSceneHandbookSlotButtons(Button left, Button right)
+    private static List<Transform> CollectSceneHandbookProprietarySlotRoots(Transform proprietaryRoot)
     {
-        RectTransform leftRect = left != null ? left.transform as RectTransform : null;
-        RectTransform rightRect = right != null ? right.transform as RectTransform : null;
+        List<Transform> slotRoots = new List<Transform>();
+        if (proprietaryRoot == null)
+        {
+            return slotRoots;
+        }
+
+        for (int i = 0; i < proprietaryRoot.childCount; i++)
+        {
+            Transform child = proprietaryRoot.GetChild(i);
+            if (IsSceneHandbookProprietarySlotRoot(child))
+            {
+                slotRoots.Add(child);
+            }
+        }
+
+        if (slotRoots.Count == 0)
+        {
+            Button[] slotButtons = proprietaryRoot.GetComponentsInChildren<Button>(true);
+            for (int i = 0; i < slotButtons.Length; i++)
+            {
+                if (slotButtons[i] != null)
+                {
+                    slotRoots.Add(slotButtons[i].transform);
+                }
+            }
+        }
+
+        slotRoots.Sort(CompareSceneHandbookSlotTransforms);
+        return slotRoots;
+    }
+
+    private static bool IsSceneHandbookProprietarySlotRoot(Transform candidate)
+    {
+        if (candidate == null)
+        {
+            return false;
+        }
+
+        if (candidate.GetComponent<Button>() != null)
+        {
+            return true;
+        }
+
+        string candidateName = candidate.name;
+        if (!string.IsNullOrEmpty(candidateName) &&
+            (candidateName.StartsWith("Material_", StringComparison.OrdinalIgnoreCase) ||
+             candidateName.StartsWith("ProprietarySlot_", StringComparison.OrdinalIgnoreCase)))
+        {
+            return true;
+        }
+
+        return candidate.GetComponentInChildren<Button>(true) != null;
+    }
+
+    private static int CompareSceneHandbookSlotTransforms(Transform left, Transform right)
+    {
+        RectTransform leftRect = left as RectTransform;
+        RectTransform rightRect = right as RectTransform;
         if (leftRect != null && rightRect != null)
         {
             int yCompare = -leftRect.anchoredPosition.y.CompareTo(rightRect.anchoredPosition.y);
@@ -1577,29 +1637,256 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
             }
         }
 
-        int siblingCompare = (left != null ? left.transform.GetSiblingIndex() : int.MaxValue)
-            .CompareTo(right != null ? right.transform.GetSiblingIndex() : int.MaxValue);
+        int siblingCompare = (left != null ? left.GetSiblingIndex() : int.MaxValue)
+            .CompareTo(right != null ? right.GetSiblingIndex() : int.MaxValue);
         return siblingCompare != 0
             ? siblingCompare
             : string.CompareOrdinal(left != null ? left.name : string.Empty, right != null ? right.name : string.Empty);
     }
 
-    private void BindSceneHandbookProprietaryDropTarget(Button slotButton, CatalogueBuildingId buildingId, int slotIndex)
+    private static void ApplySceneHandbookProprietarySlotContent(
+        Transform slotRoot,
+        BuildingSlotDefinition slotDefinition)
     {
-        if (slotButton == null)
+        if (slotRoot == null || slotDefinition == null)
         {
             return;
         }
 
-        EnsureButtonRaycastTarget(slotButton);
+        Image contentImage = ResolveSceneHandbookProprietarySlotContentImage(slotRoot);
+        Sprite slotSprite = LoadSceneHandbookSlotSprite(slotDefinition.iconAssetPath);
+        if (contentImage != null && slotSprite != null)
+        {
+            contentImage.sprite = slotSprite;
+            contentImage.enabled = true;
+            contentImage.preserveAspect = true;
+        }
+
+        TMP_Text[] slotTexts = slotRoot.GetComponentsInChildren<TMP_Text>(true);
+        for (int i = 0; i < slotTexts.Length; i++)
+        {
+            TMP_Text slotText = slotTexts[i];
+            if (slotText == null || string.IsNullOrWhiteSpace(slotDefinition.slotName))
+            {
+                continue;
+            }
+
+            slotText.text = slotDefinition.slotName;
+            slotText.raycastTarget = false;
+        }
+    }
+
+    private static Image ResolveSceneHandbookProprietarySlotContentImage(Transform slotRoot)
+    {
+        if (slotRoot == null)
+        {
+            return null;
+        }
+
+        Transform namedImage = FindDirectChild(slotRoot, "Image");
+        Image namedImageComponent = namedImage != null ? namedImage.GetComponent<Image>() : null;
+        if (namedImageComponent != null)
+        {
+            return namedImageComponent;
+        }
+
+        Image directImage = slotRoot.GetComponent<Image>();
+        if (directImage != null)
+        {
+            return directImage;
+        }
+
+        Image[] images = slotRoot.GetComponentsInChildren<Image>(true);
+        for (int i = 0; i < images.Length; i++)
+        {
+            Image image = images[i];
+            if (image == null)
+            {
+                continue;
+            }
+
+            return image;
+        }
+
+        return null;
+    }
+
+    private static Sprite LoadSceneHandbookSlotSprite(string assetPath)
+    {
+        if (string.IsNullOrWhiteSpace(assetPath))
+        {
+            return null;
+        }
+
+        if (SceneHandbookSlotSpriteCache.TryGetValue(assetPath, out Sprite cachedSprite))
+        {
+            return cachedSprite;
+        }
+
+        Sprite sprite = RuntimeProjectSpriteLoader.LoadSprite(assetPath, true, SpriteMeshType.FullRect) ??
+                        CreateFallbackSceneHandbookSlotSprite(assetPath);
+        SceneHandbookSlotSpriteCache[assetPath] = sprite;
+        return sprite;
+    }
+
+    private static Sprite CreateFallbackSceneHandbookSlotSprite(string assetPath)
+    {
+        const int size = 48;
+        string spriteName = ResolveAssetStem(assetPath);
+        int hash = assetPath.GetHashCode() & int.MaxValue;
+        Color32 primary = new Color32(
+            (byte)(96 + hash % 112),
+            (byte)(96 + (hash / 7) % 112),
+            (byte)(96 + (hash / 17) % 112),
+            255);
+        Color32 shadow = new Color32(
+            (byte)Mathf.Max(28, primary.r - 64),
+            (byte)Mathf.Max(28, primary.g - 64),
+            (byte)Mathf.Max(28, primary.b - 64),
+            255);
+
+        Texture2D texture = new Texture2D(size, size, TextureFormat.RGBA32, false);
+        texture.filterMode = FilterMode.Point;
+        texture.wrapMode = TextureWrapMode.Clamp;
+
+        Vector2 center = new Vector2((size - 1) * 0.5f, (size - 1) * 0.5f);
+        for (int y = 0; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                float dx = Mathf.Abs(x - center.x);
+                float dy = Mathf.Abs(y - center.y);
+                float diamond = dx + dy * 1.08f;
+                Color color = Color.clear;
+                if (diamond <= 19f)
+                {
+                    color = shadow;
+                }
+
+                if (diamond <= 15f)
+                {
+                    color = primary;
+                }
+
+                if (diamond <= 11f && (x + y + hash) % 5 == 0)
+                {
+                    color = Color.Lerp(primary, Color.white, 0.28f);
+                }
+
+                texture.SetPixel(x, y, color);
+            }
+        }
+
+        texture.Apply();
+        texture.name = spriteName;
+        Sprite sprite = Sprite.Create(texture, new Rect(0f, 0f, size, size), new Vector2(0.5f, 0.5f), 100f);
+        sprite.name = spriteName;
+        return sprite;
+    }
+
+    private static string ResolveAssetStem(string assetPath)
+    {
+        if (string.IsNullOrWhiteSpace(assetPath))
+        {
+            return "SceneHandbookSlot";
+        }
+
+        int slashIndex = assetPath.LastIndexOf('/');
+        int startIndex = slashIndex >= 0 ? slashIndex + 1 : 0;
+        int dotIndex = assetPath.LastIndexOf('.');
+        if (dotIndex <= startIndex)
+        {
+            dotIndex = assetPath.Length;
+        }
+
+        return assetPath.Substring(startIndex, dotIndex - startIndex);
+    }
+
+    private void BindSceneHandbookProprietaryDropTarget(Transform slotRoot, CatalogueBuildingId buildingId, int slotIndex)
+    {
+        if (slotRoot == null)
+        {
+            return;
+        }
+
+        BindSceneHandbookProprietaryDropTarget(slotRoot.gameObject, buildingId, slotIndex);
+
+        Button[] buttons = slotRoot.GetComponentsInChildren<Button>(true);
+        for (int i = 0; i < buttons.Length; i++)
+        {
+            if (buttons[i] == null)
+            {
+                continue;
+            }
+
+            EnsureButtonRaycastTarget(buttons[i]);
+            BindSceneHandbookProprietaryDropTarget(buttons[i].gameObject, buildingId, slotIndex);
+        }
+
+        Graphic[] graphics = slotRoot.GetComponentsInChildren<Graphic>(true);
+        for (int i = 0; i < graphics.Length; i++)
+        {
+            Graphic graphic = graphics[i];
+            if (graphic == null || !graphic.raycastTarget)
+            {
+                continue;
+            }
+
+            BindSceneHandbookProprietaryDropTarget(graphic.gameObject, buildingId, slotIndex);
+        }
+    }
+
+    private void BindSceneHandbookProprietaryDropTarget(GameObject targetObject, CatalogueBuildingId buildingId, int slotIndex)
+    {
+        if (targetObject == null)
+        {
+            return;
+        }
+
+        Image targetImage = targetObject.GetComponent<Image>();
+        if (targetImage != null)
+        {
+            targetImage.raycastTarget = true;
+        }
+
         SceneHandbookProprietarySlotDropHandler handler =
-            slotButton.GetComponent<SceneHandbookProprietarySlotDropHandler>();
+            targetObject.GetComponent<SceneHandbookProprietarySlotDropHandler>();
         if (handler == null)
         {
-            handler = slotButton.gameObject.AddComponent<SceneHandbookProprietarySlotDropHandler>();
+            handler = targetObject.AddComponent<SceneHandbookProprietarySlotDropHandler>();
         }
 
         handler.Bind(this, buildingId, slotIndex);
+    }
+
+    private static void ApplySceneHandbookProprietarySlotVisual(Transform slotRoot, bool unlocked)
+    {
+        if (slotRoot == null)
+        {
+            return;
+        }
+
+        Image[] images = slotRoot.GetComponentsInChildren<Image>(true);
+        for (int i = 0; i < images.Length; i++)
+        {
+            Image image = images[i];
+            if (image == null || !ShouldTintSceneHandbookProprietarySlotImage(image))
+            {
+                continue;
+            }
+
+            image.color = unlocked ? SceneHandbookSlotUnlockedColor : SceneHandbookSlotLockedColor;
+        }
+    }
+
+    private static bool ShouldTintSceneHandbookProprietarySlotImage(Image image)
+    {
+        if (image == null || image.sprite == null)
+        {
+            return false;
+        }
+
+        return image.color.a > 0.01f;
     }
 
     private void BindSceneHandbookSubmitCommonButton(Transform generalRoot, CatalogueBuildingId buildingId)
@@ -3007,6 +3294,7 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
     private void RefreshGeneratedPageContent()
     {
         RefreshSceneAuthoredPersonalPortrait();
+        RefreshSceneAuthoredPersonalAttributes();
         RefreshSceneAuthoredBackpackSurfaces();
         RefreshSceneAuthoredPersonalInkOptions();
         UpdateTextPage(IllustratedHandbookPage.IllustratedHandbook, BuildIllustratedHandbookBody(), BuildIllustratedHandbookFooter());
@@ -3091,6 +3379,42 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         portraitImage.raycastTarget = false;
         portraitImage.color = portraitSprite != null ? Color.white : Color.clear;
         portraitImage.enabled = portraitSprite != null;
+    }
+
+    private void RefreshSceneAuthoredPersonalAttributes()
+    {
+        if (!usesSceneAuthoredPages || personalInformationCanvas == null)
+        {
+            return;
+        }
+
+        Slider[] sliders = personalInformationCanvas.GetComponentsInChildren<Slider>(true);
+        for (int i = 0; i < sliders.Length; i++)
+        {
+            ConfigureSliderReadOnlyDisplay(sliders[i]);
+        }
+    }
+
+    private static void ConfigureSliderReadOnlyDisplay(Slider slider)
+    {
+        if (slider == null)
+        {
+            return;
+        }
+
+        slider.interactable = false;
+        slider.transition = Selectable.Transition.None;
+        slider.navigation = new Navigation { mode = Navigation.Mode.None };
+
+        Graphic[] graphics = slider.GetComponentsInChildren<Graphic>(true);
+        for (int i = 0; i < graphics.Length; i++)
+        {
+            Graphic graphic = graphics[i];
+            if (graphic != null)
+            {
+                graphic.raycastTarget = false;
+            }
+        }
     }
 
     private static Sprite ResolveRuntimePlayerPortraitSprite()
@@ -3684,13 +4008,14 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
             return;
         }
 
-        optionRects.Sort((left, right) => left.anchoredPosition.x.CompareTo(right.anchoredPosition.x));
+        optionRects.Sort(ComparePersonalInkOptionRects);
 
-        WeaponType selectedWeaponType = PlayerLoadoutRuntime.CurrentWeaponType;
+        WeaponType selectedWeaponType = RuntimeWeaponTypeResolver.ResolveEffectiveWeaponType(
+            BackpackMananger.Instance,
+            PlayerLoadoutRuntime.CurrentWeaponType);
         if (!IsPersonalInkOptionWeaponType(selectedWeaponType))
         {
             selectedWeaponType = WeaponType.DirectInk;
-            PlayerLoadoutRuntime.CurrentWeaponType = selectedWeaponType;
         }
 
         int optionCount = Mathf.Min(optionRects.Count, PersonalInkOptionWeaponTypes.Length);
@@ -3700,7 +4025,8 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
             WeaponType optionWeaponType = PersonalInkOptionWeaponTypes[i];
             EnsurePersonalInkOptionBehaviour(optionRect, optionWeaponType);
             bool selected = optionWeaponType == selectedWeaponType;
-            SetPersonalInkSelectionVisual(optionRect, selected);
+            bool hovered = hasHoveredPersonalInkWeapon && hoveredPersonalInkWeaponType == optionWeaponType;
+            SetPersonalInkOptionVisual(optionRect, selected, hovered);
         }
 
         RefreshPersonalInkDescription(selectedWeaponType);
@@ -3708,7 +4034,12 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
 
     private void SelectPersonalInkWeapon(WeaponType weaponType)
     {
-        PlayerLoadoutRuntime.CurrentWeaponType = weaponType;
+        bool canPersistSelectedWeapon = PlayerLoadoutRuntime.IsWeaponUnlocked(weaponType);
+        PlayerLoadoutRuntime.SetRuntimeWeaponOverride(weaponType);
+        if (canPersistSelectedWeapon)
+        {
+            PlayerLoadoutRuntime.CurrentWeaponType = weaponType;
+        }
 
         PlayerProfileData profile = FindObjectOfType<PlayerProfileData>(true);
         if (profile != null)
@@ -3718,21 +4049,17 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
             profile.SetEffectiveWeapon(weaponType);
         }
 
-        PlayerAttributeManager attributeManager = PlayerAttributeManager.Instance != null
-            ? PlayerAttributeManager.Instance
-            : FindObjectOfType<PlayerAttributeManager>(true);
-        if (attributeManager != null)
-        {
-            attributeManager.ApplyAllBonus();
-        }
-
         PlayerAttack playerAttack = FindObjectOfType<PlayerAttack>(true);
         if (playerAttack != null)
         {
             playerAttack.RefreshInkUI();
         }
 
-        GameProgressPersistence.SaveIfReady();
+        if (canPersistSelectedWeapon)
+        {
+            GameProgressPersistence.SaveIfReady();
+        }
+
         RefreshSceneAuthoredPersonalInkOptions();
         MusicManager.PlaySfx(SfxCueId.SlotSwitch);
     }
@@ -3765,6 +4092,69 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         }
     }
 
+    private static int ComparePersonalInkOptionRects(RectTransform left, RectTransform right)
+    {
+        bool hasLeftIndex = TryGetPersonalInkOptionIndex(left, out int leftIndex);
+        bool hasRightIndex = TryGetPersonalInkOptionIndex(right, out int rightIndex);
+        if (hasLeftIndex && hasRightIndex && leftIndex != rightIndex)
+        {
+            return leftIndex.CompareTo(rightIndex);
+        }
+
+        if (hasLeftIndex != hasRightIndex)
+        {
+            return hasLeftIndex ? -1 : 1;
+        }
+
+        int yCompare = -GetAnchoredPositionY(left).CompareTo(GetAnchoredPositionY(right));
+        if (yCompare != 0)
+        {
+            return yCompare;
+        }
+
+        int xCompare = GetAnchoredPositionX(left).CompareTo(GetAnchoredPositionX(right));
+        if (xCompare != 0)
+        {
+            return xCompare;
+        }
+
+        int siblingCompare = (left != null ? left.GetSiblingIndex() : int.MaxValue)
+            .CompareTo(right != null ? right.GetSiblingIndex() : int.MaxValue);
+        return siblingCompare != 0
+            ? siblingCompare
+            : string.CompareOrdinal(left != null ? left.name : string.Empty, right != null ? right.name : string.Empty);
+    }
+
+    private static bool TryGetPersonalInkOptionIndex(RectTransform optionRect, out int index)
+    {
+        index = -1;
+        if (optionRect == null ||
+            string.IsNullOrEmpty(optionRect.name) ||
+            !optionRect.name.StartsWith(PersonalInkOptionNamePrefix, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        string suffix = optionRect.name.Substring(PersonalInkOptionNamePrefix.Length);
+        if (!int.TryParse(suffix, NumberStyles.Integer, CultureInfo.InvariantCulture, out int oneBasedIndex))
+        {
+            return false;
+        }
+
+        index = oneBasedIndex - 1;
+        return index >= 0;
+    }
+
+    private static float GetAnchoredPositionX(RectTransform rectTransform)
+    {
+        return rectTransform != null ? rectTransform.anchoredPosition.x : float.MaxValue;
+    }
+
+    private static float GetAnchoredPositionY(RectTransform rectTransform)
+    {
+        return rectTransform != null ? rectTransform.anchoredPosition.y : float.MinValue;
+    }
+
     private void EnsurePersonalInkOptionBehaviour(RectTransform optionRect, WeaponType weaponType)
     {
         if (optionRect == null)
@@ -3778,19 +4168,18 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
             optionGraphic.raycastTarget = true;
         }
 
-        EnsurePersonalInkClickHandler(optionRect.gameObject, weaponType);
+        EnsurePersonalInkInteractionHandler(optionRect.gameObject, weaponType);
 
         Graphic[] childGraphics = optionRect.GetComponentsInChildren<Graphic>(true);
         for (int i = 0; i < childGraphics.Length; i++)
         {
             Graphic childGraphic = childGraphics[i];
-            if (childGraphic == null)
+            if (childGraphic == null || childGraphic.transform == optionRect)
             {
                 continue;
             }
 
-            childGraphic.raycastTarget = true;
-            EnsurePersonalInkClickHandler(childGraphic.gameObject, weaponType);
+            childGraphic.raycastTarget = false;
         }
 
         Transform buttonTransform = FindDirectChild(optionRect, PersonalInkButtonName);
@@ -3798,21 +4187,22 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         if (button != null)
         {
             button.transition = Selectable.Transition.None;
-            EnsurePersonalInkClickHandler(button.gameObject, weaponType);
+            EnsureButtonRaycastTarget(button);
+            EnsurePersonalInkInteractionHandler(button.gameObject, weaponType);
         }
     }
 
-    private void EnsurePersonalInkClickHandler(GameObject targetObject, WeaponType weaponType)
+    private void EnsurePersonalInkInteractionHandler(GameObject targetObject, WeaponType weaponType)
     {
         if (targetObject == null)
         {
             return;
         }
 
-        PersonalInkOptionClickHandler handler = targetObject.GetComponent<PersonalInkOptionClickHandler>();
+        PersonalInkOptionInteractionHandler handler = targetObject.GetComponent<PersonalInkOptionInteractionHandler>();
         if (handler == null)
         {
-            handler = targetObject.AddComponent<PersonalInkOptionClickHandler>();
+            handler = targetObject.AddComponent<PersonalInkOptionInteractionHandler>();
         }
 
         handler.Bind(this, weaponType);
@@ -3829,11 +4219,44 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         usedTransform.gameObject.SetActive(selected);
     }
 
-    private static void SetPersonalInkSelectionVisual(RectTransform optionRect, bool selected)
+    private void SetPersonalInkHoverState(WeaponType weaponType, bool hovered)
+    {
+        if (hovered)
+        {
+            hasHoveredPersonalInkWeapon = true;
+            hoveredPersonalInkWeaponType = weaponType;
+        }
+        else if (hasHoveredPersonalInkWeapon && hoveredPersonalInkWeaponType == weaponType)
+        {
+            hasHoveredPersonalInkWeapon = false;
+        }
+
+        RefreshSceneAuthoredPersonalInkOptions();
+    }
+
+    private static void SetPersonalInkOptionVisual(RectTransform optionRect, bool selected, bool hovered)
     {
         SetSceneAuthoredSelectionVisual(optionRect, PersonalInkSelectionVisualName, selected);
         SetSceneAuthoredSelectionVisual(optionRect, PersonalInkSelectionBadgeName, selected);
         SetPersonalInkUsedVisual(optionRect, selected);
+        SetPersonalInkHoverVisual(optionRect, hovered);
+    }
+
+    private static void SetPersonalInkHoverVisual(RectTransform optionRect, bool hovered)
+    {
+        if (optionRect == null)
+        {
+            return;
+        }
+
+        float targetScale = hovered ? PersonalInkHoverScale : PersonalInkNormalScale;
+        optionRect.localScale = new Vector3(targetScale, targetScale, 1f);
+
+        Graphic graphic = optionRect.GetComponent<Graphic>();
+        if (graphic != null)
+        {
+            graphic.color = Color.white;
+        }
     }
 
     private void RefreshPersonalInkDescription(WeaponType selectedWeaponType)
@@ -4217,7 +4640,7 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         }
     }
 
-    private sealed class PersonalInkOptionClickHandler : MonoBehaviour, IPointerClickHandler
+    private sealed class PersonalInkOptionInteractionHandler : MonoBehaviour, IPointerClickHandler, IPointerEnterHandler, IPointerExitHandler
     {
         private IllustratedHandbookTabsController owner;
         private WeaponType weaponType = WeaponType.DirectInk;
@@ -4231,6 +4654,16 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         public void OnPointerClick(PointerEventData eventData)
         {
             owner?.SelectPersonalInkWeapon(weaponType);
+        }
+
+        public void OnPointerEnter(PointerEventData eventData)
+        {
+            owner?.SetPersonalInkHoverState(weaponType, true);
+        }
+
+        public void OnPointerExit(PointerEventData eventData)
+        {
+            owner?.SetPersonalInkHoverState(weaponType, false);
         }
     }
 

@@ -22,6 +22,7 @@ public class BuildingSlotDefinition
     public string slotId;
     public string slotName;
     [TextArea(2, 6)] public string description;
+    public string iconAssetPath;
     public BuildingRewardDefinition reward;
 }
 
@@ -56,16 +57,19 @@ public static class BuildingDefinitionLibrary
                             "fujian_tulou_slot_1",
                             "围合防御",
                             "圆楼与方楼形成整体防御体系，让建筑能在动荡环境中维持稳定秩序。",
+                            "Assets/File/UIResources/RammedEarthUI.png",
                             CreateReward("fujian_tulou_small_1", "土楼小奖励", "生命上限提升 10。", AttributeBonusType.MaxHealth, 10f)),
                         CreateSlot(
                             "fujian_tulou_slot_2",
                             "聚族而居",
                             "土楼内部以公共空间连接各房支系，强调协作、共居与守望相助。",
+                            "Assets/File/UIResources/ThickWallUI.png",
                             CreateReward("fujian_tulou_small_2", "土楼小奖励", "防御提升 2。", AttributeBonusType.Defense, 2f)),
                         CreateSlot(
                             "fujian_tulou_slot_3",
                             "夯土营造",
                             "厚重夯土墙兼具隔热、承重与耐久能力，是土楼长期使用的基础。",
+                            "Assets/File/UIResources/TimberworkUI.png",
                             CreateReward("fujian_tulou_small_3", "土楼小奖励", "墨笔耐久上限提升 10。", AttributeBonusType.Durability, 10f))
                     },
                     completionReward = CreateWeaponUnlockReward(
@@ -89,16 +93,19 @@ public static class BuildingDefinitionLibrary
                             "zhaozhou_bridge_slot_1",
                             "敞肩券洞",
                             "主拱两侧设置小拱，既减轻桥身重量，也帮助洪水快速通过。",
+                            "Assets/File/UIResources/SingleSpan.png",
                             CreateReward("zhaozhou_bridge_small_1", "赵州桥小奖励", "攻击提升 4。", AttributeBonusType.AttackPower, 4f)),
                         CreateSlot(
                             "zhaozhou_bridge_slot_2",
                             "弧线受力",
                             "石桥将竖向压力沿弧线传导到桥台，体现精确的结构受力设计。",
+                            "Assets/File/UIResources/SmallArch.png",
                             CreateReward("zhaozhou_bridge_small_2", "赵州桥小奖励", "移动速度提升 0.25。", AttributeBonusType.MoveSpeed, 0.25f)),
                         CreateSlot(
                             "zhaozhou_bridge_slot_3",
                             "千年跨河",
                             "桥体在交通与自然冲击间长期服役，体现古代工匠对材料与结构的把控。",
+                            "Assets/File/UIResources/VoussoirConstruction.png",
                             CreateReward("zhaozhou_bridge_small_3", "赵州桥小奖励", "墨笔耐久上限提升 10。", AttributeBonusType.Durability, 10f))
                     },
                     completionReward = CreateWeaponUnlockReward(
@@ -122,16 +129,19 @@ public static class BuildingDefinitionLibrary
                             "anhui_water_town_slot_1",
                             "临水布局",
                             "依水而建的街巷与民居组织，让生活、运输与防洪形成稳定平衡。",
+                            "Assets/File/UIResources/ShuiXiang.png",
                             CreateReward("anhui_water_town_small_1", "水乡小奖励", "防御提升 2。", AttributeBonusType.Defense, 2f)),
                         CreateSlot(
                             "anhui_water_town_slot_2",
                             "白墙黛瓦",
                             "屋面与墙体形成鲜明对比，同时兼顾排水、防潮与识别性。",
+                            "Assets/File/Prop/Prop/RoofTile.png",
                             CreateReward("anhui_water_town_small_2", "水乡小奖励", "墨笔耐久上限提升 10。", AttributeBonusType.Durability, 10f)),
                         CreateSlot(
                             "anhui_water_town_slot_3",
                             "天井采光",
                             "通过天井组织通风、采光与雨水回收，是民居空间智慧的核心节点。",
+                            "Assets/File/TileMap/FirstPass/AnhuiWaterTowns_1.png",
                             CreateReward("anhui_water_town_small_3", "水乡小奖励", "生命上限提升 10。", AttributeBonusType.MaxHealth, 10f))
                     },
                     completionReward = CreateWeaponUnlockReward(
@@ -157,6 +167,7 @@ public static class BuildingDefinitionLibrary
         string slotId,
         string slotName,
         string description,
+        string iconAssetPath,
         BuildingRewardDefinition reward)
     {
         return new BuildingSlotDefinition
@@ -164,6 +175,7 @@ public static class BuildingDefinitionLibrary
             slotId = slotId,
             slotName = slotName,
             description = description,
+            iconAssetPath = iconAssetPath,
             reward = reward
         };
     }

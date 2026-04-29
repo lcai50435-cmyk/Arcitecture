@@ -31,7 +31,6 @@ public class BackpackUI : MonoBehaviour
     private const float RuntimeFallbackAttackPanelSize = 130f;
     private const float RuntimeFallbackSlotSize = 80f;
     private const float RuntimeFallbackSlotGapX = 85.6f;
-    private const float RuntimeSlotIconScale = 0.72f;
     private const float RuntimeSelectionBorderThickness = 3f;
     private const float RuntimeSelectionFramePadding = 3f;
     private const float RuntimeSelectionFadeSpeed = 12f;
@@ -1025,23 +1024,16 @@ public class BackpackUI : MonoBehaviour
             iconImage = iconObject.GetComponent<Image>();
         }
 
-        iconRect.anchorMin = new Vector2(0.5f, 0.5f);
-        iconRect.anchorMax = new Vector2(0.5f, 0.5f);
+        iconRect.anchorMin = Vector2.zero;
+        iconRect.anchorMax = Vector2.one;
         iconRect.pivot = new Vector2(0.5f, 0.5f);
-        iconRect.anchoredPosition = Vector2.zero;
-        iconRect.sizeDelta = ResolveSlotIconSize(slot);
+        iconRect.offsetMin = Vector2.zero;
+        iconRect.offsetMax = Vector2.zero;
         iconRect.SetAsLastSibling();
 
         iconImage.raycastTarget = false;
-        iconImage.preserveAspect = true;
+        iconImage.preserveAspect = false;
         return iconImage;
-    }
-
-    private static Vector2 ResolveSlotIconSize(RectTransform slot)
-    {
-        Vector2 slotSize = ResolveRectSize(slot);
-        float iconSize = Mathf.Max(1f, Mathf.Min(slotSize.x, slotSize.y) * RuntimeSlotIconScale);
-        return new Vector2(iconSize, iconSize);
     }
 
     private void EnsureRuntimeBackpackSlotBehaviour(RectTransform slot, int slotIndex, Image iconImage)

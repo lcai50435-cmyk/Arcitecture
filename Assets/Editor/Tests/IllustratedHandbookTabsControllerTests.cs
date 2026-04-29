@@ -32,6 +32,10 @@ public sealed class IllustratedHandbookTabsControllerTests
         {
             Object.DestroyImmediate(EventSystem.current.gameObject);
         }
+
+        PlayerLoadoutRuntime.ClearRuntimeWeaponOverride();
+        PlayerLoadoutRuntime.ClearDebugWeaponOverride();
+        PlayerLoadoutRuntime.CurrentWeaponType = WeaponType.DirectInk;
     }
 
     [Test]
@@ -147,6 +151,118 @@ public sealed class IllustratedHandbookTabsControllerTests
         Assert.IsTrue(handbookPage.activeSelf);
         Assert.IsFalse(personalPage.activeSelf);
         Assert.IsFalse(personalBookmark.activeSelf);
+    }
+
+    [Test]
+    public void PersonalInformationAttributeSlidersAreReadOnlyDisplays()
+    {
+        rootObject = CreateSceneAuthoredRoot();
+        GameObject personalPage = rootObject.transform.Find("PersonalInformationCanvas").gameObject;
+        CreateSceneAuthoredPersonalAttributeSurface(personalPage);
+
+        UIManager manager = rootObject.AddComponent<UIManager>();
+        manager.illustratedHandbook = rootObject;
+        IllustratedHandbookTabsController controller = IllustratedHandbookTabsController.EnsureInstalled(manager);
+
+        controller.SwitchToPage(IllustratedHandbookPage.PersonalInformation);
+
+        Slider[] sliders = personalPage.GetComponentsInChildren<Slider>(true);
+        Assert.AreEqual(4, sliders.Length);
+        for (int i = 0; i < sliders.Length; i++)
+        {
+            AssertSliderIsReadOnlyDisplay(sliders[i]);
+        }
+    }
+
+    [Test]
+    public void PersonalInkSelectionUsesAuthoredIconIndexAndMovesSelectionVisual()
+    {
+        PlayerLoadoutRuntime.CurrentWeaponType = WeaponType.DirectInk;
+
+        rootObject = CreateSceneAuthoredRoot();
+        GameObject personalPage = rootObject.transform.Find("PersonalInformationCanvas").gameObject;
+        CreateSceneAuthoredPersonalInkSurface(personalPage);
+
+        UIManager manager = rootObject.AddComponent<UIManager>();
+        manager.illustratedHandbook = rootObject;
+        IllustratedHandbookTabsController controller = IllustratedHandbookTabsController.EnsureInstalled(manager);
+
+        controller.SwitchToPage(IllustratedHandbookPage.PersonalInformation);
+
+        Transform firstOption = FindDescendant(personalPage.transform, "Image_1");
+        Transform thirdOption = FindDescendant(personalPage.transform, "Image_3");
+        AssertPersonalInkSelected(firstOption, true);
+        AssertPersonalInkSelected(thirdOption, false);
+        Assert.IsTrue(firstOption.GetComponent<Graphic>().raycastTarget);
+        Assert.IsFalse(firstOption.Find("Circle").GetComponent<Graphic>().raycastTarget);
+
+        IPointerEnterHandler hoverHandler = thirdOption.GetComponents<MonoBehaviour>().OfType<IPointerEnterHandler>().FirstOrDefault();
+        IPointerExitHandler hoverExitHandler = thirdOption.GetComponents<MonoBehaviour>().OfType<IPointerExitHandler>().FirstOrDefault();
+        Assert.IsNotNull(hoverHandler);
+        Assert.IsNotNull(hoverExitHandler);
+        EventSystem eventSystem = EventSystem.current ?? new GameObject("EventSystem", typeof(EventSystem)).GetComponent<EventSystem>();
+        hoverHandler.OnPointerEnter(new PointerEventData(eventSystem));
+        Assert.AreEqual(1.08f, thirdOption.localScale.x, 0.001f);
+        Assert.AreEqual(1.08f, thirdOption.localScale.y, 0.001f);
+
+        IPointerClickHandler clickHandler = thirdOption.GetComponents<MonoBehaviour>().OfType<IPointerClickHandler>().FirstOrDefault();
+        Assert.IsNotNull(clickHandler);
+        clickHandler.OnPointerClick(new PointerEventData(eventSystem));
+
+        PlayerLoadoutRuntime.EnsureCurrentWeaponUnlocked();
+        hoverExitHandler.OnPointerExit(new PointerEventData(eventSystem));
+
+        Assert.AreEqual(WeaponType.DirectInk, PlayerLoadoutRuntime.CurrentWeaponType);
+        Assert.AreEqual(WeaponType.PierceInk, RuntimeWeaponTypeResolver.ResolveEffectiveWeaponType(null));
+        AssertPersonalInkSelected(firstOption, false);
+        AssertPersonalInkSelected(thirdOption, true);
+    }
+
+    [Test]
+    public void SceneAuthoredHandbookProgressSlidersAreReadOnlyDisplays()
+    {
+        rootObject = CreateSceneAuthoredRoot();
+        GameObject handbookPage = rootObject.transform.Find("IllustratedHandbookCanvas").gameObject;
+        CreateSceneAuthoredHandbookSurface(handbookPage);
+
+        UIManager manager = rootObject.AddComponent<UIManager>();
+        manager.illustratedHandbook = rootObject;
+        IllustratedHandbookTabsController controller = IllustratedHandbookTabsController.EnsureInstalled(manager);
+
+        controller.SwitchToPage(IllustratedHandbookPage.IllustratedHandbook);
+
+        Slider[] sliders = handbookPage.GetComponentsInChildren<Slider>(true);
+        Assert.AreEqual(2, sliders.Length);
+        for (int i = 0; i < sliders.Length; i++)
+        {
+            AssertSliderIsReadOnlyDisplay(sliders[i]);
+        }
+    }
+
+    [Test]
+    public void SceneAuthoredProprietaryIconsFollowSelectedBuilding()
+    {
+        RuntimeProgressState.EnsureInstance().ResetProgress(false);
+
+        rootObject = CreateSceneAuthoredRoot();
+        GameObject handbookPage = rootObject.transform.Find("IllustratedHandbookCanvas").gameObject;
+        CreateSceneAuthoredHandbookSurface(handbookPage);
+
+        UIManager manager = rootObject.AddComponent<UIManager>();
+        manager.illustratedHandbook = rootObject;
+        IllustratedHandbookTabsController controller = IllustratedHandbookTabsController.EnsureInstalled(manager);
+        controller.SwitchToPage(IllustratedHandbookPage.IllustratedHandbook);
+
+        Assert.AreEqual("RammedEarthUI", GetSlotSpriteName(handbookPage.transform, "ProprietarySlot_1"));
+        Assert.AreEqual("ThickWallUI", GetSlotSpriteName(handbookPage.transform, "ProprietarySlot_2"));
+        Assert.AreEqual("TimberworkUI", GetSlotSpriteName(handbookPage.transform, "ProprietarySlot_3"));
+
+        GameObject secondCard = FindDescendant(handbookPage.transform, "ArcitectureImage_2").gameObject;
+        controller.SelectSceneAuthoredHandbookCard(secondCard);
+
+        Assert.AreEqual("SingleSpan", GetSlotSpriteName(handbookPage.transform, "ProprietarySlot_1"));
+        Assert.AreEqual("SmallArch", GetSlotSpriteName(handbookPage.transform, "ProprietarySlot_2"));
+        Assert.AreEqual("VoussoirConstruction", GetSlotSpriteName(handbookPage.transform, "ProprietarySlot_3"));
     }
 
     [Test]
@@ -292,6 +408,54 @@ public sealed class IllustratedHandbookTabsControllerTests
         Assert.AreEqual(0, backpack.GetSpecialStructureMaterialCount());
     }
 
+    [Test]
+    public void SceneAuthoredNestedProprietarySlotDimsVisibleImageAndAcceptsDropOnFirstSlotRoot()
+    {
+        RuntimeProgressState progressState = RuntimeProgressState.EnsureInstance();
+        progressState.ResetProgress(false);
+
+        BackpackMananger backpack = CreateRuntimeBackpack();
+        Assert.IsTrue(backpack.PickItem(ArchitecturalCrystalFactory.CreateSpecialStructureMaterial()));
+
+        rootObject = CreateSceneAuthoredRoot();
+        GameObject handbookPage = rootObject.transform.Find("IllustratedHandbookCanvas").gameObject;
+        CreateSceneAuthoredHandbookSurfaceWithNestedProprietarySlots(handbookPage);
+
+        UIManager manager = rootObject.AddComponent<UIManager>();
+        manager.illustratedHandbook = rootObject;
+        IllustratedHandbookTabsController controller = IllustratedHandbookTabsController.EnsureInstalled(manager);
+        controller.SwitchToPage(IllustratedHandbookPage.IllustratedHandbook);
+
+        Transform firstSlotRoot = FindDescendant(handbookPage.transform, "Material_1");
+        Assert.IsNotNull(firstSlotRoot);
+
+        Image visibleIcon = FindDescendant(firstSlotRoot, "Image").GetComponent<Image>();
+        Assert.Less(visibleIcon.color.r, 1f);
+        Assert.Less(visibleIcon.color.g, 1f);
+        Assert.Less(visibleIcon.color.b, 1f);
+
+        Image transparentHitArea = FindDescendant(firstSlotRoot, "Button_1").GetComponent<Image>();
+        Assert.AreEqual(0f, transparentHitArea.color.a);
+
+        IDropHandler dropHandler = firstSlotRoot.GetComponents<MonoBehaviour>().OfType<IDropHandler>().FirstOrDefault();
+        Assert.IsNotNull(dropHandler);
+
+        Transform backpackSlot = FindDescendant(handbookPage.transform, "HandbookBackpackSlot_1");
+        Assert.IsNotNull(backpackSlot);
+
+        EventSystem eventSystem = EventSystem.current ?? new GameObject("EventSystem", typeof(EventSystem)).GetComponent<EventSystem>();
+        PointerEventData eventData = new PointerEventData(eventSystem)
+        {
+            pointerDrag = backpackSlot.gameObject
+        };
+
+        dropHandler.OnDrop(eventData);
+
+        Assert.IsTrue(progressState.IsSlotUnlocked(CatalogueBuildingId.Building1, 0));
+        Assert.AreEqual(0, backpack.GetSpecialStructureMaterialCount());
+        Assert.AreEqual(Color.white, visibleIcon.color);
+    }
+
     private static GameObject CreateScenePageRoot()
     {
         return CreateScenePageRoot("IllustratedHandbookCanvas");
@@ -351,7 +515,7 @@ public sealed class IllustratedHandbookTabsControllerTests
         card.transform.SetParent(leftPanel.transform, false);
         CreateTmpText("Name", card.transform, "福建土楼");
         CreateChild<Image>(card.transform, "Picture");
-        CreateChild<Slider>(card.transform, "Slider");
+        CreateInteractiveSlider(card.transform, "Slider");
         CreateChild<Image>(card.transform, "Lock");
         CreateChild<Image>(card.transform, "Unlock");
 
@@ -378,11 +542,146 @@ public sealed class IllustratedHandbookTabsControllerTests
         GameObject general = new GameObject("MaterialForGeneralPurpose", typeof(RectTransform));
         general.transform.SetParent(rightIntroduction.transform, false);
         CreateTmpText("Label", general.transform, "通用材料");
-        GameObject sliderObject = new GameObject("GeneralProgressSlider", typeof(RectTransform), typeof(Slider));
-        sliderObject.transform.SetParent(general.transform, false);
+        CreateInteractiveSlider(general.transform, "GeneralProgressSlider");
         GameObject button = new GameObject("SubmitCommonMaterialButton", typeof(RectTransform), typeof(Image), typeof(Button));
         button.transform.SetParent(general.transform, false);
         CreateTmpText("Label", button.transform, "提交通用材料");
+    }
+
+    private static void CreateSceneAuthoredHandbookSurfaceWithNestedProprietarySlots(GameObject handbookPage)
+    {
+        CreateSceneAuthoredHandbookSurface(handbookPage);
+
+        Transform rightIntroduction = FindDescendant(handbookPage.transform, "RightIntroduction");
+        Transform oldProprietary = FindDescendant(rightIntroduction, "ProprietaryMaterial");
+        Object.DestroyImmediate(oldProprietary.gameObject);
+
+        GameObject proprietary = new GameObject("ProprietaryMaterial", typeof(RectTransform));
+        proprietary.transform.SetParent(rightIntroduction, false);
+        CreateTmpText("Label", proprietary.transform, "专用进度（0/3）");
+
+        for (int i = 0; i < 3; i++)
+        {
+            Transform slotRoot = CreateNestedProprietarySlot(proprietary.transform, i + 1);
+            RectTransform slotRect = slotRoot as RectTransform;
+            slotRect.anchoredPosition = new Vector2(i * 64f, 0f);
+        }
+    }
+
+    private static Transform CreateNestedProprietarySlot(Transform parent, int slotNumber)
+    {
+        GameObject slotObject = new GameObject($"Material_{slotNumber}", typeof(RectTransform), typeof(Image));
+        slotObject.transform.SetParent(parent, false);
+        Image slotImage = slotObject.GetComponent<Image>();
+        slotImage.raycastTarget = slotNumber != 1;
+
+        GameObject buttonObject = new GameObject($"Button_{slotNumber}", typeof(RectTransform), typeof(Image), typeof(Button));
+        buttonObject.transform.SetParent(slotObject.transform, false);
+        Image buttonImage = buttonObject.GetComponent<Image>();
+        buttonImage.color = new Color(1f, 1f, 1f, 0f);
+        buttonImage.raycastTarget = true;
+
+        GameObject iconObject = new GameObject("Image", typeof(RectTransform), typeof(Image));
+        iconObject.transform.SetParent(slotObject.transform, false);
+        Image iconImage = iconObject.GetComponent<Image>();
+        iconImage.raycastTarget = false;
+        iconImage.color = Color.white;
+
+        return slotObject.transform;
+    }
+
+    private static void CreateSceneAuthoredPersonalAttributeSurface(GameObject personalPage)
+    {
+        GameObject attributesRoot = new GameObject("人物属性", typeof(RectTransform));
+        attributesRoot.transform.SetParent(personalPage.transform, false);
+
+        CreateInteractiveSlider(attributesRoot.transform, "生命值");
+        CreateInteractiveSlider(attributesRoot.transform, "攻击力");
+        CreateInteractiveSlider(attributesRoot.transform, "移速");
+        CreateInteractiveSlider(attributesRoot.transform, "防御");
+    }
+
+    private static void CreateSceneAuthoredPersonalInkSurface(GameObject personalPage)
+    {
+        GameObject weaponRoot = new GameObject("Weapon", typeof(RectTransform), typeof(Image));
+        weaponRoot.transform.SetParent(personalPage.transform, false);
+
+        CreatePersonalInkOption(weaponRoot.transform, "Image_3", -80f);
+        CreatePersonalInkOption(weaponRoot.transform, "Image_1", -40f);
+        CreatePersonalInkOption(weaponRoot.transform, "Image_2", 0f);
+        CreatePersonalInkOption(weaponRoot.transform, "Image_4", 40f);
+
+        GameObject descriptionPanel = new GameObject("Image", typeof(RectTransform), typeof(Image));
+        descriptionPanel.transform.SetParent(weaponRoot.transform, false);
+        CreateTmpText("Description", descriptionPanel.transform, string.Empty);
+    }
+
+    private static void CreatePersonalInkOption(Transform parent, string name, float x)
+    {
+        GameObject optionObject = new GameObject(name, typeof(RectTransform), typeof(Image));
+        optionObject.transform.SetParent(parent, false);
+        RectTransform optionRect = optionObject.transform as RectTransform;
+        optionRect.anchoredPosition = new Vector2(x, 0f);
+
+        CreateChild<Image>(optionObject.transform, "Circle");
+        CreateChild<Image>(optionObject.transform, "Designation");
+        CreateChild<Image>(optionObject.transform, "Used");
+        CreateChild<Button>(optionObject.transform, "Button");
+    }
+
+    private static void AssertPersonalInkSelected(Transform option, bool selected)
+    {
+        Assert.IsNotNull(option);
+        Assert.AreEqual(selected, option.Find("Circle").gameObject.activeSelf, option.name);
+        Assert.AreEqual(selected, option.Find("Designation").gameObject.activeSelf, option.name);
+        Assert.AreEqual(selected, option.Find("Used").gameObject.activeSelf, option.name);
+    }
+
+    private static Slider CreateInteractiveSlider(Transform parent, string name)
+    {
+        GameObject sliderObject = new GameObject(name, typeof(RectTransform), typeof(Image), typeof(Slider));
+        sliderObject.transform.SetParent(parent, false);
+        Image background = sliderObject.GetComponent<Image>();
+        background.raycastTarget = true;
+
+        GameObject fillArea = new GameObject("Fill Area", typeof(RectTransform));
+        fillArea.transform.SetParent(sliderObject.transform, false);
+
+        GameObject fillObject = new GameObject("Fill", typeof(RectTransform), typeof(Image));
+        fillObject.transform.SetParent(fillArea.transform, false);
+        Image fillImage = fillObject.GetComponent<Image>();
+        fillImage.raycastTarget = true;
+
+        Slider slider = sliderObject.GetComponent<Slider>();
+        slider.targetGraphic = background;
+        slider.fillRect = fillObject.transform as RectTransform;
+        slider.minValue = 0f;
+        slider.maxValue = 100f;
+        slider.value = 80f;
+        slider.interactable = true;
+        slider.transition = Selectable.Transition.ColorTint;
+        slider.navigation = new Navigation { mode = Navigation.Mode.Automatic };
+        return slider;
+    }
+
+    private static void AssertSliderIsReadOnlyDisplay(Slider slider)
+    {
+        Assert.IsFalse(slider.interactable, slider.name);
+        Assert.AreEqual(Selectable.Transition.None, slider.transition, slider.name);
+        Assert.AreEqual(Navigation.Mode.None, slider.navigation.mode, slider.name);
+        Assert.IsFalse(slider.targetGraphic != null && slider.targetGraphic.raycastTarget, slider.name);
+        Assert.IsTrue(slider.GetComponentsInChildren<Graphic>(true).All(graphic => !graphic.raycastTarget), slider.name);
+    }
+
+    private static string GetSlotSpriteName(Transform root, string slotName)
+    {
+        Transform slot = FindDescendant(root, slotName);
+        Assert.IsNotNull(slot, slotName);
+
+        Image image = slot.GetComponent<Image>();
+        Assert.IsNotNull(image, slotName);
+        Assert.IsNotNull(image.sprite, slotName);
+        return image.sprite.name;
     }
 
     private static T CreateChild<T>(Transform parent, string name)

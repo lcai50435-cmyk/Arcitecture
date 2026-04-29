@@ -1,8 +1,9 @@
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 [RequireComponent(typeof(Button))]
-public class CatalogueUnlockSlotButton : MonoBehaviour
+public class CatalogueUnlockSlotButton : MonoBehaviour, IDropHandler
 {
     private const float DoubleClickWindow = 0.32f;
     private static readonly Color LockedColor = new Color(0.5f, 0.5f, 0.5f, 1f);
@@ -105,6 +106,58 @@ public class CatalogueUnlockSlotButton : MonoBehaviour
         RefreshVisual();
         ShowUnlockRequirementPrompt(buildingId, resolvedSlotIndex);
         buildingState?.RefreshState();
+    }
+
+    public void OnDrop(PointerEventData eventData)
+    {
+        if (!TryResolveRuntimeSlotContext(
+                out CatalogueBuildingUnlockState buildingState,
+                out _,
+                out CatalogueBuildingId buildingId,
+                out int resolvedSlotIndex))
+        {
+            return;
+        }
+
+        RuntimeProgressState runtimeState = RuntimeProgressState.EnsureInstance();
+        if (runtimeState.IsSlotUnlocked(buildingId, resolvedSlotIndex))
+        {
+            pendingUnlockArmed = false;
+            RefreshVisual();
+            return;
+        }
+
+        if (!BackpackSlot.TryGetDraggedSpecialStructureSlot(eventData?.pointerDrag, out int sourceSlotIndex))
+        {
+            ShowUnlockRequirementPrompt(buildingId, resolvedSlotIndex);
+            return;
+        }
+
+        BackpackMananger backpack = ResolveRuntimeBackpackManager();
+        if (backpack == null || !backpack.TryConsumeSpecialStructureMaterial(sourceSlotIndex))
+        {
+            ShowUnlockRequirementPrompt(buildingId, resolvedSlotIndex);
+            return;
+        }
+
+        bool success = runtimeState.TryUnlockSlot(
+            buildingId,
+            resolvedSlotIndex,
+            out BuildingRewardDefinition slotReward,
+            out BuildingRewardDefinition completionReward);
+
+        pendingUnlockArmed = false;
+        buildingState?.RefreshState();
+        RefreshVisual();
+        RefreshBackpackViews();
+
+        if (!success)
+        {
+            ShowUnlockRequirementPrompt(buildingId, resolvedSlotIndex);
+            return;
+        }
+
+        ShowRewardDialog(slotReward, completionReward);
     }
 
     private void ShowDescription(CatalogueBuildingId buildingId, int resolvedSlotIndex)
@@ -301,9 +354,7 @@ public class CatalogueUnlockSlotButton : MonoBehaviour
 
     private void ShowUnlockRequirementPrompt(CatalogueBuildingId buildingId, int resolvedSlotIndex)
     {
-        BackpackMananger backpack = BackpackMananger.Instance != null
-            ? BackpackMananger.Instance
-            : FindObjectOfType<BackpackMananger>(true);
+        BackpackMananger backpack = ResolveRuntimeBackpackManager();
         int remainingInventory = backpack != null ? backpack.GetSpecialStructureMaterialCount() : 0;
         string slotName = ResolveSlotName(buildingId, resolvedSlotIndex);
         string content = $"点亮 {slotName} 需要拖动 1 个专用结构到该槽位。\n当前背包专用结构：{remainingInventory}";
@@ -315,6 +366,24 @@ public class CatalogueUnlockSlotButton : MonoBehaviour
         }
 
         dialogUI.ShowAutoDialogForce(content);
+    }
+
+    private static BackpackMananger ResolveRuntimeBackpackManager()
+    {
+        return BackpackMananger.Instance != null
+            ? BackpackMananger.Instance
+            : FindObjectOfType<BackpackMananger>(true);
+    }
+
+    private static void RefreshBackpackViews()
+    {
+        BackpackUI backpackUI = FindObjectOfType<BackpackUI>(true);
+        if (backpackUI != null)
+        {
+            backpackUI.RefreshUI();
+        }
+
+        GameplayStatusHudRuntime.RefreshStructureProgressText();
     }
 
     private static string ResolveSlotName(CatalogueBuildingId buildingId, int resolvedSlotIndex)

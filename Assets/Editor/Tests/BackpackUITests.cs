@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Reflection;
 using NUnit.Framework;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -185,6 +186,30 @@ public sealed class BackpackUITests
     }
 
     [Test]
+    public void RuntimeSlotIconStretchesToFillBackpackSlot()
+    {
+        rootObject = new GameObject("PackBagCanvas", typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
+        RectTransform rootRect = rootObject.GetComponent<RectTransform>();
+        rootRect.sizeDelta = new Vector2(1920f, 1080f);
+
+        BackpackUI backpackUi = rootObject.AddComponent<BackpackUI>();
+        RectTransform itemPanel = CreateRect(rootRect, "ItemPanel", Vector2.zero, new Vector2(550f, 124f));
+        RectTransform slot = CreateRect(itemPanel, "slot_1", Vector2.zero, new Vector2(70f, 80f));
+
+        backpackUi.ConfigureRuntimeLayout();
+
+        Transform icon = slot.Find("ItemIcon");
+        Assert.IsNotNull(icon);
+
+        RectTransform iconRect = icon.GetComponent<RectTransform>();
+        Assert.IsNotNull(iconRect);
+        Assert.AreEqual(Vector2.zero, iconRect.anchorMin);
+        Assert.AreEqual(Vector2.one, iconRect.anchorMax);
+        Assert.AreEqual(Vector2.zero, iconRect.offsetMin);
+        Assert.AreEqual(Vector2.zero, iconRect.offsetMax);
+    }
+
+    [Test]
     public void GenericCommonMaterialsOccupyOnlyThreeBackpackSlotsWithoutAttackOverride()
     {
         rootObject = new GameObject("RuntimeBackpackManager");
@@ -229,6 +254,24 @@ public sealed class BackpackUITests
         Assert.IsTrue(backpack.GetItem(0).HasValue && backpack.GetItem(0).Value.IsSpecialStructure);
         Assert.IsTrue(backpack.GetItem(1).HasValue && backpack.GetItem(1).Value.IsSpecialStructure);
         Assert.IsTrue(backpack.GetItem(2).HasValue && backpack.GetItem(2).Value.IsSpecialStructure);
+    }
+
+    [Test]
+    public void DebugPanelCommonStructureUsesResolvedBackpackIcon()
+    {
+        rootObject = new GameObject("RuntimeDebugPage");
+        GameDebugPageBootstrapper debugPage = rootObject.AddComponent<GameDebugPageBootstrapper>();
+        MethodInfo createDebugCrystal = typeof(GameDebugPageBootstrapper).GetMethod(
+            "CreateDebugCrystal",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.IsNotNull(createDebugCrystal);
+
+        ArchitecturalCrystal debugCrystal = (ArchitecturalCrystal)createDebugCrystal.Invoke(
+            debugPage,
+            new object[] { ArchitecturalType.Brackets });
+        ArchitecturalCrystal factoryCrystal = ArchitecturalCrystalFactory.CreateCommonStructure(ArchitecturalType.Brackets);
+
+        Assert.AreSame(factoryCrystal.backIcon, debugCrystal.backIcon);
     }
 
     [Test]

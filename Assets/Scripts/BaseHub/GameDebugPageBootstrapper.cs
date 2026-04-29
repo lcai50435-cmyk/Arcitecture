@@ -28,8 +28,6 @@ public class GameDebugPageBootstrapper : MonoBehaviour
 
     private static TMP_FontAsset debugFontAsset;
 
-    private readonly Dictionary<ArchitecturalType, Sprite> skillIcons = new Dictionary<ArchitecturalType, Sprite>();
-
     private GameObject panelRoot;
     private RectTransform panelRectTransform;
     private ScrollRect debugScrollRect;
@@ -517,8 +515,7 @@ public class GameDebugPageBootstrapper : MonoBehaviour
 
     private ArchitecturalCrystal CreateDebugCrystal(ArchitecturalType type)
     {
-        Sprite icon = GetSkillIcon(type);
-        ArchitecturalCrystal crystal = ArchitecturalCrystalFactory.CreateCommonStructure(type, icon, icon);
+        ArchitecturalCrystal crystal = ArchitecturalCrystalFactory.CreateCommonStructure(type);
         crystal.textDescription = GetSkillDescription(type);
         return crystal;
     }
@@ -743,18 +740,6 @@ public class GameDebugPageBootstrapper : MonoBehaviour
         }
     }
 
-    private Sprite GetSkillIcon(ArchitecturalType type)
-    {
-        if (skillIcons.TryGetValue(type, out Sprite sprite))
-        {
-            return sprite;
-        }
-
-        sprite = CreateSolidSprite(GetSkillColor(type));
-        skillIcons[type] = sprite;
-        return sprite;
-    }
-
     private static string GetSkillDescription(ArchitecturalType type)
     {
         switch (type)
@@ -773,27 +758,6 @@ public class GameDebugPageBootstrapper : MonoBehaviour
                 return "梁架：提高攻击速度，最低 0.4 秒。";
             default:
                 return $"{type}：调试结构。";
-        }
-    }
-
-    private static Color GetSkillColor(ArchitecturalType type)
-    {
-        switch (type)
-        {
-            case ArchitecturalType.Brackets:
-                return new Color(0.78f, 0.34f, 0.24f, 1f);
-            case ArchitecturalType.MortiseAndTenonJoint:
-                return new Color(0.54f, 0.42f, 0.24f, 1f);
-            case ArchitecturalType.Tile:
-                return new Color(0.38f, 0.50f, 0.62f, 1f);
-            case ArchitecturalType.TampedEarth:
-                return new Color(0.46f, 0.36f, 0.27f, 1f);
-            case ArchitecturalType.GroundMass:
-                return new Color(0.36f, 0.42f, 0.39f, 1f);
-            case ArchitecturalType.BeamFrame:
-                return new Color(0.38f, 0.60f, 0.48f, 1f);
-            default:
-                return new Color(0.80f, 0.72f, 0.50f, 1f);
         }
     }
 
@@ -1193,12 +1157,4 @@ public class GameDebugPageBootstrapper : MonoBehaviour
         rect.offsetMax = new Vector2(-right, -top);
     }
 
-    private static Sprite CreateSolidSprite(Color color)
-    {
-        Texture2D texture = new Texture2D(1, 1);
-        texture.SetPixel(0, 0, color);
-        texture.Apply();
-        texture.filterMode = FilterMode.Point;
-        return Sprite.Create(texture, new Rect(0f, 0f, 1f, 1f), new Vector2(0.5f, 0.5f), 1f);
-    }
 }

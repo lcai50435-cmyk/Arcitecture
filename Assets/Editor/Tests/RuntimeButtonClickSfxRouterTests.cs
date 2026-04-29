@@ -42,6 +42,7 @@ public sealed class PlayerLoadoutRuntimeTests
     [TearDown]
     public void TearDown()
     {
+        PlayerLoadoutRuntime.ClearRuntimeWeaponOverride();
         PlayerLoadoutRuntime.ClearDebugWeaponOverride();
         PlayerLoadoutRuntime.CurrentWeaponType = WeaponType.DirectInk;
         PlayerLoadoutRuntime.AllowBaseAttack = false;
@@ -57,6 +58,18 @@ public sealed class PlayerLoadoutRuntimeTests
 
         Assert.AreEqual(WeaponType.DirectInk, PlayerLoadoutRuntime.CurrentWeaponType);
         Assert.AreEqual(WeaponType.FlowInk, RuntimeWeaponTypeResolver.ResolveEffectiveWeaponType(null));
+    }
+
+    [Test]
+    public void RuntimeWeaponOverrideSurvivesLockedSelectionValidation()
+    {
+        PlayerLoadoutRuntime.CurrentWeaponType = WeaponType.DirectInk;
+
+        PlayerLoadoutRuntime.SetRuntimeWeaponOverride(WeaponType.PierceInk);
+        PlayerLoadoutRuntime.EnsureCurrentWeaponUnlocked();
+
+        Assert.AreEqual(WeaponType.DirectInk, PlayerLoadoutRuntime.CurrentWeaponType);
+        Assert.AreEqual(WeaponType.PierceInk, RuntimeWeaponTypeResolver.ResolveEffectiveWeaponType(null));
     }
 
     [Test]

@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using NUnit.Framework;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 public sealed class CatalogueBuildingUnlockStateTests
@@ -24,6 +25,16 @@ public sealed class CatalogueBuildingUnlockStateTests
         if (RuntimeProgressState.Instance != null)
         {
             Object.DestroyImmediate(RuntimeProgressState.Instance.gameObject);
+        }
+
+        if (BackpackMananger.Instance != null)
+        {
+            Object.DestroyImmediate(BackpackMananger.Instance.gameObject);
+        }
+
+        if (EventSystem.current != null && EventSystem.current.gameObject.name == "EventSystem")
+        {
+            Object.DestroyImmediate(EventSystem.current.gameObject);
         }
 
         DestroyRuntimeDialogs();
@@ -251,6 +262,58 @@ public sealed class CatalogueBuildingUnlockStateTests
         Assert.IsFalse(handbookPanel.activeSelf);
         Assert.IsTrue(detailPanel.activeSelf);
         Assert.IsNull(FindRuntimeDialog());
+    }
+
+    [Test]
+    public void DroppingBackpackSpecialStructureOnCatalogueSlotUnlocksSlotAndAddsProgress()
+    {
+        RuntimeProgressState state = RuntimeProgressState.EnsureInstance();
+        state.ResetProgress(false);
+
+        GameObject backpackObject = new GameObject("RuntimeBackpackManager");
+        roots.Add(backpackObject);
+        BackpackMananger backpack = backpackObject.AddComponent<BackpackMananger>();
+        Assert.IsTrue(backpack.PickItem(ArchitecturalCrystalFactory.CreateSpecialStructureMaterial()));
+
+        GameObject cardObject = new GameObject("Card", typeof(RectTransform));
+        roots.Add(cardObject);
+        Slider slider = CreateChild<Slider>(cardObject.transform, "Slider");
+
+        GameObject slotObject = new GameObject("SpecialSlot", typeof(RectTransform), typeof(Image), typeof(Button));
+        slotObject.transform.SetParent(cardObject.transform, false);
+        Image slotImage = slotObject.GetComponent<Image>();
+        CatalogueUnlockSlotButton slotButton = slotObject.AddComponent<CatalogueUnlockSlotButton>();
+        slotButton.targetImage = slotImage;
+        slotButton.slotIndex = 0;
+
+        CatalogueBuildingUnlockState unlockState = cardObject.AddComponent<CatalogueBuildingUnlockState>();
+        unlockState.buildingId = CatalogueBuildingId.Building1;
+        unlockState.buildingSlider = slider;
+        unlockState.slotButtons = new[] { slotButton };
+        unlockState.RefreshState();
+
+        Assert.Less(slotImage.color.r, 1f);
+
+        GameObject sourceSlotObject = new GameObject("BackpackSlot", typeof(RectTransform), typeof(Image), typeof(BackpackSlot));
+        roots.Add(sourceSlotObject);
+        sourceSlotObject.GetComponent<BackpackSlot>().slotIndex = 0;
+
+        IDropHandler dropHandler = slotButton as IDropHandler;
+        Assert.IsNotNull(dropHandler);
+
+        EventSystem eventSystem = EventSystem.current ?? new GameObject("EventSystem", typeof(EventSystem)).GetComponent<EventSystem>();
+        PointerEventData eventData = new PointerEventData(eventSystem)
+        {
+            pointerDrag = sourceSlotObject
+        };
+
+        int previousProgress = state.GetBuildingProgress(CatalogueBuildingId.Building1);
+        dropHandler.OnDrop(eventData);
+
+        Assert.IsTrue(state.IsSlotUnlocked(CatalogueBuildingId.Building1, 0));
+        Assert.Greater(state.GetBuildingProgress(CatalogueBuildingId.Building1), previousProgress);
+        Assert.AreEqual(0, backpack.GetSpecialStructureMaterialCount());
+        Assert.AreEqual(Color.white, slotImage.color);
     }
 
     private static T CreateChild<T>(Transform parent, string name)
