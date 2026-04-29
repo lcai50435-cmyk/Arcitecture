@@ -508,6 +508,12 @@ public static class RuntimeUiSpriteFactory
 
     public static Sprite GetMainMenuStartButtonSprite()
     {
+        Sprite catalogSprite = GetRuntimeUiSpriteCatalog()?.MainMenuStartButton;
+        if (catalogSprite != null)
+        {
+            return catalogSprite;
+        }
+
         return ResolveMainMenuButtonSprite(
             ref mainMenuStartButtonSprite,
             MainMenuStartButtonSpriteName,
@@ -518,6 +524,12 @@ public static class RuntimeUiSpriteFactory
 
     public static Sprite GetMainMenuSettingsButtonSprite()
     {
+        Sprite catalogSprite = GetRuntimeUiSpriteCatalog()?.MainMenuSettingsButton;
+        if (catalogSprite != null)
+        {
+            return catalogSprite;
+        }
+
         return ResolveMainMenuButtonSprite(
             ref mainMenuSettingsButtonSprite,
             MainMenuSettingsButtonSpriteName,
@@ -528,6 +540,12 @@ public static class RuntimeUiSpriteFactory
 
     public static Sprite GetMainMenuExitButtonSprite()
     {
+        Sprite catalogSprite = GetRuntimeUiSpriteCatalog()?.MainMenuExitButton;
+        if (catalogSprite != null)
+        {
+            return catalogSprite;
+        }
+
         return ResolveMainMenuButtonSprite(
             ref mainMenuExitButtonSprite,
             MainMenuExitButtonSpriteName,
@@ -691,6 +709,13 @@ public static class RuntimeUiSpriteFactory
     {
         if (mainMenuTextButtonFrameSprite != null)
         {
+            return mainMenuTextButtonFrameSprite;
+        }
+
+        Sprite catalogSprite = GetRuntimeUiSpriteCatalog()?.MainMenuTextButtonFrame;
+        if (catalogSprite != null && catalogSprite.texture != null)
+        {
+            mainMenuTextButtonFrameSprite = CreateSlicedSpriteFromSource(catalogSprite, MainMenuTextButtonFrameBorder, "MainMenuTextButtonFrameSprite");
             return mainMenuTextButtonFrameSprite;
         }
 

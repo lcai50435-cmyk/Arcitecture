@@ -263,11 +263,13 @@ public sealed class MainMenuControllerSlotPanelTests
         Image image = button.GetComponent<Image>();
         Assert.IsNotNull(image);
         Assert.IsNotNull(image.sprite);
-        Assert.AreEqual("MainMenuStartButtonSprite", image.sprite.name);
+        Assert.AreEqual("游戏开始_0", image.sprite.name);
         Assert.AreEqual(Image.Type.Simple, image.type);
-        Assert.IsTrue(image.preserveAspect);
+        Assert.IsFalse(image.preserveAspect);
         Assert.IsNull(button.transform.Find("Accent"));
         Assert.IsNull(button.transform.Find("Label"));
+
+        AssertMainMenuButtonGeometry(button, new Vector2(500f, 250f), new Vector2(0f, 310f));
     }
 
     [Test]
@@ -298,6 +300,52 @@ public sealed class MainMenuControllerSlotPanelTests
         Assert.IsFalse(image.preserveAspect);
         Assert.IsNotNull(button.transform.Find("Label"));
         Assert.IsNull(button.transform.Find("Accent"));
+
+        AssertMainMenuButtonGeometry(button, new Vector2(760f, 140f), new Vector2(0f, 115f));
+    }
+
+    [Test]
+    public void UtilityMainMenuButtonsUseOriginalSceneGeometry()
+    {
+        _ = CreateController();
+
+        MethodInfo createMenuButton = typeof(MainMenuController).GetMethod(
+            "CreateMenuButton",
+            BindingFlags.Static | BindingFlags.NonPublic);
+        Assert.IsNotNull(createMenuButton);
+
+        Button handbookButton = (Button)createMenuButton.Invoke(
+            null,
+            new object[]
+            {
+                parentObject.transform,
+                "HandbookButton",
+                "图鉴/手册",
+                (UnityEngine.Events.UnityAction)(() => { })
+            });
+        AssertMainMenuButtonGeometry(handbookButton, new Vector2(760f, 140f), new Vector2(0f, -80f));
+
+        Button settingsButton = (Button)createMenuButton.Invoke(
+            null,
+            new object[]
+            {
+                parentObject.transform,
+                "SettingsButton",
+                "设置",
+                (UnityEngine.Events.UnityAction)(() => { })
+            });
+        AssertAuthoredButton(settingsButton, "设置_0", new Vector2(420f, 180f), new Vector2(0f, -275f));
+
+        Button exitButton = (Button)createMenuButton.Invoke(
+            null,
+            new object[]
+            {
+                parentObject.transform,
+                "ExitButton",
+                "退出",
+                (UnityEngine.Events.UnityAction)(() => { })
+            });
+        AssertAuthoredButton(exitButton, "退出按钮_0", new Vector2(80f, 80f), new Vector2(0f, -405f));
     }
 
     private MainMenuController CreateController()
@@ -329,6 +377,40 @@ public sealed class MainMenuControllerSlotPanelTests
     {
         Assert.That(actual.x, Is.EqualTo(expected.x).Within(0.001f));
         Assert.That(actual.y, Is.EqualTo(expected.y).Within(0.001f));
+    }
+
+    private static void AssertMainMenuButtonSize(Button button, Vector2 expectedSize)
+    {
+        Assert.IsNotNull(button);
+        RectTransform rectTransform = button.transform as RectTransform;
+        Assert.IsNotNull(rectTransform);
+        AssertVector2(rectTransform.sizeDelta, expectedSize);
+
+        LayoutElement layoutElement = button.GetComponent<LayoutElement>();
+        Assert.IsNotNull(layoutElement);
+        Assert.That(layoutElement.preferredWidth, Is.EqualTo(expectedSize.x).Within(0.001f));
+        Assert.That(layoutElement.preferredHeight, Is.EqualTo(expectedSize.y).Within(0.001f));
+    }
+
+    private static void AssertMainMenuButtonGeometry(Button button, Vector2 expectedSize, Vector2 expectedPosition)
+    {
+        AssertMainMenuButtonSize(button, expectedSize);
+
+        RectTransform rectTransform = button.transform as RectTransform;
+        Assert.IsNotNull(rectTransform);
+        AssertVector2(rectTransform.anchoredPosition, expectedPosition);
+    }
+
+    private static void AssertAuthoredButton(Button button, string expectedSpriteName, Vector2 expectedSize, Vector2 expectedPosition)
+    {
+        Image image = button.GetComponent<Image>();
+        Assert.IsNotNull(image);
+        Assert.IsNotNull(image.sprite);
+        Assert.AreEqual(expectedSpriteName, image.sprite.name);
+        Assert.AreEqual(Image.Type.Simple, image.type);
+        Assert.IsFalse(image.preserveAspect);
+        Assert.IsNull(button.transform.Find("Label"));
+        AssertMainMenuButtonGeometry(button, expectedSize, expectedPosition);
     }
 
     private static float GetLeftWorldX(RectTransform rectTransform)

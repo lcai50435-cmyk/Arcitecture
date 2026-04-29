@@ -69,6 +69,20 @@ public sealed class MainMenuController : MonoBehaviour
         Exit = 3
     }
 
+    private readonly struct MainMenuButtonLayout
+    {
+        public MainMenuButtonLayout(Vector2 size, Vector2 anchoredPosition, int labelFontSize)
+        {
+            Size = size;
+            AnchoredPosition = anchoredPosition;
+            LabelFontSize = labelFontSize;
+        }
+
+        public Vector2 Size { get; }
+        public Vector2 AnchoredPosition { get; }
+        public int LabelFontSize { get; }
+    }
+
     private const string MainSceneName = "MainScene";
     private const int UiLayer = 5;
     private const string RuntimeCanvasName = "MainMenuRuntimeCanvas";
@@ -297,21 +311,8 @@ public sealed class MainMenuController : MonoBehaviour
         menuRootRect.anchorMin = new Vector2(0.5f, 0.5f);
         menuRootRect.anchorMax = new Vector2(0.5f, 0.5f);
         menuRootRect.pivot = new Vector2(0.5f, 0.5f);
-        menuRootRect.sizeDelta = new Vector2(560f, 760f);
-        menuRootRect.anchoredPosition = new Vector2(0f, -90f);
-
-        VerticalLayoutGroup layoutGroup = menuRoot.AddComponent<VerticalLayoutGroup>();
-        layoutGroup.spacing = 28f;
-        layoutGroup.padding = new RectOffset(0, 0, 0, 0);
-        layoutGroup.childAlignment = TextAnchor.MiddleCenter;
-        layoutGroup.childControlWidth = true;
-        layoutGroup.childControlHeight = false;
-        layoutGroup.childForceExpandWidth = true;
-        layoutGroup.childForceExpandHeight = false;
-
-        ContentSizeFitter sizeFitter = menuRoot.AddComponent<ContentSizeFitter>();
-        sizeFitter.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
-        sizeFitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+        menuRootRect.sizeDelta = new Vector2(860f, 920f);
+        menuRootRect.anchoredPosition = new Vector2(0f, -30f);
 
         CreateMenuButton(menuRootRect, "NewGameButton", "新游戏", OpenNewGamePanel);
         continueButton = CreateMenuButton(menuRootRect, "ContinueButton", "继续游戏", OpenContinuePanel);
@@ -1183,13 +1184,19 @@ public sealed class MainMenuController : MonoBehaviour
 
     private static Button CreateMenuButton(Transform parent, string objectName, string label, UnityEngine.Events.UnityAction onClick)
     {
+        MainMenuButtonLayout buttonLayout = ResolveMenuButtonLayout(objectName);
+
         GameObject buttonObject = CreateUiObject(objectName, parent);
         RectTransform rectTransform = buttonObject.GetComponent<RectTransform>();
-        rectTransform.sizeDelta = new Vector2(500f, 114f);
+        rectTransform.anchorMin = new Vector2(0.5f, 0.5f);
+        rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
+        rectTransform.pivot = new Vector2(0.5f, 0.5f);
+        rectTransform.sizeDelta = buttonLayout.Size;
+        rectTransform.anchoredPosition = buttonLayout.AnchoredPosition;
 
         LayoutElement layoutElement = buttonObject.AddComponent<LayoutElement>();
-        layoutElement.preferredWidth = 500f;
-        layoutElement.preferredHeight = 114f;
+        layoutElement.preferredWidth = buttonLayout.Size.x;
+        layoutElement.preferredHeight = buttonLayout.Size.y;
 
         Image image = buttonObject.AddComponent<Image>();
         Sprite authoredSprite = GetMenuButtonSprite(objectName);
@@ -1197,7 +1204,7 @@ public sealed class MainMenuController : MonoBehaviour
         {
             image.sprite = authoredSprite;
             image.type = Image.Type.Simple;
-            image.preserveAspect = true;
+            image.preserveAspect = false;
             image.color = Color.white;
         }
         else
@@ -1232,12 +1239,31 @@ public sealed class MainMenuController : MonoBehaviour
 
         if (authoredSprite == null)
         {
-            Text labelText = CreateText(buttonObject.transform, "Label", label, 42, TextPrimaryColor, TextAnchor.MiddleCenter, FontStyle.Bold);
-            ConfigureRect(labelText.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(420f, 60f), new Vector2(0f, -4f));
+            Text labelText = CreateText(buttonObject.transform, "Label", label, buttonLayout.LabelFontSize, TextPrimaryColor, TextAnchor.MiddleCenter, FontStyle.Bold);
+            ConfigureRect(labelText.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), buttonLayout.Size - new Vector2(60f, 34f), new Vector2(0f, -4f));
             AddTextOutline(labelText);
         }
 
         return button;
+    }
+
+    private static MainMenuButtonLayout ResolveMenuButtonLayout(string objectName)
+    {
+        switch (objectName)
+        {
+            case "NewGameButton":
+                return new MainMenuButtonLayout(new Vector2(500f, 250f), new Vector2(0f, 310f), 42);
+            case "ContinueButton":
+                return new MainMenuButtonLayout(new Vector2(760f, 140f), new Vector2(0f, 115f), 48);
+            case "HandbookButton":
+                return new MainMenuButtonLayout(new Vector2(760f, 140f), new Vector2(0f, -80f), 48);
+            case "SettingsButton":
+                return new MainMenuButtonLayout(new Vector2(420f, 180f), new Vector2(0f, -275f), 42);
+            case "ExitButton":
+                return new MainMenuButtonLayout(new Vector2(80f, 80f), new Vector2(0f, -405f), 32);
+            default:
+                return new MainMenuButtonLayout(new Vector2(500f, 114f), Vector2.zero, 42);
+        }
     }
 
     private static Sprite GetMenuButtonSprite(string objectName)
