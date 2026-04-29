@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
@@ -100,6 +101,11 @@ public static class BuildingKnowledgeLibrary
 
     public static string Answer(string query, string sceneName, RuntimeProgressState runtimeState)
     {
+        if (BeaverQuoteLibrary.TryAnswerStructureQuestion(query, out string structureAnswer))
+        {
+            return structureAnswer;
+        }
+
         IReadOnlyList<BuildingKnowledgeEntry> accessible = GetAccessibleEntries(sceneName, runtimeState);
         if (accessible.Count == 0)
         {
@@ -125,6 +131,12 @@ public static class BuildingKnowledgeLibrary
     public static string GetAmbientFact(string sceneName, RuntimeProgressState runtimeState)
     {
         IReadOnlyList<BuildingKnowledgeEntry> accessible = GetAccessibleEntries(sceneName, runtimeState);
+        string quote = BeaverQuoteLibrary.GetAmbientQuote(sceneName, accessible.Count > 0);
+        if (!string.IsNullOrWhiteSpace(quote))
+        {
+            return quote;
+        }
+
         if (accessible.Count == 0)
         {
             return UnityEngine.Random.value > 0.5f
@@ -197,8 +209,14 @@ public static class BuildingKnowledgeLibrary
 public sealed class BeaverAssistantHud : MonoBehaviour
 {
     private const string CanvasName = "BeaverAssistantCanvas";
-    private const int SortingOrder = 238;
+    private const string AvatarResourcePath = "UI/dabb2b31-d671-4717-9918-6d60739a0f10_no_bg";
+    private const int SortingOrder = 245;
+    private const float AvatarLeftMargin = 48f;
+    private const float AvatarBottomMargin = 64f;
+    private const float AvatarSize = 88f;
     private const float BubbleVisibleSeconds = 4.8f;
+    private const float BubbleResumeMinVisibleSeconds = 2.6f;
+    private static readonly Vector2 BottomLeftAnchor = new Vector2(0f, 0f);
 
     private static BeaverAssistantHud instance;
 
@@ -210,6 +228,9 @@ public sealed class BeaverAssistantHud : MonoBehaviour
     private Sprite avatarSprite;
     private float bubbleUntilTime;
     private float nextAmbientTime;
+    private string lastBubbleMessage;
+    private float suspendedBubbleRemainingSeconds;
+    private bool wasAssistantBlockedByRuntimeUi;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void Bootstrap()
@@ -221,7 +242,21 @@ public sealed class BeaverAssistantHud : MonoBehaviour
 
     private static void HandleSceneLoaded(Scene scene, LoadSceneMode mode)
     {
-        EnsureInstance().HandleSceneChanged(scene.name);
+        EnsureInstance().HandleSceneChanged(ResolveHudSceneName(scene, mode));
+    }
+
+    private static string ResolveHudSceneName(Scene loadedScene, LoadSceneMode mode)
+    {
+        if (mode == LoadSceneMode.Additive && IllustratedUISceneLoader.IsIllustratedUiScene(loadedScene))
+        {
+            Scene activeScene = SceneManager.GetActiveScene();
+            if (activeScene.IsValid())
+            {
+                return activeScene.name;
+            }
+        }
+
+        return loadedScene.name;
     }
 
     public static BeaverAssistantHud EnsureInstance()
@@ -265,6 +300,9 @@ public sealed class BeaverAssistantHud : MonoBehaviour
 
     private void Update()
     {
+        RefreshBlockingUiResumeState();
+        RefreshUnblockedCanvasState();
+
         if (bubbleGroup != null)
         {
             float targetAlpha = Time.unscaledTime <= bubbleUntilTime ? 1f : 0f;
@@ -280,13 +318,7 @@ public sealed class BeaverAssistantHud : MonoBehaviour
 
     private void HandleSceneChanged(string sceneName)
     {
-        EnsureUi();
-        bool supported = IsSupportedScene(sceneName);
-        if (canvas != null)
-        {
-            canvas.gameObject.SetActive(supported);
-        }
-
+        ApplyCanvasSupportState(sceneName);
         ScheduleNextAmbient();
     }
 
@@ -297,11 +329,7 @@ public sealed class BeaverAssistantHud : MonoBehaviour
             return;
         }
 
-        if (BeaverAssistantPanel.IsOpen ||
-            RuntimePauseMenu.IsPauseOpen ||
-            (UIRootManager.Instance != null && UIRootManager.Instance.IsAnyGameplayBlockingUIOpen()) ||
-            GameplayStageIntroDirector.IsIntroActive ||
-            GameplayFailureController.IsFailureActive)
+        if (IsAssistantBlockedByRuntimeUi())
         {
             return;
         }
@@ -326,6 +354,7 @@ public sealed class BeaverAssistantHud : MonoBehaviour
 
         EnsureUi();
         TmpRuntimeFontFallback.WarmupCharacters(message);
+        lastBubbleMessage = message;
         bubbleText.text = message;
         bubbleUntilTime = Time.unscaledTime + BubbleVisibleSeconds;
         if (bubbleGroup != null)
@@ -334,8 +363,73 @@ public sealed class BeaverAssistantHud : MonoBehaviour
         }
     }
 
+    private void RefreshBlockingUiResumeState()
+    {
+        bool blocked = IsAssistantBlockedByRuntimeUi();
+        if (blocked && !wasAssistantBlockedByRuntimeUi)
+        {
+            suspendedBubbleRemainingSeconds = Mathf.Max(0f, bubbleUntilTime - Time.unscaledTime);
+        }
+        else if (!blocked && wasAssistantBlockedByRuntimeUi)
+        {
+            RestoreAfterBlockingUiClosed();
+        }
+
+        wasAssistantBlockedByRuntimeUi = blocked;
+    }
+
+    private void RefreshUnblockedCanvasState()
+    {
+        if (IsAssistantBlockedByRuntimeUi())
+        {
+            return;
+        }
+
+        ApplyCanvasSupportState(SceneManager.GetActiveScene().name);
+    }
+
+    private void RestoreAfterBlockingUiClosed()
+    {
+        ApplyCanvasSupportState(SceneManager.GetActiveScene().name);
+
+        if (suspendedBubbleRemainingSeconds > 0f && !string.IsNullOrWhiteSpace(lastBubbleMessage))
+        {
+            EnsureUi();
+            TmpRuntimeFontFallback.WarmupCharacters(lastBubbleMessage);
+            bubbleText.text = lastBubbleMessage;
+            bubbleUntilTime = Time.unscaledTime + Mathf.Max(suspendedBubbleRemainingSeconds, BubbleResumeMinVisibleSeconds);
+            if (bubbleGroup != null)
+            {
+                bubbleGroup.alpha = 1f;
+            }
+        }
+
+        suspendedBubbleRemainingSeconds = 0f;
+    }
+
+    private static bool IsAssistantBlockedByRuntimeUi()
+    {
+        return BeaverAssistantPanel.IsOpen ||
+               RuntimePauseMenu.IsPauseOpen ||
+               (UIRootManager.Instance != null && UIRootManager.Instance.IsAnyGameplayBlockingUIOpen()) ||
+               GameplayStageIntroDirector.IsIntroActive ||
+               GameplayFailureController.IsFailureActive;
+    }
+
+    private void ApplyCanvasSupportState(string sceneName)
+    {
+        EnsureUi();
+        bool supported = IsSupportedScene(sceneName);
+        if (canvas != null && canvas.gameObject.activeSelf != supported)
+        {
+            canvas.gameObject.SetActive(supported);
+        }
+    }
+
     private void EnsureUi()
     {
+        RuntimeUiEventSystemBootstrapper.Ensure();
+
         if (canvas != null && avatarButton != null && bubbleText != null)
         {
             return;
@@ -375,11 +469,11 @@ public sealed class BeaverAssistantHud : MonoBehaviour
         GameObject buttonObject = new GameObject("BeaverAvatarButton", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button));
         RectTransform rect = buttonObject.GetComponent<RectTransform>();
         rect.SetParent(parent, false);
-        rect.anchorMin = new Vector2(1f, 0.5f);
-        rect.anchorMax = new Vector2(1f, 0.5f);
-        rect.pivot = new Vector2(1f, 0.5f);
-        rect.anchoredPosition = new Vector2(-28f, -26f);
-        rect.sizeDelta = new Vector2(82f, 82f);
+        rect.anchorMin = BottomLeftAnchor;
+        rect.anchorMax = BottomLeftAnchor;
+        rect.pivot = BottomLeftAnchor;
+        rect.anchoredPosition = new Vector2(AvatarLeftMargin, AvatarBottomMargin);
+        rect.sizeDelta = new Vector2(AvatarSize, AvatarSize);
 
         Image image = buttonObject.GetComponent<Image>();
         image.sprite = GetOrCreateAvatarSprite();
@@ -387,6 +481,7 @@ public sealed class BeaverAssistantHud : MonoBehaviour
         image.color = Color.white;
 
         Button button = buttonObject.GetComponent<Button>();
+        button.targetGraphic = image;
         button.onClick.AddListener(() => BeaverAssistantPanel.EnsureInstance().Toggle());
         return button;
     }
@@ -396,10 +491,10 @@ public sealed class BeaverAssistantHud : MonoBehaviour
         GameObject bubbleObject = new GameObject("BeaverBubble", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(CanvasGroup));
         RectTransform rect = bubbleObject.GetComponent<RectTransform>();
         rect.SetParent(parent, false);
-        rect.anchorMin = new Vector2(1f, 0.5f);
-        rect.anchorMax = new Vector2(1f, 0.5f);
-        rect.pivot = new Vector2(1f, 0.5f);
-        rect.anchoredPosition = new Vector2(-120f, -26f);
+        rect.anchorMin = BottomLeftAnchor;
+        rect.anchorMax = BottomLeftAnchor;
+        rect.pivot = BottomLeftAnchor;
+        rect.anchoredPosition = new Vector2(AvatarLeftMargin + AvatarSize + 16f, AvatarBottomMargin + 9f);
         rect.sizeDelta = new Vector2(430f, 66f);
 
         Image background = bubbleObject.GetComponent<Image>();
@@ -436,6 +531,55 @@ public sealed class BeaverAssistantHud : MonoBehaviour
             return avatarSprite;
         }
 
+        avatarSprite = CreateAuthoredAvatarSprite();
+        if (avatarSprite != null)
+        {
+            return avatarSprite;
+        }
+
+        avatarSprite = CreateFallbackAvatarSprite();
+        return avatarSprite;
+    }
+
+    private static Sprite CreateAuthoredAvatarSprite()
+    {
+        Sprite sourceSprite = Resources.Load<Sprite>(AvatarResourcePath);
+        Texture2D texture = sourceSprite != null ? sourceSprite.texture : Resources.Load<Texture2D>(AvatarResourcePath);
+        if (texture == null)
+        {
+            return null;
+        }
+
+        texture.filterMode = FilterMode.Point;
+        texture.wrapMode = TextureWrapMode.Clamp;
+
+        Sprite sprite = Sprite.Create(
+            texture,
+            GetAuthoredAvatarSpriteRect(texture),
+            new Vector2(0.5f, 0.5f),
+            sourceSprite != null ? sourceSprite.pixelsPerUnit : 100f);
+        sprite.name = "RuntimeBeaverAssistantAvatarSprite";
+        return sprite;
+    }
+
+    private static Rect GetAuthoredAvatarSpriteRect(Texture2D texture)
+    {
+        const float sourceWidth = 2066f;
+        const float sourceHeight = 761f;
+        const float cropX = 175f;
+        const float cropTop = 0f;
+        const float cropWidth = 230f;
+        const float cropHeight = 205f;
+
+        return new Rect(
+            Mathf.Round(texture.width * cropX / sourceWidth),
+            Mathf.Round(texture.height * (sourceHeight - cropTop - cropHeight) / sourceHeight),
+            Mathf.Round(texture.width * cropWidth / sourceWidth),
+            Mathf.Round(texture.height * cropHeight / sourceHeight));
+    }
+
+    private static Sprite CreateFallbackAvatarSprite()
+    {
         const int size = 64;
         Texture2D texture = new Texture2D(size, size, TextureFormat.RGBA32, false);
         texture.filterMode = FilterMode.Point;
@@ -465,9 +609,9 @@ public sealed class BeaverAssistantHud : MonoBehaviour
         FillRect(texture, 33, 14, 6, 9, tooth);
         texture.Apply();
 
-        avatarSprite = Sprite.Create(texture, new Rect(0f, 0f, size, size), new Vector2(0.5f, 0.5f), 100f);
-        avatarSprite.name = "RuntimeBeaverAvatar";
-        return avatarSprite;
+        Sprite sprite = Sprite.Create(texture, new Rect(0f, 0f, size, size), new Vector2(0.5f, 0.5f), 100f);
+        sprite.name = "RuntimeBeaverFallbackAvatar";
+        return sprite;
     }
 
     private static bool IsSupportedScene(string sceneName)
@@ -522,15 +666,47 @@ public sealed class BeaverAssistantHud : MonoBehaviour
 public sealed class BeaverAssistantPanel : MonoBehaviour
 {
     private const string PauseReason = "BeaverAssistant";
-    private const int SortingOrder = 239;
+    private const int SortingOrder = RuntimeModalStyle.ModalSortingOrder;
+    private const int MaxHistoryLines = 48;
+    private const float HistoryScrollWidth = 796f;
+    private const float HistoryScrollHeight = 292f;
+    private const float HistoryTextWidth = 744f;
+    private const float HistoryViewportHeight = 268f;
+    private const float MessageMaxBubbleWidth = 540f;
+    private const float MessageTextMaxWidth = 492f;
+    private const float MessageMinBubbleWidth = 96f;
+    private const float MessageMinHeight = 48f;
+    private const float MessageHorizontalPadding = 18f;
+    private const float MessageVerticalPadding = 12f;
+    private const float MessageGap = 10f;
 
     private static BeaverAssistantPanel instance;
 
+    private enum HistorySpeaker
+    {
+        Beaver,
+        Player
+    }
+
+    private readonly struct HistoryEntry
+    {
+        public HistoryEntry(HistorySpeaker speaker, string message)
+        {
+            Speaker = speaker;
+            Message = message;
+        }
+
+        public HistorySpeaker Speaker { get; }
+        public string Message { get; }
+    }
+
     private Canvas canvas;
     private CanvasGroup rootGroup;
-    private TextMeshProUGUI historyText;
+    private ScrollRect historyScrollRect;
+    private RectTransform historyContentRect;
     private TMP_InputField inputField;
-    private readonly List<string> historyLines = new List<string>();
+    private readonly List<HistoryEntry> historyEntries = new List<HistoryEntry>();
+    private readonly List<GameObject> historyRowObjects = new List<GameObject>();
 
     public static bool IsOpen => instance != null && instance.gameObject.activeInHierarchy;
 
@@ -614,7 +790,9 @@ public sealed class BeaverAssistantPanel : MonoBehaviour
 
     private void EnsureUi()
     {
-        if (canvas != null && historyText != null && inputField != null)
+        RuntimeUiEventSystemBootstrapper.Ensure();
+
+        if (canvas != null && historyScrollRect != null && historyContentRect != null && inputField != null)
         {
             return;
         }
@@ -646,7 +824,7 @@ public sealed class BeaverAssistantPanel : MonoBehaviour
 
         GameObject panel = CreatePanel(canvasRect);
         CreateHeader(panel.transform);
-        historyText = CreateHistory(panel.transform);
+        historyContentRect = CreateHistory(panel.transform);
         inputField = CreateInput(panel.transform);
         CreateAskButton(panel.transform);
         CreateTopicButtons(panel.transform);
@@ -677,13 +855,81 @@ public sealed class BeaverAssistantPanel : MonoBehaviour
         close.onClick.AddListener(Hide);
     }
 
-    private TextMeshProUGUI CreateHistory(Transform parent)
+    private RectTransform CreateHistory(Transform parent)
     {
-        TextMeshProUGUI history = CreateText(parent, "History", string.Empty, 24f, new Color(0.91f, 0.90f, 0.84f, 1f), TextAlignmentOptions.TopLeft);
-        SetRect(history.rectTransform, new Vector2(32f, -92f), new Vector2(796f, 292f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f));
-        history.enableWordWrapping = true;
-        history.overflowMode = TextOverflowModes.Ellipsis;
-        return history;
+        GameObject scrollObject = new GameObject("HistoryScroll", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(ScrollRect));
+        RectTransform scrollRect = scrollObject.GetComponent<RectTransform>();
+        scrollRect.SetParent(parent, false);
+        SetRect(scrollRect, new Vector2(32f, -92f), new Vector2(HistoryScrollWidth, HistoryScrollHeight), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f));
+
+        Image background = scrollObject.GetComponent<Image>();
+        RuntimeUiSpriteFactory.ApplyRoundedSprite(background, new Color(0.05f, 0.06f, 0.05f, 0.42f), 10, 10);
+        background.raycastTarget = true;
+
+        GameObject viewportObject = new GameObject("Viewport", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(RectMask2D));
+        RectTransform viewportRect = viewportObject.GetComponent<RectTransform>();
+        viewportRect.SetParent(scrollRect, false);
+        SetStretch(viewportRect, 16f, 12f, 36f, 12f);
+
+        Image viewportImage = viewportObject.GetComponent<Image>();
+        viewportImage.color = new Color(1f, 1f, 1f, 0.001f);
+        viewportImage.raycastTarget = true;
+
+        GameObject contentObject = new GameObject("Content", typeof(RectTransform));
+        RectTransform contentRect = contentObject.GetComponent<RectTransform>();
+        contentRect.SetParent(viewportRect, false);
+        contentRect.anchorMin = new Vector2(0f, 1f);
+        contentRect.anchorMax = new Vector2(1f, 1f);
+        contentRect.pivot = new Vector2(0f, 1f);
+        contentRect.anchoredPosition = Vector2.zero;
+        contentRect.sizeDelta = new Vector2(0f, HistoryViewportHeight);
+
+        Scrollbar scrollbar = CreateHistoryScrollbar(scrollRect);
+        historyScrollRect = scrollObject.GetComponent<ScrollRect>();
+        historyScrollRect.viewport = viewportRect;
+        historyScrollRect.content = contentRect;
+        historyScrollRect.horizontal = false;
+        historyScrollRect.vertical = true;
+        historyScrollRect.movementType = ScrollRect.MovementType.Clamped;
+        historyScrollRect.scrollSensitivity = 42f;
+        historyScrollRect.verticalScrollbar = scrollbar;
+        historyScrollRect.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.AutoHide;
+        historyScrollRect.verticalNormalizedPosition = 0f;
+        return contentRect;
+    }
+
+    private static Scrollbar CreateHistoryScrollbar(Transform parent)
+    {
+        GameObject scrollbarObject = new GameObject("HistoryScrollbar", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Scrollbar));
+        RectTransform scrollbarRect = scrollbarObject.GetComponent<RectTransform>();
+        scrollbarRect.SetParent(parent, false);
+        scrollbarRect.anchorMin = new Vector2(1f, 0f);
+        scrollbarRect.anchorMax = new Vector2(1f, 1f);
+        scrollbarRect.pivot = new Vector2(1f, 0.5f);
+        scrollbarRect.anchoredPosition = new Vector2(-14f, 0f);
+        scrollbarRect.sizeDelta = new Vector2(8f, -24f);
+
+        Image track = scrollbarObject.GetComponent<Image>();
+        RuntimeUiSpriteFactory.ApplyRoundedSprite(track, new Color(0.20f, 0.25f, 0.19f, 0.32f), 4, 4);
+
+        GameObject slidingAreaObject = new GameObject("SlidingArea", typeof(RectTransform));
+        RectTransform slidingArea = slidingAreaObject.GetComponent<RectTransform>();
+        slidingArea.SetParent(scrollbarRect, false);
+        SetStretch(slidingArea, 0f, 0f, 0f, 0f);
+
+        GameObject handleObject = new GameObject("Handle", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+        RectTransform handle = handleObject.GetComponent<RectTransform>();
+        handle.SetParent(slidingArea, false);
+        SetStretch(handle, 0f, 0f, 0f, 0f);
+
+        Image handleImage = handleObject.GetComponent<Image>();
+        RuntimeUiSpriteFactory.ApplyRoundedSprite(handleImage, new Color(0.82f, 0.74f, 0.52f, 0.86f), 4, 4);
+
+        Scrollbar scrollbar = scrollbarObject.GetComponent<Scrollbar>();
+        scrollbar.direction = Scrollbar.Direction.BottomToTop;
+        scrollbar.handleRect = handle;
+        scrollbar.targetGraphic = handleImage;
+        return scrollbar;
     }
 
     private TMP_InputField CreateInput(Transform parent)
@@ -744,12 +990,8 @@ public sealed class BeaverAssistantPanel : MonoBehaviour
             SceneManager.GetActiveScene().name,
             RuntimeProgressState.Instance ?? RuntimeProgressState.EnsureInstance());
 
-        if (!string.IsNullOrWhiteSpace(question))
-        {
-            AddHistoryLine($"你：{question}");
-        }
-
-        AddHistoryLine($"河狸：{answer}");
+        AddHistoryEntry(HistorySpeaker.Player, question);
+        AddHistoryEntry(HistorySpeaker.Beaver, answer);
         if (inputField != null)
         {
             inputField.text = string.Empty;
@@ -759,13 +1001,15 @@ public sealed class BeaverAssistantPanel : MonoBehaviour
 
     private void SeedHistoryIfNeeded()
     {
-        if (historyLines.Count > 0)
+        if (historyEntries.Count > 0)
         {
             return;
         }
 
-        AddHistoryLine("河狸：我会根据已修复的上一关建筑回答问题。");
-        AddHistoryLine(BuildingKnowledgeLibrary.Answer(string.Empty, SceneManager.GetActiveScene().name, RuntimeProgressState.Instance ?? RuntimeProgressState.EnsureInstance()));
+        AddHistoryEntry(HistorySpeaker.Beaver, "我会根据已修复的上一关建筑回答问题。");
+        AddHistoryEntry(
+            HistorySpeaker.Beaver,
+            BuildingKnowledgeLibrary.Answer(string.Empty, SceneManager.GetActiveScene().name, RuntimeProgressState.Instance ?? RuntimeProgressState.EnsureInstance()));
     }
 
     private void AddHistoryLine(string line)
@@ -775,14 +1019,149 @@ public sealed class BeaverAssistantPanel : MonoBehaviour
             return;
         }
 
-        historyLines.Add(line);
-        while (historyLines.Count > 8)
+        if (line.StartsWith("你：", StringComparison.Ordinal))
         {
-            historyLines.RemoveAt(0);
+            AddHistoryEntry(HistorySpeaker.Player, line.Substring(2).TrimStart());
+            return;
         }
 
-        TmpRuntimeFontFallback.WarmupCharacters(string.Join("\n", historyLines));
-        historyText.text = string.Join("\n", historyLines);
+        if (line.StartsWith("河狸：", StringComparison.Ordinal))
+        {
+            AddHistoryEntry(HistorySpeaker.Beaver, line.Substring(3).TrimStart());
+            return;
+        }
+
+        AddHistoryEntry(HistorySpeaker.Beaver, line);
+    }
+
+    private void AddHistoryEntry(HistorySpeaker speaker, string message)
+    {
+        if (string.IsNullOrWhiteSpace(message))
+        {
+            return;
+        }
+
+        historyEntries.Add(new HistoryEntry(speaker, message.Trim()));
+        while (historyEntries.Count > MaxHistoryLines)
+        {
+            historyEntries.RemoveAt(0);
+        }
+
+        RefreshHistoryLayout();
+    }
+
+    private void RefreshHistoryLayout()
+    {
+        if (historyContentRect == null || historyScrollRect == null)
+        {
+            return;
+        }
+
+        ClearHistoryRows();
+
+        float currentY = 0f;
+        string warmupText = GetHistoryWarmupText();
+        TmpRuntimeFontFallback.WarmupCharacters(warmupText);
+
+        for (int i = 0; i < historyEntries.Count; i++)
+        {
+            GameObject row = CreateHistoryRow(historyEntries[i], i, currentY, out float rowHeight);
+            historyRowObjects.Add(row);
+            currentY += rowHeight + MessageGap;
+        }
+
+        float contentHeight = Mathf.Max(HistoryViewportHeight, Mathf.Ceil(Mathf.Max(0f, currentY - MessageGap)));
+        historyContentRect.sizeDelta = new Vector2(0f, contentHeight);
+        Canvas.ForceUpdateCanvases();
+        historyScrollRect.verticalNormalizedPosition = 0f;
+    }
+
+    private GameObject CreateHistoryRow(HistoryEntry entry, int index, float topOffset, out float rowHeight)
+    {
+        string rowPrefix = entry.Speaker == HistorySpeaker.Player ? "Player" : "Beaver";
+        GameObject rowObject = new GameObject($"{rowPrefix}MessageRow_{index:D2}", typeof(RectTransform));
+        RectTransform rowRect = rowObject.GetComponent<RectTransform>();
+        rowRect.SetParent(historyContentRect, false);
+        rowRect.anchorMin = new Vector2(0f, 1f);
+        rowRect.anchorMax = new Vector2(1f, 1f);
+        rowRect.pivot = new Vector2(0f, 1f);
+        rowRect.anchoredPosition = new Vector2(0f, -topOffset);
+
+        GameObject bubbleObject = new GameObject($"{rowPrefix}MessageBubble_{index:D2}", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+        RectTransform bubbleRect = bubbleObject.GetComponent<RectTransform>();
+        bubbleRect.SetParent(rowRect, false);
+        bool player = entry.Speaker == HistorySpeaker.Player;
+        Vector2 horizontalAnchor = player ? new Vector2(1f, 1f) : new Vector2(0f, 1f);
+        bubbleRect.anchorMin = horizontalAnchor;
+        bubbleRect.anchorMax = horizontalAnchor;
+        bubbleRect.pivot = horizontalAnchor;
+        bubbleRect.anchoredPosition = Vector2.zero;
+
+        Image bubbleImage = bubbleObject.GetComponent<Image>();
+        RuntimeUiSpriteFactory.ApplyRoundedSprite(
+            bubbleImage,
+            player ? new Color(0.27f, 0.34f, 0.24f, 0.96f) : new Color(0.07f, 0.09f, 0.08f, 0.78f),
+            12,
+            10);
+        bubbleImage.raycastTarget = false;
+
+        TextMeshProUGUI text = CreateText(
+            bubbleObject.transform,
+            "MessageText",
+            entry.Message,
+            23f,
+            new Color(0.93f, 0.92f, 0.86f, 1f),
+            player ? TextAlignmentOptions.TopRight : TextAlignmentOptions.TopLeft);
+        text.enableWordWrapping = true;
+        text.overflowMode = TextOverflowModes.Overflow;
+        SetStretch(text.rectTransform, MessageHorizontalPadding, MessageVerticalPadding, MessageHorizontalPadding, MessageVerticalPadding);
+
+        Vector2 preferred = text.GetPreferredValues(entry.Message, MessageTextMaxWidth, 0f);
+        float bubbleWidth = Mathf.Clamp(
+            Mathf.Ceil(preferred.x + MessageHorizontalPadding * 2f),
+            MessageMinBubbleWidth,
+            MessageMaxBubbleWidth);
+        float textWidth = Mathf.Max(1f, bubbleWidth - MessageHorizontalPadding * 2f);
+        float preferredHeight = text.GetPreferredValues(entry.Message, textWidth, 0f).y;
+        rowHeight = Mathf.Max(MessageMinHeight, Mathf.Ceil(preferredHeight + MessageVerticalPadding * 2f));
+        rowRect.sizeDelta = new Vector2(0f, rowHeight);
+        bubbleRect.sizeDelta = new Vector2(bubbleWidth, rowHeight);
+        return rowObject;
+    }
+
+    private void ClearHistoryRows()
+    {
+        for (int i = 0; i < historyRowObjects.Count; i++)
+        {
+            GameObject row = historyRowObjects[i];
+            if (row == null)
+            {
+                continue;
+            }
+
+            row.SetActive(false);
+            if (Application.isPlaying)
+            {
+                Destroy(row);
+            }
+            else
+            {
+                DestroyImmediate(row);
+            }
+        }
+
+        historyRowObjects.Clear();
+    }
+
+    private string GetHistoryWarmupText()
+    {
+        List<string> values = new List<string>(historyEntries.Count);
+        for (int i = 0; i < historyEntries.Count; i++)
+        {
+            values.Add(historyEntries[i].Message);
+        }
+
+        return string.Join("\n", values);
     }
 
     private static Button CreateButton(Transform parent, string name, string label, Vector2 position, Vector2 size, Vector2 anchor)
@@ -834,5 +1213,29 @@ public sealed class BeaverAssistantPanel : MonoBehaviour
         rect.anchorMax = Vector2.one;
         rect.offsetMin = new Vector2(left, bottom);
         rect.offsetMax = new Vector2(-right, -top);
+    }
+
+}
+
+internal static class RuntimeUiEventSystemBootstrapper
+{
+    public static void Ensure()
+    {
+        EventSystem eventSystem = EventSystem.current ?? UnityEngine.Object.FindObjectOfType<EventSystem>(true);
+        if (eventSystem == null)
+        {
+            GameObject eventSystemObject = new GameObject("EventSystem");
+            eventSystem = eventSystemObject.AddComponent<EventSystem>();
+        }
+
+        if (!eventSystem.gameObject.activeSelf)
+        {
+            eventSystem.gameObject.SetActive(true);
+        }
+
+        if (eventSystem.GetComponent<BaseInputModule>() == null)
+        {
+            eventSystem.gameObject.AddComponent<StandaloneInputModule>();
+        }
     }
 }

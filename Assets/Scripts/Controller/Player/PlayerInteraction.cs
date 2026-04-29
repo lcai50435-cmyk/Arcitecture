@@ -233,7 +233,14 @@ public class PlayerInteraction : MonoBehaviour
 
     private static bool UseFloatingPromptStyle()
     {
-        return GameplayStageCatalog.IsGameplayScene(SceneManager.GetActiveScene().name);
+        return UseFloatingPromptStyleForScene(SceneManager.GetActiveScene().name);
+    }
+
+    public static bool UseFloatingPromptStyleForScene(string sceneName)
+    {
+        return GameplayStageCatalog.IsGameplayScene(sceneName) ||
+               string.Equals(sceneName, "NewBase", System.StringComparison.Ordinal) ||
+               string.Equals(sceneName, "BaseScene", System.StringComparison.Ordinal);
     }
 
     private bool ShouldHoldFloatingPromptUntilPlayerIsControllable()

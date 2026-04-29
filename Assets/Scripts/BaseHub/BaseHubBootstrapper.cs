@@ -11,7 +11,7 @@ public class BaseHubBootstrapper : MonoBehaviour
 {
     private const string BaseHubMapResourcePath = "BaseHub/base_hub_map";
     private const string DefaultHandbookPrefabPath = "Assets/Scripts/View/Prefab/CatagloueUI.prefab";
-    private const string RequiredRuntimeCharacters = "图鉴精灵河狸关卡入口打开查看属性武器攻击基地允许生命上限耐久攻击力移动速度防御调试面板按住显示关闭点击装备相册留念拍照本地保存时间场景分辨率暂无上一页下一页修复工作台材料";
+    private const string RequiredRuntimeCharacters = "图鉴精灵河狸关卡入口打开查看属性武器攻击基地允许生命上限耐久攻击力移动速度防御调试面板按住显示关闭点击装备相册留念拍照本地保存时间场景分辨率暂无上一页下一页删除选中修复工作台材料第一二三四五未开放后续版本榫卯斗拱梁架石基夯土瓦片扇形波次消耗射程攻速伤害没有额外效果单体单次命中目标范围贯穿并造成持续掉血↑↓";
     private static readonly string[] RuntimeFontNames =
     {
         "Arial Unicode MS",
@@ -59,6 +59,7 @@ public class BaseHubBootstrapper : MonoBehaviour
     private Sprite generatedGateSprite;
     private Sprite generatedFloorSprite;
     private Sprite generatedHubMapSprite;
+    private Sprite generatedStagePointerSprite;
 
     private void Start()
     {
@@ -713,7 +714,7 @@ public class BaseHubBootstrapper : MonoBehaviour
         TextMeshProUGUI switchHint = CreateText(
             "SwitchHint",
             panel.transform,
-            "左右拖动卡片，或使用两侧按钮切换关卡",
+            "上下滚动列表，点击选择关卡",
             20,
             new Color(0.76f, 0.74f, 0.68f, 1f),
             TextAlignmentOptions.Center);
@@ -722,7 +723,7 @@ public class BaseHubBootstrapper : MonoBehaviour
         TextMeshProUGUI pageIndicator = CreateText(
             "PageIndicator",
             panel.transform,
-            "1 / 3",
+            "1 / 5",
             22,
             new Color(0.96f, 0.91f, 0.80f, 1f),
             TextAlignmentOptions.Center);
@@ -745,21 +746,21 @@ public class BaseHubBootstrapper : MonoBehaviour
         Button previousButton = CreateButton(
             "PreviousButton",
             panel.transform,
-            "←",
+            "↑",
             new Color(0.28f, 0.24f, 0.18f, 0.96f),
             new Vector2(62f, 48f));
-        previousButton.GetComponent<RectTransform>().anchoredPosition = new Vector2(-464f, -14f);
+        previousButton.GetComponent<RectTransform>().anchoredPosition = new Vector2(464f, 92f);
 
         Button nextButton = CreateButton(
             "NextButton",
             panel.transform,
-            "→",
+            "↓",
             new Color(0.28f, 0.24f, 0.18f, 0.96f),
             new Vector2(62f, 48f));
-        nextButton.GetComponent<RectTransform>().anchoredPosition = new Vector2(464f, -14f);
+        nextButton.GetComponent<RectTransform>().anchoredPosition = new Vector2(464f, -110f);
 
         GameObject scrollRoot = CreateUIObject("StageScrollView", panel.transform);
-        SetCenteredRect(scrollRoot.GetComponent<RectTransform>(), new Vector2(0f, -18f), new Vector2(880f, 360f));
+        SetCenteredRect(scrollRoot.GetComponent<RectTransform>(), new Vector2(-22f, -18f), new Vector2(840f, 360f));
         Image scrollBackground = scrollRoot.AddComponent<Image>();
         RuntimeUiSpriteFactory.ApplyRoundedSprite(
             scrollBackground,
@@ -777,31 +778,31 @@ public class BaseHubBootstrapper : MonoBehaviour
 
         GameObject content = CreateUIObject("Content", viewport.transform);
         RectTransform contentRect = content.GetComponent<RectTransform>();
-        contentRect.anchorMin = new Vector2(0f, 0.5f);
-        contentRect.anchorMax = new Vector2(0f, 0.5f);
-        contentRect.pivot = new Vector2(0f, 0.5f);
+        contentRect.anchorMin = new Vector2(0.5f, 1f);
+        contentRect.anchorMax = new Vector2(0.5f, 1f);
+        contentRect.pivot = new Vector2(0.5f, 1f);
         contentRect.anchoredPosition = Vector2.zero;
-        contentRect.sizeDelta = new Vector2(0f, 320f);
+        contentRect.sizeDelta = new Vector2(780f, 0f);
 
-        HorizontalLayoutGroup layout = content.AddComponent<HorizontalLayoutGroup>();
-        layout.childAlignment = TextAnchor.MiddleLeft;
-        layout.spacing = 26f;
-        layout.padding = new RectOffset(44, 44, 12, 12);
+        VerticalLayoutGroup layout = content.AddComponent<VerticalLayoutGroup>();
+        layout.childAlignment = TextAnchor.UpperCenter;
+        layout.spacing = 12f;
+        layout.padding = new RectOffset(0, 0, 12, 12);
         layout.childForceExpandWidth = false;
         layout.childForceExpandHeight = false;
-        layout.childControlWidth = false;
+        layout.childControlWidth = true;
         layout.childControlHeight = false;
 
         ContentSizeFitter fitter = content.AddComponent<ContentSizeFitter>();
-        fitter.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
-        fitter.verticalFit = ContentSizeFitter.FitMode.Unconstrained;
+        fitter.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
+        fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
         ScrollRect scrollRect = scrollRoot.AddComponent<ScrollRect>();
-        scrollRect.horizontal = true;
-        scrollRect.vertical = false;
+        scrollRect.horizontal = false;
+        scrollRect.vertical = true;
         scrollRect.movementType = ScrollRect.MovementType.Clamped;
         scrollRect.inertia = true;
-        scrollRect.scrollSensitivity = 24f;
+        scrollRect.scrollSensitivity = 42f;
         scrollRect.viewport = viewport.GetComponent<RectTransform>();
         scrollRect.content = contentRect;
 
@@ -897,7 +898,7 @@ public class BaseHubBootstrapper : MonoBehaviour
         TextMeshProUGUI emptyState = CreateText(
             "EmptyState",
             leftPanel.transform,
-            "还没有留念。\n进入关卡后按下拍照键，就会自动保存到这里。",
+            "还没有留念。\n在基地或关卡按下拍照键，就会自动保存到这里。",
             22,
             new Color(0.82f, 0.78f, 0.70f, 1f),
             TextAlignmentOptions.Center);
@@ -996,12 +997,21 @@ public class BaseHubBootstrapper : MonoBehaviour
             new Vector2(150f, 48f));
         nextPageButton.GetComponent<RectTransform>().anchoredPosition = new Vector2(108f, -326f);
 
+        Button deleteSelectedButton = CreateButton(
+            "DeleteSelectedButton",
+            rightPanel.transform,
+            "删除选中",
+            new Color(0.54f, 0.18f, 0.14f, 0.96f),
+            new Vector2(150f, 46f));
+        deleteSelectedButton.GetComponent<RectTransform>().anchoredPosition = new Vector2(198f, -244f);
+
         BaseHubAlbumPanel albumPanel = root.AddComponent<BaseHubAlbumPanel>();
         albumPanel.Configure(
             uiController,
             closeButton,
             previousPageButton,
             nextPageButton,
+            deleteSelectedButton,
             pageIndicator,
             previewTitle,
             previewMeta,
@@ -1114,26 +1124,27 @@ public class BaseHubBootstrapper : MonoBehaviour
     {
         GameObject cardRoot = CreateUIObject($"{definition.stageId}_Card", parent);
         RectTransform cardRect = cardRoot.GetComponent<RectTransform>();
-        cardRect.sizeDelta = new Vector2(320f, 300f);
+        cardRect.sizeDelta = new Vector2(780f, 112f);
         LayoutElement layoutElement = cardRoot.gameObject.AddComponent<LayoutElement>();
-        layoutElement.preferredWidth = 320f;
-        layoutElement.preferredHeight = 300f;
+        layoutElement.preferredWidth = 780f;
+        layoutElement.preferredHeight = 112f;
 
         Image cardBackground = cardRoot.AddComponent<Image>();
         RuntimeUiSpriteFactory.ApplyRoundedSprite(
             cardBackground,
             new Color(0.19f, 0.22f, 0.18f, 0.92f),
-            18,
-            16,
+            12,
+            12,
             1.2f);
+        CanvasGroup selectionGroup = CreateStageSelectionGroup(cardRect);
 
         Button selectButton = CreateButton(
             "SelectButton",
             cardRoot.transform,
             string.Empty,
             new Color(1f, 1f, 1f, 0.001f),
-            new Vector2(280f, 220f));
-        selectButton.GetComponent<RectTransform>().anchoredPosition = new Vector2(0f, 28f);
+            new Vector2(740f, 92f));
+        selectButton.GetComponent<RectTransform>().anchoredPosition = Vector2.zero;
         Image selectBackground = selectButton.GetComponent<Image>();
         selectBackground.color = new Color(1f, 1f, 1f, 0.001f);
 
@@ -1143,8 +1154,8 @@ public class BaseHubBootstrapper : MonoBehaviour
             $"第 {stageNumber} 关",
             18,
             new Color(0.86f, 0.80f, 0.70f, 1f),
-            TextAlignmentOptions.Center);
-        SetCenteredRect(chapterText.rectTransform, new Vector2(0f, 108f), new Vector2(120f, 24f));
+            TextAlignmentOptions.MidlineLeft);
+        SetCenteredRect(chapterText.rectTransform, new Vector2(-284f, 26f), new Vector2(120f, 24f));
 
         TextMeshProUGUI titleText = CreateText(
             "Title",
@@ -1152,17 +1163,17 @@ public class BaseHubBootstrapper : MonoBehaviour
             definition.displayName,
             26,
             new Color(0.96f, 0.83f, 0.52f, 1f),
-            TextAlignmentOptions.Center);
-        SetCenteredRect(titleText.rectTransform, new Vector2(0f, 64f), new Vector2(260f, 56f));
+            TextAlignmentOptions.MidlineLeft);
+        SetCenteredRect(titleText.rectTransform, new Vector2(-150f, 24f), new Vector2(320f, 36f));
 
         TextMeshProUGUI sceneText = CreateText(
             "Scene",
             selectButton.transform,
-            $"地图 Scene：{definition.sceneName}",
+            definition.isPlaceholder ? "地图：未开放" : $"地图 Scene：{definition.sceneName}",
             18,
             new Color(0.92f, 0.90f, 0.84f, 1f),
-            TextAlignmentOptions.Center);
-        SetCenteredRect(sceneText.rectTransform, new Vector2(0f, 18f), new Vector2(260f, 24f));
+            TextAlignmentOptions.MidlineLeft);
+        SetCenteredRect(sceneText.rectTransform, new Vector2(-144f, -17f), new Vector2(332f, 24f));
 
         TextMeshProUGUI statusText = CreateText(
             "Status",
@@ -1171,7 +1182,7 @@ public class BaseHubBootstrapper : MonoBehaviour
             20,
             new Color(0.84f, 0.94f, 0.82f, 1f),
             TextAlignmentOptions.Center);
-        SetCenteredRect(statusText.rectTransform, new Vector2(0f, -28f), new Vector2(220f, 28f));
+        SetCenteredRect(statusText.rectTransform, new Vector2(190f, 22f), new Vector2(136f, 28f));
 
         TextMeshProUGUI lockHintText = CreateText(
             "LockHint",
@@ -1179,28 +1190,30 @@ public class BaseHubBootstrapper : MonoBehaviour
             definition.lockedHint,
             17,
             new Color(0.82f, 0.78f, 0.72f, 1f),
-            TextAlignmentOptions.Center);
-        SetCenteredRect(lockHintText.rectTransform, new Vector2(0f, -78f), new Vector2(250f, 56f));
+            TextAlignmentOptions.MidlineLeft);
+        SetCenteredRect(lockHintText.rectTransform, new Vector2(58f, -20f), new Vector2(360f, 32f));
 
         Button enterButton = CreateButton(
             "EnterButton",
             cardRoot.transform,
-            "进入关卡",
+            definition.isPlaceholder ? "未开放" : "进入关卡",
             new Color(0.53f, 0.24f, 0.16f, 1f),
-            new Vector2(168f, 48f));
+            new Vector2(128f, 42f));
         RuntimeUiSpriteFactory.ApplyRoundedSprite(
             enterButton.GetComponent<Image>(),
             new Color(0.53f, 0.24f, 0.16f, 1f),
             12,
             12,
             1.2f);
-        enterButton.GetComponent<RectTransform>().anchoredPosition = new Vector2(0f, -118f);
+        enterButton.GetComponent<RectTransform>().anchoredPosition = new Vector2(300f, 0f);
 
         stagePanel.RegisterCard(new StageCardView
         {
             definition = definition,
             root = cardRect,
             background = cardBackground,
+            selectionGroup = selectionGroup,
+            pointer = selectionGroup.transform.Find("SelectedPointer") as RectTransform,
             selectButton = selectButton,
             enterButton = enterButton,
             titleText = titleText,
@@ -1208,6 +1221,66 @@ public class BaseHubBootstrapper : MonoBehaviour
             statusText = statusText,
             lockHintText = lockHintText
         });
+    }
+
+    private CanvasGroup CreateStageSelectionGroup(RectTransform cardRect)
+    {
+        GameObject selectionObject = CreateUIObject("SelectedState", cardRect);
+        selectionObject.layer = cardRect.gameObject.layer;
+        RectTransform selectionRect = selectionObject.GetComponent<RectTransform>();
+        SetStretch(selectionRect, 0f, 0f, 0f, 0f);
+        selectionRect.SetAsLastSibling();
+
+        CanvasGroup selectionGroup = selectionObject.AddComponent<CanvasGroup>();
+        selectionGroup.alpha = 0f;
+        selectionGroup.interactable = false;
+        selectionGroup.blocksRaycasts = false;
+
+        Color borderColor = new Color(0.30f, 0.67f, 0.96f, 1f);
+        const float thickness = 3f;
+        CreateStageSelectionLine(selectionRect, "Top", new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0f, -thickness), Vector2.zero, borderColor);
+        CreateStageSelectionLine(selectionRect, "Bottom", Vector2.zero, new Vector2(1f, 0f), Vector2.zero, new Vector2(0f, thickness), borderColor);
+        CreateStageSelectionLine(selectionRect, "Left", Vector2.zero, new Vector2(0f, 1f), Vector2.zero, new Vector2(thickness, 0f), borderColor);
+        CreateStageSelectionLine(selectionRect, "Right", new Vector2(1f, 0f), Vector2.one, new Vector2(-thickness, 0f), Vector2.zero, borderColor);
+
+        GameObject pointerObject = CreateUIObject("SelectedPointer", selectionRect);
+        pointerObject.layer = cardRect.gameObject.layer;
+        RectTransform pointerRect = pointerObject.GetComponent<RectTransform>();
+        pointerRect.anchorMin = new Vector2(0f, 0.5f);
+        pointerRect.anchorMax = new Vector2(0f, 0.5f);
+        pointerRect.pivot = new Vector2(0.5f, 0.5f);
+        pointerRect.anchoredPosition = new Vector2(-20f, 0f);
+        pointerRect.sizeDelta = new Vector2(30f, 32f);
+
+        Image pointerImage = pointerObject.AddComponent<Image>();
+        pointerImage.sprite = GetOrCreateGeneratedStagePointerSprite();
+        pointerImage.color = new Color(0.95f, 0.68f, 0.28f, 1f);
+        pointerImage.raycastTarget = false;
+        return selectionGroup;
+    }
+
+    private static void CreateStageSelectionLine(
+        RectTransform parent,
+        string lineName,
+        Vector2 anchorMin,
+        Vector2 anchorMax,
+        Vector2 offsetMin,
+        Vector2 offsetMax,
+        Color borderColor)
+    {
+        GameObject lineObject = new GameObject(lineName, typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+        lineObject.layer = parent.gameObject.layer;
+        RectTransform lineRect = lineObject.GetComponent<RectTransform>();
+        lineRect.SetParent(parent, false);
+        lineRect.anchorMin = anchorMin;
+        lineRect.anchorMax = anchorMax;
+        lineRect.pivot = new Vector2(0.5f, 0.5f);
+        lineRect.offsetMin = offsetMin;
+        lineRect.offsetMax = offsetMax;
+
+        Image lineImage = lineObject.GetComponent<Image>();
+        lineImage.color = borderColor;
+        lineImage.raycastTarget = false;
     }
 
     private void BuildStatsPage(Transform parent, PlayerStatsPanelUI statsPanel, Image avatarImage)
@@ -1242,10 +1315,10 @@ public class BaseHubBootstrapper : MonoBehaviour
         layout.childForceExpandWidth = true;
         layout.padding = new RectOffset(4, 4, 10, 10);
 
-        CreateWeaponOption(list.transform, weaponPanel, WeaponType.DirectInk, "直墨", "标准墨迹，稳定直射，适合作为通用基型。");
-        CreateWeaponOption(list.transform, weaponPanel, WeaponType.BurstInk, "爆墨", "命中后爆散成片，擅长处理聚集敌人。");
-        CreateWeaponOption(list.transform, weaponPanel, WeaponType.PierceInk, "贯墨", "初始可连续命中 3 次，更适合打穿一列目标。");
-        CreateWeaponOption(list.transform, weaponPanel, WeaponType.FlowInk, "流墨", "命中后附带持续 3 秒的流墨侵蚀。");
+        CreateWeaponOption(list.transform, weaponPanel, WeaponType.DirectInk, "直墨", InkTypeCatalog.GetEffectDescription(WeaponType.DirectInk));
+        CreateWeaponOption(list.transform, weaponPanel, WeaponType.BurstInk, "爆墨", InkTypeCatalog.GetEffectDescription(WeaponType.BurstInk));
+        CreateWeaponOption(list.transform, weaponPanel, WeaponType.PierceInk, "贯墨", InkTypeCatalog.GetEffectDescription(WeaponType.PierceInk));
+        CreateWeaponOption(list.transform, weaponPanel, WeaponType.FlowInk, "流墨", InkTypeCatalog.GetEffectDescription(WeaponType.FlowInk));
     }
 
     private void CreateWeaponOption(
@@ -1899,6 +1972,16 @@ public class BaseHubBootstrapper : MonoBehaviour
         return generatedGateSprite;
     }
 
+    private Sprite GetOrCreateGeneratedStagePointerSprite()
+    {
+        if (generatedStagePointerSprite == null)
+        {
+            generatedStagePointerSprite = CreateStagePointerSprite();
+        }
+
+        return generatedStagePointerSprite;
+    }
+
     private static Sprite CreatePlayerSprite()
     {
         Texture2D texture = CreateTransparentTexture(24, 32);
@@ -1987,6 +2070,28 @@ public class BaseHubBootstrapper : MonoBehaviour
         FillRect(texture, 20, 4, 8, 8, dark);
         texture.Apply();
         return CreateSpriteFromTexture(texture, 16f);
+    }
+
+    private static Sprite CreateStagePointerSprite()
+    {
+        Texture2D texture = CreateTransparentTexture(22, 24);
+        Color fill = Color.white;
+        Color outline = new Color(0.25f, 0.14f, 0.06f, 1f);
+        float centerY = (texture.height - 1) * 0.5f;
+
+        for (int y = 0; y < texture.height; y++)
+        {
+            float distanceFromCenter = Mathf.Abs(y - centerY);
+            int maxX = Mathf.RoundToInt(texture.width - 2f - distanceFromCenter * 0.9f);
+            for (int x = 0; x <= maxX; x++)
+            {
+                bool edge = x <= 1 || x >= maxX - 1 || distanceFromCenter >= centerY - 1.2f;
+                texture.SetPixel(x, y, edge ? outline : fill);
+            }
+        }
+
+        texture.Apply();
+        return CreateSpriteFromTexture(texture, 18f);
     }
 
     private static Sprite CreateTrainingDummySprite()

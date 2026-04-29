@@ -9,6 +9,9 @@ using UnityEngine;
 public sealed class SpriteCompanionFollowController : MonoBehaviour
 {
     private const float CompanionMoveSpeedMultiplier = 0.7f;
+    private const float IntroIdleVisualScaleMultiplier = 1.7f;
+    private const string IntroIdleControllerResourcePath = "RuntimeSpriteCompanionIdle";
+    private const string IntroIdleStateName = "SpriteIdle";
 
     [Header("跟随")]
     [SerializeField] private float followStartDistance = 1.05f;
@@ -23,9 +26,15 @@ public sealed class SpriteCompanionFollowController : MonoBehaviour
     private EnemyAvoidObstacle avoidObstacle;
     private CharacterCore companionCore;
     private SpriteRenderer companionRenderer;
+    private Animator companionAnimator;
+    private SpriteCompanionAnimator animationDriver;
     private Collider2D companionCollider;
     private BoxCollider2D companionBoxCollider;
     private Sprite colliderSourceSprite;
+    private RuntimeAnimatorController runtimeAnimatorController;
+    private bool animationDriverWasEnabled;
+    private Vector3 scaleBeforeIntroPause;
+    private bool hasScaleBeforeIntroPause;
 
     private Transform playerTransform;
     private CharacterCore playerCore;
@@ -34,6 +43,8 @@ public sealed class SpriteCompanionFollowController : MonoBehaviour
     private float nextSlotRefreshTime;
     private float blockedSince = -1f;
     private bool hasSpawnedNearPlayer;
+
+    public bool IsIntroPaused { get; private set; }
 
     public void Bind(Transform targetPlayerTransform, CharacterCore targetPlayerCore = null, Collider2D targetCompanionCollider = null)
     {
@@ -71,12 +82,35 @@ public sealed class SpriteCompanionFollowController : MonoBehaviour
         return playerTransform == target;
     }
 
+    public void SetIntroPaused(bool paused)
+    {
+        if (IsIntroPaused == paused)
+        {
+            return;
+        }
+
+        IsIntroPaused = paused;
+        move?.StopMovement();
+        avoidObstacle?.ResetAvoidance();
+
+        if (paused)
+        {
+            ApplyIntroIdleAnimator();
+        }
+        else
+        {
+            RestoreRuntimeAnimator();
+        }
+    }
+
     private void Awake()
     {
         move = GetComponent<EnemyMove>();
         avoidObstacle = GetComponent<EnemyAvoidObstacle>();
         companionCore = GetComponent<CharacterCore>();
         companionRenderer = GetComponent<SpriteRenderer>();
+        companionAnimator = GetComponent<Animator>();
+        animationDriver = GetComponent<SpriteCompanionAnimator>();
         companionBoxCollider = GetComponent<BoxCollider2D>();
         companionCollider = companionBoxCollider != null ? companionBoxCollider : GetComponent<Collider2D>();
     }
@@ -93,12 +127,23 @@ public sealed class SpriteCompanionFollowController : MonoBehaviour
         SyncCompanionCollider();
         float distanceToPlayer = Vector2.Distance(transform.position, playerTransform.position);
         SyncMoveSpeed(distanceToPlayer);
+
+        if (IsIntroPaused)
+        {
+            move?.StopMovement();
+        }
     }
 
     private void FixedUpdate()
     {
         if (!HasValidPlayer())
         {
+            return;
+        }
+
+        if (IsIntroPaused)
+        {
+            move?.StopMovement();
             return;
         }
 
@@ -162,7 +207,77 @@ public sealed class SpriteCompanionFollowController : MonoBehaviour
 
     private void OnDestroy()
     {
+        RestoreRuntimeAnimator();
         SpriteCompanionRuntime.NotifyDestroyed(this);
+    }
+
+    private void ApplyIntroIdleAnimator()
+    {
+        companionAnimator ??= GetComponent<Animator>();
+        animationDriver ??= GetComponent<SpriteCompanionAnimator>();
+
+        if (animationDriver != null)
+        {
+            animationDriverWasEnabled = animationDriver.enabled;
+            animationDriver.enabled = false;
+        }
+
+        ApplyIntroIdleScale();
+
+        if (companionAnimator == null)
+        {
+            return;
+        }
+
+        runtimeAnimatorController ??= companionAnimator.runtimeAnimatorController;
+        RuntimeAnimatorController idleController = Resources.Load<RuntimeAnimatorController>(IntroIdleControllerResourcePath);
+        if (idleController == null)
+        {
+            return;
+        }
+
+        companionAnimator.runtimeAnimatorController = idleController;
+        companionAnimator.Play(IntroIdleStateName, 0, 0f);
+        companionAnimator.Update(0f);
+    }
+
+    private void RestoreRuntimeAnimator()
+    {
+        companionAnimator ??= GetComponent<Animator>();
+        if (companionAnimator != null && runtimeAnimatorController != null)
+        {
+            companionAnimator.runtimeAnimatorController = runtimeAnimatorController;
+        }
+
+        animationDriver ??= GetComponent<SpriteCompanionAnimator>();
+        if (animationDriver != null)
+        {
+            animationDriver.enabled = animationDriverWasEnabled;
+        }
+
+        RestoreIntroIdleScale();
+    }
+
+    private void ApplyIntroIdleScale()
+    {
+        if (!hasScaleBeforeIntroPause)
+        {
+            scaleBeforeIntroPause = transform.localScale;
+            hasScaleBeforeIntroPause = true;
+        }
+
+        transform.localScale = scaleBeforeIntroPause * IntroIdleVisualScaleMultiplier;
+    }
+
+    private void RestoreIntroIdleScale()
+    {
+        if (!hasScaleBeforeIntroPause)
+        {
+            return;
+        }
+
+        transform.localScale = scaleBeforeIntroPause;
+        hasScaleBeforeIntroPause = false;
     }
 
     private bool HasValidPlayer()

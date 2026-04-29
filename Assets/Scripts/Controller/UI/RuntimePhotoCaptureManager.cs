@@ -9,6 +9,8 @@ public sealed class RuntimePhotoCaptureManager : MonoBehaviour
 {
     private const string CanvasName = "RuntimePhotoCaptureCanvas";
     private const string PauseReason = "RuntimePhotoCapture";
+    private const string BaseSceneName = "NewBase";
+    private const string BaseSceneDisplayName = "基地";
     private const int SortingOrder = 290;
     private const float ShutterDuration = 0.18f;
     private const float ShutterMaxHeight = 132f;
@@ -66,12 +68,14 @@ public sealed class RuntimePhotoCaptureManager : MonoBehaviour
     private GameObject cachedPlayerObject;
     private PlayerMove cachedPlayerMove;
     private PlayerAttack cachedPlayerAttack;
+    private BaseHubInkAttack cachedBaseHubInkAttack;
     private PlayerInteraction cachedPlayerInteraction;
     private Rigidbody2D cachedPlayerBody;
     private bool cachedPlayerStateValid;
     private bool wasMoveEnabled;
     private bool wasCanMove;
     private bool wasAttackEnabled;
+    private bool wasBaseHubInkAttackEnabled;
     private bool wasInteractionEnabled;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
@@ -91,8 +95,20 @@ public sealed class RuntimePhotoCaptureManager : MonoBehaviour
         RuntimePhotoCaptureManager manager = EnsureInstance();
         if (manager != null)
         {
-            manager.PrepareForScene(scene.name);
+            manager.PrepareForScene(ResolvePreparedSceneName(scene.name, mode, SceneManager.GetActiveScene().name));
         }
+    }
+
+    private static string ResolvePreparedSceneName(string loadedSceneName, LoadSceneMode mode, string activeSceneName)
+    {
+        if (mode == LoadSceneMode.Additive &&
+            !IsCaptureSupportedScene(loadedSceneName) &&
+            !string.IsNullOrWhiteSpace(activeSceneName))
+        {
+            return activeSceneName;
+        }
+
+        return loadedSceneName;
     }
 
     public static RuntimePhotoCaptureManager EnsureInstance()
@@ -161,7 +177,7 @@ public sealed class RuntimePhotoCaptureManager : MonoBehaviour
     {
         captureInProgress = false;
         pendingConfirmDecision = null;
-        visible = GameplayStageCatalog.IsGameplayScene(sceneName);
+        visible = IsCaptureSupportedScene(sceneName);
         ClearCachedPlayerReferences();
         ApplyVisibilityState();
         HideConfirmationImmediate();
@@ -173,12 +189,14 @@ public sealed class RuntimePhotoCaptureManager : MonoBehaviour
 #if UNITY_WEBGL && !UNITY_EDITOR
         return false;
 #else
-        if (!GameplayStageCatalog.IsGameplayScene(SceneManager.GetActiveScene().name))
+        string activeSceneName = SceneManager.GetActiveScene().name;
+        bool isGameplayScene = GameplayStageCatalog.IsGameplayScene(activeSceneName);
+        if (!IsCaptureSupportedScene(activeSceneName))
         {
             return false;
         }
 
-        if (GameplayFailureController.IsFailureActive || GameplayStageIntroDirector.IsIntroActive)
+        if (isGameplayScene && (GameplayFailureController.IsFailureActive || GameplayStageIntroDirector.IsIntroActive))
         {
             return false;
         }
@@ -303,14 +321,12 @@ public sealed class RuntimePhotoCaptureManager : MonoBehaviour
         }
 
         string sceneName = SceneManager.GetActiveScene().name;
-        GameplayStageDefinition stageDefinition = GameplayStageCatalog.GetStageByScene(sceneName);
-        string stageId = stageDefinition != null ? stageDefinition.stageId : GameplayStageRuntime.SelectedStageId;
         return PhotoAlbumRepository.SaveCapture(
             pngBytes,
             screenshot.width,
             screenshot.height,
             sceneName,
-            stageId);
+            ResolveCaptureStageId(sceneName));
     }
 
     private IEnumerator PlayShutterRoutine()
@@ -481,6 +497,12 @@ public sealed class RuntimePhotoCaptureManager : MonoBehaviour
             cachedPlayerAttack.enabled = false;
         }
 
+        if (cachedBaseHubInkAttack != null)
+        {
+            wasBaseHubInkAttackEnabled = cachedBaseHubInkAttack.enabled;
+            cachedBaseHubInkAttack.enabled = false;
+        }
+
         if (cachedPlayerBody != null)
         {
             cachedPlayerBody.velocity = Vector2.zero;
@@ -505,6 +527,11 @@ public sealed class RuntimePhotoCaptureManager : MonoBehaviour
         if (cachedPlayerAttack != null)
         {
             cachedPlayerAttack.enabled = wasAttackEnabled;
+        }
+
+        if (cachedBaseHubInkAttack != null)
+        {
+            cachedBaseHubInkAttack.enabled = wasBaseHubInkAttackEnabled;
         }
 
         if (cachedPlayerInteraction != null)
@@ -552,6 +579,7 @@ public sealed class RuntimePhotoCaptureManager : MonoBehaviour
         cachedPlayerObject = playerObject;
         cachedPlayerMove = playerObject != null ? playerObject.GetComponent<PlayerMove>() : null;
         cachedPlayerAttack = playerObject != null ? playerObject.GetComponent<PlayerAttack>() : null;
+        cachedBaseHubInkAttack = playerObject != null ? playerObject.GetComponent<BaseHubInkAttack>() : null;
         cachedPlayerInteraction = playerObject != null ? playerObject.GetComponent<PlayerInteraction>() : null;
         cachedPlayerBody = playerObject != null ? playerObject.GetComponent<Rigidbody2D>() : null;
     }
@@ -561,6 +589,7 @@ public sealed class RuntimePhotoCaptureManager : MonoBehaviour
         cachedPlayerObject = null;
         cachedPlayerMove = null;
         cachedPlayerAttack = null;
+        cachedBaseHubInkAttack = null;
         cachedPlayerInteraction = null;
         cachedPlayerBody = null;
         cachedPlayerStateValid = false;
@@ -842,16 +871,49 @@ public sealed class RuntimePhotoCaptureManager : MonoBehaviour
     private string BuildConfirmationMeta(Texture2D screenshot)
     {
         string sceneName = SceneManager.GetActiveScene().name;
-        GameplayStageDefinition stageDefinition = GameplayStageCatalog.GetStageByScene(sceneName);
-        string stageLabel = stageDefinition != null
-            ? stageDefinition.displayName
-            : (string.IsNullOrWhiteSpace(GameplayStageRuntime.SelectedStageId)
-                ? "未记录"
-                : GameplayStageRuntime.SelectedStageId);
         string resolutionText = screenshot != null
             ? $"{screenshot.width} x {screenshot.height}"
             : "未知";
-        return $"关卡：{stageLabel}    场景：{sceneName}\n分辨率：{resolutionText}";
+        return $"位置：{ResolveCaptureLocationLabel(sceneName)}    场景：{sceneName}\n分辨率：{resolutionText}";
+    }
+
+    private static bool IsCaptureSupportedScene(string sceneName)
+    {
+        return IsBaseScene(sceneName) || GameplayStageCatalog.IsGameplayScene(sceneName);
+    }
+
+    private static bool IsBaseScene(string sceneName)
+    {
+        return string.Equals(sceneName, BaseSceneName, StringComparison.Ordinal);
+    }
+
+    private static string ResolveCaptureStageId(string sceneName)
+    {
+        GameplayStageDefinition stageDefinition = GameplayStageCatalog.GetStageByScene(sceneName);
+        if (stageDefinition != null)
+        {
+            return stageDefinition.stageId;
+        }
+
+        return IsBaseScene(sceneName) ? string.Empty : GameplayStageRuntime.SelectedStageId;
+    }
+
+    private static string ResolveCaptureLocationLabel(string sceneName)
+    {
+        if (IsBaseScene(sceneName))
+        {
+            return BaseSceneDisplayName;
+        }
+
+        GameplayStageDefinition stageDefinition = GameplayStageCatalog.GetStageByScene(sceneName);
+        if (stageDefinition != null)
+        {
+            return stageDefinition.displayName;
+        }
+
+        return string.IsNullOrWhiteSpace(GameplayStageRuntime.SelectedStageId)
+            ? "未记录"
+            : GameplayStageRuntime.SelectedStageId;
     }
 
     private static Image CreateImage(string name, Transform parent, Color color, bool raycastTarget)

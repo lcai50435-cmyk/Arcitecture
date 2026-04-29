@@ -2,17 +2,23 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using UnityEngine.Tilemaps;
 
 [DisallowMultipleComponent]
 public sealed class RuntimeWaterReflectionCaster : MonoBehaviour
 {
-    private const string ReflectionObjectName = "RuntimeWaterReflection";
-    private const float ReflectionAlpha = 0.22f;
-    private static readonly Color ReflectionTint = new Color(0.58f, 0.78f, 0.86f, 1f);
-    private static readonly Vector3 ReflectionLocalScale = new Vector3(1f, -0.58f, 1f);
+    internal const string ShadowObjectName = "RuntimeWaterShadow";
+    internal const string LegacyReflectionObjectName = "RuntimeWaterReflection";
+    private const float ShadowBaseAlpha = 0.26f;
+    private const float ShadowNightAlphaBoost = 0.10f;
+    private const float ShadowWidthFactor = 0.82f;
+    private const float ShadowHeightFactor = 0.16f;
+    private const float MinimumShadowWidth = 0.24f;
+    private const float MinimumShadowHeight = 0.06f;
+    private static readonly Color ShadowTint = new Color(0.012f, 0.015f, 0.022f, 1f);
 
     [SerializeField] private SpriteRenderer sourceRenderer;
-    [SerializeField] private SpriteRenderer reflectionRenderer;
+    [SerializeField] private SpriteRenderer shadowRenderer;
 
     public static RuntimeWaterReflectionCaster EnsureForRenderer(SpriteRenderer renderer)
     {
@@ -34,47 +40,48 @@ public sealed class RuntimeWaterReflectionCaster : MonoBehaviour
     private void Configure(SpriteRenderer renderer)
     {
         sourceRenderer = renderer;
-        EnsureReflectionRenderer();
-        SyncReflection();
+        EnsureShadowRenderer();
+        SyncShadow();
     }
 
     private void OnEnable()
     {
         sourceRenderer ??= GetComponent<SpriteRenderer>();
-        EnsureReflectionRenderer();
-        SyncReflection();
+        EnsureShadowRenderer();
+        SyncShadow();
     }
 
     private void LateUpdate()
     {
-        SyncReflection();
+        SyncShadow();
     }
 
-    private void EnsureReflectionRenderer()
+    private void EnsureShadowRenderer()
     {
-        if (reflectionRenderer != null)
+        if (shadowRenderer != null)
         {
             return;
         }
 
-        Transform existing = transform.Find(ReflectionObjectName);
-        GameObject reflectionObject = existing != null
+        Transform existing = transform.Find(ShadowObjectName) ?? transform.Find(LegacyReflectionObjectName);
+        GameObject shadowObject = existing != null
             ? existing.gameObject
-            : new GameObject(ReflectionObjectName);
+            : new GameObject(ShadowObjectName);
 
-        reflectionObject.transform.SetParent(transform, false);
-        reflectionObject.hideFlags = HideFlags.DontSaveInEditor | HideFlags.DontSaveInBuild;
-        reflectionRenderer = reflectionObject.GetComponent<SpriteRenderer>();
-        if (reflectionRenderer == null)
+        shadowObject.name = ShadowObjectName;
+        shadowObject.transform.SetParent(transform, false);
+        shadowObject.hideFlags = HideFlags.DontSaveInEditor | HideFlags.DontSaveInBuild;
+        shadowRenderer = shadowObject.GetComponent<SpriteRenderer>();
+        if (shadowRenderer == null)
         {
-            reflectionRenderer = reflectionObject.AddComponent<SpriteRenderer>();
+            shadowRenderer = shadowObject.AddComponent<SpriteRenderer>();
         }
 
-        reflectionRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-        reflectionRenderer.receiveShadows = false;
+        shadowRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        shadowRenderer.receiveShadows = false;
     }
 
-    private void SyncReflection()
+    private void SyncShadow()
     {
         if (sourceRenderer == null)
         {
@@ -86,34 +93,55 @@ public sealed class RuntimeWaterReflectionCaster : MonoBehaviour
             return;
         }
 
-        EnsureReflectionRenderer();
+        EnsureShadowRenderer();
 
         bool shouldShow = sourceRenderer.enabled &&
                           sourceRenderer.sprite != null &&
                           RuntimeWaterReflectionSceneController.IsNearWater(sourceRenderer.bounds.center);
-        reflectionRenderer.enabled = shouldShow;
+        shadowRenderer.enabled = shouldShow;
         if (!shouldShow)
         {
             return;
         }
 
         Sprite sourceSprite = sourceRenderer.sprite;
+        Vector3 shadowScale = ResolveShadowScale(sourceSprite);
         float localHeight = sourceSprite != null ? Mathf.Max(0.18f, sourceSprite.bounds.size.y) : 0.22f;
-        Transform reflectionTransform = reflectionRenderer.transform;
-        reflectionTransform.localPosition = new Vector3(0f, -localHeight * 0.62f, 0f);
-        reflectionTransform.localRotation = Quaternion.identity;
-        reflectionTransform.localScale = ReflectionLocalScale;
+        Transform shadowTransform = shadowRenderer.transform;
+        shadowTransform.localPosition = new Vector3(0f, -localHeight * 0.42f, 0f);
+        shadowTransform.localRotation = Quaternion.identity;
+        shadowTransform.localScale = shadowScale;
 
-        reflectionRenderer.sprite = sourceSprite;
-        reflectionRenderer.flipX = sourceRenderer.flipX;
-        reflectionRenderer.flipY = sourceRenderer.flipY;
-        reflectionRenderer.color = new Color(
-            ReflectionTint.r,
-            ReflectionTint.g,
-            ReflectionTint.b,
-            ReflectionAlpha * sourceRenderer.color.a);
-        reflectionRenderer.sortingLayerID = sourceRenderer.sortingLayerID;
-        reflectionRenderer.sortingOrder = sourceRenderer.sortingOrder - 2;
+        shadowRenderer.sprite = ProjectedShadowFollower.GetOrCreateEllipseShadowSprite();
+        shadowRenderer.sharedMaterial = null;
+        shadowRenderer.flipX = false;
+        shadowRenderer.flipY = false;
+        shadowRenderer.color = ResolveShadowColor();
+        shadowRenderer.sortingLayerID = NightLightingVisualFactory.GetTopSortingLayerId();
+        shadowRenderer.sortingOrder = NightLightingController.ShadowSortingOrder - 2;
+    }
+
+    private static Vector3 ResolveShadowScale(Sprite sourceSprite)
+    {
+        if (sourceSprite == null)
+        {
+            return new Vector3(MinimumShadowWidth, MinimumShadowHeight, 1f);
+        }
+
+        Bounds bounds = sourceSprite.bounds;
+        float width = Mathf.Max(MinimumShadowWidth, bounds.size.x * ShadowWidthFactor);
+        float height = Mathf.Max(MinimumShadowHeight, bounds.size.y * ShadowHeightFactor);
+        return new Vector3(width, height, 1f);
+    }
+
+    private Color ResolveShadowColor()
+    {
+        float alpha = ShadowBaseAlpha + NightLightingController.ActiveNightProgress * ShadowNightAlphaBoost;
+        return new Color(
+            ShadowTint.r,
+            ShadowTint.g,
+            ShadowTint.b,
+            Mathf.Clamp01(alpha * sourceRenderer.color.a));
     }
 }
 
@@ -122,6 +150,10 @@ public sealed class RuntimeWaterReflectionSceneController : MonoBehaviour
     private const string ControllerName = "RuntimeWaterReflectionSceneController";
     private const string ShimmerObjectName = "RuntimeWaterShimmer";
     private const float RescanInterval = 0.8f;
+    private const float ShimmerPixelsPerUnit = 32f;
+    private const int ShimmerTextureWidth = 64;
+    private const int ShimmerTextureHeight = 16;
+    private const int MaxShimmerTileQuads = 12000;
     private static readonly List<Bounds> WaterBounds = new List<Bounds>();
     private static RuntimeWaterReflectionSceneController instance;
     private static Sprite sharedShimmerSprite;
@@ -256,7 +288,14 @@ public sealed class RuntimeWaterReflectionSceneController : MonoBehaviour
             }
 
             WaterBounds.Add(bounds);
-            EnsureWaterShimmer(renderer, bounds);
+            if (ShouldCreateWaterShimmer(renderer, bounds))
+            {
+                EnsureWaterShimmer(renderer, bounds);
+            }
+            else
+            {
+                RemoveWaterShimmer(renderer);
+            }
         }
 
         Collider2D[] colliders = FindObjectsOfType<Collider2D>(true);
@@ -286,7 +325,7 @@ public sealed class RuntimeWaterReflectionSceneController : MonoBehaviour
     private static bool ShouldAttachReflection(SpriteRenderer renderer)
     {
         GameObject owner = renderer.gameObject;
-        if (owner == null || string.Equals(owner.name, ShimmerObjectName, StringComparison.Ordinal))
+        if (owner == null || IsGeneratedRuntimeVisual(owner))
         {
             return false;
         }
@@ -315,6 +354,16 @@ public sealed class RuntimeWaterReflectionSceneController : MonoBehaviour
                RuntimeProgressState.EnsureInstance().IsBuildingRepaired(group.BuildingId);
     }
 
+    private static bool IsGeneratedRuntimeVisual(GameObject owner)
+    {
+        string name = owner.name;
+        return string.Equals(name, ShimmerObjectName, StringComparison.Ordinal) ||
+               string.Equals(name, RuntimeWaterReflectionCaster.ShadowObjectName, StringComparison.Ordinal) ||
+               string.Equals(name, RuntimeWaterReflectionCaster.LegacyReflectionObjectName, StringComparison.Ordinal) ||
+               string.Equals(name, ProjectedShadowFollower.ShadowObjectName, StringComparison.Ordinal) ||
+               string.Equals(name, NightLocalLightSource.VisualObjectName, StringComparison.Ordinal);
+    }
+
     private static bool IsWaterObject(GameObject gameObject)
     {
         if (gameObject == null)
@@ -338,6 +387,62 @@ public sealed class RuntimeWaterReflectionSceneController : MonoBehaviour
         }
 
         return false;
+    }
+
+    private static bool ShouldCreateWaterShimmer(Renderer waterRenderer, Bounds bounds)
+    {
+        if (waterRenderer == null || IsCollisionOnlyWaterRenderer(waterRenderer))
+        {
+            return false;
+        }
+
+        return EstimateShimmerTileQuads(bounds.size) <= MaxShimmerTileQuads;
+    }
+
+    private static bool IsCollisionOnlyWaterRenderer(Renderer renderer)
+    {
+        if (renderer.GetComponent<TilemapRenderer>() == null ||
+            renderer.GetComponent<TilemapCollider2D>() == null)
+        {
+            return false;
+        }
+
+        string name = renderer.gameObject.name;
+        return name.IndexOf("Collision", StringComparison.OrdinalIgnoreCase) >= 0 ||
+               name.IndexOf("Collider", StringComparison.OrdinalIgnoreCase) >= 0 ||
+               name.IndexOf("碰撞", StringComparison.OrdinalIgnoreCase) >= 0;
+    }
+
+    private static int EstimateShimmerTileQuads(Vector3 boundsSize)
+    {
+        float tileWidth = ShimmerTextureWidth / ShimmerPixelsPerUnit;
+        float tileHeight = ShimmerTextureHeight / ShimmerPixelsPerUnit;
+        int columns = Mathf.CeilToInt(Mathf.Max(0.4f, boundsSize.x) / tileWidth);
+        int rows = Mathf.CeilToInt(Mathf.Max(0.25f, boundsSize.y) / tileHeight);
+        return columns * rows;
+    }
+
+    private static void RemoveWaterShimmer(Renderer waterRenderer)
+    {
+        if (waterRenderer == null)
+        {
+            return;
+        }
+
+        Transform existing = waterRenderer.transform.Find(ShimmerObjectName);
+        if (existing == null)
+        {
+            return;
+        }
+
+        if (Application.isPlaying)
+        {
+            Destroy(existing.gameObject);
+        }
+        else
+        {
+            DestroyImmediate(existing.gameObject);
+        }
     }
 
     private static void EnsureWaterShimmer(Renderer waterRenderer, Bounds bounds)
@@ -381,18 +486,16 @@ public sealed class RuntimeWaterReflectionSceneController : MonoBehaviour
             return sharedShimmerSprite;
         }
 
-        const int width = 64;
-        const int height = 16;
-        Texture2D texture = new Texture2D(width, height, TextureFormat.RGBA32, false)
+        Texture2D texture = new Texture2D(ShimmerTextureWidth, ShimmerTextureHeight, TextureFormat.RGBA32, false)
         {
             name = "RuntimeWaterShimmerTexture",
             wrapMode = TextureWrapMode.Repeat,
             filterMode = FilterMode.Bilinear
         };
 
-        for (int y = 0; y < height; y++)
+        for (int y = 0; y < ShimmerTextureHeight; y++)
         {
-            for (int x = 0; x < width; x++)
+            for (int x = 0; x < ShimmerTextureWidth; x++)
             {
                 bool stripe = (x + y * 3) % 19 < 4;
                 byte alpha = stripe ? (byte)58 : (byte)0;
@@ -401,7 +504,7 @@ public sealed class RuntimeWaterReflectionSceneController : MonoBehaviour
         }
 
         texture.Apply(false, false);
-        sharedShimmerSprite = Sprite.Create(texture, new Rect(0f, 0f, width, height), new Vector2(0.5f, 0.5f), 32f);
+        sharedShimmerSprite = Sprite.Create(texture, new Rect(0f, 0f, ShimmerTextureWidth, ShimmerTextureHeight), new Vector2(0.5f, 0.5f), ShimmerPixelsPerUnit);
         sharedShimmerSprite.name = "RuntimeWaterShimmerSprite";
         return sharedShimmerSprite;
     }

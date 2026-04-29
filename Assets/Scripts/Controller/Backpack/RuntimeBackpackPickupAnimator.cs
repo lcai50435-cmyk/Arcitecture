@@ -27,7 +27,7 @@ public sealed class RuntimeBackpackPickupAnimator : MonoBehaviour
         Vector3 worldPosition,
         Sprite travelSprite)
     {
-        if (!crystal.IsCommonStructure && !crystal.IsRepairMaterial)
+        if (!crystal.IsCommonStructure && !crystal.IsSpecialStructure && !crystal.IsRepairMaterial)
         {
             return false;
         }
@@ -292,7 +292,7 @@ public sealed class RuntimeBackpackPickupAnimator : MonoBehaviour
         scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
         scaler.referenceResolution = new Vector2(1920f, 1080f);
         scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
-        scaler.matchWidthOrHeight = 0.5f;
+        scaler.matchWidthOrHeight = 0f;
 
         GraphicRaycaster raycaster = GetComponent<GraphicRaycaster>();
         if (raycaster == null)

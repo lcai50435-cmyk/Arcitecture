@@ -184,7 +184,13 @@ public class UIManager : MonoBehaviour
 
     public void CloseIllustratedHandbook()
     {
-        if (!isHandbookOpen || isClosingHandbook)
+        if (isClosingHandbook)
+        {
+            Debug.Log("图鉴当前正在关闭");
+            return;
+        }
+
+        if (!isHandbookOpen && !IsHandbookVisible())
         {
             Debug.Log("图鉴当前已处于关闭状态");
             return;
@@ -219,13 +225,13 @@ public class UIManager : MonoBehaviour
 
     private void CompleteCloseIllustratedHandbook()
     {
+        tabsController?.ResetToDefaultPage();
+
         if (illustratedHandbook != null)
             illustratedHandbook.SetActive(false);
 
         if (detailedInformation != null)
             detailedInformation.SetActive(false);
-
-        tabsController?.ResetToDefaultPage();
 
         HideOtherUI(false);
         EnablePlayerMovement();
@@ -251,6 +257,22 @@ public class UIManager : MonoBehaviour
 
         isHandbookOpen = false;
         isClosingHandbook = false;
+    }
+
+    private bool IsHandbookVisible()
+    {
+        if (illustratedHandbook != null && illustratedHandbook.activeInHierarchy)
+        {
+            return true;
+        }
+
+        if (detailedInformation != null && detailedInformation.activeInHierarchy)
+        {
+            return true;
+        }
+
+        return UIRootManager.Instance != null &&
+               UIRootManager.Instance.ActiveModalType == RuntimeModalType.Handbook;
     }
 
     private void DisablePlayerMovement()

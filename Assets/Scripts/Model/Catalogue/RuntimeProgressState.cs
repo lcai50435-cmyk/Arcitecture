@@ -44,6 +44,8 @@ public class BuildingRuntimeStateData
 
 public class RuntimeProgressState : MonoBehaviour
 {
+    private const float CommonProgressRatio = 0.7f;
+
     public static RuntimeProgressState Instance { get; private set; }
 
     public event Action OnStateChanged;
@@ -139,14 +141,17 @@ public class RuntimeProgressState : MonoBehaviour
         BuildingDefinition definition = BuildingDefinitionLibrary.Get(buildingId);
         BuildingRuntimeStateData state = GetBuildingState(buildingId);
         int previousProgress = state.progress;
-        state.progress = Mathf.Clamp(state.progress + value, 0, definition.requiredProgress);
+        int currentCommonProgress = GetCommonProgressContribution(definition, state);
+        int specialProgress = GetSpecialProgressContribution(definition, state);
+        int commonProgressCap = GetCommonProgressCap(definition);
+        int nextCommonProgress = Mathf.Clamp(currentCommonProgress + value, 0, commonProgressCap);
+        state.progress = Mathf.Clamp(nextCommonProgress + specialProgress, 0, definition.requiredProgress);
 
         if (previousProgress == state.progress)
         {
             return false;
         }
 
-        completionReward = TryGrantCompletionReward(buildingId);
         NotifyStateChanged();
         return true;
     }
@@ -202,16 +207,15 @@ public class RuntimeProgressState : MonoBehaviour
             return false;
         }
 
-        if (availableSpecialStructureInventory <= 0)
-        {
-            return false;
-        }
+        int commonProgress = GetCommonProgressContribution(definition, state);
 
-        availableSpecialStructureInventory--;
         state.unlockedSlots[slotIndex] = true;
         state.grantedSlotRewards[slotIndex] = true;
+        state.progress = Mathf.Clamp(
+            commonProgress + GetSpecialProgressContribution(definition, state),
+            0,
+            definition.requiredProgress);
         slotReward = definition.slotDefinitions[slotIndex].reward;
-        completionReward = TryGrantCompletionReward(buildingId);
         NotifyStateChanged();
         return true;
     }
@@ -252,12 +256,42 @@ public class RuntimeProgressState : MonoBehaviour
         return GetBuildingState(buildingId).isBuildingUnlocked;
     }
 
+    public bool CanUnlockBuilding(CatalogueBuildingId buildingId)
+    {
+        BuildingDefinition definition = BuildingDefinitionLibrary.Get(buildingId);
+        BuildingRuntimeStateData state = GetBuildingState(buildingId);
+        return !state.isBuildingUnlocked &&
+               state.progress >= definition.requiredProgress &&
+               AreAllSlotsUnlocked(definition, state);
+    }
+
+    public bool TryUnlockBuilding(
+        CatalogueBuildingId buildingId,
+        out BuildingRewardDefinition completionReward)
+    {
+        completionReward = null;
+
+        if (!CanUnlockBuilding(buildingId))
+        {
+            return false;
+        }
+
+        BuildingDefinition definition = BuildingDefinitionLibrary.Get(buildingId);
+        BuildingRuntimeStateData state = GetBuildingState(buildingId);
+        state.grantedCompletionReward = true;
+        state.isBuildingUnlocked = true;
+        completionReward = definition.completionReward;
+        NotifyStateChanged();
+        return true;
+    }
+
     public bool IsBuildingRepairReady(CatalogueBuildingId buildingId)
     {
         BuildingDefinition definition = BuildingDefinitionLibrary.Get(buildingId);
         BuildingRuntimeStateData state = GetBuildingState(buildingId);
         state.EnsureSlotCapacity(definition.slotDefinitions != null ? definition.slotDefinitions.Length : 0);
-        return state.progress >= definition.requiredProgress &&
+        return state.isBuildingUnlocked &&
+               state.progress >= definition.requiredProgress &&
                GetUnlockedSlotCountInternal(state) >= state.unlockedSlots.Length;
     }
 
@@ -389,44 +423,103 @@ public class RuntimeProgressState : MonoBehaviour
             }
 
             state.EnsureSlotCapacity(definition.slotDefinitions != null ? definition.slotDefinitions.Length : 0);
-            state.progress = Mathf.Clamp(state.progress, 0, definition.requiredProgress);
-            state.isBuildingUnlocked = state.grantedCompletionReward ||
-                (state.progress >= definition.requiredProgress && GetUnlockedSlotCountInternal(state) >= state.unlockedSlots.Length);
+            state.progress = NormalizeProgress(definition, state, state.progress);
+            state.isBuildingUnlocked = state.grantedCompletionReward;
         }
     }
 
-    private BuildingRewardDefinition TryGrantCompletionReward(CatalogueBuildingId buildingId)
+    private static int GetCommonProgressCap(BuildingDefinition definition)
     {
-        BuildingDefinition definition = BuildingDefinitionLibrary.Get(buildingId);
-        BuildingRuntimeStateData state = GetBuildingState(buildingId);
-
-        bool allSlotsUnlocked = state.unlockedSlots != null && state.unlockedSlots.Length > 0;
-        if (allSlotsUnlocked)
+        if (definition == null || definition.requiredProgress <= 0)
         {
-            for (int i = 0; i < state.unlockedSlots.Length; i++)
-            {
-                if (!state.unlockedSlots[i])
-                {
-                    allSlotsUnlocked = false;
-                    break;
-                }
-            }
+            return 0;
         }
 
-        bool ready = state.progress >= definition.requiredProgress && allSlotsUnlocked;
-        state.isBuildingUnlocked = ready || state.grantedCompletionReward;
-
-        if (!ready || state.grantedCompletionReward || definition.completionReward == null)
+        int slotCount = definition.slotDefinitions != null ? definition.slotDefinitions.Length : 0;
+        if (slotCount <= 0)
         {
-            return null;
+            return definition.requiredProgress;
         }
 
-        state.grantedCompletionReward = true;
-        state.isBuildingUnlocked = true;
-        return definition.completionReward;
+        return Mathf.Clamp(
+            Mathf.RoundToInt(definition.requiredProgress * CommonProgressRatio),
+            0,
+            definition.requiredProgress);
     }
 
-    private int GetUnlockedSlotCountInternal(BuildingRuntimeStateData state)
+    private static int GetSpecialProgressMax(BuildingDefinition definition)
+    {
+        if (definition == null)
+        {
+            return 0;
+        }
+
+        return Mathf.Max(0, definition.requiredProgress - GetCommonProgressCap(definition));
+    }
+
+    private static int GetSpecialProgressContribution(
+        BuildingDefinition definition,
+        BuildingRuntimeStateData state)
+    {
+        int slotCount = definition?.slotDefinitions != null ? definition.slotDefinitions.Length : 0;
+        if (slotCount <= 0 || state == null)
+        {
+            return 0;
+        }
+
+        int unlockedCount = GetUnlockedSlotCountInternal(state);
+        int specialProgressMax = GetSpecialProgressMax(definition);
+        return Mathf.Clamp(
+            Mathf.RoundToInt(specialProgressMax * (unlockedCount / (float)slotCount)),
+            0,
+            specialProgressMax);
+    }
+
+    private static int GetCommonProgressContribution(
+        BuildingDefinition definition,
+        BuildingRuntimeStateData state)
+    {
+        if (definition == null || state == null)
+        {
+            return 0;
+        }
+
+        int specialProgress = GetSpecialProgressContribution(definition, state);
+        return Mathf.Clamp(state.progress - specialProgress, 0, GetCommonProgressCap(definition));
+    }
+
+    private static int NormalizeProgress(
+        BuildingDefinition definition,
+        BuildingRuntimeStateData state,
+        int totalProgress)
+    {
+        if (definition == null || state == null)
+        {
+            return 0;
+        }
+
+        int specialProgress = GetSpecialProgressContribution(definition, state);
+        int commonProgress = Mathf.Clamp(
+            totalProgress - specialProgress,
+            0,
+            GetCommonProgressCap(definition));
+        return Mathf.Clamp(commonProgress + specialProgress, 0, definition.requiredProgress);
+    }
+
+    private static bool AreAllSlotsUnlocked(
+        BuildingDefinition definition,
+        BuildingRuntimeStateData state)
+    {
+        int slotCount = definition?.slotDefinitions != null ? definition.slotDefinitions.Length : 0;
+        if (slotCount <= 0)
+        {
+            return true;
+        }
+
+        return GetUnlockedSlotCountInternal(state) >= slotCount;
+    }
+
+    private static int GetUnlockedSlotCountInternal(BuildingRuntimeStateData state)
     {
         if (state.unlockedSlots == null)
         {

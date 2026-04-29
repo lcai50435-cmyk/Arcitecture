@@ -323,7 +323,7 @@ public sealed class MainMenuController : MonoBehaviour
         panelRect.anchorMin = new Vector2(0.5f, 0.5f);
         panelRect.anchorMax = new Vector2(0.5f, 0.5f);
         panelRect.pivot = new Vector2(0.5f, 0.5f);
-        panelRect.sizeDelta = new Vector2(960f, 660f);
+        panelRect.sizeDelta = new Vector2(1100f, 780f);
         panelRect.anchoredPosition = Vector2.zero;
 
         Image panelImage = panelObject.AddComponent<Image>();
@@ -334,28 +334,28 @@ public sealed class MainMenuController : MonoBehaviour
         headerAccentRect.anchorMin = new Vector2(0.5f, 1f);
         headerAccentRect.anchorMax = new Vector2(0.5f, 1f);
         headerAccentRect.pivot = new Vector2(0.5f, 1f);
-        headerAccentRect.sizeDelta = new Vector2(320f, 6f);
-        headerAccentRect.anchoredPosition = new Vector2(0f, -30f);
+        headerAccentRect.sizeDelta = new Vector2(380f, 6f);
+        headerAccentRect.anchoredPosition = new Vector2(0f, -28f);
         Image headerAccentImage = headerAccent.AddComponent<Image>();
         RuntimeUiSpriteFactory.ApplyRoundedSprite(headerAccentImage, AccentColor, 6, 4, 1f);
 
-        panelTitleText = CreateText(panelObject.transform, "Title", string.Empty, 44, TextPrimaryColor, TextAnchor.MiddleCenter, FontStyle.Bold);
-        ConfigureRect(panelTitleText.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(720f, 60f), new Vector2(0f, -72f));
+        panelTitleText = CreateText(panelObject.transform, "Title", string.Empty, 40, TextPrimaryColor, TextAnchor.MiddleCenter, FontStyle.Bold);
+        ConfigureRect(panelTitleText.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(760f, 56f), new Vector2(0f, -70f));
         AddTextOutline(panelTitleText);
 
-        panelHintText = CreateText(panelObject.transform, "Hint", string.Empty, 24, TextSecondaryColor, TextAnchor.MiddleCenter);
-        ConfigureRect(panelHintText.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(820f, 70f), new Vector2(0f, -126f));
+        panelHintText = CreateText(panelObject.transform, "Hint", string.Empty, 22, TextSecondaryColor, TextAnchor.MiddleCenter);
+        ConfigureRect(panelHintText.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(900f, 58f), new Vector2(0f, -124f));
 
         GameObject cardsRoot = CreateUiObject("CardsRoot", panelObject.transform);
         RectTransform cardsRootRect = cardsRoot.GetComponent<RectTransform>();
         cardsRootRect.anchorMin = new Vector2(0.5f, 0.5f);
         cardsRootRect.anchorMax = new Vector2(0.5f, 0.5f);
         cardsRootRect.pivot = new Vector2(0.5f, 0.5f);
-        cardsRootRect.sizeDelta = new Vector2(840f, 370f);
-        cardsRootRect.anchoredPosition = new Vector2(0f, -18f);
+        cardsRootRect.sizeDelta = new Vector2(940f, 458f);
+        cardsRootRect.anchoredPosition = new Vector2(0f, -22f);
 
         VerticalLayoutGroup cardsLayout = cardsRoot.AddComponent<VerticalLayoutGroup>();
-        cardsLayout.spacing = 18f;
+        cardsLayout.spacing = 16f;
         cardsLayout.padding = new RectOffset(0, 0, 0, 0);
         cardsLayout.childAlignment = TextAnchor.UpperCenter;
         cardsLayout.childControlWidth = true;
@@ -368,14 +368,14 @@ public sealed class MainMenuController : MonoBehaviour
             slotCardViews.Add(CreateSlotCard(cardsRoot.transform, slotId));
         }
 
-        panelSelectionText = CreateText(panelObject.transform, "SelectionHint", string.Empty, 24, TextSecondaryColor, TextAnchor.MiddleCenter);
-        ConfigureRect(panelSelectionText.rectTransform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(820f, 80f), new Vector2(0f, 102f));
+        panelSelectionText = CreateText(panelObject.transform, "SelectionHint", string.Empty, 22, TextSecondaryColor, TextAnchor.MiddleCenter);
+        ConfigureRect(panelSelectionText.rectTransform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(880f, 52f), new Vector2(0f, 94f));
 
-        Button closeButton = CreateActionButton(panelObject.transform, "CloseButton", "返回", new Vector2(220f, 78f), CloseSlotPanel, MenuButtonColor);
-        ConfigureRect((RectTransform)closeButton.transform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(220f, 78f), new Vector2(-160f, 32f));
+        Button closeButton = CreateActionButton(panelObject.transform, "CloseButton", "返回", new Vector2(210f, 66f), CloseSlotPanel, MenuButtonColor);
+        ConfigureRect((RectTransform)closeButton.transform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(210f, 66f), new Vector2(-150f, 42f));
 
-        primaryButton = CreateActionButton(panelObject.transform, "PrimaryButton", "继续游戏", new Vector2(340f, 84f), HandlePrimaryAction, AccentColor);
-        ConfigureRect((RectTransform)primaryButton.transform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(340f, 84f), new Vector2(170f, 28f));
+        primaryButton = CreateActionButton(panelObject.transform, "PrimaryButton", "继续游戏", new Vector2(320f, 70f), HandlePrimaryAction, AccentColor);
+        ConfigureRect((RectTransform)primaryButton.transform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(320f, 70f), new Vector2(165f, 40f));
         primaryButtonText = primaryButton.GetComponentInChildren<Text>(true);
 
         slotOverlayObject.transform.SetAsLastSibling();
@@ -386,10 +386,10 @@ public sealed class MainMenuController : MonoBehaviour
     {
         GameObject cardObject = CreateUiObject($"SlotCard_{slotId}", parent);
         RectTransform cardRect = cardObject.GetComponent<RectTransform>();
-        cardRect.sizeDelta = new Vector2(840f, 110f);
+        cardRect.sizeDelta = new Vector2(940f, 142f);
 
         LayoutElement layoutElement = cardObject.AddComponent<LayoutElement>();
-        layoutElement.preferredHeight = 110f;
+        layoutElement.preferredHeight = 142f;
 
         Image backgroundImage = cardObject.AddComponent<Image>();
         RuntimeUiSpriteFactory.ApplyRoundedSprite(backgroundImage, CardColor, 18, 14, 1.1f);
@@ -404,11 +404,11 @@ public sealed class MainMenuController : MonoBehaviour
         RectTransform contentRect = contentObject.GetComponent<RectTransform>();
         contentRect.anchorMin = Vector2.zero;
         contentRect.anchorMax = Vector2.one;
-        contentRect.offsetMin = new Vector2(22f, 16f);
-        contentRect.offsetMax = new Vector2(-22f, -16f);
+        contentRect.offsetMin = new Vector2(24f, 18f);
+        contentRect.offsetMax = new Vector2(-24f, -18f);
 
         HorizontalLayoutGroup contentLayout = contentObject.AddComponent<HorizontalLayoutGroup>();
-        contentLayout.spacing = 20f;
+        contentLayout.spacing = 18f;
         contentLayout.padding = new RectOffset(0, 0, 0, 0);
         contentLayout.childAlignment = TextAnchor.MiddleLeft;
         contentLayout.childControlWidth = true;
@@ -421,39 +421,41 @@ public sealed class MainMenuController : MonoBehaviour
         leftLayout.flexibleWidth = 1f;
 
         VerticalLayoutGroup leftGroup = leftObject.AddComponent<VerticalLayoutGroup>();
-        leftGroup.spacing = 10f;
+        leftGroup.spacing = 8f;
         leftGroup.childAlignment = TextAnchor.MiddleLeft;
         leftGroup.childControlWidth = true;
         leftGroup.childControlHeight = false;
         leftGroup.childForceExpandWidth = true;
         leftGroup.childForceExpandHeight = false;
 
-        Text titleText = CreateText(leftObject.transform, "Title", string.Empty, 30, TextPrimaryColor, TextAnchor.MiddleLeft, FontStyle.Bold);
+        Text titleText = CreateText(leftObject.transform, "Title", string.Empty, 28, TextPrimaryColor, TextAnchor.MiddleLeft, FontStyle.Bold);
         LayoutElement titleLayout = titleText.gameObject.AddComponent<LayoutElement>();
-        titleLayout.preferredHeight = 34f;
+        titleLayout.preferredHeight = 32f;
 
-        Text detailText = CreateText(leftObject.transform, "Detail", string.Empty, 21, TextSecondaryColor, TextAnchor.UpperLeft);
+        Text detailText = CreateText(leftObject.transform, "Detail", string.Empty, 20, TextSecondaryColor, TextAnchor.UpperLeft);
         detailText.horizontalOverflow = HorizontalWrapMode.Wrap;
-        detailText.verticalOverflow = VerticalWrapMode.Overflow;
-        detailText.lineSpacing = 0.92f;
+        detailText.verticalOverflow = VerticalWrapMode.Truncate;
+        detailText.lineSpacing = 0.95f;
+        LayoutElement detailLayout = detailText.gameObject.AddComponent<LayoutElement>();
+        detailLayout.preferredHeight = 62f;
 
         GameObject rightObject = CreateUiObject("Right", contentObject.transform);
         LayoutElement rightLayout = rightObject.AddComponent<LayoutElement>();
-        rightLayout.preferredWidth = 190f;
+        rightLayout.preferredWidth = 210f;
 
         VerticalLayoutGroup rightGroup = rightObject.AddComponent<VerticalLayoutGroup>();
-        rightGroup.spacing = 12f;
+        rightGroup.spacing = 10f;
         rightGroup.childAlignment = TextAnchor.MiddleCenter;
         rightGroup.childControlWidth = true;
         rightGroup.childControlHeight = false;
         rightGroup.childForceExpandWidth = true;
         rightGroup.childForceExpandHeight = false;
 
-        Text stateText = CreateText(rightObject.transform, "State", string.Empty, 22, AccentColor, TextAnchor.MiddleCenter, FontStyle.Bold);
+        Text stateText = CreateText(rightObject.transform, "State", string.Empty, 21, AccentColor, TextAnchor.MiddleCenter, FontStyle.Bold);
         LayoutElement stateLayout = stateText.gameObject.AddComponent<LayoutElement>();
         stateLayout.preferredHeight = 28f;
 
-        Button deleteButton = CreateActionButton(rightObject.transform, "DeleteButton", "删除存档", new Vector2(180f, 48f), () => HandleDeleteAction(capturedSlotId), DeleteButtonColor);
+        Button deleteButton = CreateActionButton(rightObject.transform, "DeleteButton", "删除存档", new Vector2(178f, 50f), () => HandleDeleteAction(capturedSlotId), DeleteButtonColor);
         Text deleteButtonText = deleteButton.GetComponentInChildren<Text>(true);
 
         return new SlotCardView
@@ -761,6 +763,11 @@ public sealed class MainMenuController : MonoBehaviour
             return "请选择一个已有存档的槽位继续游戏。";
         }
 
+        if (armedDeleteSlotId == summary.slotId)
+        {
+            return $"再次点击槽位 {summary.slotId} 的确认删除按钮，将删除该存档。照片相册保留。";
+        }
+
         return $"将读取槽位 {summary.slotId} 的永久进度并进入基地场景，不会恢复战斗中途现场。";
     }
 
@@ -768,13 +775,13 @@ public sealed class MainMenuController : MonoBehaviour
     {
         if (summary == null || !summary.hasSave)
         {
-            return "状态：空槽位\n最后保存：暂无\n当前关卡：未开始    总进度：0%    当前武器：直墨";
+            return "最后保存：暂无\n关卡：未开始    进度：0%    武器：直墨";
         }
 
         string stageName = ResolveStageName(summary.selectedStageId);
         string weaponName = InkTypeCatalog.GetDisplayName(summary.currentWeaponType);
         int progressValue = Mathf.RoundToInt(summary.progressPercent);
-        return $"状态：已占用\n最后保存：{FormatUtcTimestamp(summary.savedAtUtc)}\n当前关卡：{stageName}    总进度：{progressValue}%    当前武器：{weaponName}";
+        return $"最后保存：{FormatUtcTimestamp(summary.savedAtUtc)}\n关卡：{stageName}    进度：{progressValue}%    武器：{weaponName}";
     }
 
     private string BuildSlotState(SaveSlotSummary summary, bool isSelected)
@@ -973,7 +980,8 @@ public sealed class MainMenuController : MonoBehaviour
         ApplyButtonStyle(button, image, buttonColor, highlighted, pressed, disabled);
         button.onClick.AddListener(onClick);
 
-        Text labelText = CreateText(buttonObject.transform, "Label", label, 28, TextPrimaryColor, TextAnchor.MiddleCenter, FontStyle.Bold);
+        int labelFontSize = size.y <= 54f ? 24 : 28;
+        Text labelText = CreateText(buttonObject.transform, "Label", label, labelFontSize, TextPrimaryColor, TextAnchor.MiddleCenter, FontStyle.Bold);
         ConfigureRect(labelText.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), size - new Vector2(20f, 14f), Vector2.zero);
         AddTextOutline(labelText);
 
@@ -1030,6 +1038,7 @@ public sealed class MainMenuController : MonoBehaviour
         text.color = color;
         text.horizontalOverflow = HorizontalWrapMode.Overflow;
         text.verticalOverflow = VerticalWrapMode.Overflow;
+        text.raycastTarget = false;
         text.supportRichText = false;
         RuntimeTextFontRepair.RepairLegacyText(text);
         return text;

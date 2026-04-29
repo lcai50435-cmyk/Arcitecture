@@ -55,6 +55,7 @@ public static class GameplayStatusHudRuntime
     private static TextMeshProUGUI weaponValueText;
     private static TextMeshProUGUI structureValueText;
     private static TextMeshProUGUI countdownText;
+    private static BackpackMananger subscribedBackpack;
     private static bool externallyHidden;
     private static bool usingSceneShowPanel;
     private static readonly Dictionary<string, Sprite> HudSpriteCache = new Dictionary<string, Sprite>();
@@ -127,9 +128,11 @@ public static class GameplayStatusHudRuntime
 
     public static void RefreshStructureProgressText()
     {
-        RuntimeProgressState state = RuntimeProgressState.Instance ?? RuntimeProgressState.EnsureInstance();
-        float max = state != null ? Mathf.Max(1, state.GetTotalMaxProgress()) : 1f;
-        float current = state != null ? Mathf.Clamp(state.GetTotalProgress(), 0f, max) : 0f;
+        BackpackMananger backpack = BackpackMananger.Instance ?? Object.FindObjectOfType<BackpackMananger>(true);
+        EnsureBackpackSubscription(backpack);
+
+        float max = BackpackMananger.MaxSpecialStructureMaterialCount;
+        float current = backpack != null ? Mathf.Clamp(backpack.GetSpecialStructureMaterialCount(), 0f, max) : 0f;
 
         if (structureGauge != null)
         {
@@ -145,6 +148,25 @@ public static class GameplayStatusHudRuntime
         if (structureValueText != null)
         {
             structureValueText.text = $"{current:0}/{max:0}";
+        }
+    }
+
+    private static void EnsureBackpackSubscription(BackpackMananger backpack)
+    {
+        if (subscribedBackpack == backpack)
+        {
+            return;
+        }
+
+        if (subscribedBackpack != null)
+        {
+            subscribedBackpack.OnInventoryChanged -= RefreshStructureProgressText;
+        }
+
+        subscribedBackpack = backpack;
+        if (subscribedBackpack != null)
+        {
+            subscribedBackpack.OnInventoryChanged += RefreshStructureProgressText;
         }
     }
 

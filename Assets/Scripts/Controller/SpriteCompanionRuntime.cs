@@ -4,6 +4,7 @@ using UnityEngine.SceneManagement;
 public static class SpriteCompanionRuntime
 {
     private const string CompanionName = "SpriteCompanion";
+    private const string AuthoredIdleCompanionName = "SpriteIdle_0";
     private const string CompanionControllerResourcePath = "RuntimeSpriteCompanion";
     private const int DefaultSortingOrder = 4;
     private const float BaseCompanionScaleMultiplier = 0.54f;
@@ -56,19 +57,30 @@ public static class SpriteCompanionRuntime
             return null;
         }
 
-        GameObject companionObject = new GameObject(CompanionName);
-        companionObject.layer = player.layer;
         Scene playerScene = player.scene;
+        GameObject companionObject = FindAuthoredIdleCompanion(playerScene);
+        bool reusedAuthoredCompanion = companionObject != null;
+        if (companionObject == null)
+        {
+            companionObject = new GameObject(CompanionName);
+        }
+
+        companionObject.name = CompanionName;
+        companionObject.layer = player.layer;
         if (playerScene.IsValid() && playerScene.isLoaded && companionObject.scene != playerScene)
         {
             SceneManager.MoveGameObjectToScene(companionObject, playerScene);
         }
 
-        companionObject.transform.position = playerTransform.position;
+        if (!reusedAuthoredCompanion)
+        {
+            companionObject.transform.position = playerTransform.position;
+        }
+
         companionObject.transform.localScale = Vector3.one * ResolveCompanionScale(playerScene.name);
 
         SpriteRenderer playerRenderer = player.GetComponent<SpriteRenderer>();
-        SpriteRenderer companionRenderer = companionObject.AddComponent<SpriteRenderer>();
+        SpriteRenderer companionRenderer = GetOrAddComponent<SpriteRenderer>(companionObject);
         if (playerRenderer != null)
         {
             companionRenderer.sortingLayerID = playerRenderer.sortingLayerID;
@@ -79,19 +91,19 @@ public static class SpriteCompanionRuntime
             companionRenderer.sortingOrder = DefaultSortingOrder;
         }
 
-        Animator animator = companionObject.AddComponent<Animator>();
+        Animator animator = GetOrAddComponent<Animator>(companionObject);
         animator.runtimeAnimatorController = controller;
 
-        Rigidbody2D body = companionObject.AddComponent<Rigidbody2D>();
+        Rigidbody2D body = GetOrAddComponent<Rigidbody2D>(companionObject);
         body.gravityScale = 0f;
         body.freezeRotation = true;
         body.interpolation = RigidbodyInterpolation2D.Interpolate;
         body.collisionDetectionMode = CollisionDetectionMode2D.Continuous;
 
-        BoxCollider2D collider = companionObject.AddComponent<BoxCollider2D>();
+        BoxCollider2D collider = GetOrAddComponent<BoxCollider2D>(companionObject);
         ConfigureCompanionCollider(collider, companionRenderer);
 
-        CharacterCore companionCore = companionObject.AddComponent<CharacterCore>();
+        CharacterCore companionCore = GetOrAddComponent<CharacterCore>(companionObject);
         CharacterStats stats = new CharacterStats
         {
             maxHp = 1f,
@@ -104,15 +116,15 @@ public static class SpriteCompanionRuntime
         companionCore.currentHp = stats.maxHp;
         companionCore.lastFacingDirection = Vector2.down;
 
-        EnemyMove move = companionObject.AddComponent<EnemyMove>();
+        EnemyMove move = GetOrAddComponent<EnemyMove>(companionObject);
         move.rb = body;
         move.animator = animator;
         move.autoAssignMovementController = false;
         move.movementAnimatorController = controller;
 
-        companionObject.AddComponent<EnemyAvoidObstacle>();
+        GetOrAddComponent<EnemyAvoidObstacle>(companionObject);
 
-        SpriteCompanionAnimator animationDriver = companionObject.AddComponent<SpriteCompanionAnimator>();
+        SpriteCompanionAnimator animationDriver = GetOrAddComponent<SpriteCompanionAnimator>(companionObject);
         animationDriver.Bind(move, companionCore, animator);
 
         animator.Play(SpriteCompanionAnimator.FrontStateName, 0, 0f);
@@ -120,7 +132,7 @@ public static class SpriteCompanionRuntime
         ConfigureCompanionCollider(collider, companionRenderer);
         EnsureCompanionShadow(companionObject);
 
-        SpriteCompanionFollowController followController = companionObject.AddComponent<SpriteCompanionFollowController>();
+        SpriteCompanionFollowController followController = GetOrAddComponent<SpriteCompanionFollowController>(companionObject);
         followController.Bind(playerTransform, playerCore, collider);
 
         activeCompanion = followController;
@@ -143,6 +155,57 @@ public static class SpriteCompanionRuntime
         }
 
         return Mathf.Max(4.8f, playerCore.stats.moveSpeed + 0.75f);
+    }
+
+    private static GameObject FindAuthoredIdleCompanion(Scene playerScene)
+    {
+        if (!playerScene.IsValid() || !playerScene.isLoaded)
+        {
+            return null;
+        }
+
+        GameObject[] roots = playerScene.GetRootGameObjects();
+        for (int i = 0; i < roots.Length; i++)
+        {
+            Transform match = FindChildByName(roots[i].transform, AuthoredIdleCompanionName);
+            if (match != null && match.GetComponent<SpriteCompanionFollowController>() == null)
+            {
+                return match.gameObject;
+            }
+        }
+
+        return null;
+    }
+
+    private static Transform FindChildByName(Transform root, string objectName)
+    {
+        if (root == null)
+        {
+            return null;
+        }
+
+        if (root.name == objectName)
+        {
+            return root;
+        }
+
+        for (int i = 0; i < root.childCount; i++)
+        {
+            Transform match = FindChildByName(root.GetChild(i), objectName);
+            if (match != null)
+            {
+                return match;
+            }
+        }
+
+        return null;
+    }
+
+    private static T GetOrAddComponent<T>(GameObject target)
+        where T : Component
+    {
+        T component = target.GetComponent<T>();
+        return component != null ? component : target.AddComponent<T>();
     }
 
     private static void ApplyCompanionScale(Transform companionTransform, string sceneName)

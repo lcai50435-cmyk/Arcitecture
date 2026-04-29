@@ -1,3 +1,6 @@
+using System.IO;
+using System.Reflection;
+using TMPro;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.UI;
@@ -31,5 +34,406 @@ public sealed class RuntimeButtonClickSfxRouterTests
         Assert.IsFalse(RuntimeButtonClickSfxRouter.ShouldPlayClickForButton(button));
 
         Assert.IsFalse(RuntimeButtonClickSfxRouter.ShouldPlayClickForButton(null));
+    }
+}
+
+public sealed class PlayerLoadoutRuntimeTests
+{
+    [TearDown]
+    public void TearDown()
+    {
+        PlayerLoadoutRuntime.ClearRuntimeWeaponOverride();
+        PlayerLoadoutRuntime.ClearDebugWeaponOverride();
+        PlayerLoadoutRuntime.CurrentWeaponType = WeaponType.DirectInk;
+        PlayerLoadoutRuntime.AllowBaseAttack = false;
+    }
+
+    [Test]
+    public void DebugWeaponOverrideControlsEffectiveWeaponWithoutPersistingSelection()
+    {
+        PlayerLoadoutRuntime.CurrentWeaponType = WeaponType.DirectInk;
+
+        PlayerLoadoutRuntime.SetDebugWeaponOverride(WeaponType.FlowInk);
+        PlayerLoadoutRuntime.EnsureCurrentWeaponUnlocked();
+
+        Assert.AreEqual(WeaponType.DirectInk, PlayerLoadoutRuntime.CurrentWeaponType);
+        Assert.AreEqual(WeaponType.FlowInk, RuntimeWeaponTypeResolver.ResolveEffectiveWeaponType(null));
+    }
+
+    [Test]
+    public void RuntimeWeaponOverrideSurvivesLockedSelectionValidation()
+    {
+        PlayerLoadoutRuntime.CurrentWeaponType = WeaponType.DirectInk;
+
+        PlayerLoadoutRuntime.SetRuntimeWeaponOverride(WeaponType.PierceInk);
+        PlayerLoadoutRuntime.EnsureCurrentWeaponUnlocked();
+
+        Assert.AreEqual(WeaponType.DirectInk, PlayerLoadoutRuntime.CurrentWeaponType);
+        Assert.AreEqual(WeaponType.PierceInk, RuntimeWeaponTypeResolver.ResolveEffectiveWeaponType(null));
+    }
+
+    [Test]
+    public void BackpackStructureDoesNotOverrideSelectedWeapon()
+    {
+        PlayerLoadoutRuntime.CurrentWeaponType = WeaponType.FlowInk;
+        GameObject backpackObject = new GameObject("BackpackManager");
+        BackpackMananger backpack = backpackObject.AddComponent<BackpackMananger>();
+        try
+        {
+            backpack.backpackItems[0] = new ArchitecturalCrystal
+            {
+                type = ArchitecturalType.Brackets,
+                resourceCategory = ArchitecturalResourceCategory.CommonStructure,
+                runtimePickupOrder = 10
+            };
+
+            Assert.AreEqual(WeaponType.FlowInk, RuntimeWeaponTypeResolver.ResolveEffectiveWeaponType(backpack));
+            Assert.IsFalse(RuntimeWeaponTypeResolver.TryGetActiveWeaponOverride(
+                backpack,
+                out ArchitecturalCrystal _,
+                out WeaponType _,
+                out int _));
+        }
+        finally
+        {
+            Object.DestroyImmediate(backpackObject);
+        }
+    }
+
+    [Test]
+    public void DebugWeaponOverrideControlsEffectiveWeaponEvenWithBackpackStructure()
+    {
+        PlayerLoadoutRuntime.CurrentWeaponType = WeaponType.DirectInk;
+        PlayerLoadoutRuntime.SetDebugWeaponOverride(WeaponType.FlowInk);
+        GameObject backpackObject = new GameObject("BackpackManager");
+        BackpackMananger backpack = backpackObject.AddComponent<BackpackMananger>();
+        try
+        {
+            backpack.backpackItems[0] = new ArchitecturalCrystal
+            {
+                type = ArchitecturalType.MortiseAndTenonJoint,
+                resourceCategory = ArchitecturalResourceCategory.CommonStructure,
+                runtimePickupOrder = 10
+            };
+
+            Assert.AreEqual(WeaponType.FlowInk, RuntimeWeaponTypeResolver.ResolveEffectiveWeaponType(backpack));
+            Assert.IsFalse(RuntimeWeaponTypeResolver.TryGetActiveWeaponOverride(
+                backpack,
+                out ArchitecturalCrystal _,
+                out WeaponType _,
+                out int _));
+        }
+        finally
+        {
+            Object.DestroyImmediate(backpackObject);
+        }
+    }
+}
+
+public sealed class PhotoAlbumRepositoryTests
+{
+    [Test]
+    public void DeleteEntryRemovesPhotoFileAndIndexEntry()
+    {
+        string tempAlbumDirectory = Path.Combine(
+            Path.GetTempPath(),
+            "ArcitecturePhotoAlbumTests",
+            System.Guid.NewGuid().ToString("N"));
+
+        try
+        {
+            using (PhotoAlbumRepository.UseAlbumDirectoryForTests(tempAlbumDirectory))
+            {
+                PhotoAlbumEntry first = PhotoAlbumRepository.SaveCapture(
+                    new byte[] { 1, 2, 3 },
+                    160,
+                    90,
+                    "GameScene",
+                    "stage_01");
+                PhotoAlbumEntry second = PhotoAlbumRepository.SaveCapture(
+                    new byte[] { 4, 5, 6 },
+                    160,
+                    90,
+                    "GameScene",
+                    "stage_02");
+
+                Assert.IsTrue(File.Exists(PhotoAlbumRepository.GetPhotoPath(first)));
+
+                Assert.IsTrue(PhotoAlbumRepository.DeleteEntry(first));
+
+                Assert.IsFalse(File.Exists(Path.Combine(tempAlbumDirectory, first.fileName)));
+                Assert.IsTrue(File.Exists(Path.Combine(tempAlbumDirectory, second.fileName)));
+
+                var entries = PhotoAlbumRepository.LoadEntries();
+                Assert.AreEqual(1, entries.Count);
+                Assert.AreEqual(second.id, entries[0].id);
+            }
+        }
+        finally
+        {
+            if (Directory.Exists(tempAlbumDirectory))
+            {
+                Directory.Delete(tempAlbumDirectory, true);
+            }
+        }
+    }
+}
+
+public sealed class GameDebugPageBootstrapperAttributeTests
+{
+    private GameObject debugObject;
+    private GameObject playerObject;
+
+    [TearDown]
+    public void TearDown()
+    {
+        if (debugObject != null)
+        {
+            Object.DestroyImmediate(debugObject);
+        }
+
+        if (playerObject != null)
+        {
+            Object.DestroyImmediate(playerObject);
+        }
+
+        if (RuntimeProgressState.Instance != null)
+        {
+            Object.DestroyImmediate(RuntimeProgressState.Instance.gameObject);
+        }
+
+        if (BackpackMananger.Instance != null)
+        {
+            Object.DestroyImmediate(BackpackMananger.Instance.gameObject);
+        }
+
+        GameObject hudCanvas = GameObject.Find("GameplayStatusHudCanvas");
+        if (hudCanvas != null)
+        {
+            Object.DestroyImmediate(hudCanvas);
+        }
+    }
+
+    [Test]
+    public void SetMaxHpRefreshesBoundHealthGauge()
+    {
+        GameDebugPageBootstrapper debugPage = CreateDebugPage();
+        CharacterCore core = CreatePlayerCore();
+        ValueTrans healthGauge = GameplayStatusHudRuntime.EnsureHealthGauge(null);
+        Slider healthSlider = healthGauge.slider;
+        healthSlider.maxValue = 100f;
+        healthSlider.value = 100f;
+
+        InvokePrivate(debugPage, "SetMaxHp", 300f);
+
+        Assert.AreEqual(300f, core.stats.maxHp);
+        Assert.AreEqual(300f, healthSlider.maxValue);
+        Assert.AreEqual(100f, healthSlider.value);
+    }
+
+    [Test]
+    public void StructureGaugeTracksSpecialStructuresInBackpack()
+    {
+        BackpackMananger backpack = new GameObject("RuntimeBackpackManager").AddComponent<BackpackMananger>();
+        GameplayStatusHudRuntime.EnsureHealthGauge(null);
+
+        Assert.IsTrue(backpack.PickItem(ArchitecturalCrystalFactory.CreateSpecialStructureMaterial()));
+        Assert.IsTrue(backpack.PickItem(ArchitecturalCrystalFactory.CreateSpecialStructureMaterial()));
+
+        GameplayStatusHudRuntime.RefreshStructureProgressText();
+
+        GameObject structureRow = GameObject.Find("StructureRow");
+        Assert.IsNotNull(structureRow);
+
+        Slider structureSlider = structureRow.GetComponentInChildren<Slider>(true);
+        TextMeshProUGUI valueText = structureRow.GetComponentInChildren<TextMeshProUGUI>(true);
+
+        Assert.IsNotNull(structureSlider);
+        Assert.IsNotNull(valueText);
+        Assert.AreEqual(BackpackMananger.MaxSpecialStructureMaterialCount, structureSlider.maxValue);
+        Assert.AreEqual(2f, structureSlider.value);
+        Assert.AreEqual("2/3", valueText.text);
+    }
+
+    [Test]
+    public void DebugPageCanCreateInAnyNamedScene()
+    {
+        Assert.IsTrue(InvokePrivateStaticBool("CanCreateInScene", "MainScene"));
+        Assert.IsTrue(InvokePrivateStaticBool("CanCreateInScene", "DeadScene"));
+        Assert.IsTrue(InvokePrivateStaticBool("CanCreateInScene", "IllustratedUIScene"));
+    }
+
+    [Test]
+    public void DebugPanelHotkeyCanOpenOverBlockingGameplayUi()
+    {
+        Assert.IsTrue(InvokePrivateStaticBool("CanOpenPanelFromHotkey", true));
+        Assert.IsTrue(InvokePrivateStaticBool("CanOpenPanelFromHotkey", false));
+    }
+
+    [Test]
+    public void RuntimeSceneSystemsArePreparedOnlyForGameplayScopes()
+    {
+        Assert.IsFalse(InvokePrivateStaticBool("ShouldEnsureBackpackForScene", "MainScene"));
+        Assert.IsFalse(InvokePrivateStaticBool("ShouldEnsureCountdownForScene", "MainScene"));
+        Assert.IsTrue(InvokePrivateStaticBool("ShouldEnsureBackpackForScene", "NewBase"));
+        Assert.IsFalse(InvokePrivateStaticBool("ShouldEnsureCountdownForScene", "NewBase"));
+        Assert.IsTrue(InvokePrivateStaticBool("ShouldEnsureBackpackForScene", "GameScene"));
+        Assert.IsTrue(InvokePrivateStaticBool("ShouldEnsureCountdownForScene", "GameScene"));
+    }
+
+    [Test]
+    public void ManualScrollDeltaMovesScrollableDebugContent()
+    {
+        GameObject scrollObject = new GameObject("DebugScroll", typeof(RectTransform));
+        try
+        {
+            ScrollRect scrollRect = scrollObject.AddComponent<ScrollRect>();
+            RectTransform viewport = CreateRectTransform("Viewport", scrollObject.transform, new Vector2(100f, 100f));
+            RectTransform content = CreateRectTransform("Content", viewport, new Vector2(100f, 300f));
+            scrollRect.viewport = viewport;
+            scrollRect.content = content;
+            scrollRect.verticalNormalizedPosition = 0.5f;
+
+            InvokePrivateStatic("ApplyManualScrollDelta", scrollRect, -10f);
+            Assert.AreEqual(0f, scrollRect.verticalNormalizedPosition);
+
+            InvokePrivateStatic("ApplyManualScrollDelta", scrollRect, 10f);
+            Assert.AreEqual(0.8f, scrollRect.verticalNormalizedPosition, 0.001f);
+        }
+        finally
+        {
+            Object.DestroyImmediate(scrollObject);
+        }
+    }
+
+    [Test]
+    public void ClearPhotoAlbumRemovesAlbumData()
+    {
+        string tempAlbumDirectory = Path.Combine(
+            Path.GetTempPath(),
+            "ArcitectureDebugAlbumTests",
+            System.Guid.NewGuid().ToString("N"));
+
+        try
+        {
+            using (PhotoAlbumRepository.UseAlbumDirectoryForTests(tempAlbumDirectory))
+            {
+                PhotoAlbumRepository.SaveCapture(
+                    new byte[] { 1, 2, 3 },
+                    160,
+                    90,
+                    "GameScene",
+                    "stage_01");
+                Assert.IsTrue(PhotoAlbumRepository.HasEntries());
+
+                GameDebugPageBootstrapper debugPage = CreateDebugPage();
+                InvokePrivate(debugPage, "ClearPhotoAlbum");
+
+                Assert.IsFalse(PhotoAlbumRepository.HasEntries());
+            }
+        }
+        finally
+        {
+            if (Directory.Exists(tempAlbumDirectory))
+            {
+                Directory.Delete(tempAlbumDirectory, true);
+            }
+        }
+    }
+
+    [Test]
+    public void SkillDebugRowAddsSpecialStructureBackpackItems()
+    {
+        RuntimeProgressState runtimeState = RuntimeProgressState.EnsureInstance();
+        runtimeState.ResetProgress(false);
+        BackpackMananger backpack = new GameObject("RuntimeBackpackManager").AddComponent<BackpackMananger>();
+
+        GameDebugPageBootstrapper debugPage = CreateDebugPage();
+        GameObject contentObject = new GameObject("DebugContent", typeof(RectTransform));
+
+        try
+        {
+            InvokePrivate(debugPage, "BuildSkillSection", contentObject.transform);
+
+            Transform section = contentObject.transform.Find("临时构筑");
+            Assert.NotNull(section);
+            Assert.IsNull(section.Find("通用材料"));
+
+            Transform row = section.Find("专用结构");
+            Assert.NotNull(row);
+
+            Button[] buttons = row.GetComponentsInChildren<Button>(true);
+            Assert.GreaterOrEqual(buttons.Length, 2);
+
+            buttons[0].onClick.Invoke();
+            Assert.AreEqual(1, backpack.GetSpecialStructureMaterialCount());
+            Assert.AreEqual(0, runtimeState.AvailableSpecialStructureInventory);
+
+            buttons[1].onClick.Invoke();
+            Assert.AreEqual(3, backpack.GetSpecialStructureMaterialCount());
+            Assert.AreEqual(0, runtimeState.AvailableSpecialStructureInventory);
+        }
+        finally
+        {
+            Object.DestroyImmediate(contentObject);
+        }
+    }
+
+    private GameDebugPageBootstrapper CreateDebugPage()
+    {
+        debugObject = new GameObject("RuntimeDebugPage");
+        return debugObject.AddComponent<GameDebugPageBootstrapper>();
+    }
+
+    private CharacterCore CreatePlayerCore()
+    {
+        playerObject = new GameObject("Player");
+        CharacterCore core = playerObject.AddComponent<CharacterCore>();
+        core.stats.maxHp = 100f;
+        core.currentHp = 100f;
+        return core;
+    }
+
+    private static RectTransform CreateRectTransform(string name, Transform parent, Vector2 size)
+    {
+        GameObject rectObject = new GameObject(name, typeof(RectTransform));
+        rectObject.transform.SetParent(parent, false);
+        RectTransform rectTransform = rectObject.GetComponent<RectTransform>();
+        rectTransform.sizeDelta = size;
+        return rectTransform;
+    }
+
+    private static void InvokePrivate(object target, string methodName, params object[] args)
+    {
+        MethodInfo method = target.GetType().GetMethod(methodName, BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(method);
+        method.Invoke(target, args);
+    }
+
+    private static bool InvokePrivateStaticBool(string methodName, string sceneName)
+    {
+        MethodInfo method = typeof(GameDebugPageBootstrapper).GetMethod(
+            methodName,
+            BindingFlags.Static | BindingFlags.NonPublic);
+        Assert.NotNull(method);
+        return (bool)method.Invoke(null, new object[] { sceneName });
+    }
+
+    private static bool InvokePrivateStaticBool(string methodName, bool value)
+    {
+        MethodInfo method = typeof(GameDebugPageBootstrapper).GetMethod(
+            methodName,
+            BindingFlags.Static | BindingFlags.NonPublic);
+        Assert.NotNull(method);
+        return (bool)method.Invoke(null, new object[] { value });
+    }
+
+    private static void InvokePrivateStatic(string methodName, params object[] args)
+    {
+        MethodInfo method = typeof(GameDebugPageBootstrapper).GetMethod(
+            methodName,
+            BindingFlags.Static | BindingFlags.NonPublic);
+        Assert.NotNull(method);
+        method.Invoke(null, args);
     }
 }

@@ -261,7 +261,8 @@ public class PlayerAttributeManager : MonoBehaviour
             characterCore.baseStats = characterCore.stats != null ? characterCore.stats.Clone() : new CharacterStats();
         }
 
-        InkTypeDefinition inkDefinition = InkTypeCatalog.Get(PlayerLoadoutRuntime.CurrentWeaponType);
+        WeaponType effectiveWeaponType = RuntimeWeaponTypeResolver.ResolveEffectiveWeaponType(BackpackMananger.Instance);
+        InkTypeDefinition inkDefinition = InkTypeCatalog.Get(effectiveWeaponType);
         if (characterCore.baseStats.attackDamage < inkDefinition.baseDamage)
         {
             characterCore.baseStats.attackDamage = inkDefinition.baseDamage;

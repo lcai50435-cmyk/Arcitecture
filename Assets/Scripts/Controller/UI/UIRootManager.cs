@@ -266,7 +266,9 @@ public class UIRootManager : MonoBehaviour
             handbookManager = FindObjectOfType<UIManager>(true);
         }
         baseHubUiController = FindObjectOfType<BaseHubUIController>(true);
-        dialogController = FindObjectOfType<Dialog>(true);
+        dialogController = isGameplayScene
+            ? Dialog.EnsureGameplayRuntimeInstance()
+            : Dialog.FindUsableInstance() ?? FindObjectOfType<Dialog>(true);
         detailedInformationController = isGameplayScene ? FindObjectOfType<DetailedInformationUI>(true) : null;
         submitPanelControllers = isGameplayScene ? FindObjectsOfType<SubmitSelectionPanelUI>(true) : Array.Empty<SubmitSelectionPanelUI>();
 
@@ -408,6 +410,7 @@ public class UIRootManager : MonoBehaviour
 
             if (modalShell != null)
             {
+                ConfigureBackdropClickHandler(type);
                 modalShell.Show(binding.CanvasGroup);
             }
 
@@ -426,6 +429,7 @@ public class UIRootManager : MonoBehaviour
 
         if (modalShell != null)
         {
+            ConfigureBackdropClickHandler(type);
             modalShell.Retarget(binding.CanvasGroup);
         }
     }
@@ -654,6 +658,7 @@ public class UIRootManager : MonoBehaviour
         RuntimeModalBinding binding = GetBinding(activeModalType);
         if (binding == null)
         {
+            modalShell?.SetBackdropClickHandler(null);
             modalShell?.Hide(immediate);
             ShowBackpack(immediate);
             RuntimeGameplayPauseController.ReleasePause(ModalPauseReason);
@@ -669,6 +674,7 @@ public class UIRootManager : MonoBehaviour
         activeModalType = RuntimeModalType.None;
         activeFlowGroup = RuntimeModalFlowGroup.None;
         activeFlowSource = RuntimeModalOpenSource.None;
+        modalShell?.SetBackdropClickHandler(null);
 
         Action finishClose = () =>
         {
@@ -705,6 +711,7 @@ public class UIRootManager : MonoBehaviour
 
         if (modalShell != null)
         {
+            modalShell.SetBackdropClickHandler(null);
             modalShell.Hide(true);
         }
     }
@@ -804,7 +811,9 @@ public class UIRootManager : MonoBehaviour
         if (binding.Canvas != null)
         {
             binding.Canvas.overrideSorting = true;
-            binding.Canvas.sortingOrder = RuntimeModalStyle.ModalSortingOrder;
+            binding.Canvas.sortingOrder = Dialog.IsTopmostRuntimeDialogPanel(binding.CanvasGroup.gameObject)
+                ? Dialog.TopmostRuntimeDialogSortingOrder
+                : RuntimeModalStyle.ModalSortingOrder;
         }
 
         binding.CanvasGroup.alpha = 1f;
@@ -827,6 +836,8 @@ public class UIRootManager : MonoBehaviour
         {
             binding.CanvasGroup.gameObject.SetActive(false);
         }
+
+        NotifySubmitPanelHidden(binding.Type);
     }
 
     private void SetCanvasGroupVisible(CanvasGroup canvasGroup, bool active, bool deactivateWhenHidden = true)
@@ -942,10 +953,26 @@ public class UIRootManager : MonoBehaviour
 
         IllustratedUISceneLoader.Open(
             RuntimeModalOpenSource.None,
-            IllustratedHandbookPage.IllustratedHandbook,
+            ResolveHandbookHotkeyPage(),
             null,
             interactTipUI != null ? interactTipUI.gameObject : null,
             ResolveRuntimePlayerObject());
+    }
+
+    private static IllustratedHandbookPage ResolveHandbookHotkeyPage()
+    {
+#if UNITY_WEBGL && !UNITY_EDITOR
+        return ResolveHandbookHotkeyPage(false);
+#else
+        return ResolveHandbookHotkeyPage(PhotoAlbumRepository.HasEntries());
+#endif
+    }
+
+    private static IllustratedHandbookPage ResolveHandbookHotkeyPage(bool hasPhotoEntries)
+    {
+        return hasPhotoEntries
+            ? IllustratedHandbookPage.PhotoAlbum
+            : IllustratedHandbookPage.PersonalInformation;
     }
 
     private static GameObject ResolveRuntimePlayerObject()
@@ -997,6 +1024,20 @@ public class UIRootManager : MonoBehaviour
         return null;
     }
 
+    private void NotifySubmitPanelHidden(RuntimeModalType type)
+    {
+        if (!IsSubmitModalType(type))
+        {
+            return;
+        }
+
+        SubmitSelectionPanelUI panel = FindSubmitPanel(type);
+        if (panel != null)
+        {
+            panel.NotifyHiddenByRoot();
+        }
+    }
+
     private void ApplyGameplayPauseForModalFlow()
     {
         if (activeFlowGroup == RuntimeModalFlowGroup.None)
@@ -1005,6 +1046,19 @@ public class UIRootManager : MonoBehaviour
         }
 
         RuntimeGameplayPauseController.RequestPause(ModalPauseReason);
+    }
+
+    private void ConfigureBackdropClickHandler(RuntimeModalType modalType)
+    {
+        if (modalShell == null)
+        {
+            return;
+        }
+
+        modalShell.SetBackdropClickHandler(
+            modalType == RuntimeModalType.Dialog
+                ? () => CloseActiveModal()
+                : null);
     }
 
     private CanvasGroup ResolveSubmitCanvasGroup(int index)
@@ -1022,6 +1076,13 @@ public class UIRootManager : MonoBehaviour
 
         GameObject panelRoot = panel.panelRoot != null ? panel.panelRoot : panel.gameObject;
         return EnsureCanvasGroup(panelRoot);
+    }
+
+    private static bool IsSubmitModalType(RuntimeModalType type)
+    {
+        return type == RuntimeModalType.SubmitSelection1 ||
+               type == RuntimeModalType.SubmitSelection2 ||
+               type == RuntimeModalType.SubmitSelection3;
     }
 
     private static RuntimeModalFlowGroup GetFlowGroup(RuntimeModalType type)
@@ -1106,7 +1167,9 @@ public class UIRootManager : MonoBehaviour
         }
 
         canvas.overrideSorting = true;
-        canvas.sortingOrder = RuntimeModalStyle.ModalSortingOrder;
+        canvas.sortingOrder = Dialog.IsTopmostRuntimeDialogPanel(target)
+            ? Dialog.TopmostRuntimeDialogSortingOrder
+            : RuntimeModalStyle.ModalSortingOrder;
 
         if (ReferenceEquals(canvas.gameObject, target) &&
             target.GetComponent<GraphicRaycaster>() == null)
@@ -1151,7 +1214,7 @@ public static class TmpRuntimeFontFallback
     };
 
     private const string RequiredCharacters =
-        "按住或轻点查看大地图松开预览收起继续游戏设置返回基地关卡暂停分辨率显示模式窗口全屏比例当前地图交互攻击点击继续返回总音量音乐音量控制全部游戏声音背景音乐单独强度分辨率显示模式当前比例屏幕适配自动根据窗口大小匹配视野生命构筑建筑结构图鉴背包专用材料普通结构解锁消耗数量剩余详情说明近战远程耐久防御速度倍率0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-+/():.% x";
+        "按住或轻点查看大地图松开预览收起继续游戏设置返回基地关卡暂停分辨率显示模式窗口全屏比例当前地图交互攻击点击继续返回总音量音乐音量控制全部游戏声音背景音乐单独强度分辨率显示模式当前比例屏幕适配自动根据窗口大小匹配视野生命构筑建筑结构图鉴背包专用结构普通材料解锁消耗数量剩余详情说明近战远程耐久防御速度倍率0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-+/():.% x";
 
     private static readonly string[] RuntimeFontNames =
     {

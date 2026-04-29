@@ -12,6 +12,7 @@ public class SubmitSelectionPanelUI : MonoBehaviour
     private BackpackMananger backpack;
     private PlayerGetArchitectural playerGetArchitectural;
     private BackpackUI backpackUI;
+    private CanvasGroup selectionIndicatorGroup;
     private int selectedIndex = -1;
     private float lastSelectedClickTime = -10f;
     private bool isOpen;
@@ -52,6 +53,7 @@ public class SubmitSelectionPanelUI : MonoBehaviour
     {
         ResolveRuntimeDependencies();
         isOpen = true;
+        ShowOnlyThisSelectionIndicator();
 
         if (UIRootManager.Instance != null)
         {
@@ -76,6 +78,7 @@ public class SubmitSelectionPanelUI : MonoBehaviour
     public void ClosePanel()
     {
         isOpen = false;
+        HideAllSelectionIndicators();
 
         if (UIRootManager.Instance != null)
         {
@@ -122,6 +125,7 @@ public class SubmitSelectionPanelUI : MonoBehaviour
 
         selectedIndex = -1;
         lastSelectedClickTime = -10f;
+        SetSelectionIndicatorVisible(false);
     }
 
     public void OnSlotPressed(int slotIndex, int clickCount)
@@ -204,6 +208,27 @@ public class SubmitSelectionPanelUI : MonoBehaviour
         }
     }
 
+    public void NotifyHiddenByRoot()
+    {
+        isOpen = false;
+        selectedIndex = -1;
+        lastSelectedClickTime = -10f;
+        SetSelectionIndicatorVisible(false);
+    }
+
+    public void SetSelectionIndicatorVisible(bool visible)
+    {
+        ResolveSelectionIndicatorGroup();
+        if (selectionIndicatorGroup == null)
+        {
+            return;
+        }
+
+        selectionIndicatorGroup.alpha = visible ? 1f : 0f;
+        selectionIndicatorGroup.interactable = true;
+        selectionIndicatorGroup.blocksRaycasts = true;
+    }
+
     private void ResolveRuntimeDependencies()
     {
         if (backpack == null)
@@ -230,6 +255,52 @@ public class SubmitSelectionPanelUI : MonoBehaviour
         if (panelRoot == null)
         {
             panelRoot = gameObject;
+        }
+    }
+
+    private void ShowOnlyThisSelectionIndicator()
+    {
+        SubmitSelectionPanelUI[] allPanels = FindObjectsOfType<SubmitSelectionPanelUI>(true);
+        for (int i = 0; i < allPanels.Length; i++)
+        {
+            if (allPanels[i] == null)
+            {
+                continue;
+            }
+
+            allPanels[i].SetSelectionIndicatorVisible(allPanels[i] == this);
+        }
+    }
+
+    private static void HideAllSelectionIndicators()
+    {
+        SubmitSelectionPanelUI[] allPanels = FindObjectsOfType<SubmitSelectionPanelUI>(true);
+        for (int i = 0; i < allPanels.Length; i++)
+        {
+            if (allPanels[i] != null)
+            {
+                allPanels[i].SetSelectionIndicatorVisible(false);
+            }
+        }
+    }
+
+    private void ResolveSelectionIndicatorGroup()
+    {
+        if (selectionIndicatorGroup != null)
+        {
+            return;
+        }
+
+        Transform indicatorTransform = transform.parent;
+        if (indicatorTransform == null)
+        {
+            return;
+        }
+
+        selectionIndicatorGroup = indicatorTransform.GetComponent<CanvasGroup>();
+        if (selectionIndicatorGroup == null)
+        {
+            selectionIndicatorGroup = indicatorTransform.gameObject.AddComponent<CanvasGroup>();
         }
     }
 

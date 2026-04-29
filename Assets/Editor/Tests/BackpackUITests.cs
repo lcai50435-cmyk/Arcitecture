@@ -1,0 +1,420 @@
+using System.Collections.Generic;
+using System.Reflection;
+using NUnit.Framework;
+using UnityEditor.SceneManagement;
+using UnityEngine;
+using UnityEngine.SceneManagement;
+using UnityEngine.UI;
+
+public sealed class BackpackUITests
+{
+    private GameObject rootObject;
+    private readonly List<Scene> createdScenes = new List<Scene>();
+    private Scene originalActiveScene;
+
+    [SetUp]
+    public void SetUp()
+    {
+        originalActiveScene = SceneManager.GetActiveScene();
+    }
+
+    [TearDown]
+    public void TearDown()
+    {
+        if (rootObject != null)
+        {
+            Object.DestroyImmediate(rootObject);
+        }
+
+        if (originalActiveScene.IsValid() && originalActiveScene.isLoaded)
+        {
+            SceneManager.SetActiveScene(originalActiveScene);
+        }
+
+        for (int i = createdScenes.Count - 1; i >= 0; i--)
+        {
+            Scene scene = createdScenes[i];
+            if (scene.IsValid() && scene.isLoaded)
+            {
+                EditorSceneManager.CloseScene(scene, true);
+            }
+        }
+
+        createdScenes.Clear();
+    }
+
+    [Test]
+    public void RuntimeBackpackStartsWithAttackSlotSelected()
+    {
+        rootObject = new GameObject("PackBagCanvas", typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
+        rootObject.AddComponent<BackpackUI>().ConfigureRuntimeLayout();
+
+        BackpackUI backpackUi = rootObject.GetComponent<BackpackUI>();
+
+        Assert.IsTrue(backpackUi.IsAttackSlotSelected);
+        Assert.IsFalse(RuntimeUiInputGuard.ShouldBlockGameplayAttack(KeyCode.Space));
+    }
+
+    [Test]
+    public void SelectingBackpackSlotBlocksAttackUntilAttackSlotIsSelectedAgain()
+    {
+        rootObject = new GameObject("PackBagCanvas", typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
+        BackpackUI backpackUi = rootObject.AddComponent<BackpackUI>();
+        backpackUi.ConfigureRuntimeLayout();
+
+        backpackUi.SelectSlot(0);
+
+        Assert.IsFalse(backpackUi.IsAttackSlotSelected);
+        Assert.IsTrue(RuntimeUiInputGuard.ShouldBlockGameplayAttack(KeyCode.Space));
+
+        backpackUi.SelectAttackSlot();
+
+        Assert.IsTrue(backpackUi.IsAttackSlotSelected);
+        Assert.IsFalse(RuntimeUiInputGuard.ShouldBlockGameplayAttack(KeyCode.Space));
+    }
+
+    [Test]
+    public void TryGetSlotScreenPositionUsesCurrentRuntimeLayoutSlot()
+    {
+        rootObject = new GameObject("PackBagCanvas", typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
+        RectTransform rootRect = rootObject.GetComponent<RectTransform>();
+        rootRect.sizeDelta = new Vector2(1920f, 1080f);
+
+        BackpackUI backpackUi = rootObject.AddComponent<BackpackUI>();
+
+        RectTransform staleSurface = CreateRect(rootRect, "RuntimeBackpackSurface", new Vector2(-740f, -360f), new Vector2(80f, 80f));
+        RectTransform staleSlot = CreateRect(staleSurface, "slot_1", Vector2.zero, new Vector2(80f, 80f));
+        BackpackSlot staleSlotBehaviour = staleSlot.gameObject.AddComponent<BackpackSlot>();
+        staleSlotBehaviour.slotIndex = 0;
+
+        RectTransform itemPanel = CreateRect(rootRect, "ItemPanel", new Vector2(180f, 72f), new Vector2(600f, 120f));
+        RectTransform visibleSlot = CreateRect(itemPanel, "slot_1", new Vector2(260f, 12f), new Vector2(80f, 80f));
+
+        backpackUi.ConfigureRuntimeLayout();
+        Canvas.ForceUpdateCanvases();
+
+        Assert.IsFalse(staleSurface.gameObject.activeSelf);
+        Assert.IsTrue(backpackUi.TryGetSlotScreenPosition(0, out Vector2 actualScreenPosition, out Vector2 slotSize));
+
+        Vector2 visibleSlotScreenPosition = RectTransformUtility.WorldToScreenPoint(
+            null,
+            visibleSlot.TransformPoint(visibleSlot.rect.center));
+        Vector2 staleSlotScreenPosition = RectTransformUtility.WorldToScreenPoint(
+            null,
+            staleSlot.TransformPoint(staleSlot.rect.center));
+
+        Assert.That(Vector2.Distance(actualScreenPosition, visibleSlotScreenPosition), Is.LessThan(0.5f));
+        Assert.That(Vector2.Distance(actualScreenPosition, staleSlotScreenPosition), Is.GreaterThan(1f));
+        Assert.That(slotSize, Is.EqualTo(new Vector2(80f, 80f)));
+    }
+
+    [Test]
+    public void ConfigureRuntimeLayoutPinsSceneAuthoredBackpackToBottomCenter()
+    {
+        rootObject = new GameObject("PackBagCanvas", typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
+        RectTransform rootRect = rootObject.GetComponent<RectTransform>();
+        rootRect.anchorMin = Vector2.zero;
+        rootRect.anchorMax = Vector2.zero;
+        rootRect.pivot = Vector2.zero;
+        rootRect.anchoredPosition = Vector2.zero;
+        rootRect.sizeDelta = new Vector2(1920f, 1080f);
+
+        BackpackUI backpackUi = rootObject.AddComponent<BackpackUI>();
+
+        RectTransform scenePanel = CreateRect(rootRect, "Panel", new Vector2(0f, 751f), new Vector2(1920f, 1502f));
+        scenePanel.anchorMin = new Vector2(0.5f, 0f);
+        scenePanel.anchorMax = new Vector2(0.5f, 0f);
+        scenePanel.pivot = new Vector2(0.5f, 0.5f);
+
+        RectTransform itemPanel = CreateRect(scenePanel, "ItemPanel", new Vector2(162f, 0f), new Vector2(550f, 124f));
+        itemPanel.anchorMin = new Vector2(0.5f, 0f);
+        itemPanel.anchorMax = new Vector2(0.5f, 0f);
+        itemPanel.pivot = new Vector2(0.5f, 0f);
+
+        RectTransform attackPanel = CreateRect(scenePanel, "AttackPanel", new Vector2(-240f, 60.9f), new Vector2(120f, 120f));
+        attackPanel.anchorMin = new Vector2(0.5f, 0f);
+        attackPanel.anchorMax = new Vector2(0.5f, 0f);
+        attackPanel.pivot = new Vector2(0.5f, 0.5f);
+
+        backpackUi.ConfigureRuntimeLayout();
+        Canvas.ForceUpdateCanvases();
+
+        Assert.That(scenePanel.anchorMin, Is.EqualTo(new Vector2(0.5f, 0f)));
+        Assert.That(scenePanel.anchorMax, Is.EqualTo(new Vector2(0.5f, 0f)));
+        Assert.That(scenePanel.pivot, Is.EqualTo(new Vector2(0.5f, 0f)));
+        Assert.That(scenePanel.anchoredPosition.x, Is.EqualTo(0f));
+        Assert.That(scenePanel.anchoredPosition.y, Is.EqualTo(12f));
+
+        Vector3[] itemCorners = new Vector3[4];
+        itemPanel.GetWorldCorners(itemCorners);
+        Assert.That(itemCorners[0].y, Is.GreaterThan(0f));
+
+        Vector3[] attackCorners = new Vector3[4];
+        attackPanel.GetWorldCorners(attackCorners);
+        Assert.That(attackCorners[0].y, Is.GreaterThan(0f));
+    }
+
+    [Test]
+    public void ConfigureRuntimeLayoutUsesMergedSeventhSlotAsAttackPanel()
+    {
+        rootObject = new GameObject("PackBagCanvas", typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
+        RectTransform rootRect = rootObject.GetComponent<RectTransform>();
+        rootRect.sizeDelta = new Vector2(1920f, 1080f);
+
+        BackpackUI backpackUi = rootObject.AddComponent<BackpackUI>();
+        RectTransform itemPanel = CreateRect(rootRect, "ItemPanel", Vector2.zero, new Vector2(550f, 124f));
+
+        for (int i = 0; i < 7; i++)
+        {
+            CreateRect(itemPanel, $"slot_{i + 1}", new Vector2(-222f + i * 74f, 0f), new Vector2(70f, 80f));
+        }
+
+        backpackUi.ConfigureRuntimeLayout();
+        backpackUi.SelectSlot(0);
+
+        Assert.IsNull(rootRect.Find("AttackPanel"));
+
+        Transform mergedAttackSlot = itemPanel.Find("slot_7");
+        Assert.IsNotNull(mergedAttackSlot);
+
+        Button attackButton = mergedAttackSlot.GetComponent<Button>();
+        Assert.IsNotNull(attackButton);
+
+        attackButton.onClick.Invoke();
+
+        Assert.IsTrue(backpackUi.IsAttackSlotSelected);
+    }
+
+    [Test]
+    public void RuntimeSlotIconStretchesToFillBackpackSlot()
+    {
+        rootObject = new GameObject("PackBagCanvas", typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
+        RectTransform rootRect = rootObject.GetComponent<RectTransform>();
+        rootRect.sizeDelta = new Vector2(1920f, 1080f);
+
+        BackpackUI backpackUi = rootObject.AddComponent<BackpackUI>();
+        RectTransform itemPanel = CreateRect(rootRect, "ItemPanel", Vector2.zero, new Vector2(550f, 124f));
+        RectTransform slot = CreateRect(itemPanel, "slot_1", Vector2.zero, new Vector2(70f, 80f));
+
+        backpackUi.ConfigureRuntimeLayout();
+
+        Transform icon = slot.Find("ItemIcon");
+        Assert.IsNotNull(icon);
+
+        RectTransform iconRect = icon.GetComponent<RectTransform>();
+        Assert.IsNotNull(iconRect);
+        Assert.AreEqual(Vector2.zero, iconRect.anchorMin);
+        Assert.AreEqual(Vector2.one, iconRect.anchorMax);
+        Assert.AreEqual(Vector2.zero, iconRect.offsetMin);
+        Assert.AreEqual(Vector2.zero, iconRect.offsetMax);
+    }
+
+    [Test]
+    public void GenericCommonMaterialsOccupyOnlyThreeBackpackSlotsWithoutAttackOverride()
+    {
+        rootObject = new GameObject("RuntimeBackpackManager");
+        BackpackMananger backpack = rootObject.AddComponent<BackpackMananger>();
+        ArchitecturalCrystal genericMaterial = ArchitecturalCrystalFactory.CreateCommonStructure(
+            ArchitecturalType.Green,
+            buildProgressPercent: 100);
+
+        Assert.IsTrue(backpack.PickItem(genericMaterial));
+        Assert.IsTrue(backpack.PickItem(genericMaterial));
+        Assert.IsTrue(backpack.PickItem(genericMaterial));
+        Assert.IsFalse(backpack.PickItem(genericMaterial));
+        Assert.AreEqual(3, backpack.GetOccupiedCount());
+        Assert.AreEqual(3, backpack.GetCommonMaterialCount());
+
+        InkAttackRuntimeConfig config = InkModifierRuntimeConfig.BuildFromBackpack(backpack);
+        Assert.AreEqual(1, config.projectileCount);
+        Assert.AreEqual(1, config.maxHitCount);
+        Assert.AreEqual(1f, config.projectileScale);
+
+        Assert.IsFalse(RuntimeWeaponTypeResolver.TryGetActiveWeaponOverride(
+            backpack,
+            out ArchitecturalCrystal _,
+            out WeaponType _,
+            out int _));
+    }
+
+    [Test]
+    public void SpecialStructuresOccupyBackpackSlotsAndCapAtThree()
+    {
+        rootObject = new GameObject("RuntimeBackpackManager");
+        BackpackMananger backpack = rootObject.AddComponent<BackpackMananger>();
+        ArchitecturalCrystal specialStructure = ArchitecturalCrystalFactory.CreateSpecialStructureMaterial();
+
+        Assert.IsTrue(backpack.PickItem(specialStructure));
+        Assert.IsTrue(backpack.PickItem(specialStructure));
+        Assert.IsTrue(backpack.PickItem(specialStructure));
+        Assert.IsFalse(backpack.PickItem(specialStructure));
+
+        Assert.AreEqual(3, backpack.GetOccupiedCount());
+        Assert.AreEqual(3, backpack.GetSpecialStructureMaterialCount());
+        Assert.IsTrue(backpack.GetItem(0).HasValue && backpack.GetItem(0).Value.IsSpecialStructure);
+        Assert.IsTrue(backpack.GetItem(1).HasValue && backpack.GetItem(1).Value.IsSpecialStructure);
+        Assert.IsTrue(backpack.GetItem(2).HasValue && backpack.GetItem(2).Value.IsSpecialStructure);
+    }
+
+    [Test]
+    public void DebugPanelCommonStructureUsesResolvedBackpackIcon()
+    {
+        rootObject = new GameObject("RuntimeDebugPage");
+        GameDebugPageBootstrapper debugPage = rootObject.AddComponent<GameDebugPageBootstrapper>();
+        MethodInfo createDebugCrystal = typeof(GameDebugPageBootstrapper).GetMethod(
+            "CreateDebugCrystal",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.IsNotNull(createDebugCrystal);
+
+        ArchitecturalCrystal debugCrystal = (ArchitecturalCrystal)createDebugCrystal.Invoke(
+            debugPage,
+            new object[] { ArchitecturalType.Brackets });
+        ArchitecturalCrystal factoryCrystal = ArchitecturalCrystalFactory.CreateCommonStructure(ArchitecturalType.Brackets);
+
+        Assert.AreSame(factoryCrystal.backIcon, debugCrystal.backIcon);
+    }
+
+    [Test]
+    public void EnsureRuntimeInstancePrefersActiveScenePackBagCanvasOverAdditiveUiScene()
+    {
+        Scene gameplayScene = CreateScene("GameScene");
+        Scene illustratedScene = CreateScene("IllustratedUIScene");
+
+        GameObject illustratedRoot = new GameObject("PackBagCanvas", typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
+        SceneManager.MoveGameObjectToScene(illustratedRoot, illustratedScene);
+        illustratedRoot.SetActive(false);
+
+        GameObject gameplayRoot = new GameObject("PackBagCanvas", typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
+        SceneManager.MoveGameObjectToScene(gameplayRoot, gameplayScene);
+        Assert.IsTrue(SceneManager.SetActiveScene(gameplayScene));
+        rootObject = gameplayRoot;
+
+        BackpackUI backpackUi = BackpackUI.EnsureRuntimeInstance(false);
+
+        Assert.IsNotNull(backpackUi);
+        Assert.AreEqual(gameplayScene, backpackUi.gameObject.scene);
+        Assert.IsNull(illustratedRoot.GetComponent<BackpackUI>());
+    }
+
+    [Test]
+    public void EnsureRuntimeInstancePrefersUsableBaseBackpackRootOverLegacyDuplicate()
+    {
+        Scene baseScene = CreateScene("NewBase");
+
+        GameObject legacyRoot = new GameObject("PackBagCanvas", typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
+        SceneManager.MoveGameObjectToScene(legacyRoot, baseScene);
+        legacyRoot.SetActive(false);
+
+        GameObject usableRoot = new GameObject("PackBagCanvas", typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
+        SceneManager.MoveGameObjectToScene(usableRoot, baseScene);
+        Assert.IsTrue(SceneManager.SetActiveScene(baseScene));
+        rootObject = usableRoot;
+
+        RectTransform usableRootRect = usableRoot.GetComponent<RectTransform>();
+        RectTransform scenePanel = CreateRect(usableRootRect, "Panel", new Vector2(0f, 751f), new Vector2(1920f, 1502f));
+        RectTransform itemPanel = CreateRect(scenePanel, "ItemPanel", Vector2.zero, new Vector2(550f, 124f));
+        for (int i = 0; i < 7; i++)
+        {
+            CreateRect(itemPanel, $"slot_{i + 1}", new Vector2(-222f + i * 74f, 0f), new Vector2(70f, 80f));
+        }
+
+        BackpackUI backpackUi = BackpackUI.EnsureRuntimeInstance();
+
+        Assert.IsNotNull(backpackUi);
+        Assert.AreSame(usableRoot, backpackUi.gameObject);
+        Assert.IsNull(legacyRoot.GetComponent<BackpackUI>());
+    }
+
+    [Test]
+    public void BaseInteractionPromptsUseFloatingStyleToKeepBottomBackpackClear()
+    {
+        Assert.IsTrue(PlayerInteraction.UseFloatingPromptStyleForScene("NewBase"));
+        Assert.IsTrue(PlayerInteraction.UseFloatingPromptStyleForScene("BaseScene"));
+        Assert.IsTrue(PlayerInteraction.UseFloatingPromptStyleForScene("GameScene"));
+        Assert.IsFalse(PlayerInteraction.UseFloatingPromptStyleForScene("MainScene"));
+    }
+
+    private static RectTransform CreateRect(Transform parent, string name, Vector2 anchoredPosition, Vector2 size)
+    {
+        GameObject rectObject = new GameObject(name, typeof(RectTransform), typeof(Image));
+        RectTransform rectTransform = rectObject.GetComponent<RectTransform>();
+        rectTransform.SetParent(parent, false);
+        rectTransform.anchorMin = new Vector2(0.5f, 0.5f);
+        rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
+        rectTransform.pivot = new Vector2(0.5f, 0.5f);
+        rectTransform.anchoredPosition = anchoredPosition;
+        rectTransform.sizeDelta = size;
+
+        Image image = rectObject.GetComponent<Image>();
+        image.raycastTarget = false;
+        image.color = Color.clear;
+
+        return rectTransform;
+    }
+
+    private Scene CreateScene(string sceneName)
+    {
+        Scene scene = SceneManager.CreateScene(sceneName);
+        createdScenes.Add(scene);
+        return scene;
+    }
+}
+
+public sealed class SubmitSelectionPanelUITests
+{
+    private readonly List<GameObject> roots = new List<GameObject>();
+
+    [TearDown]
+    public void TearDown()
+    {
+        for (int i = 0; i < roots.Count; i++)
+        {
+            if (roots[i] != null)
+            {
+                Object.DestroyImmediate(roots[i]);
+            }
+        }
+
+        roots.Clear();
+
+        if (BackpackMananger.Instance != null &&
+            BackpackMananger.Instance.gameObject.name == "RuntimeBackpackManager")
+        {
+            Object.DestroyImmediate(BackpackMananger.Instance.gameObject);
+        }
+    }
+
+    [Test]
+    public void OpenPanelShowsOnlyCurrentBuildingIndicator()
+    {
+        CreatePanel("Building1", out CanvasGroup firstIndicator);
+        SubmitSelectionPanelUI secondPanel = CreatePanel("Building2", out CanvasGroup secondIndicator);
+        CreatePanel("Building3", out CanvasGroup thirdIndicator);
+
+        secondPanel.TogglePanelForBuilding((int)CatalogueBuildingId.Building2);
+
+        Assert.AreEqual(0f, firstIndicator.alpha);
+        Assert.AreEqual(1f, secondIndicator.alpha);
+        Assert.AreEqual(0f, thirdIndicator.alpha);
+        Assert.IsTrue(firstIndicator.blocksRaycasts);
+        Assert.IsTrue(thirdIndicator.blocksRaycasts);
+    }
+
+    private SubmitSelectionPanelUI CreatePanel(string name, out CanvasGroup indicatorGroup)
+    {
+        GameObject buttonObject = new GameObject($"{name}AddButton", typeof(RectTransform), typeof(Image), typeof(Button), typeof(CanvasGroup));
+        roots.Add(buttonObject);
+
+        indicatorGroup = buttonObject.GetComponent<CanvasGroup>();
+        indicatorGroup.alpha = 1f;
+        indicatorGroup.interactable = true;
+        indicatorGroup.blocksRaycasts = true;
+
+        GameObject panelObject = new GameObject($"{name}AddItemUI", typeof(RectTransform), typeof(CanvasGroup));
+        panelObject.transform.SetParent(buttonObject.transform, false);
+
+        SubmitSelectionPanelUI panel = panelObject.AddComponent<SubmitSelectionPanelUI>();
+        panel.panelRoot = panelObject;
+        return panel;
+    }
+}

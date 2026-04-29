@@ -3,7 +3,7 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
-public class BackpackSlot : MonoBehaviour, IPointerDownHandler, IPointerUpHandler, IPointerEnterHandler, IPointerExitHandler
+public class BackpackSlot : MonoBehaviour, IPointerDownHandler, IPointerUpHandler, IPointerEnterHandler, IPointerExitHandler, IBeginDragHandler, IDragHandler, IEndDragHandler
 {
     private const string RuntimeSlotIconName = "ItemIcon";
 
@@ -21,6 +21,30 @@ public class BackpackSlot : MonoBehaviour, IPointerDownHandler, IPointerUpHandle
     private bool isHolding;
     private float holdTimer;
     private bool isHovered;
+    private RectTransform dragGhost;
+
+    public static bool TryGetDraggedSpecialStructureSlot(GameObject pointerDrag, out int sourceSlotIndex)
+    {
+        sourceSlotIndex = -1;
+
+        BackpackSlot slot = pointerDrag != null ? pointerDrag.GetComponent<BackpackSlot>() : null;
+        if (slot == null)
+        {
+            return false;
+        }
+
+        BackpackMananger runtimeBackpack = BackpackMananger.Instance != null
+            ? BackpackMananger.Instance
+            : Object.FindObjectOfType<BackpackMananger>(true);
+        ArchitecturalCrystal? item = runtimeBackpack != null ? runtimeBackpack.GetItem(slot.slotIndex) : null;
+        if (!item.HasValue || !item.Value.IsSpecialStructure)
+        {
+            return false;
+        }
+
+        sourceSlotIndex = slot.slotIndex;
+        return true;
+    }
 
     private void Start()
     {
@@ -149,6 +173,28 @@ public class BackpackSlot : MonoBehaviour, IPointerDownHandler, IPointerUpHandle
         HideHoverState();
     }
 
+    public void OnBeginDrag(PointerEventData eventData)
+    {
+        if (!TryGetCurrentSpecialStructure(out ArchitecturalCrystal crystal))
+        {
+            return;
+        }
+
+        backpackUI?.SelectSlot(slotIndex);
+        HideHoverTooltip();
+        dragGhost = CreateDragGhost(crystal, eventData != null ? eventData.position : (Vector2)Input.mousePosition);
+    }
+
+    public void OnDrag(PointerEventData eventData)
+    {
+        UpdateDragGhost(eventData != null ? eventData.position : (Vector2)Input.mousePosition);
+    }
+
+    public void OnEndDrag(PointerEventData eventData)
+    {
+        DestroyDragGhost();
+    }
+
     private void StartSingleHold()
     {
         if (backpack == null)
@@ -179,6 +225,127 @@ public class BackpackSlot : MonoBehaviour, IPointerDownHandler, IPointerUpHandle
     {
         isHolding = false;
         holdTimer = 0f;
+    }
+
+    private bool TryGetCurrentSpecialStructure(out ArchitecturalCrystal crystal)
+    {
+        crystal = default;
+
+        if (backpack == null)
+        {
+            backpack = BackpackMananger.Instance != null
+                ? BackpackMananger.Instance
+                : Object.FindObjectOfType<BackpackMananger>(true);
+        }
+
+        ArchitecturalCrystal? item = backpack != null ? backpack.GetItem(slotIndex) : null;
+        if (!item.HasValue || !item.Value.IsSpecialStructure)
+        {
+            return false;
+        }
+
+        crystal = item.Value;
+        return true;
+    }
+
+    private RectTransform CreateDragGhost(ArchitecturalCrystal crystal, Vector2 screenPosition)
+    {
+        Canvas canvas = GetComponentInParent<Canvas>();
+        RectTransform canvasRect = canvas != null ? canvas.transform as RectTransform : null;
+        if (canvasRect == null)
+        {
+            return null;
+        }
+
+        GameObject ghostObject = new GameObject(
+            "BackpackSpecialStructureDragGhost",
+            typeof(RectTransform),
+            typeof(CanvasRenderer),
+            typeof(Image),
+            typeof(CanvasGroup));
+        RectTransform ghostRect = ghostObject.GetComponent<RectTransform>();
+        ghostRect.SetParent(canvasRect, false);
+        ghostRect.SetAsLastSibling();
+        ghostRect.anchorMin = new Vector2(0.5f, 0.5f);
+        ghostRect.anchorMax = new Vector2(0.5f, 0.5f);
+        ghostRect.pivot = new Vector2(0.5f, 0.5f);
+        ghostRect.sizeDelta = ResolveDragGhostSize();
+
+        Image ghostImage = ghostObject.GetComponent<Image>();
+        Sprite displaySprite = crystal.backIcon != null ? crystal.backIcon : crystal.icon;
+        ghostImage.sprite = RuntimeSpriteDisplaySanitizer.GetDisplaySprite(displaySprite);
+        ghostImage.color = new Color(1f, 1f, 1f, 0.88f);
+        ghostImage.preserveAspect = true;
+        ghostImage.raycastTarget = false;
+
+        CanvasGroup canvasGroup = ghostObject.GetComponent<CanvasGroup>();
+        canvasGroup.blocksRaycasts = false;
+        canvasGroup.interactable = false;
+
+        UpdateDragGhost(ghostRect, canvas, screenPosition);
+        return ghostRect;
+    }
+
+    private Vector2 ResolveDragGhostSize()
+    {
+        RectTransform rectTransform = transform as RectTransform;
+        if (rectTransform == null)
+        {
+            return new Vector2(64f, 64f);
+        }
+
+        Vector2 slotSize = rectTransform.rect.size;
+        float size = Mathf.Clamp(Mathf.Min(slotSize.x, slotSize.y), 48f, 86f);
+        return new Vector2(size, size);
+    }
+
+    private void UpdateDragGhost(Vector2 screenPosition)
+    {
+        if (dragGhost == null)
+        {
+            return;
+        }
+
+        Canvas canvas = dragGhost.GetComponentInParent<Canvas>();
+        UpdateDragGhost(dragGhost, canvas, screenPosition);
+    }
+
+    private static void UpdateDragGhost(RectTransform ghostRect, Canvas canvas, Vector2 screenPosition)
+    {
+        RectTransform canvasRect = canvas != null ? canvas.transform as RectTransform : null;
+        if (ghostRect == null || canvasRect == null)
+        {
+            return;
+        }
+
+        Camera canvasCamera = canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : canvas.worldCamera;
+        if (RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                canvasRect,
+                screenPosition,
+                canvasCamera,
+                out Vector2 localPoint))
+        {
+            ghostRect.anchoredPosition = localPoint;
+        }
+    }
+
+    private void DestroyDragGhost()
+    {
+        if (dragGhost == null)
+        {
+            return;
+        }
+
+        if (Application.isPlaying)
+        {
+            Destroy(dragGhost.gameObject);
+        }
+        else
+        {
+            DestroyImmediate(dragGhost.gameObject);
+        }
+
+        dragGhost = null;
     }
 
     private void RefreshHoverState()
@@ -277,7 +444,7 @@ public class BackpackSlot : MonoBehaviour, IPointerDownHandler, IPointerUpHandle
 public sealed class RuntimeBackpackHoverHud : MonoBehaviour
 {
     private const string CanvasName = "RuntimeBackpackHoverHudCanvas";
-    private const int SortingOrder = 286;
+    private const int SortingOrder = RuntimeModalStyle.ModalSortingOrder + 80;
     private const float PanelWidth = 320f;
     private const float PanelMinHeight = 132f;
     private const float MouseOffsetX = 26f;
@@ -300,7 +467,7 @@ public sealed class RuntimeBackpackHoverHud : MonoBehaviour
     private int capturedScreenWidth;
     private int capturedScreenHeight;
     private float nextBackdropRefreshAt;
-    private BackpackSlot currentOwner;
+    private MonoBehaviour currentOwner;
     private string cachedTitle;
     private string cachedDescription;
     private Sprite cachedIcon;
@@ -340,6 +507,11 @@ public sealed class RuntimeBackpackHoverHud : MonoBehaviour
 
     public void ShowOrUpdate(BackpackSlot owner, ArchitecturalCrystal crystal, Vector2 screenPosition)
     {
+        ShowOrUpdate(owner as MonoBehaviour, crystal, screenPosition);
+    }
+
+    public void ShowOrUpdate(MonoBehaviour owner, ArchitecturalCrystal crystal, Vector2 screenPosition)
+    {
         if (owner == null)
         {
             return;
@@ -369,6 +541,11 @@ public sealed class RuntimeBackpackHoverHud : MonoBehaviour
 
     public void HideForSlot(BackpackSlot owner)
     {
+        HideForOwner(owner);
+    }
+
+    public void HideForOwner(MonoBehaviour owner)
+    {
         if (owner == null || currentOwner != owner)
         {
             return;
@@ -391,6 +568,8 @@ public sealed class RuntimeBackpackHoverHud : MonoBehaviour
     {
         if (canvas != null)
         {
+            canvas.overrideSorting = true;
+            canvas.sortingOrder = SortingOrder;
             return;
         }
 
@@ -493,7 +672,9 @@ public sealed class RuntimeBackpackHoverHud : MonoBehaviour
                 : crystal.textDescription;
         }
 
-        Sprite resolvedIcon = crystal.backIcon != null ? crystal.backIcon : crystal.icon;
+        Sprite resolvedIcon = crystal.backIcon != null
+            ? crystal.backIcon
+            : (crystal.icon != null ? crystal.icon : RuntimeCrystalDropFactory.ResolveSprite(crystal));
         resolvedIcon = RuntimeSpriteDisplaySanitizer.GetDisplaySprite(resolvedIcon);
         bool contentChanged = cachedTitle != title
             || cachedDescription != description

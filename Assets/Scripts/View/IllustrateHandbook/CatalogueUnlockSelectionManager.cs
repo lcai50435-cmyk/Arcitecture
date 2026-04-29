@@ -2,13 +2,13 @@ using UnityEngine;
 
 /// <summary>
 /// 图鉴解锁选择管理器
-/// 负责维护专用结构材料库存显示。
+/// 负责兼容旧图鉴解锁入口，专用结构以背包格为准。
 /// </summary>
 public class CatalogueUnlockSelectionManager : MonoBehaviour
 {
     public static CatalogueUnlockSelectionManager Instance;
 
-    [Header("当前可用专用结构材料（运行时观察）")]
+    [Header("当前可用专用结构（运行时观察）")]
     public int availableUnlockCount = 0;
 
     public static CatalogueUnlockSelectionManager EnsureInstance()
@@ -58,7 +58,12 @@ public class CatalogueUnlockSelectionManager : MonoBehaviour
 
     public void AddUnlockCount(int count)
     {
-        RuntimeProgressState.EnsureInstance().AddSpecialStructureInventory(count);
+        BackpackMananger backpack = ResolveRuntimeBackpackManager();
+        for (int i = 0; i < count && backpack != null; i++)
+        {
+            backpack.PickItem(ArchitecturalCrystalFactory.CreateSpecialStructureMaterial());
+        }
+
         RefreshInventoryValue();
     }
 
@@ -69,8 +74,21 @@ public class CatalogueUnlockSelectionManager : MonoBehaviour
             return false;
         }
 
-        bool success = RuntimeProgressState.EnsureInstance()
-            .TryUnlockSlot(buildingId, slotIndex, out _, out _);
+        RuntimeProgressState runtimeState = RuntimeProgressState.EnsureInstance();
+        if (runtimeState.IsSlotUnlocked(buildingId, slotIndex))
+        {
+            RefreshInventoryValue();
+            return false;
+        }
+
+        BackpackMananger backpack = ResolveRuntimeBackpackManager();
+        if (backpack == null || !backpack.TryConsumeFirstSpecialStructureMaterial(out _))
+        {
+            RefreshInventoryValue();
+            return false;
+        }
+
+        bool success = runtimeState.TryUnlockSlot(buildingId, slotIndex, out _, out _);
         RefreshInventoryValue();
         return success;
     }
@@ -87,14 +105,28 @@ public class CatalogueUnlockSelectionManager : MonoBehaviour
 
     public bool TryConsumeUnlockCount()
     {
-        bool success = RuntimeProgressState.EnsureInstance().TryConsumeSpecialStructureInventory(1);
+        BackpackMananger backpack = ResolveRuntimeBackpackManager();
+        bool success = backpack != null && backpack.TryConsumeFirstSpecialStructureMaterial(out _);
         RefreshInventoryValue();
         return success;
     }
 
     private void RefreshInventoryValue()
     {
-        availableUnlockCount = RuntimeProgressState.EnsureInstance().AvailableSpecialStructureInventory;
+        BackpackMananger backpack = ResolveRuntimeBackpackManager();
+        availableUnlockCount = backpack != null ? backpack.GetSpecialStructureMaterialCount() : 0;
+    }
+
+    private static BackpackMananger ResolveRuntimeBackpackManager()
+    {
+        BackpackMananger backpack = BackpackMananger.Instance;
+        if (backpack != null)
+        {
+            return backpack;
+        }
+
+        GameObject manager = new GameObject("RuntimeBackpackManager");
+        return manager.AddComponent<BackpackMananger>();
     }
 
     private static bool TryResolveSlotContext(
