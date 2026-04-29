@@ -363,10 +363,28 @@ public static class GameSettingsStore
     public static void ApplyDisplaySettings()
     {
         GameSettingsDraft savedSettings = LoadSavedSettings();
-        Vector2Int resolution = GetResolutionOption(savedSettings.resolutionIndex);
-        bool fullscreen = savedSettings.displayMode == GameDisplayMode.Fullscreen;
-        Screen.SetResolution(resolution.x, resolution.y, fullscreen);
+        if (ShouldApplyExplicitResolutionForCurrentPlatform())
+        {
+            Vector2Int resolution = GetResolutionOption(savedSettings.resolutionIndex);
+            bool fullscreen = savedSettings.displayMode == GameDisplayMode.Fullscreen;
+            Screen.SetResolution(resolution.x, resolution.y, fullscreen);
+        }
+
         ScreenAdaptationManager.RefreshNow();
+    }
+
+    public static bool ShouldApplyExplicitResolutionForPlatform(bool isWebGlPlayer)
+    {
+        return !isWebGlPlayer;
+    }
+
+    private static bool ShouldApplyExplicitResolutionForCurrentPlatform()
+    {
+#if UNITY_WEBGL && !UNITY_EDITOR
+        return ShouldApplyExplicitResolutionForPlatform(true);
+#else
+        return ShouldApplyExplicitResolutionForPlatform(false);
+#endif
     }
 
     public static void ApplyAudioSettings()
