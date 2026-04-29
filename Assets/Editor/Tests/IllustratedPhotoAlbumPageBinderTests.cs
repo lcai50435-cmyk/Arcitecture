@@ -353,12 +353,105 @@ public sealed class IllustratedPhotoAlbumPageBinderTests
         Button deleteButton = FindButton(root, "RuntimePhotoAlbumDeleteSelected");
         Assert.IsNotNull(deleteButton);
         deleteButton.onClick.Invoke();
+        ClickConfirmDelete(root);
 
         RawImage previewImage = preview.GetComponentInChildren<RawImage>(true);
         Assert.AreEqual("photo_3.png", previewImage.texture.name);
         Assert.AreEqual(2, entries.Count);
         Assert.IsNotNull(deletedEntryId);
         Assert.AreEqual("photo_2.png", deletedFileName);
+    }
+
+    [Test]
+    public void DeleteSelectedButtonRequiresConfirmationBeforeDeleting()
+    {
+        RectTransform root = CreateRoot();
+        CreateImage(root, "Photo", new Vector2(-420f, 70f), new Vector2(260f, 200f));
+        CreateText(root, "Name", "Name");
+        CreateText(root, "Time", "拍摄时间 : 0000/00/00 00:00");
+        CreateText(root, "Scene", "拍摄地点 : location");
+        CreateText(root, "PageNumber", "0/0");
+
+        GameObject rightPanelObject = new GameObject("RightPanel", typeof(RectTransform));
+        RectTransform rightPanel = rightPanelObject.GetComponent<RectTransform>();
+        rightPanel.SetParent(root, false);
+        rightPanel.sizeDelta = new Vector2(520f, 520f);
+        CreateImage(rightPanel, "Image_1", new Vector2(80f, 150f), new Vector2(96f, 96f));
+
+        List<PhotoAlbumEntry> entries = CreateEntries(1);
+        int deleteCalls = 0;
+        IllustratedPhotoAlbumPageBinder binder = new IllustratedPhotoAlbumPageBinder(
+            () => entries,
+            entry => CreateTexture(entry.fileName),
+            entry =>
+            {
+                deleteCalls++;
+                return entries.Remove(entry);
+            },
+            false);
+
+        binder.Bind(root);
+        binder.Refresh();
+
+        Button deleteButton = FindButton(root, "RuntimePhotoAlbumDeleteSelected");
+        Assert.IsNotNull(deleteButton);
+        deleteButton.onClick.Invoke();
+
+        Assert.AreEqual(1, entries.Count);
+        Assert.AreEqual(0, deleteCalls);
+
+        Button confirmButton = FindButton(root, "RuntimePhotoAlbumConfirmDelete");
+        Button cancelButton = FindButton(root, "RuntimePhotoAlbumCancelDelete");
+        Assert.IsNotNull(confirmButton);
+        Assert.IsNotNull(cancelButton);
+
+        confirmButton.onClick.Invoke();
+
+        Assert.IsEmpty(entries);
+        Assert.AreEqual(1, deleteCalls);
+    }
+
+    [Test]
+    public void DeleteConfirmationCancelKeepsCurrentPhoto()
+    {
+        RectTransform root = CreateRoot();
+        CreateImage(root, "Photo", new Vector2(-420f, 70f), new Vector2(260f, 200f));
+        CreateText(root, "Name", "Name");
+        CreateText(root, "Time", "拍摄时间 : 0000/00/00 00:00");
+        CreateText(root, "Scene", "拍摄地点 : location");
+        CreateText(root, "PageNumber", "0/0");
+
+        GameObject rightPanelObject = new GameObject("RightPanel", typeof(RectTransform));
+        RectTransform rightPanel = rightPanelObject.GetComponent<RectTransform>();
+        rightPanel.SetParent(root, false);
+        rightPanel.sizeDelta = new Vector2(520f, 520f);
+        CreateImage(rightPanel, "Image_1", new Vector2(80f, 150f), new Vector2(96f, 96f));
+
+        List<PhotoAlbumEntry> entries = CreateEntries(1);
+        int deleteCalls = 0;
+        IllustratedPhotoAlbumPageBinder binder = new IllustratedPhotoAlbumPageBinder(
+            () => entries,
+            entry => CreateTexture(entry.fileName),
+            entry =>
+            {
+                deleteCalls++;
+                return entries.Remove(entry);
+            },
+            false);
+
+        binder.Bind(root);
+        binder.Refresh();
+
+        Button deleteButton = FindButton(root, "RuntimePhotoAlbumDeleteSelected");
+        Assert.IsNotNull(deleteButton);
+        deleteButton.onClick.Invoke();
+
+        Button cancelButton = FindButton(root, "RuntimePhotoAlbumCancelDelete");
+        Assert.IsNotNull(cancelButton);
+        cancelButton.onClick.Invoke();
+
+        Assert.AreEqual(1, entries.Count);
+        Assert.AreEqual(0, deleteCalls);
     }
 
     [Test]
@@ -397,6 +490,7 @@ public sealed class IllustratedPhotoAlbumPageBinderTests
         Button deleteButton = FindButton(root, "RuntimePhotoAlbumDeleteSelected");
         Assert.IsNotNull(deleteButton);
         deleteButton.onClick.Invoke();
+        ClickConfirmDelete(root);
 
         RawImage slot1Image = slot1.GetComponentInChildren<RawImage>(true);
         RawImage slot2Image = slot2.GetComponentInChildren<RawImage>(true);
@@ -410,6 +504,49 @@ public sealed class IllustratedPhotoAlbumPageBinderTests
         Assert.AreEqual("photo_2.png", slot1Image.texture.name);
         Assert.AreEqual("photo_3.png", slot2Image.texture.name);
         Assert.IsNull(slot3Image.texture);
+    }
+
+    [Test]
+    public void DeleteSelectedButtonReusesSceneAuthoredDeleButtonWithoutRuntimeLabel()
+    {
+        RectTransform root = CreateRoot();
+        RectTransform preview = CreateImage(root, "Photo", new Vector2(-420f, 70f), new Vector2(260f, 200f));
+        CreateText(root, "Name", "Name");
+        CreateText(root, "Time", "拍摄时间 : 0000/00/00 00:00");
+        CreateText(root, "Scene", "拍摄地点 : location");
+        CreateText(root, "PageNumber", "0/0");
+        Button shareButton = CreateButton(root, "ShareButton", new Vector2(79f, -89.5f), new Vector2(15f, 15f));
+        ColorBlock shareColors = shareButton.colors;
+        shareColors.highlightedColor = new Color(0.42f, 0.42f, 0.42f, 1f);
+        shareColors.pressedColor = new Color(0.28f, 0.28f, 0.28f, 1f);
+        shareButton.colors = shareColors;
+        Button sceneDeleteButton = CreateButton(root, "DeleButton", new Vector2(56f, -89.5f), new Vector2(15f, 15f));
+
+        GameObject rightPanelObject = new GameObject("RightPanel", typeof(RectTransform));
+        RectTransform rightPanel = rightPanelObject.GetComponent<RectTransform>();
+        rightPanel.SetParent(root, false);
+        rightPanel.sizeDelta = new Vector2(520f, 520f);
+        CreateImage(rightPanel, "Image_1", new Vector2(80f, 150f), new Vector2(96f, 96f));
+
+        List<PhotoAlbumEntry> entries = CreateEntries(1);
+        IllustratedPhotoAlbumPageBinder binder = new IllustratedPhotoAlbumPageBinder(
+            () => entries,
+            entry => CreateTexture(entry.fileName),
+            entry => entries.Remove(entry),
+            false);
+
+        binder.Bind(root);
+        binder.Refresh();
+
+        Assert.IsNull(FindButton(root, "RuntimePhotoAlbumDeleteSelected"));
+        Assert.AreEqual(shareButton.transition, sceneDeleteButton.transition);
+        Assert.AreEqual(shareButton.colors.highlightedColor, sceneDeleteButton.colors.highlightedColor);
+        Assert.AreEqual(shareButton.colors.pressedColor, sceneDeleteButton.colors.pressedColor);
+
+        sceneDeleteButton.onClick.Invoke();
+        ClickConfirmDelete(root);
+
+        Assert.IsEmpty(entries);
     }
 
     [Test]
@@ -567,6 +704,13 @@ public sealed class IllustratedPhotoAlbumPageBinderTests
         }
 
         return null;
+    }
+
+    private static void ClickConfirmDelete(Transform root)
+    {
+        Button confirmButton = FindButton(root, "RuntimePhotoAlbumConfirmDelete");
+        Assert.IsNotNull(confirmButton);
+        confirmButton.onClick.Invoke();
     }
 
     private static List<PhotoAlbumEntry> CreateEntries(int count)

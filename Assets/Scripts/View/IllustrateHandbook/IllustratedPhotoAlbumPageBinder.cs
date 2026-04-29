@@ -13,8 +13,18 @@ public sealed class IllustratedPhotoAlbumPageBinder
     private const string RuntimePreviousButtonName = "RuntimePhotoAlbumPreviousPage";
     private const string RuntimeNextButtonName = "RuntimePhotoAlbumNextPage";
     private const string RuntimeDeleteButtonName = "RuntimePhotoAlbumDeleteSelected";
+    private const string RuntimeDeleteConfirmRootName = "RuntimePhotoAlbumDeleteConfirm";
+    private const string RuntimeConfirmDeleteButtonName = "RuntimePhotoAlbumConfirmDelete";
+    private const string RuntimeCancelDeleteButtonName = "RuntimePhotoAlbumCancelDelete";
+    private const string SceneDeleteButtonName = "DeleButton";
     private const float DeleteButtonShareGap = 8f;
     private const float ScenePagingButtonMaxHorizontalDistance = 160f;
+    private static readonly Color DeleteConfirmOverlayColor = new Color(0.05f, 0.04f, 0.03f, 0.54f);
+    private static readonly Color DeleteConfirmPanelColor = new Color(0.72f, 0.60f, 0.40f, 0.98f);
+    private static readonly Color DeleteConfirmTitleColor = new Color(0.13f, 0.09f, 0.04f, 1f);
+    private static readonly Color DeleteConfirmBodyColor = new Color(0.20f, 0.15f, 0.08f, 1f);
+    private static readonly Color DeleteConfirmDangerColor = new Color(0.54f, 0.18f, 0.12f, 0.98f);
+    private static readonly Color DeleteConfirmCancelColor = new Color(0.39f, 0.31f, 0.19f, 0.94f);
 
     private readonly Func<IReadOnlyList<PhotoAlbumEntry>> entryLoader;
     private readonly Func<PhotoAlbumEntry, Texture2D> textureLoader;
@@ -36,6 +46,8 @@ public sealed class IllustratedPhotoAlbumPageBinder
     private Button previousPageButton;
     private Button nextPageButton;
     private Button deleteSelectedButton;
+    private RectTransform deleteConfirmRoot;
+    private CanvasGroup deleteConfirmCanvasGroup;
     private int currentPageIndex;
     private int selectedEntryIndex = -1;
 
@@ -112,6 +124,8 @@ public sealed class IllustratedPhotoAlbumPageBinder
         previousPageButton = null;
         nextPageButton = null;
         deleteSelectedButton = null;
+        deleteConfirmRoot = null;
+        deleteConfirmCanvasGroup = null;
         slotRects.Clear();
         slotImages.Clear();
         currentPageIndex = 0;
@@ -149,6 +163,7 @@ public sealed class IllustratedPhotoAlbumPageBinder
         pageNumberText = FindTextByName(root, "PageNumber");
         EnsurePagingButtons();
         EnsureDeleteSelectedButton(previewTarget as RectTransform);
+        EnsureDeleteConfirmDialog();
     }
 
     private void LoadEntries()
@@ -267,6 +282,11 @@ public sealed class IllustratedPhotoAlbumPageBinder
                 selectedEntryIndex < entries.Count &&
                 entries[selectedEntryIndex] != null;
         }
+
+        if (selectedEntryIndex < 0 || selectedEntryIndex >= entries.Count || entries[selectedEntryIndex] == null)
+        {
+            SetDeleteConfirmVisible(false);
+        }
     }
 
     private void RefreshSummaryCounters()
@@ -327,6 +347,7 @@ public sealed class IllustratedPhotoAlbumPageBinder
         }
 
         selectedEntryIndex = entryIndex;
+        SetDeleteConfirmVisible(false);
         RefreshCurrentSnapshot();
     }
 
@@ -339,6 +360,7 @@ public sealed class IllustratedPhotoAlbumPageBinder
 
         currentPageIndex--;
         selectedEntryIndex = FindFirstEntryIndexOnPage(currentPageIndex);
+        SetDeleteConfirmVisible(false);
         RefreshCurrentSnapshot();
     }
 
@@ -351,7 +373,25 @@ public sealed class IllustratedPhotoAlbumPageBinder
 
         currentPageIndex++;
         selectedEntryIndex = FindFirstEntryIndexOnPage(currentPageIndex);
+        SetDeleteConfirmVisible(false);
         RefreshCurrentSnapshot();
+    }
+
+    private void ShowDeleteConfirm()
+    {
+        if (selectedEntryIndex < 0 || selectedEntryIndex >= entries.Count || entries[selectedEntryIndex] == null)
+        {
+            return;
+        }
+
+        EnsureDeleteConfirmDialog();
+        SetDeleteConfirmVisible(true);
+    }
+
+    private void ConfirmDeleteSelectedEntry()
+    {
+        SetDeleteConfirmVisible(false);
+        DeleteSelectedEntry();
     }
 
     private void DeleteSelectedEntry()
@@ -529,6 +569,16 @@ public sealed class IllustratedPhotoAlbumPageBinder
             return;
         }
 
+        Button sceneDeleteButton = FindSceneAuthoredDeleteButton(root);
+        if (sceneDeleteButton != null)
+        {
+            deleteSelectedButton = sceneDeleteButton;
+            ApplyShareButtonInteractionStyle(deleteSelectedButton, root);
+            deleteSelectedButton.onClick.RemoveAllListeners();
+            deleteSelectedButton.onClick.AddListener(ShowDeleteConfirm);
+            return;
+        }
+
         RectTransform shareButtonRect = FindTransformByName(root, "ShareButton") as RectTransform;
         RectTransform referenceRect = shareButtonRect != null
             ? shareButtonRect
@@ -564,7 +614,273 @@ public sealed class IllustratedPhotoAlbumPageBinder
         }
 
         deleteSelectedButton.onClick.RemoveAllListeners();
-        deleteSelectedButton.onClick.AddListener(DeleteSelectedEntry);
+        deleteSelectedButton.onClick.AddListener(ShowDeleteConfirm);
+    }
+
+    private void EnsureDeleteConfirmDialog()
+    {
+        if (root == null)
+        {
+            return;
+        }
+
+        Transform existingRoot = FindTransformByName(root, RuntimeDeleteConfirmRootName);
+        GameObject confirmObject = existingRoot != null
+            ? existingRoot.gameObject
+            : new GameObject(RuntimeDeleteConfirmRootName, typeof(RectTransform), typeof(CanvasGroup));
+        deleteConfirmRoot = confirmObject.GetComponent<RectTransform>();
+        deleteConfirmRoot.SetParent(root, false);
+        deleteConfirmRoot.anchorMin = Vector2.zero;
+        deleteConfirmRoot.anchorMax = Vector2.one;
+        deleteConfirmRoot.offsetMin = Vector2.zero;
+        deleteConfirmRoot.offsetMax = Vector2.zero;
+        deleteConfirmRoot.localScale = Vector3.one;
+        deleteConfirmRoot.SetAsLastSibling();
+
+        deleteConfirmCanvasGroup = GetOrAddComponent<CanvasGroup>(confirmObject);
+
+        Image overlay = EnsureConfirmImage(deleteConfirmRoot, "Backdrop", DeleteConfirmOverlayColor);
+        StretchRect(overlay.rectTransform);
+
+        Image panelImage = EnsureConfirmImage(deleteConfirmRoot, "Panel", DeleteConfirmPanelColor);
+        RuntimeUiSpriteFactory.ApplyRoundedSprite(panelImage, DeleteConfirmPanelColor, 16, 14, 1.1f);
+        RectTransform panelRect = panelImage.rectTransform;
+        panelRect.anchorMin = new Vector2(0.5f, 0.5f);
+        panelRect.anchorMax = new Vector2(0.5f, 0.5f);
+        panelRect.pivot = new Vector2(0.5f, 0.5f);
+        panelRect.anchoredPosition = Vector2.zero;
+        panelRect.sizeDelta = new Vector2(430f, 220f);
+        panelRect.localScale = Vector3.one;
+
+        TextMeshProUGUI title = EnsureConfirmText(
+            panelRect,
+            "Title",
+            "确认删除这张留念？",
+            30f,
+            DeleteConfirmTitleColor,
+            TextAlignmentOptions.Center,
+            new Vector2(0f, 1f),
+            new Vector2(1f, 1f),
+            new Vector2(28f, -74f),
+            new Vector2(-28f, -24f));
+        ApplyExistingFont(title);
+
+        TextMeshProUGUI body = EnsureConfirmText(
+            panelRect,
+            "Body",
+            "删除后会从本地相册移除，无法恢复。",
+            20f,
+            DeleteConfirmBodyColor,
+            TextAlignmentOptions.Center,
+            new Vector2(0f, 0.5f),
+            new Vector2(1f, 0.5f),
+            new Vector2(30f, -22f),
+            new Vector2(-30f, 38f));
+        body.enableWordWrapping = true;
+        ApplyExistingFont(body);
+
+        Button cancelButton = EnsureConfirmButton(
+            panelRect,
+            RuntimeCancelDeleteButtonName,
+            "取消",
+            DeleteConfirmCancelColor,
+            Color.white,
+            new Vector2(0.5f, 0f),
+            new Vector2(0.5f, 0f),
+            new Vector2(-88f, 34f),
+            new Vector2(128f, 48f));
+        cancelButton.onClick.RemoveAllListeners();
+        cancelButton.onClick.AddListener(() => SetDeleteConfirmVisible(false));
+
+        Button confirmButton = EnsureConfirmButton(
+            panelRect,
+            RuntimeConfirmDeleteButtonName,
+            "确认删除",
+            DeleteConfirmDangerColor,
+            Color.white,
+            new Vector2(0.5f, 0f),
+            new Vector2(0.5f, 0f),
+            new Vector2(88f, 34f),
+            new Vector2(128f, 48f));
+        confirmButton.onClick.RemoveAllListeners();
+        confirmButton.onClick.AddListener(ConfirmDeleteSelectedEntry);
+
+        SetDeleteConfirmVisible(false);
+    }
+
+    private void SetDeleteConfirmVisible(bool visible)
+    {
+        if (deleteConfirmRoot == null || deleteConfirmCanvasGroup == null)
+        {
+            return;
+        }
+
+        deleteConfirmRoot.gameObject.SetActive(visible);
+        deleteConfirmCanvasGroup.alpha = visible ? 1f : 0f;
+        deleteConfirmCanvasGroup.interactable = visible;
+        deleteConfirmCanvasGroup.blocksRaycasts = visible;
+    }
+
+    private static Button FindSceneAuthoredDeleteButton(Transform root)
+    {
+        Transform deleteTransform = FindTransformByName(root, SceneDeleteButtonName);
+        return deleteTransform != null
+            ? deleteTransform.GetComponent<Button>()
+            : null;
+    }
+
+    private static void ApplyShareButtonInteractionStyle(Button targetButton, Transform root)
+    {
+        if (targetButton == null || root == null)
+        {
+            return;
+        }
+
+        Transform shareTransform = FindTransformByName(root, "ShareButton");
+        Button shareButton = shareTransform != null ? shareTransform.GetComponent<Button>() : null;
+        if (shareButton == null || shareButton == targetButton)
+        {
+            return;
+        }
+
+        targetButton.transition = shareButton.transition;
+        targetButton.colors = shareButton.colors;
+        targetButton.spriteState = shareButton.spriteState;
+        targetButton.animationTriggers = shareButton.animationTriggers;
+    }
+
+    private static Image EnsureConfirmImage(RectTransform parent, string name, Color color)
+    {
+        Transform existing = parent != null ? parent.Find(name) : null;
+        GameObject imageObject = existing != null
+            ? existing.gameObject
+            : new GameObject(name, typeof(RectTransform), typeof(Image));
+        RectTransform rect = imageObject.GetComponent<RectTransform>();
+        rect.SetParent(parent, false);
+        rect.localScale = Vector3.one;
+        rect.SetAsLastSibling();
+
+        Image image = GetOrAddComponent<Image>(imageObject);
+        image.color = color;
+        image.raycastTarget = true;
+        return image;
+    }
+
+    private TextMeshProUGUI EnsureConfirmText(
+        RectTransform parent,
+        string name,
+        string content,
+        float fontSize,
+        Color color,
+        TextAlignmentOptions alignment,
+        Vector2 anchorMin,
+        Vector2 anchorMax,
+        Vector2 offsetMin,
+        Vector2 offsetMax)
+    {
+        Transform existing = parent != null ? parent.Find(name) : null;
+        GameObject textObject = existing != null
+            ? existing.gameObject
+            : new GameObject(name, typeof(RectTransform), typeof(TextMeshProUGUI));
+        RectTransform rect = textObject.GetComponent<RectTransform>();
+        rect.SetParent(parent, false);
+        rect.anchorMin = anchorMin;
+        rect.anchorMax = anchorMax;
+        rect.offsetMin = offsetMin;
+        rect.offsetMax = offsetMax;
+        rect.localScale = Vector3.one;
+        rect.SetAsLastSibling();
+
+        TextMeshProUGUI text = GetOrAddComponent<TextMeshProUGUI>(textObject);
+        text.text = content;
+        text.fontSize = fontSize;
+        text.color = color;
+        text.alignment = alignment;
+        text.raycastTarget = false;
+        return text;
+    }
+
+    private Button EnsureConfirmButton(
+        RectTransform parent,
+        string name,
+        string label,
+        Color backgroundColor,
+        Color textColor,
+        Vector2 anchorMin,
+        Vector2 anchorMax,
+        Vector2 anchoredPosition,
+        Vector2 size)
+    {
+        Transform existing = parent != null ? parent.Find(name) : null;
+        GameObject buttonObject = existing != null
+            ? existing.gameObject
+            : new GameObject(name, typeof(RectTransform), typeof(Image), typeof(Button));
+        RectTransform rect = buttonObject.GetComponent<RectTransform>();
+        rect.SetParent(parent, false);
+        rect.anchorMin = anchorMin;
+        rect.anchorMax = anchorMax;
+        rect.pivot = new Vector2(0.5f, 0.5f);
+        rect.anchoredPosition = anchoredPosition;
+        rect.sizeDelta = size;
+        rect.localScale = Vector3.one;
+        rect.SetAsLastSibling();
+
+        Image image = GetOrAddComponent<Image>(buttonObject);
+        RuntimeUiSpriteFactory.ApplyRoundedSprite(image, backgroundColor, 12, 10, 1.1f);
+        image.raycastTarget = true;
+
+        Button button = GetOrAddComponent<Button>(buttonObject);
+        button.targetGraphic = image;
+
+        Transform existingText = buttonObject.transform.Find("Text");
+        GameObject textObject = existingText != null
+            ? existingText.gameObject
+            : new GameObject("Text", typeof(RectTransform), typeof(TextMeshProUGUI));
+        RectTransform textRect = textObject.GetComponent<RectTransform>();
+        textRect.SetParent(buttonObject.transform, false);
+        textRect.anchorMin = Vector2.zero;
+        textRect.anchorMax = Vector2.one;
+        textRect.offsetMin = Vector2.zero;
+        textRect.offsetMax = Vector2.zero;
+        textRect.localScale = Vector3.one;
+
+        TextMeshProUGUI text = GetOrAddComponent<TextMeshProUGUI>(textObject);
+        text.text = label;
+        text.fontSize = 20f;
+        text.color = textColor;
+        text.alignment = TextAlignmentOptions.Center;
+        text.raycastTarget = false;
+        ApplyExistingFont(text);
+        return button;
+    }
+
+    private void ApplyExistingFont(TMP_Text targetText)
+    {
+        if (targetText != null && titleText != null && titleText.font != null)
+        {
+            targetText.font = titleText.font;
+        }
+    }
+
+    private static void StretchRect(RectTransform rect)
+    {
+        if (rect == null)
+        {
+            return;
+        }
+
+        rect.anchorMin = Vector2.zero;
+        rect.anchorMax = Vector2.one;
+        rect.offsetMin = Vector2.zero;
+        rect.offsetMax = Vector2.zero;
+        rect.localScale = Vector3.one;
+    }
+
+    private static T GetOrAddComponent<T>(GameObject gameObject)
+        where T : Component
+    {
+        T component = gameObject.GetComponent<T>();
+        return component != null ? component : gameObject.AddComponent<T>();
     }
 
     private static Button ResolvePagingButton(
