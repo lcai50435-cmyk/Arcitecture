@@ -1,0 +1,340 @@
+fileFormatVersion: 2
+guid: 1673fac2a325278408fa120fe9081f62
+TextureImporter:
+  internalIDToNameTable: []
+  externalObjects: {}
+  serializedVersion: 13
+  mipmaps:
+    mipMapMode: 0
+    enableMipMap: 0
+    sRGBTexture: 1
+    linearTexture: 0
+    fadeOut: 0
+    borderMipMap: 0
+    mipMapsPreserveCoverage: 0
+    alphaTestReferenceValue: 0.5
+    mipMapFadeDistanceStart: 1
+    mipMapFadeDistanceEnd: 3
+  bumpmap:
+    convertToNormalMap: 0
+    externalNormalMap: 0
+    heightScale: 0.25
+    normalMapFilter: 0
+    flipGreenChannel: 0
+  isReadable: 0
+  streamingMipmaps: 0
+  streamingMipmapsPriority: 0
+  vTOnly: 0
+  ignoreMipmapLimit: 0
+  grayScaleToAlpha: 0
+  generateCubemap: 6
+  cubemapConvolution: 0
+  seamlessCubemap: 0
+  textureFormat: 1
+  maxTextureSize: 2048
+  textureSettings:
+    serializedVersion: 2
+    filterMode: 0
+    aniso: 1
+    mipBias: 0
+    wrapU: 1
+    wrapV: 1
+    wrapW: 1
+  nPOTScale: 0
+  lightmap: 0
+  compressionQuality: 50
+  spriteMode: 2
+  spriteExtrude: 1
+  spriteMeshType: 1
+  alignment: 0
+  spritePivot: {x: 0.5, y: 0.5}
+  spritePixelsToUnits: 100
+  spriteBorder: {x: 0, y: 0, z: 0, w: 0}
+  spriteGenerateFallbackPhysicsShape: 1
+  alphaUsage: 1
+  alphaIsTransparency: 1
+  spriteTessellationDetail: -1
+  textureType: 8
+  textureShape: 1
+  singleChannelComponent: 0
+  flipbookRows: 1
+  flipbookColumns: 1
+  maxTextureSizeSet: 0
+  compressionQualitySet: 0
+  textureFormatSet: 0
+  ignorePngGamma: 0
+  applyGammaDecoding: 0
+  swizzle: 50462976
+  cookieLightType: 0
+  platformSettings:
+  - serializedVersion: 3
+    buildTarget: DefaultTexturePlatform
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: 4
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 3
+    buildTarget: Standalone
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 3
+    buildTarget: WebGL
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  spriteSheet:
+    serializedVersion: 2
+    sprites:
+    - serializedVersion: 2
+      name: TX Plant with Shadow_53
+      rect:
+        serializedVersion: 2
+        x: 29
+        y: 288
+        width: 32
+        height: 32
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: c6cc53509a2d35b409733b90ad39a532
+      internalID: -1948473193
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TX Plant with Shadow_54
+      rect:
+        serializedVersion: 2
+        x: 96
+        y: 288
+        width: 32
+        height: 32
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 751712f542a5aca4497907af1cc347c6
+      internalID: 1829993450
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TX Plant with Shadow_56
+      rect:
+        serializedVersion: 2
+        x: 157
+        y: 288
+        width: 40
+        height: 35
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: f337994e7fa1ab4459140faa62ca550b
+      internalID: 766933707
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TX Plant with Shadow_58
+      rect:
+        serializedVersion: 2
+        x: 217
+        y: 281
+        width: 47
+        height: 46
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 5d2aeb68715ab35419d2b06d73ab436a
+      internalID: 1683680804
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TX Plant with Shadow_60
+      rect:
+        serializedVersion: 2
+        x: 283
+        y: 277
+        width: 39
+        height: 49
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: aef3e9ffb3be2204799dc62592875f81
+      internalID: -1004159293
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TX Plant with Shadow_62
+      rect:
+        serializedVersion: 2
+        x: 346
+        y: 285
+        width: 41
+        height: 36
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 26caad6ad16a65b4b853e3e40c8a6f22
+      internalID: -32136656
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    outline: []
+    physicsShape: []
+    bones: []
+    spriteID: 5e97eb03825dee720800000000000000
+    internalID: 0
+    vertices: []
+    indices: 
+    edges: []
+    weights: []
+    secondaryTextures: []
+    nameFileIdTable:
+      TX Plant with Shadow 1_0: 525759135
+      TX Plant with Shadow_0: -1123668115
+      TX Plant with Shadow_1: -503798264
+      TX Plant with Shadow_10: 2076552036
+      TX Plant with Shadow_11: 1038131489
+      TX Plant with Shadow_12: -385065110
+      TX Plant with Shadow_13: -1962301414
+      TX Plant with Shadow_14: -346381978
+      TX Plant with Shadow_15: -746615007
+      TX Plant with Shadow_16: -1285680085
+      TX Plant with Shadow_17: 1169633197
+      TX Plant with Shadow_18: -170221506
+      TX Plant with Shadow_19: 846400994
+      TX Plant with Shadow_2: 523278427
+      TX Plant with Shadow_20: 1192583144
+      TX Plant with Shadow_21: -775517291
+      TX Plant with Shadow_22: 62744583
+      TX Plant with Shadow_23: -1447094968
+      TX Plant with Shadow_24: -960580571
+      TX Plant with Shadow_25: -1325270984
+      TX Plant with Shadow_26: 2039559395
+      TX Plant with Shadow_27: -720142217
+      TX Plant with Shadow_28: 1431501823
+      TX Plant with Shadow_29: 107428462
+      TX Plant with Shadow_3: -1251062668
+      TX Plant with Shadow_30: -946321065
+      TX Plant with Shadow_31: -1410885748
+      TX Plant with Shadow_32: 1382463037
+      TX Plant with Shadow_33: -2097674228
+      TX Plant with Shadow_34: 1965814530
+      TX Plant with Shadow_35: -253651116
+      TX Plant with Shadow_36: -865937211
+      TX Plant with Shadow_37: -1845260143
+      TX Plant with Shadow_38: -1674202952
+      TX Plant with Shadow_39: -1626699616
+      TX Plant with Shadow_4: 596458616
+      TX Plant with Shadow_40: -1108162445
+      TX Plant with Shadow_41: 614667884
+      TX Plant with Shadow_42: -1578360588
+      TX Plant with Shadow_43: 189953931
+      TX Plant with Shadow_44: -787897930
+      TX Plant with Shadow_45: -2076045329
+      TX Plant with Shadow_46: 2141759812
+      TX Plant with Shadow_47: -2124727374
+      TX Plant with Shadow_48: 568452817
+      TX Plant with Shadow_49: -157586134
+      TX Plant with Shadow_5: 1561691306
+      TX Plant with Shadow_50: 647910870
+      TX Plant with Shadow_51: -697734840
+      TX Plant with Shadow_52: 1958231829
+      TX Plant with Shadow_53: -1948473193
+      TX Plant with Shadow_54: 1829993450
+      TX Plant with Shadow_55: 1941212054
+      TX Plant with Shadow_56: 766933707
+      TX Plant with Shadow_57: -1611837368
+      TX Plant with Shadow_58: 1683680804
+      TX Plant with Shadow_59: 328454890
+      TX Plant with Shadow_6: 1653713536
+      TX Plant with Shadow_60: -1004159293
+      TX Plant with Shadow_61: -121075109
+      TX Plant with Shadow_62: -32136656
+      TX Plant with Shadow_63: 789945128
+      TX Plant with Shadow_64: 825504548
+      TX Plant with Shadow_65: -1827750723
+      TX Plant with Shadow_66: 252716347
+      TX Plant with Shadow_67: 219128272
+      TX Plant with Shadow_68: 1965219279
+      TX Plant with Shadow_69: -918966108
+      TX Plant with Shadow_7: 176686366
+      TX Plant with Shadow_70: -1468924483
+      TX Plant with Shadow_71: 221293297
+      TX Plant with Shadow_72: -551567835
+      TX Plant with Shadow_73: 1546943144
+      TX Plant with Shadow_74: -199997671
+      TX Plant with Shadow_75: -794882520
+      TX Plant with Shadow_76: 1641244321
+      TX Plant with Shadow_77: -2144518211
+      TX Plant with Shadow_78: -770433993
+      TX Plant with Shadow_79: -1990215795
+      TX Plant with Shadow_8: 446023748
+      TX Plant with Shadow_80: 670014050
+      TX Plant with Shadow_81: 1359542143
+      TX Plant with Shadow_82: -489566727
+      TX Plant with Shadow_83: 41534392
+      TX Plant with Shadow_84: 1017576079
+      TX Plant with Shadow_85: 1920430185
+      TX Plant with Shadow_9: 1075001879
+  mipmapLimitGroupName: 
+  pSDRemoveMatte: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
