@@ -11,8 +11,10 @@ public class Dialog : MonoBehaviour
     private const string GameplayPauseReason = "RuntimeDialog";
     private const string RuntimeDialogObjectName = "RuntimeDialogController";
     private const string RuntimeDialogPanelName = "RuntimeDialogPanel";
+    private const string RuntimeDialogBoxResourcePath = "UI/DialogBox";
     private const string RuntimeTextAreaResourcePath = "UI/TextArea";
     private const string RuntimeDialogFontResourcePath = "UI/NotoSansSC-Black";
+    private const string RuntimeDialogBoxSpritePath = "Assets/Resources/UI/DialogBox.png";
     private const string RuntimeTextAreaSpritePath = "Assets/File/UIResources/TextArea.png";
     private const string RuntimeDialogFontPath = "Assets/File/Fonts/NotoSansSC-Black.ttf";
     public const int TopmostRuntimeDialogSortingOrder = 32000;
@@ -508,14 +510,21 @@ public class Dialog : MonoBehaviour
 
     private static Dialog CreateRuntimeInstanceFromProjectAssets()
     {
+        Sprite dialogBoxSprite = LoadRuntimeDialogBoxSprite();
         Sprite textAreaSprite = LoadRuntimeTextAreaSprite();
-        if (textAreaSprite == null)
+        if (dialogBoxSprite == null && textAreaSprite == null)
         {
             return null;
         }
 
         Font dialogFont = LoadRuntimeDialogFont();
-        Sprite panelSprite = CreateSlicedRuntimeSprite(textAreaSprite, RuntimeTextAreaBorder, "RuntimeDialogTextAreaPanelSprite");
+        Sprite panelSprite = dialogBoxSprite != null
+            ? dialogBoxSprite
+            : CreateSlicedRuntimeSprite(textAreaSprite, RuntimeTextAreaBorder, "RuntimeDialogTextAreaPanelSprite");
+        Sprite buttonSprite = CreateSlicedRuntimeSprite(
+            textAreaSprite ?? dialogBoxSprite,
+            RuntimeTextAreaBorder,
+            "RuntimeDialogButtonSprite");
 
         GameObject controllerObject = new GameObject(RuntimeDialogObjectName);
         Dialog dialog = controllerObject.AddComponent<Dialog>();
@@ -554,16 +563,24 @@ public class Dialog : MonoBehaviour
         Button backdropButton = panelObject.GetComponent<Button>();
         backdropButton.transition = Selectable.Transition.None;
 
-        GameObject cardObject = new GameObject("RuntimeDialogTextArea", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+        GameObject cardObject = new GameObject("RuntimeDialogBox", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
         cardObject.transform.SetParent(panelObject.transform, false);
         RectTransform cardRect = cardObject.GetComponent<RectTransform>();
-        SetRect(cardRect, Vector2.zero, new Vector2(840f, 330f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f));
+        SetRect(
+            cardRect,
+            new Vector2(0f, 20f),
+            new Vector2(1720f, 634f),
+            new Vector2(0.5f, 0f),
+            new Vector2(0.5f, 0f),
+            new Vector2(0.5f, 0f));
 
         Image cardImage = cardObject.GetComponent<Image>();
         cardImage.sprite = panelSprite;
-        cardImage.type = Image.Type.Sliced;
+        cardImage.type = dialogBoxSprite != null ? Image.Type.Simple : Image.Type.Sliced;
         cardImage.preserveAspect = false;
-        cardImage.color = new Color(0.13f, 0.11f, 0.09f, 0.96f);
+        cardImage.color = dialogBoxSprite != null
+            ? Color.white
+            : new Color(0.13f, 0.11f, 0.09f, 0.96f);
 
         GameObject textObject = new GameObject("Description", typeof(RectTransform), typeof(CanvasRenderer), typeof(Text));
         textObject.transform.SetParent(cardObject.transform, false);
@@ -573,25 +590,42 @@ public class Dialog : MonoBehaviour
             description.font = dialogFont;
         }
 
-        description.fontSize = 28;
+        description.fontSize = dialogBoxSprite != null ? 30 : 28;
         description.lineSpacing = 1.12f;
         description.color = new Color(1f, 0.96f, 0.88f, 1f);
         description.alignment = TextAnchor.UpperLeft;
         description.horizontalOverflow = HorizontalWrapMode.Wrap;
         description.verticalOverflow = VerticalWrapMode.Truncate;
-        StretchRectWithOffsets(description.rectTransform, 52f, 42f, 52f, 92f);
+        if (dialogBoxSprite != null)
+        {
+            StretchRectWithOffsets(description.rectTransform, 92f, 184f, 88f, 138f);
+        }
+        else
+        {
+            StretchRectWithOffsets(description.rectTransform, 52f, 42f, 52f, 92f);
+        }
 
         Button closeButton = CreateRuntimeButton(cardObject.transform);
         RectTransform closeRect = closeButton.GetComponent<RectTransform>();
-        SetRect(closeRect, new Vector2(-54f, 40f), new Vector2(138f, 52f), new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(1f, 0f));
+        if (dialogBoxSprite != null)
+        {
+            SetRect(closeRect, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero, Vector2.zero);
+            HideRuntimeCloseButtonVisual(closeButton);
+        }
+        else
+        {
+            SetRect(closeRect, new Vector2(-54f, 40f), new Vector2(138f, 52f), new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(1f, 0f));
+        }
 
         Image closeImage = closeButton.GetComponent<Image>();
         if (closeImage != null)
         {
-            closeImage.sprite = panelSprite;
+            closeImage.sprite = buttonSprite;
             closeImage.type = Image.Type.Sliced;
             closeImage.preserveAspect = false;
-            closeImage.color = new Color(0.58f, 0.39f, 0.18f, 0.96f);
+            closeImage.color = dialogBoxSprite != null
+                ? Color.clear
+                : new Color(0.58f, 0.39f, 0.18f, 0.96f);
         }
 
         Text closeLabel = closeButton.GetComponentInChildren<Text>();
@@ -603,7 +637,9 @@ public class Dialog : MonoBehaviour
             }
 
             closeLabel.fontSize = 24;
-            closeLabel.color = new Color(1f, 0.96f, 0.88f, 1f);
+            closeLabel.color = dialogBoxSprite != null
+                ? Color.clear
+                : new Color(1f, 0.96f, 0.88f, 1f);
         }
 
         dialog.dialogPanel = panelObject;
@@ -614,6 +650,24 @@ public class Dialog : MonoBehaviour
         panelObject.SetActive(false);
         dialog.InitializeLifecycle(false);
         return dialog;
+    }
+
+    private static Sprite LoadRuntimeDialogBoxSprite()
+    {
+        Sprite sprite = Resources.Load<Sprite>(RuntimeDialogBoxResourcePath);
+#if UNITY_EDITOR
+        if (sprite == null)
+        {
+            sprite = AssetDatabase.LoadAssetAtPath<Sprite>(RuntimeDialogBoxSpritePath);
+        }
+#endif
+        if (sprite != null && sprite.texture != null)
+        {
+            sprite.texture.filterMode = FilterMode.Point;
+            sprite.texture.wrapMode = TextureWrapMode.Clamp;
+        }
+
+        return sprite;
     }
 
     private static Sprite LoadRuntimeTextAreaSprite()
@@ -828,6 +882,26 @@ public class Dialog : MonoBehaviour
         RuntimeTextFontRepair.RepairLegacyText(label);
 
         return buttonObject.GetComponent<Button>();
+    }
+
+    private static void HideRuntimeCloseButtonVisual(Button closeButton)
+    {
+        if (closeButton == null)
+        {
+            return;
+        }
+
+        Image image = closeButton.GetComponent<Image>();
+        if (image != null)
+        {
+            image.color = Color.clear;
+        }
+
+        Text label = closeButton.GetComponentInChildren<Text>(true);
+        if (label != null)
+        {
+            label.color = Color.clear;
+        }
     }
 
     private void HideOtherUI(bool hide)

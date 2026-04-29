@@ -73,20 +73,35 @@ public sealed class DialogRuntimeInteractionTests
 
         Dialog dialog = Dialog.EnsureRuntimeInstance();
 
-        Transform card = dialog.dialogPanel.transform.Find("RuntimeDialogTextArea");
+        Transform card = dialog.dialogPanel.transform.Find("RuntimeDialogBox");
         Assert.IsNotNull(card);
 
         RectTransform cardRect = card.GetComponent<RectTransform>();
         Assert.IsNotNull(cardRect);
-        Assert.LessOrEqual(cardRect.sizeDelta.x, 900f);
-        Assert.LessOrEqual(cardRect.sizeDelta.y, 360f);
+        Assert.AreEqual(0f, cardRect.anchorMin.y);
+        Assert.AreEqual(0f, cardRect.anchorMax.y);
+        Assert.AreEqual(0f, cardRect.pivot.y);
+        Assert.GreaterOrEqual(cardRect.sizeDelta.x, 1700f);
+        Assert.GreaterOrEqual(cardRect.sizeDelta.y, 620f);
+
+        Image cardImage = card.GetComponent<Image>();
+        Assert.IsNotNull(cardImage);
+        Assert.IsNotNull(cardImage.sprite);
+        Assert.AreEqual("DialogBox", cardImage.sprite.texture.name);
+        Assert.That(cardImage.color.r, Is.EqualTo(1f).Within(0.001f));
+        Assert.That(cardImage.color.g, Is.EqualTo(1f).Within(0.001f));
+        Assert.That(cardImage.color.b, Is.EqualTo(1f).Within(0.001f));
 
         Assert.LessOrEqual(dialog.descriptionText.fontSize, 32);
 
         RectTransform buttonRect = dialog.clickCloseButton.GetComponent<RectTransform>();
         Assert.IsNotNull(buttonRect);
-        Assert.LessOrEqual(buttonRect.sizeDelta.x, 160f);
-        Assert.LessOrEqual(buttonRect.sizeDelta.y, 60f);
+        Assert.LessOrEqual(buttonRect.sizeDelta.x, 2f);
+        Assert.LessOrEqual(buttonRect.sizeDelta.y, 2f);
+
+        Image buttonImage = dialog.clickCloseButton.GetComponent<Image>();
+        Assert.IsNotNull(buttonImage);
+        Assert.That(buttonImage.color.a, Is.EqualTo(0f).Within(0.001f));
     }
 
     [Test]
