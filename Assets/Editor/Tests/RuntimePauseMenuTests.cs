@@ -85,6 +85,23 @@ public sealed class RuntimePauseMenuTests
     }
 
     [Test]
+    public void TryOpenFromPauseKeyBypassesExistingGameplayBlockingUi()
+    {
+        createdScene = SceneManager.CreateScene("FirstPass_1");
+        Assert.IsTrue(SceneManager.SetActiveScene(createdScene));
+        Time.timeScale = 1f;
+        CreateOpenBlockingUiRoot();
+
+        Assert.IsTrue(RuntimeUiInputGuard.IsBlockingGameplayUiOpen());
+        Assert.IsFalse(RuntimePauseMenu.TryOpenFromExternal());
+
+        Assert.IsTrue(RuntimePauseMenu.TryOpenFromPauseKey());
+
+        Assert.IsTrue(RuntimePauseMenu.IsPauseOpen);
+        Assert.AreEqual(0f, Time.timeScale);
+    }
+
+    [Test]
     public void ResumeButtonReceivesRaycastClickAndContinuesGame()
     {
         createdScene = SceneManager.CreateScene("FirstPass_1");
@@ -133,6 +150,67 @@ public sealed class RuntimePauseMenuTests
             $"Expected pause button to be the top raycast target, but got {result.gameObject.name}.");
     }
 
+    [Test]
+    public void PauseMenuButtonsRenderAboveTopmostRuntimeDialogBlocker()
+    {
+        createdScene = SceneManager.CreateScene("FirstPass_1");
+        Assert.IsTrue(SceneManager.SetActiveScene(createdScene));
+        Time.timeScale = 1f;
+        CreateTransparentRaycastBlocker("TopmostRuntimeDialogCanvas", Dialog.TopmostRuntimeDialogSortingOrder);
+
+        Assert.IsTrue(RuntimePauseMenu.TryOpenFromPauseKey());
+        RevealMenuButtonsImmediate();
+
+        Button resumeButton = FindButtonByLabel("返回游戏");
+        Assert.IsNotNull(resumeButton);
+
+        RaycastResult result = RaycastTopResult(resumeButton);
+        Assert.IsNotNull(result.gameObject);
+        Assert.IsTrue(
+            result.gameObject == resumeButton.gameObject || result.gameObject.transform.IsChildOf(resumeButton.transform),
+            $"Expected pause button to be above topmost runtime blockers, but got {result.gameObject.name}.");
+    }
+
+    [Test]
+    public void PauseMenuButtonLabelDoesNotCaptureTopRaycastTarget()
+    {
+        createdScene = SceneManager.CreateScene("FirstPass_1");
+        Assert.IsTrue(SceneManager.SetActiveScene(createdScene));
+        Time.timeScale = 1f;
+
+        Assert.IsTrue(RuntimePauseMenu.TryOpenFromExternal());
+        RevealMenuButtonsImmediate();
+
+        Button resumeButton = FindButtonByLabel("返回游戏");
+        Assert.IsNotNull(resumeButton);
+
+        RaycastResult result = RaycastTopResult(resumeButton);
+        Assert.AreEqual(
+            resumeButton.gameObject,
+            result.gameObject,
+            $"Expected pause button to receive the top raycast directly, but got {result.gameObject.name}.");
+    }
+
+    [Test]
+    public void PauseMenuButtonBecomesInteractiveBeforeRevealAnimationFullyCompletes()
+    {
+        createdScene = SceneManager.CreateScene("FirstPass_1");
+        Assert.IsTrue(SceneManager.SetActiveScene(createdScene));
+        Time.timeScale = 1f;
+
+        Assert.IsTrue(RuntimePauseMenu.TryOpenFromExternal());
+
+        Button resumeButton = FindButtonByLabel("返回游戏");
+        Assert.IsNotNull(resumeButton);
+        CanvasGroup canvasGroup = resumeButton.GetComponent<CanvasGroup>();
+        Assert.IsNotNull(canvasGroup);
+
+        ApplyMenuButtonRevealProgress(resumeButton, 0.5f);
+
+        Assert.IsTrue(canvasGroup.interactable);
+        Assert.IsTrue(canvasGroup.blocksRaycasts);
+    }
+
     private static void DestroyPauseMenu()
     {
         if (RuntimePauseMenu.Instance != null)
@@ -161,6 +239,28 @@ public sealed class RuntimePauseMenuTests
         revealMethod.Invoke(RuntimePauseMenu.Instance, null);
     }
 
+    private static void ApplyMenuButtonRevealProgress(Button button, float progress)
+    {
+        Assert.IsNotNull(button);
+
+        System.Type revealItemType = typeof(RuntimePauseMenu).GetNestedType(
+            "MenuButtonRevealItem",
+            BindingFlags.NonPublic);
+        Assert.IsNotNull(revealItemType);
+
+        object revealItem = System.Activator.CreateInstance(
+            revealItemType,
+            button.GetComponent<RectTransform>(),
+            button.GetComponent<CanvasGroup>());
+        Assert.IsNotNull(revealItem);
+
+        MethodInfo applyMethod = typeof(RuntimePauseMenu).GetMethod(
+            "ApplyMenuButtonRevealState",
+            BindingFlags.Static | BindingFlags.NonPublic);
+        Assert.IsNotNull(applyMethod);
+        applyMethod.Invoke(null, new[] { revealItem, progress });
+    }
+
     private static Button FindButtonByLabel(string label)
     {
         Button[] buttons = Object.FindObjectsOfType<Button>(true);
@@ -174,6 +274,23 @@ public sealed class RuntimePauseMenuTests
         }
 
         return null;
+    }
+
+    private static void CreateOpenBlockingUiRoot()
+    {
+        GameObject rootObject = new GameObject("RuntimeUIRootManager");
+        SceneManager.MoveGameObjectToScene(rootObject, SceneManager.GetActiveScene());
+        UIRootManager rootManager = rootObject.AddComponent<UIRootManager>();
+
+        GameObject dialogObject = new GameObject("BlockingDialog", typeof(RectTransform), typeof(CanvasGroup));
+        SceneManager.MoveGameObjectToScene(dialogObject, SceneManager.GetActiveScene());
+        CanvasGroup dialogGroup = dialogObject.GetComponent<CanvasGroup>();
+        dialogGroup.alpha = 1f;
+        dialogGroup.interactable = true;
+        dialogGroup.blocksRaycasts = true;
+
+        rootManager.dialogUI = dialogGroup;
+        Assert.IsTrue(rootManager.IsAnyGameplayBlockingUIOpen());
     }
 
     private static RaycastResult RaycastTopClickableResult(Button expectedButton)
@@ -205,8 +322,13 @@ public sealed class RuntimePauseMenuTests
 
     private static void CreateTransparentSceneTransitionBlocker()
     {
+        CreateTransparentRaycastBlocker("FadeOverlayCanvas", 9999);
+    }
+
+    private static void CreateTransparentRaycastBlocker(string canvasName, int sortingOrder)
+    {
         GameObject canvasObject = new GameObject(
-            "FadeOverlayCanvas",
+            canvasName,
             typeof(RectTransform),
             typeof(Canvas),
             typeof(CanvasScaler),
@@ -215,7 +337,7 @@ public sealed class RuntimePauseMenuTests
         Canvas canvas = canvasObject.GetComponent<Canvas>();
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;
         canvas.overrideSorting = true;
-        canvas.sortingOrder = 9999;
+        canvas.sortingOrder = sortingOrder;
 
         RectTransform canvasRect = canvasObject.GetComponent<RectTransform>();
         StretchRect(canvasRect);

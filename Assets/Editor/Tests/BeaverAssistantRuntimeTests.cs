@@ -146,8 +146,101 @@ public sealed class BeaverAssistantRuntimeTests
         Canvas canvas = hud.transform.Find("BeaverAssistantCanvas")?.GetComponent<Canvas>();
         Assert.IsNotNull(canvas);
         Assert.IsTrue(canvas.overrideSorting);
-        Assert.That(canvas.sortingOrder, Is.GreaterThan(RuntimeModalStyle.BackdropSortingOrder));
-        Assert.That(canvas.sortingOrder, Is.LessThan(RuntimeModalStyle.ModalSortingOrder));
+        Assert.That(canvas.sortingOrder, Is.GreaterThan(SceneTransitionBlockerSortingOrder));
+        Assert.That(canvas.sortingOrder, Is.LessThan(Dialog.TopmostRuntimeDialogSortingOrder));
+    }
+
+    [Test]
+    public void AvatarClickOpensPanelAboveTransparentSceneTransitionBlockerInFirstPass()
+    {
+        Scene gameplayScene = GetOrCreateScene("FirstPass_1");
+        Assert.IsTrue(SceneManager.SetActiveScene(gameplayScene));
+        CreateTransparentSceneTransitionBlocker();
+
+        BeaverAssistantHud hud = BeaverAssistantHud.EnsureInstance();
+        InvokeSceneChanged(hud, "FirstPass_1");
+
+        Button avatarButton = hud.transform.Find("BeaverAssistantCanvas/BeaverAvatarButton")?.GetComponent<Button>();
+        Assert.IsNotNull(avatarButton);
+
+        RaycastResult result = RaycastTopResult(avatarButton);
+        Assert.IsNotNull(result.gameObject);
+        Assert.IsTrue(
+            result.gameObject == avatarButton.gameObject || result.gameObject.transform.IsChildOf(avatarButton.transform),
+            $"Expected beaver avatar to receive the top raycast in FirstPass_1, but got {result.gameObject.name}.");
+
+        ExecuteEvents.ExecuteHierarchy(
+            result.gameObject,
+            new PointerEventData(EventSystem.current)
+            {
+                position = RectTransformUtility.WorldToScreenPoint(null, avatarButton.transform.position)
+            },
+            ExecuteEvents.pointerClickHandler);
+
+        Assert.IsTrue(BeaverAssistantPanel.IsOpen);
+
+        Canvas panelCanvas = BeaverAssistantPanel.EnsureInstance()
+            .transform
+            .Find("BeaverAssistantPanelCanvas")
+            ?.GetComponent<Canvas>();
+        Assert.IsNotNull(panelCanvas);
+        Assert.That(panelCanvas.sortingOrder, Is.GreaterThan(SceneTransitionBlockerSortingOrder));
+    }
+
+    [Test]
+    public void LegacyAuthoredBeaverButtonOpensPanelOnceInFirstPass()
+    {
+        Scene gameplayScene = GetOrCreateScene("FirstPass_1");
+        Assert.IsTrue(SceneManager.SetActiveScene(gameplayScene));
+        Button legacyButton = CreateLegacyBeaverButton();
+
+        BeaverAssistantHud hud = BeaverAssistantHud.EnsureInstance();
+        InvokeSceneChanged(hud, "FirstPass_1");
+        InvokePrivate(hud, "RefreshLegacyBeaverButtonBindings");
+        InvokePrivate(hud, "RefreshLegacyBeaverButtonBindings");
+
+        Assert.IsNotNull(legacyButton.GetComponent<BeaverAssistantLegacyButtonBinding>());
+
+        legacyButton.onClick.Invoke();
+        Assert.IsTrue(BeaverAssistantPanel.IsOpen);
+
+        legacyButton.onClick.Invoke();
+        Assert.IsFalse(BeaverAssistantPanel.IsOpen);
+    }
+
+    [Test]
+    public void SpriteCompanionClickProxyOpensPanelInFirstPass()
+    {
+        Scene gameplayScene = GetOrCreateScene("FirstPass_1");
+        Assert.IsTrue(SceneManager.SetActiveScene(gameplayScene));
+        GameObject companion = new GameObject("SpriteCompanion");
+        SpriteCompanionAssistantClickProxy proxy = companion.AddComponent<SpriteCompanionAssistantClickProxy>();
+
+        proxy.ToggleAssistantPanel();
+
+        Assert.IsTrue(BeaverAssistantPanel.IsOpen);
+    }
+
+    [Test]
+    public void SpriteCompanionRuntimeAddsAssistantClickProxy()
+    {
+        GameObject companion = new GameObject("SpriteCompanion");
+
+        try
+        {
+            MethodInfo method = typeof(SpriteCompanionRuntime).GetMethod(
+                "EnsureAssistantClickProxy",
+                BindingFlags.Static | BindingFlags.NonPublic);
+            Assert.IsNotNull(method);
+
+            method.Invoke(null, new object[] { companion });
+
+            Assert.IsNotNull(companion.GetComponent<SpriteCompanionAssistantClickProxy>());
+        }
+        finally
+        {
+            Object.DestroyImmediate(companion);
+        }
     }
 
     [Test]
@@ -166,7 +259,7 @@ public sealed class BeaverAssistantRuntimeTests
     }
 
     [Test]
-    public void PanelCanvasUsesModalSortingOrderWhenShown()
+    public void PanelCanvasRendersAboveSceneTransitionBlockerWhenShown()
     {
         Scene baseScene = GetOrCreateScene("NewBase");
         Assert.IsTrue(SceneManager.SetActiveScene(baseScene));
@@ -177,7 +270,8 @@ public sealed class BeaverAssistantRuntimeTests
         Canvas canvas = panel.transform.Find("BeaverAssistantPanelCanvas")?.GetComponent<Canvas>();
         Assert.IsNotNull(canvas);
         Assert.IsTrue(canvas.overrideSorting);
-        Assert.That(canvas.sortingOrder, Is.EqualTo(RuntimeModalStyle.ModalSortingOrder));
+        Assert.That(canvas.sortingOrder, Is.GreaterThan(SceneTransitionBlockerSortingOrder));
+        Assert.That(canvas.sortingOrder, Is.LessThan(Dialog.TopmostRuntimeDialogSortingOrder));
 
         panel.Hide();
     }
@@ -401,5 +495,96 @@ public sealed class BeaverAssistantRuntimeTests
         }
 
         return false;
+    }
+
+    private const int SceneTransitionBlockerSortingOrder = 9999;
+
+    private static RaycastResult RaycastTopResult(Button expectedButton)
+    {
+        EventSystem eventSystem = EventSystem.current;
+        Assert.IsNotNull(eventSystem);
+
+        PointerEventData eventData = new PointerEventData(eventSystem)
+        {
+            position = RectTransformUtility.WorldToScreenPoint(null, expectedButton.transform.position)
+        };
+
+        List<RaycastResult> results = new List<RaycastResult>();
+        eventSystem.RaycastAll(eventData, results);
+        Assert.IsNotEmpty(results);
+
+        return results[0];
+    }
+
+    private static void CreateTransparentSceneTransitionBlocker()
+    {
+        GameObject canvasObject = new GameObject(
+            "FadeOverlayCanvas",
+            typeof(RectTransform),
+            typeof(Canvas),
+            typeof(CanvasScaler),
+            typeof(GraphicRaycaster),
+            typeof(CanvasGroup));
+        Canvas canvas = canvasObject.GetComponent<Canvas>();
+        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        canvas.overrideSorting = true;
+        canvas.sortingOrder = SceneTransitionBlockerSortingOrder;
+
+        RectTransform canvasRect = canvasObject.GetComponent<RectTransform>();
+        StretchRect(canvasRect);
+
+        CanvasGroup canvasGroup = canvasObject.GetComponent<CanvasGroup>();
+        canvasGroup.alpha = 0f;
+        canvasGroup.interactable = true;
+        canvasGroup.blocksRaycasts = true;
+
+        GameObject overlayObject = new GameObject("FadeOverlay", typeof(RectTransform), typeof(Image));
+        overlayObject.transform.SetParent(canvasObject.transform, false);
+        RectTransform overlayRect = overlayObject.GetComponent<RectTransform>();
+        StretchRect(overlayRect);
+
+        Image overlayImage = overlayObject.GetComponent<Image>();
+        overlayImage.color = Color.clear;
+        overlayImage.raycastTarget = true;
+    }
+
+    private static Button CreateLegacyBeaverButton()
+    {
+        GameObject canvasObject = new GameObject(
+            "AICanvas",
+            typeof(RectTransform),
+            typeof(Canvas),
+            typeof(CanvasScaler),
+            typeof(GraphicRaycaster));
+        Canvas canvas = canvasObject.GetComponent<Canvas>();
+        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        canvas.overrideSorting = true;
+        canvas.sortingOrder = 240;
+
+        RectTransform canvasRect = canvasObject.GetComponent<RectTransform>();
+        StretchRect(canvasRect);
+
+        GameObject buttonObject = new GameObject("Beaver", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button));
+        buttonObject.transform.SetParent(canvasObject.transform, false);
+        RectTransform buttonRect = buttonObject.GetComponent<RectTransform>();
+        buttonRect.anchorMin = new Vector2(0.5f, 0.5f);
+        buttonRect.anchorMax = new Vector2(0.5f, 0.5f);
+        buttonRect.pivot = new Vector2(0.5f, 0.5f);
+        buttonRect.anchoredPosition = new Vector2(-820f, -428f);
+        buttonRect.sizeDelta = new Vector2(108f, 90f);
+
+        Image image = buttonObject.GetComponent<Image>();
+        image.color = Color.white;
+        image.raycastTarget = true;
+
+        return buttonObject.GetComponent<Button>();
+    }
+
+    private static void StretchRect(RectTransform rectTransform)
+    {
+        rectTransform.anchorMin = Vector2.zero;
+        rectTransform.anchorMax = Vector2.one;
+        rectTransform.offsetMin = Vector2.zero;
+        rectTransform.offsetMax = Vector2.zero;
     }
 }

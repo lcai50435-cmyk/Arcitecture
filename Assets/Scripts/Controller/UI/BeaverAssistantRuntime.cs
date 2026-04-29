@@ -210,12 +210,14 @@ public sealed class BeaverAssistantHud : MonoBehaviour
 {
     private const string CanvasName = "BeaverAssistantCanvas";
     private const string AvatarResourcePath = "UI/dabb2b31-d671-4717-9918-6d60739a0f10_no_bg";
-    private const int SortingOrder = RuntimeModalStyle.BackdropSortingOrder + 10;
+    private const string LegacyBeaverButtonName = "Beaver";
+    private const int SortingOrder = Dialog.TopmostRuntimeDialogSortingOrder - 20;
     private const float AvatarLeftMargin = 48f;
     private const float AvatarBottomMargin = 64f;
     private const float AvatarSize = 88f;
     private const float BubbleVisibleSeconds = 4.8f;
     private const float BubbleResumeMinVisibleSeconds = 2.6f;
+    private const float LegacyButtonRescanInterval = 0.5f;
     private static readonly Vector2 BottomLeftAnchor = new Vector2(0f, 0f);
 
     private static BeaverAssistantHud instance;
@@ -230,6 +232,7 @@ public sealed class BeaverAssistantHud : MonoBehaviour
     private float nextAmbientTime;
     private string lastBubbleMessage;
     private float suspendedBubbleRemainingSeconds;
+    private float nextLegacyButtonScanTime;
     private bool wasAssistantBlockedByRuntimeUi;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
@@ -302,6 +305,7 @@ public sealed class BeaverAssistantHud : MonoBehaviour
     {
         RefreshBlockingUiResumeState();
         RefreshUnblockedCanvasState();
+        RefreshLegacyBeaverButtonBindingsIfNeeded();
 
         if (bubbleGroup != null)
         {
@@ -319,6 +323,7 @@ public sealed class BeaverAssistantHud : MonoBehaviour
     private void HandleSceneChanged(string sceneName)
     {
         ApplyCanvasSupportState(sceneName);
+        RefreshLegacyBeaverButtonBindings();
         ScheduleNextAmbient();
     }
 
@@ -467,6 +472,7 @@ public sealed class BeaverAssistantHud : MonoBehaviour
 
         avatarButton = CreateAvatarButton(canvasRect);
         bubbleText = CreateBubble(canvasRect, out bubbleGroup);
+        RefreshLegacyBeaverButtonBindings();
     }
 
     private Button CreateAvatarButton(Transform parent)
@@ -636,6 +642,45 @@ public sealed class BeaverAssistantHud : MonoBehaviour
         return message.Substring(0, 40) + "…";
     }
 
+    private void RefreshLegacyBeaverButtonBindingsIfNeeded()
+    {
+        if (Time.unscaledTime < nextLegacyButtonScanTime)
+        {
+            return;
+        }
+
+        nextLegacyButtonScanTime = Time.unscaledTime + LegacyButtonRescanInterval;
+        RefreshLegacyBeaverButtonBindings();
+    }
+
+    private void RefreshLegacyBeaverButtonBindings()
+    {
+        Button[] buttons = FindObjectsOfType<Button>(true);
+        for (int i = 0; i < buttons.Length; i++)
+        {
+            Button button = buttons[i];
+            if (!IsLegacyBeaverButton(button) || button.GetComponent<BeaverAssistantLegacyButtonBinding>() != null)
+            {
+                continue;
+            }
+
+            button.onClick.AddListener(TogglePanelFromLegacyButton);
+            button.gameObject.AddComponent<BeaverAssistantLegacyButtonBinding>();
+        }
+    }
+
+    private static bool IsLegacyBeaverButton(Button button)
+    {
+        return button != null &&
+               button.gameObject != null &&
+               string.Equals(button.gameObject.name, LegacyBeaverButtonName, StringComparison.Ordinal);
+    }
+
+    private static void TogglePanelFromLegacyButton()
+    {
+        BeaverAssistantPanel.EnsureInstance().Toggle();
+    }
+
     private static void FillCircle(Texture2D texture, int centerX, int centerY, int radius, Color color)
     {
         int radiusSquared = radius * radius;
@@ -668,10 +713,15 @@ public sealed class BeaverAssistantHud : MonoBehaviour
     }
 }
 
+[DisallowMultipleComponent]
+public sealed class BeaverAssistantLegacyButtonBinding : MonoBehaviour
+{
+}
+
 public sealed class BeaverAssistantPanel : MonoBehaviour
 {
     private const string PauseReason = "BeaverAssistant";
-    private const int SortingOrder = RuntimeModalStyle.ModalSortingOrder;
+    private const int SortingOrder = Dialog.TopmostRuntimeDialogSortingOrder - 10;
     private const int MaxHistoryLines = 48;
     private const float HistoryScrollWidth = 796f;
     private const float HistoryScrollHeight = 292f;
