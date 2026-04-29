@@ -7,7 +7,6 @@ public class BackpackSlot : MonoBehaviour, IPointerDownHandler, IPointerUpHandle
 {
     private const string RuntimeSlotIconName = "ItemIcon";
     private const int DropClickCount = 2;
-    private const float DroppedLootBagScale = 0.0875f;
 
     [Header("格子编号 0~5")]
     public int slotIndex;
@@ -32,7 +31,13 @@ public class BackpackSlot : MonoBehaviour, IPointerDownHandler, IPointerUpHandle
         BackpackSlot slot = pointerDrag != null
             ? pointerDrag.GetComponent<BackpackSlot>() ?? pointerDrag.GetComponentInParent<BackpackSlot>()
             : null;
-        if (slot == null)
+
+        int resolvedSlotIndex;
+        if (slot != null)
+        {
+            resolvedSlotIndex = slot.slotIndex;
+        }
+        else if (!DraggedSpecialStructureSlotSource.TryResolve(pointerDrag, out resolvedSlotIndex))
         {
             return false;
         }
@@ -40,13 +45,13 @@ public class BackpackSlot : MonoBehaviour, IPointerDownHandler, IPointerUpHandle
         BackpackMananger runtimeBackpack = BackpackMananger.Instance != null
             ? BackpackMananger.Instance
             : Object.FindObjectOfType<BackpackMananger>(true);
-        ArchitecturalCrystal? item = runtimeBackpack != null ? runtimeBackpack.GetItem(slot.slotIndex) : null;
+        ArchitecturalCrystal? item = runtimeBackpack != null ? runtimeBackpack.GetItem(resolvedSlotIndex) : null;
         if (!item.HasValue || !item.Value.IsSpecialStructure)
         {
             return false;
         }
 
-        sourceSlotIndex = slot.slotIndex;
+        sourceSlotIndex = resolvedSlotIndex;
         return true;
     }
 
@@ -293,6 +298,9 @@ public class BackpackSlot : MonoBehaviour, IPointerDownHandler, IPointerUpHandle
         canvasGroup.blocksRaycasts = false;
         canvasGroup.interactable = false;
 
+        DraggedSpecialStructureSlotSource dragSource = ghostObject.AddComponent<DraggedSpecialStructureSlotSource>();
+        dragSource.Bind(slotIndex);
+
         UpdateDragGhost(ghostRect, canvas, screenPosition);
         return ghostRect;
     }
@@ -432,7 +440,7 @@ public class BackpackSlot : MonoBehaviour, IPointerDownHandler, IPointerUpHandle
         RuntimeCrystalDropFactory.CreateInteractiveDrop(
             crystal,
             dropPosition,
-            DroppedLootBagScale,
+            RuntimeCrystalDropFactory.ClosedLootBagWorldScale,
             4,
             null,
             $"Drop_{crystal.type}",
@@ -470,6 +478,33 @@ public class BackpackSlot : MonoBehaviour, IPointerDownHandler, IPointerUpHandle
 
         backpackUI = view;
         backpackUI.RefreshUI();
+    }
+}
+
+internal sealed class DraggedSpecialStructureSlotSource : MonoBehaviour
+{
+    [SerializeField] private int slotIndex = -1;
+
+    public void Bind(int sourceSlotIndex)
+    {
+        slotIndex = sourceSlotIndex;
+    }
+
+    public static bool TryResolve(GameObject pointerDrag, out int sourceSlotIndex)
+    {
+        sourceSlotIndex = -1;
+        DraggedSpecialStructureSlotSource source =
+            pointerDrag != null
+                ? pointerDrag.GetComponent<DraggedSpecialStructureSlotSource>() ??
+                  pointerDrag.GetComponentInParent<DraggedSpecialStructureSlotSource>()
+                : null;
+        if (source == null || source.slotIndex < 0)
+        {
+            return false;
+        }
+
+        sourceSlotIndex = source.slotIndex;
+        return true;
     }
 }
 

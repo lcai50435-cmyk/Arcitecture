@@ -329,6 +329,7 @@ public class GameDebugPageBootstrapper : MonoBehaviour
         CreateActionRow(section.transform, "福建土楼", ("+25", () => AddBuildingProgress(CatalogueBuildingId.Building1, 25)), ("+100", () => AddBuildingProgress(CatalogueBuildingId.Building1, 100)));
         CreateActionRow(section.transform, "赵州桥", ("+25", () => AddBuildingProgress(CatalogueBuildingId.Building2, 25)), ("+100", () => AddBuildingProgress(CatalogueBuildingId.Building2, 100)));
         CreateActionRow(section.transform, "安徽民居", ("+25", () => AddBuildingProgress(CatalogueBuildingId.Building3, 25)), ("+100", () => AddBuildingProgress(CatalogueBuildingId.Building3, 100)));
+        CreateActionRow(section.transform, "专用进度", ("一键点满", FillAllDedicatedProgress));
         CreateActionRow(section.transform, "专用结构", ("+1", () => AddSpecialStructureToBackpack(1)), ("+3", () => AddSpecialStructureToBackpack(3)));
     }
 
@@ -577,6 +578,30 @@ public class GameDebugPageBootstrapper : MonoBehaviour
         }
 
         RuntimeProgressState.EnsureInstance().AddBuildingProgress(buildingId, value, out _);
+        RefreshStatus();
+    }
+
+    private void FillAllDedicatedProgress()
+    {
+        RuntimeProgressState runtimeState = RuntimeProgressState.EnsureInstance();
+
+        foreach (BuildingDefinition definition in BuildingDefinitionLibrary.GetAll())
+        {
+            if (definition == null || definition.slotDefinitions == null)
+            {
+                continue;
+            }
+
+            for (int i = 0; i < definition.slotDefinitions.Length; i++)
+            {
+                runtimeState.TryUnlockSlot(
+                    definition.buildingId,
+                    i,
+                    out _,
+                    out _);
+            }
+        }
+
         RefreshStatus();
     }
 

@@ -265,6 +265,54 @@ public sealed class CatalogueBuildingUnlockStateTests
     }
 
     [Test]
+    public void DetailOpenButtonResolvesSceneBindingsAndShowsUnlockedBuildingDetail()
+    {
+        RuntimeProgressState state = RuntimeProgressState.EnsureInstance();
+        state.ResetProgress(false);
+
+        GameObject detailPanel = new GameObject("DetailedInformationCanvas");
+        roots.Add(detailPanel);
+        Text detailTitle = CreateChild<Text>(detailPanel.transform, "Title");
+        DetailedInformationUI detailUi = detailPanel.AddComponent<DetailedInformationUI>();
+        detailUi.detailedInformationPanel = detailPanel;
+        detailUi.page1NameText = detailTitle;
+        detailPanel.SetActive(false);
+
+        GameObject cardObject = new GameObject("Card", typeof(RectTransform));
+        roots.Add(cardObject);
+        Slider slider = CreateChild<Slider>(cardObject.transform, "Slider");
+        BuildingDetailData detailData = CreateChild<BuildingDetailData>(cardObject.transform, "DetailData");
+        detailData.buildingName = "测试建筑";
+
+        CatalogueBuildingUnlockState unlockState = cardObject.AddComponent<CatalogueBuildingUnlockState>();
+        unlockState.buildingId = CatalogueBuildingId.Building1;
+        unlockState.buildingSlider = slider;
+
+        GameObject buttonObject = new GameObject("GotoButton", typeof(RectTransform), typeof(Image), typeof(Button));
+        buttonObject.transform.SetParent(cardObject.transform, false);
+        Button button = buttonObject.GetComponent<Button>();
+        BuildingDetailOpenButton openButton = buttonObject.AddComponent<BuildingDetailOpenButton>();
+
+        state.AddBuildingProgress(
+            CatalogueBuildingId.Building1,
+            BuildingDefinitionLibrary.Get(CatalogueBuildingId.Building1).requiredProgress,
+            out _);
+        CompleteBuildingUnlockPrerequisites(state, CatalogueBuildingId.Building1);
+        Assert.IsTrue(state.TryUnlockBuilding(CatalogueBuildingId.Building1, out _));
+        unlockState.RefreshState();
+
+        InvokePrivate(openButton, "Awake");
+        InvokePrivate(openButton, "Start");
+
+        Assert.IsTrue(button.interactable);
+
+        button.onClick.Invoke();
+
+        Assert.IsTrue(detailPanel.activeSelf);
+        Assert.AreEqual("测试建筑", detailTitle.text);
+    }
+
+    [Test]
     public void DroppingBackpackSpecialStructureOnCatalogueSlotUnlocksSlotAndAddsProgress()
     {
         RuntimeProgressState state = RuntimeProgressState.EnsureInstance();

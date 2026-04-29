@@ -690,7 +690,8 @@ public sealed class IllustratedHandbookTabsControllerTests
         Assert.Less(visibleIcon.color.b, 1f);
 
         Image transparentHitArea = FindDescendant(firstSlotRoot, "Button_1").GetComponent<Image>();
-        Assert.AreEqual(0f, transparentHitArea.color.a);
+        Assert.LessOrEqual(transparentHitArea.color.a, 0.001f);
+        Assert.IsTrue(transparentHitArea.raycastTarget);
 
         IDropHandler dropHandler = firstSlotRoot.GetComponents<MonoBehaviour>().OfType<IDropHandler>().FirstOrDefault();
         Assert.IsNotNull(dropHandler);
@@ -709,6 +710,164 @@ public sealed class IllustratedHandbookTabsControllerTests
         Assert.IsTrue(progressState.IsSlotUnlocked(CatalogueBuildingId.Building1, 0));
         Assert.AreEqual(0, backpack.GetSpecialStructureMaterialCount());
         Assert.AreEqual(Color.white, visibleIcon.color);
+    }
+
+    [Test]
+    public void SceneAuthoredFirstProprietaryButtonAcceptsDrop()
+    {
+        RuntimeProgressState progressState = RuntimeProgressState.EnsureInstance();
+        progressState.ResetProgress(false);
+
+        BackpackMananger backpack = CreateRuntimeBackpack();
+        Assert.IsTrue(backpack.PickItem(ArchitecturalCrystalFactory.CreateSpecialStructureMaterial()));
+
+        rootObject = CreateSceneAuthoredRoot();
+        GameObject handbookPage = rootObject.transform.Find("IllustratedHandbookCanvas").gameObject;
+        CreateSceneAuthoredHandbookSurfaceWithNestedProprietarySlots(handbookPage);
+
+        UIManager manager = rootObject.AddComponent<UIManager>();
+        manager.illustratedHandbook = rootObject;
+        IllustratedHandbookTabsController controller = IllustratedHandbookTabsController.EnsureInstalled(manager);
+        controller.SwitchToPage(IllustratedHandbookPage.IllustratedHandbook);
+
+        Transform firstSlotRoot = FindDescendant(handbookPage.transform, "Material_1");
+        Button firstSlotButton = FindDescendant(firstSlotRoot, "Button_1").GetComponent<Button>();
+        IDropHandler dropHandler = ResolveDropHandler(firstSlotButton.transform);
+        Assert.IsNotNull(dropHandler);
+
+        Transform backpackSlotIcon = FindDescendant(
+            FindDescendant(handbookPage.transform, "HandbookBackpackSlot_1"),
+            "ItemIcon");
+        EventSystem eventSystem = EventSystem.current ?? new GameObject("EventSystem", typeof(EventSystem)).GetComponent<EventSystem>();
+        PointerEventData eventData = new PointerEventData(eventSystem)
+        {
+            pointerDrag = backpackSlotIcon.gameObject
+        };
+
+        dropHandler.OnDrop(eventData);
+
+        Assert.IsTrue(progressState.IsSlotUnlocked(CatalogueBuildingId.Building1, 0));
+        Assert.IsFalse(backpack.GetItem(0).HasValue);
+        Assert.AreEqual(0, backpack.GetSpecialStructureMaterialCount());
+    }
+
+    [Test]
+    public void SceneAuthoredFirstProprietaryVisibleImageDoesNotBlockDrop()
+    {
+        RuntimeProgressState.EnsureInstance().ResetProgress(false);
+
+        rootObject = CreateSceneAuthoredRoot();
+        GameObject handbookPage = rootObject.transform.Find("IllustratedHandbookCanvas").gameObject;
+        CreateSceneAuthoredHandbookSurfaceWithNestedProprietarySlots(handbookPage);
+
+        UIManager manager = rootObject.AddComponent<UIManager>();
+        manager.illustratedHandbook = rootObject;
+        IllustratedHandbookTabsController controller = IllustratedHandbookTabsController.EnsureInstalled(manager);
+        controller.SwitchToPage(IllustratedHandbookPage.IllustratedHandbook);
+
+        Transform firstSlotRoot = FindDescendant(handbookPage.transform, "Material_1");
+        Transform firstSlotButton = FindDescendant(firstSlotRoot, "Button_1");
+        Transform visibleImage = FindDescendant(firstSlotRoot, "Image");
+        Image rootImage = firstSlotRoot.GetComponent<Image>();
+        Image buttonImage = firstSlotButton.GetComponent<Image>();
+        Image visibleIcon = visibleImage.GetComponent<Image>();
+
+        Assert.IsTrue(rootImage.raycastTarget);
+        Assert.IsTrue(buttonImage.raycastTarget);
+        Assert.IsFalse(visibleIcon.raycastTarget);
+        AssertHasDropHandler(firstSlotRoot);
+        AssertHasDropHandler(firstSlotButton);
+        AssertHasDropHandler(visibleImage);
+    }
+
+    [Test]
+    public void DroppingRuntimeBackpackIconOntoFirstProprietaryButtonConsumesItem()
+    {
+        RuntimeProgressState progressState = RuntimeProgressState.EnsureInstance();
+        progressState.ResetProgress(false);
+
+        BackpackMananger backpack = CreateRuntimeBackpack();
+        Assert.IsTrue(backpack.PickItem(ArchitecturalCrystalFactory.CreateSpecialStructureMaterial()));
+
+        rootObject = CreateSceneAuthoredRoot();
+        GameObject handbookPage = rootObject.transform.Find("IllustratedHandbookCanvas").gameObject;
+        CreateSceneAuthoredHandbookSurfaceWithNestedProprietarySlots(handbookPage);
+
+        UIManager manager = rootObject.AddComponent<UIManager>();
+        manager.illustratedHandbook = rootObject;
+        IllustratedHandbookTabsController controller = IllustratedHandbookTabsController.EnsureInstalled(manager);
+        controller.SwitchToPage(IllustratedHandbookPage.IllustratedHandbook);
+
+        GameObject runtimeSlotObject = new GameObject("RuntimeBackpackSlot_1", typeof(RectTransform), typeof(Image), typeof(BackpackSlot));
+        runtimeSlotObject.transform.SetParent(rootObject.transform, false);
+        runtimeSlotObject.GetComponent<BackpackSlot>().slotIndex = 0;
+        Image runtimeSlotIcon = CreateChild<Image>(runtimeSlotObject.transform, "ItemIcon");
+
+        Transform firstSlotRoot = FindDescendant(handbookPage.transform, "Material_1");
+        Button firstSlotButton = FindDescendant(firstSlotRoot, "Button_1").GetComponent<Button>();
+        IDropHandler dropHandler = ResolveDropHandler(firstSlotButton.transform);
+        Assert.IsNotNull(dropHandler);
+
+        EventSystem eventSystem = EventSystem.current ?? new GameObject("EventSystem", typeof(EventSystem)).GetComponent<EventSystem>();
+        PointerEventData eventData = new PointerEventData(eventSystem)
+        {
+            pointerDrag = runtimeSlotIcon.gameObject
+        };
+
+        dropHandler.OnDrop(eventData);
+
+        Assert.IsTrue(progressState.IsSlotUnlocked(CatalogueBuildingId.Building1, 0));
+        Assert.IsFalse(backpack.GetItem(0).HasValue);
+        Assert.AreEqual(0, backpack.GetSpecialStructureMaterialCount());
+    }
+
+    [Test]
+    public void DroppingSceneHandbookDragGhostOntoFirstProprietaryButtonConsumesItem()
+    {
+        RuntimeProgressState progressState = RuntimeProgressState.EnsureInstance();
+        progressState.ResetProgress(false);
+
+        BackpackMananger backpack = CreateRuntimeBackpack();
+        Assert.IsTrue(backpack.PickItem(ArchitecturalCrystalFactory.CreateSpecialStructureMaterial()));
+
+        rootObject = CreateSceneAuthoredRoot();
+        rootObject.AddComponent<Canvas>().renderMode = RenderMode.ScreenSpaceOverlay;
+        GameObject handbookPage = rootObject.transform.Find("IllustratedHandbookCanvas").gameObject;
+        CreateSceneAuthoredHandbookSurfaceWithNestedProprietarySlots(handbookPage);
+
+        UIManager manager = rootObject.AddComponent<UIManager>();
+        manager.illustratedHandbook = rootObject;
+        IllustratedHandbookTabsController controller = IllustratedHandbookTabsController.EnsureInstalled(manager);
+        controller.SwitchToPage(IllustratedHandbookPage.IllustratedHandbook);
+
+        Transform backpackSlot = FindDescendant(handbookPage.transform, "HandbookBackpackSlot_1");
+        IBeginDragHandler beginDragHandler = backpackSlot.GetComponents<MonoBehaviour>().OfType<IBeginDragHandler>().FirstOrDefault();
+        Assert.IsNotNull(beginDragHandler);
+
+        EventSystem eventSystem = EventSystem.current ?? new GameObject("EventSystem", typeof(EventSystem)).GetComponent<EventSystem>();
+        beginDragHandler.OnBeginDrag(new PointerEventData(eventSystem)
+        {
+            position = new Vector2(10f, 10f)
+        });
+
+        GameObject dragGhost = GameObject.Find("HandbookDragGhost");
+        Assert.IsNotNull(dragGhost);
+
+        Transform firstSlotRoot = FindDescendant(handbookPage.transform, "Material_1");
+        Button firstSlotButton = FindDescendant(firstSlotRoot, "Button_1").GetComponent<Button>();
+        IDropHandler dropHandler = ResolveDropHandler(firstSlotButton.transform);
+        Assert.IsNotNull(dropHandler);
+
+        PointerEventData eventData = new PointerEventData(eventSystem)
+        {
+            pointerDrag = dragGhost
+        };
+
+        dropHandler.OnDrop(eventData);
+
+        Assert.IsTrue(progressState.IsSlotUnlocked(CatalogueBuildingId.Building1, 0));
+        Assert.IsFalse(backpack.GetItem(0).HasValue);
+        Assert.AreEqual(0, backpack.GetSpecialStructureMaterialCount());
     }
 
     private static GameObject CreateScenePageRoot()
@@ -965,6 +1124,18 @@ public sealed class IllustratedHandbookTabsControllerTests
         Transform content = slot.Find("Image");
         Image contentImage = content != null ? content.GetComponent<Image>() : null;
         return contentImage != null ? contentImage : slot.GetComponent<Image>();
+    }
+
+    private static void AssertHasDropHandler(Transform target)
+    {
+        Assert.IsNotNull(ResolveDropHandler(target), target != null ? target.name : "null");
+    }
+
+    private static IDropHandler ResolveDropHandler(Transform target)
+    {
+        return target != null
+            ? target.GetComponents<MonoBehaviour>().OfType<IDropHandler>().FirstOrDefault()
+            : null;
     }
 
     private static T CreateChild<T>(Transform parent, string name)

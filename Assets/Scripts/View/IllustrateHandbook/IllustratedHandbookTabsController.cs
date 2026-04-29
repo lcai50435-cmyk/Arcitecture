@@ -1855,6 +1855,12 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
 
         BindSceneHandbookProprietaryDropTarget(slotRoot.gameObject, buildingId, slotIndex);
 
+        Image contentImage = ResolveSceneHandbookProprietarySlotContentImage(slotRoot);
+        if (contentImage != null && contentImage.transform != slotRoot)
+        {
+            BindSceneHandbookProprietaryDropTarget(contentImage.gameObject, buildingId, slotIndex, false);
+        }
+
         Button[] buttons = slotRoot.GetComponentsInChildren<Button>(true);
         for (int i = 0; i < buttons.Length; i++)
         {
@@ -1880,7 +1886,11 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         }
     }
 
-    private void BindSceneHandbookProprietaryDropTarget(GameObject targetObject, CatalogueBuildingId buildingId, int slotIndex)
+    private void BindSceneHandbookProprietaryDropTarget(
+        GameObject targetObject,
+        CatalogueBuildingId buildingId,
+        int slotIndex,
+        bool enableRaycastTarget = true)
     {
         if (targetObject == null)
         {
@@ -1888,7 +1898,7 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         }
 
         Image targetImage = targetObject.GetComponent<Image>();
-        if (targetImage != null)
+        if (enableRaycastTarget && targetImage != null)
         {
             targetImage.raycastTarget = true;
         }
@@ -4540,19 +4550,25 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
                     ? pointerDrag.GetComponent<SceneHandbookBackpackSlotDragHandler>() ??
                       pointerDrag.GetComponentInParent<SceneHandbookBackpackSlotDragHandler>()
                     : null;
-            if (handler == null)
+
+            int resolvedSlotIndex;
+            if (handler != null)
+            {
+                resolvedSlotIndex = handler.slotIndex;
+            }
+            else if (!DraggedSpecialStructureSlotSource.TryResolve(pointerDrag, out resolvedSlotIndex))
             {
                 return false;
             }
 
             BackpackMananger backpack = ResolveRuntimeBackpackManager();
-            ArchitecturalCrystal? item = backpack != null ? backpack.GetItem(handler.slotIndex) : null;
+            ArchitecturalCrystal? item = backpack != null ? backpack.GetItem(resolvedSlotIndex) : null;
             if (!item.HasValue || !item.Value.IsSpecialStructure)
             {
                 return false;
             }
 
-            sourceSlotIndex = handler.slotIndex;
+            sourceSlotIndex = resolvedSlotIndex;
             return true;
         }
 
@@ -4565,7 +4581,10 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
                 return;
             }
 
-            dragGhost = CreateSceneHandbookDragGhost(sourceIcon, eventData != null ? eventData.position : (Vector2)Input.mousePosition);
+            dragGhost = CreateSceneHandbookDragGhost(
+                sourceIcon,
+                slotIndex,
+                eventData != null ? eventData.position : (Vector2)Input.mousePosition);
         }
 
         public void OnDrag(PointerEventData eventData)
@@ -4581,7 +4600,7 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         }
     }
 
-    private static RectTransform CreateSceneHandbookDragGhost(Image sourceIcon, Vector2 screenPosition)
+    private static RectTransform CreateSceneHandbookDragGhost(Image sourceIcon, int sourceSlotIndex, Vector2 screenPosition)
     {
         Canvas canvas = ResolveSceneHandbookDragCanvas();
         if (canvas == null)
@@ -4595,6 +4614,9 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         ghostRect.sizeDelta = new Vector2(42f, 42f);
         ghostRect.pivot = new Vector2(0.5f, 0.5f);
         ghostRect.SetAsLastSibling();
+
+        DraggedSpecialStructureSlotSource dragSource = ghostObject.AddComponent<DraggedSpecialStructureSlotSource>();
+        dragSource.Bind(sourceSlotIndex);
 
         CanvasGroup canvasGroup = ghostObject.GetComponent<CanvasGroup>();
         canvasGroup.interactable = false;

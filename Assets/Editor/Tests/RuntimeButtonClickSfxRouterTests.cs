@@ -714,6 +714,50 @@ public sealed class GameDebugPageBootstrapperAttributeTests
         }
     }
 
+    [Test]
+    public void ProgressDebugRowCanFillAllDedicatedProgressSlots()
+    {
+        RuntimeProgressState runtimeState = RuntimeProgressState.EnsureInstance();
+        runtimeState.ResetProgress(false);
+
+        GameDebugPageBootstrapper debugPage = CreateDebugPage();
+        GameObject contentObject = new GameObject("DebugContent", typeof(RectTransform));
+
+        try
+        {
+            InvokePrivate(debugPage, "BuildProgressSection", contentObject.transform);
+
+            Transform section = contentObject.transform.Find("图鉴进度");
+            Assert.NotNull(section);
+
+            Transform dedicatedRow = section.Find("专用进度");
+            Assert.NotNull(dedicatedRow);
+
+            Button[] buttons = dedicatedRow.GetComponentsInChildren<Button>(true);
+            Assert.AreEqual(1, buttons.Length);
+
+            buttons[0].onClick.Invoke();
+
+            foreach (BuildingDefinition definition in BuildingDefinitionLibrary.GetAll())
+            {
+                int slotCount = definition.slotDefinitions != null ? definition.slotDefinitions.Length : 0;
+                int commonCap = Mathf.Clamp(
+                    Mathf.RoundToInt(definition.requiredProgress * 0.7f),
+                    0,
+                    definition.requiredProgress);
+                int expectedDedicatedProgress = Mathf.Max(0, definition.requiredProgress - commonCap);
+
+                Assert.AreEqual(slotCount, runtimeState.GetUnlockedSlotCount(definition.buildingId));
+                Assert.AreEqual(expectedDedicatedProgress, runtimeState.GetBuildingProgress(definition.buildingId));
+                Assert.IsFalse(runtimeState.IsBuildingUnlocked(definition.buildingId));
+            }
+        }
+        finally
+        {
+            Object.DestroyImmediate(contentObject);
+        }
+    }
+
     private GameDebugPageBootstrapper CreateDebugPage()
     {
         debugObject = new GameObject("RuntimeDebugPage");
