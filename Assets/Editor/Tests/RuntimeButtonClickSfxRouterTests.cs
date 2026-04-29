@@ -1,8 +1,11 @@
+using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 using TMPro;
 using NUnit.Framework;
+using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 public sealed class RuntimeButtonClickSfxRouterTests
@@ -34,6 +37,299 @@ public sealed class RuntimeButtonClickSfxRouterTests
         Assert.IsFalse(RuntimeButtonClickSfxRouter.ShouldPlayClickForButton(button));
 
         Assert.IsFalse(RuntimeButtonClickSfxRouter.ShouldPlayClickForButton(null));
+    }
+}
+
+public sealed class FirstPassRuntimePortTests
+{
+    private readonly List<GameObject> roots = new List<GameObject>();
+
+    [TearDown]
+    public void TearDown()
+    {
+        for (int i = 0; i < roots.Count; i++)
+        {
+            if (roots[i] != null)
+            {
+                Object.DestroyImmediate(roots[i]);
+            }
+        }
+
+        roots.Clear();
+        InkBall[] inkBalls = Object.FindObjectsOfType<InkBall>();
+        for (int i = 0; i < inkBalls.Length; i++)
+        {
+            if (inkBalls[i] != null)
+            {
+                Object.DestroyImmediate(inkBalls[i].gameObject);
+            }
+        }
+
+        DestroyRuntimeObject("GameplayStatusHudCanvas");
+        DestroyRuntimeObject("RuntimeMiniMapHud");
+        DestroyRuntimeObject("RuntimeMiniMapOverlayCanvas");
+        DestroyRuntimeObject("PackBagCanvas");
+    }
+
+    [Test]
+    public void GameplayStageRuntimeBootstrapperExistsForFirstPassPort()
+    {
+        System.Type bootstrapperType = System.Type.GetType("GameplayStageRuntimeBootstrapper, Assembly-CSharp");
+
+        Assert.IsNotNull(bootstrapperType);
+        Assert.IsTrue(typeof(MonoBehaviour).IsAssignableFrom(bootstrapperType));
+    }
+
+    [Test]
+    public void StatusHudCreatesFallbackGaugesWhenFirstPassHasNoSceneShowPanel()
+    {
+        ValueTrans healthGauge = GameplayStatusHudRuntime.EnsureHealthGauge(null);
+        ValueTrans weaponGauge = GameplayStatusHudRuntime.EnsureWeaponGauge(null);
+
+        Assert.IsNotNull(healthGauge);
+        Assert.IsNotNull(weaponGauge);
+        Assert.IsNotNull(GameObject.Find("GameplayStatusHudRoot"));
+        Assert.IsNotNull(GameObject.Find("HealthRow"));
+        Assert.IsNotNull(GameObject.Find("InkRow"));
+        Assert.IsNotNull(GameObject.Find("StructureRow"));
+    }
+
+    [Test]
+    public void StatusHudFallbackUsesCompactFirstPassLayout()
+    {
+        GameplayStatusHudRuntime.EnsureHealthGauge(null);
+
+        RectTransform root = GameObject.Find("GameplayStatusHudRoot").GetComponent<RectTransform>();
+        RectTransform healthRow = GameObject.Find("HealthRow").GetComponent<RectTransform>();
+        RectTransform inkRow = GameObject.Find("InkRow").GetComponent<RectTransform>();
+        RectTransform structureRow = GameObject.Find("StructureRow").GetComponent<RectTransform>();
+
+        Assert.AreEqual(new Vector2(18f, -16f), root.anchoredPosition);
+        Assert.AreEqual(new Vector2(360f, 166f), root.sizeDelta);
+        Assert.AreEqual(new Vector2(352f, 52f), healthRow.sizeDelta);
+        Assert.AreEqual(new Vector2(352f, 52f), inkRow.sizeDelta);
+        Assert.AreEqual(new Vector2(352f, 52f), structureRow.sizeDelta);
+        Assert.AreEqual(new Vector2(0f, 0f), healthRow.anchoredPosition);
+        Assert.AreEqual(new Vector2(0f, -50f), inkRow.anchoredPosition);
+        Assert.AreEqual(new Vector2(0f, -100f), structureRow.anchoredPosition);
+
+        RectTransform healthIcon = healthRow.Find("Icon").GetComponent<RectTransform>();
+        Image healthIconImage = healthIcon.GetComponent<Image>();
+        RectTransform healthBar = healthRow.Find("Bar").GetComponent<RectTransform>();
+        TextMeshProUGUI healthValue = healthRow.GetComponentInChildren<TextMeshProUGUI>(true);
+        Assert.AreEqual(new Vector2(58f, 58f), healthIcon.sizeDelta);
+        Assert.AreEqual(new Vector2(252f, 22f), healthBar.sizeDelta);
+        Assert.AreEqual(new Vector2(78f, 28f), healthValue.rectTransform.sizeDelta);
+
+        Image inkIcon = inkRow.Find("Icon").GetComponent<Image>();
+        Image structureIcon = structureRow.Find("Icon").GetComponent<Image>();
+        Assert.IsNotNull(healthIconImage.sprite);
+        Assert.IsNotNull(inkIcon.sprite);
+        Assert.IsNotNull(structureIcon.sprite);
+        Assert.AreEqual("NewUI_1_0", healthIconImage.sprite.name);
+        Assert.AreEqual("NewUI_0", inkIcon.sprite.name);
+        Assert.AreEqual("NewUI_1", structureIcon.sprite.name);
+    }
+
+    [Test]
+    public void RuntimeCountdownFallbackRestoresAuthoredTimeBackground()
+    {
+        TextMeshProUGUI countdown = GameplayStatusHudRuntime.EnsureCountdownText(null);
+
+        GameObject frameObject = GameObject.Find("GameplayCountdownFrame");
+        Assert.IsNotNull(countdown);
+        Assert.IsNotNull(frameObject);
+
+        RectTransform frameRect = frameObject.GetComponent<RectTransform>();
+        Image frameImage = frameObject.GetComponent<Image>();
+        Assert.AreEqual(new Vector2(336f, 72f), frameRect.sizeDelta);
+        Assert.AreEqual(new Vector2(0f, -12f), frameRect.anchoredPosition);
+        Assert.IsNotNull(frameImage.sprite);
+        Assert.AreEqual("time", frameImage.sprite.name);
+        Assert.IsFalse(frameImage.raycastTarget);
+    }
+
+    [Test]
+    public void StatusHudSkinsSceneShowPanelSlidersWithPixelBars()
+    {
+        GameObject panel = new GameObject("ShowPanel", typeof(RectTransform));
+        roots.Add(panel);
+
+        Slider healthSlider = CreateSceneStatusSlider(panel.transform, "HealthSlider");
+        Slider inkSlider = CreateSceneStatusSlider(panel.transform, "InkSlider");
+        Slider structureSlider = CreateSceneStatusSlider(panel.transform, "StructureSlider");
+
+        GameplayStatusHudRuntime.EnsureHealthGauge(null);
+
+        AssertSceneStatusSliderSkinned(healthSlider, new Color(0.82f, 0.19f, 0.16f, 1f));
+        AssertSceneStatusSliderSkinned(inkSlider, new Color(0.08f, 0.08f, 0.08f, 1f));
+        AssertSceneStatusSliderSkinned(structureSlider, new Color(0.20f, 0.78f, 0.82f, 1f));
+    }
+
+    [Test]
+    public void PlayerAttackCreatesRuntimeInkBallWhenPrefabIsMissing()
+    {
+        GameObject player = new GameObject(
+            "Player",
+            typeof(Rigidbody2D),
+            typeof(SpriteRenderer),
+            typeof(Animator),
+            typeof(CharacterCore),
+            typeof(DirectionTracker),
+            typeof(PlayerAttack));
+        roots.Add(player);
+        player.tag = "Player";
+
+        PlayerAttack attack = player.GetComponent<PlayerAttack>();
+        attack.inkballPrefab = null;
+        attack.inkPoint = player.transform;
+        attack.ink = 100f;
+        attack.maxInk = 100f;
+        attack.baseMaxInk = 100f;
+
+        attack.TriggerAttack();
+
+        InkBall[] spawnedInkBalls = Object.FindObjectsOfType<InkBall>();
+        Assert.That(spawnedInkBalls.Length, Is.GreaterThan(0));
+        Assert.IsNotNull(spawnedInkBalls[0].GetComponent<Rigidbody2D>());
+        Assert.IsNotNull(spawnedInkBalls[0].GetComponent<Collider2D>());
+        Assert.IsNotNull(spawnedInkBalls[0].GetComponent<SpriteRenderer>());
+    }
+
+    [Test]
+    public void PlayerAttackOffsetsFallbackRuntimeInkBallOutsideOwnerBody()
+    {
+        GameObject player = new GameObject(
+            "Player",
+            typeof(Rigidbody2D),
+            typeof(BoxCollider2D),
+            typeof(SpriteRenderer),
+            typeof(Animator),
+            typeof(CharacterCore),
+            typeof(DirectionTracker),
+            typeof(PlayerAttack));
+        roots.Add(player);
+        player.tag = "Player";
+
+        DirectionTracker tracker = player.GetComponent<DirectionTracker>();
+        tracker.defaultDirection = Vector2.right;
+
+        PlayerAttack attack = player.GetComponent<PlayerAttack>();
+        attack.inkballPrefab = null;
+        attack.inkPoint = player.transform;
+
+        InvokeSpawnInkBalls(attack, Vector2.right, InkAttackRuntimeConfig.Default);
+
+        InkBall[] spawnedInkBalls = Object.FindObjectsOfType<InkBall>();
+        Assert.That(spawnedInkBalls.Length, Is.EqualTo(1));
+
+        BoxCollider2D ownerCollider = player.GetComponent<BoxCollider2D>();
+        Assert.Greater(spawnedInkBalls[0].transform.position.x, ownerCollider.bounds.max.x + 0.05f);
+        Assert.AreEqual(0f, spawnedInkBalls[0].transform.position.y, 0.001f);
+    }
+
+    [Test]
+    public void InkBallIgnoresOwnerColliderTrigger()
+    {
+        GameObject player = new GameObject(
+            "Player",
+            typeof(Rigidbody2D),
+            typeof(BoxCollider2D),
+            typeof(CharacterCore));
+        roots.Add(player);
+        player.tag = "Player";
+
+        GameObject projectile = new GameObject(
+            "Projectile",
+            typeof(Rigidbody2D),
+            typeof(CircleCollider2D),
+            typeof(SpriteRenderer),
+            typeof(InkBall));
+        roots.Add(projectile);
+
+        CircleCollider2D projectileCollider = projectile.GetComponent<CircleCollider2D>();
+        projectileCollider.isTrigger = true;
+
+        InkBall inkBall = projectile.GetComponent<InkBall>();
+        inkBall.character = player.GetComponent<CharacterCore>();
+        inkBall.Init(InkAttackRuntimeConfig.Default);
+
+        InvokeInkBallTrigger(inkBall, player.GetComponent<BoxCollider2D>());
+
+        Assert.IsTrue(projectileCollider.enabled);
+        Assert.IsNull(GameObject.Find("InkImpactPulse"));
+    }
+
+    private static void DestroyRuntimeObject(string objectName)
+    {
+        GameObject target = GameObject.Find(objectName);
+        if (target != null)
+        {
+            Object.DestroyImmediate(target);
+        }
+    }
+
+    private static Slider CreateSceneStatusSlider(Transform parent, string name)
+    {
+        GameObject sliderObject = new GameObject(name, typeof(RectTransform), typeof(Slider));
+        sliderObject.transform.SetParent(parent, false);
+        Slider slider = sliderObject.GetComponent<Slider>();
+
+        GameObject background = new GameObject("Background", typeof(RectTransform), typeof(Image));
+        background.transform.SetParent(sliderObject.transform, false);
+
+        GameObject fillArea = new GameObject("Fill Area", typeof(RectTransform));
+        fillArea.transform.SetParent(sliderObject.transform, false);
+
+        GameObject fill = new GameObject("Fill", typeof(RectTransform), typeof(Image));
+        fill.transform.SetParent(fillArea.transform, false);
+        slider.fillRect = fill.GetComponent<RectTransform>();
+
+        GameObject icon = new GameObject("StatusBackGround", typeof(RectTransform), typeof(Image));
+        icon.transform.SetParent(sliderObject.transform, false);
+
+        GameObject number = new GameObject("Number", typeof(RectTransform), typeof(TextMeshProUGUI));
+        number.transform.SetParent(sliderObject.transform, false);
+
+        return slider;
+    }
+
+    private static void AssertSceneStatusSliderSkinned(Slider slider, Color expectedFillColor)
+    {
+        Assert.IsNotNull(slider);
+
+        Image background = slider.transform.Find("Background").GetComponent<Image>();
+        Image fill = slider.fillRect.GetComponent<Image>();
+
+        Assert.IsNotNull(background.sprite);
+        Assert.That(background.sprite.name, Does.StartWith("pixel_frame_"));
+        Assert.AreEqual(Image.Type.Sliced, background.type);
+        Assert.AreEqual(Color.white, background.color);
+
+        Assert.IsNotNull(fill.sprite);
+        Assert.AreEqual("pixel_gauge_fill", fill.sprite.name);
+        Assert.AreEqual(Image.Type.Sliced, fill.type);
+        Assert.AreEqual(expectedFillColor, fill.color);
+    }
+
+    private static void InvokeSpawnInkBalls(PlayerAttack attack, Vector2 direction, InkAttackRuntimeConfig config)
+    {
+        MethodInfo method = typeof(PlayerAttack).GetMethod(
+            "SpawnInkBalls",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+
+        Assert.IsNotNull(method);
+        method.Invoke(attack, new object[] { direction, config });
+    }
+
+    private static void InvokeInkBallTrigger(InkBall inkBall, Collider2D collider)
+    {
+        MethodInfo method = typeof(InkBall).GetMethod(
+            "OnTriggerEnter2D",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+
+        Assert.IsNotNull(method);
+        method.Invoke(inkBall, new object[] { collider });
     }
 }
 
@@ -256,11 +552,15 @@ public sealed class GameDebugPageBootstrapperAttributeTests
     }
 
     [Test]
-    public void DebugPageCanCreateInAnyNamedScene()
+    public void DebugPageCanCreateInBaseAndExistingRuntimeScenes()
     {
+        Assert.IsTrue(InvokePrivateStaticBool("CanCreateInScene", "NewBase"));
+        Assert.IsTrue(InvokePrivateStaticBool("CanCreateInScene", "BaseScene"));
         Assert.IsTrue(InvokePrivateStaticBool("CanCreateInScene", "MainScene"));
         Assert.IsTrue(InvokePrivateStaticBool("CanCreateInScene", "DeadScene"));
         Assert.IsTrue(InvokePrivateStaticBool("CanCreateInScene", "IllustratedUIScene"));
+        Assert.IsTrue(InvokePrivateStaticBool("CanCreateInScene", "GameScene"));
+        Assert.IsTrue(InvokePrivateStaticBool("CanCreateInScene", "FirstPass_1"));
     }
 
     [Test]
@@ -268,6 +568,41 @@ public sealed class GameDebugPageBootstrapperAttributeTests
     {
         Assert.IsTrue(InvokePrivateStaticBool("CanOpenPanelFromHotkey", true));
         Assert.IsTrue(InvokePrivateStaticBool("CanOpenPanelFromHotkey", false));
+    }
+
+    [Test]
+    public void BaseDebugPanelKeepsGeneralDebugTools()
+    {
+        Scene originalScene = SceneManager.GetActiveScene();
+        Scene baseScene = SceneManager.CreateScene("NewBase");
+
+        try
+        {
+            Assert.IsTrue(SceneManager.SetActiveScene(baseScene));
+            GameDebugPageBootstrapper debugPage = CreateDebugPage();
+
+            InvokePrivate(debugPage, "Build");
+
+            Transform content = debugPage.transform.Find("RuntimeDebugCanvas/DebugPanel/ScrollView/Viewport/Content");
+            Assert.NotNull(content);
+            Assert.NotNull(content.Find("基地调试"));
+            Assert.NotNull(content.Find("玩家属性"));
+            Assert.NotNull(content.Find("临时构筑"));
+            Assert.NotNull(content.Find("时间与倒计时"));
+            Assert.NotNull(content.Find("场景与敌人"));
+        }
+        finally
+        {
+            if (originalScene.IsValid() && originalScene.isLoaded)
+            {
+                SceneManager.SetActiveScene(originalScene);
+            }
+
+            if (baseScene.IsValid() && baseScene.isLoaded)
+            {
+                EditorSceneManager.CloseScene(baseScene, true);
+            }
+        }
     }
 
     [Test]

@@ -3,6 +3,10 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
+
 public enum RunStagePhase
 {
     Basic,
@@ -33,6 +37,12 @@ public class DropTableConfig
 
 public class RunStageDirector : MonoBehaviour
 {
+    private const string FireMonsterResourcePath = "EnemyPrefab/FireMonster";
+    private const string StoneMonsterResourcePath = "EnemyPrefab/StoneMonster";
+#if UNITY_EDITOR
+    private const string FireMonsterPrefabPath = "Assets/File/Prefab/EnemyPrefab/FireMonster.prefab";
+    private const string StoneMonsterPrefabPath = "Assets/File/Prefab/EnemyPrefab/StoneMonster.prefab";
+#endif
     private const float StageRefreshInterval = 0.2f;
     private const float SpawnProbeRadius = 3.5f;
     private const int SpawnProbeAttempts = 16;
@@ -309,7 +319,7 @@ public class RunStageDirector : MonoBehaviour
             return;
         }
 
-        EnemyStatsManager[] existingEnemies = FindObjectsOfType<EnemyStatsManager>();
+        EnemyStatsManager[] existingEnemies = FindObjectsOfType<EnemyStatsManager>(true);
         for (int i = 0; i < existingEnemies.Length; i++)
         {
             EnemyStatsManager enemy = existingEnemies[i];
@@ -318,19 +328,98 @@ public class RunStageDirector : MonoBehaviour
                 continue;
             }
 
-            GameObject templateObject = Instantiate(enemy.gameObject, enemy.transform.position, enemy.transform.rotation, transform);
-            templateObject.name = $"{enemy.gameObject.name}_Template";
-            templateObject.SetActive(false);
-
-            spawnTemplates.Add(new EnemySpawnTemplate
-            {
-                template = templateObject,
-                position = enemy.transform.position,
-                rotation = enemy.transform.rotation
-            });
-
+            AddSpawnTemplate(enemy.gameObject, enemy.transform.position, enemy.transform.rotation);
             PrepareEnemyInstance(enemy.gameObject);
         }
+
+        if (spawnTemplates.Count == 0)
+        {
+            CaptureFallbackEnemyPrefabsAsTemplates();
+        }
+    }
+
+    private void CaptureFallbackEnemyPrefabsAsTemplates()
+    {
+        Vector3 fallbackPosition = ResolveFallbackTemplatePosition();
+        AddFallbackEnemyTemplate(FireMonsterResourcePath, GetEditorFireMonsterPrefabPath(), fallbackPosition);
+        AddFallbackEnemyTemplate(StoneMonsterResourcePath, GetEditorStoneMonsterPrefabPath(), fallbackPosition);
+    }
+
+    private void AddFallbackEnemyTemplate(string resourcePath, string editorAssetPath, Vector3 fallbackPosition)
+    {
+        GameObject prefab = LoadFallbackEnemyPrefab(resourcePath, editorAssetPath);
+        if (prefab == null || prefab.GetComponent<EnemyStatsManager>() == null)
+        {
+            return;
+        }
+
+        AddSpawnTemplate(prefab, fallbackPosition, prefab.transform.rotation);
+    }
+
+    private void AddSpawnTemplate(GameObject source, Vector3 position, Quaternion rotation)
+    {
+        if (source == null)
+        {
+            return;
+        }
+
+        GameObject templateObject = Instantiate(source, position, rotation, transform);
+        templateObject.name = $"{source.name}_Template";
+        templateObject.SetActive(false);
+
+        spawnTemplates.Add(new EnemySpawnTemplate
+        {
+            template = templateObject,
+            position = position,
+            rotation = rotation
+        });
+    }
+
+    private static Vector3 ResolveFallbackTemplatePosition()
+    {
+        GameObject player = GameObject.FindGameObjectWithTag("Player");
+        if (player != null)
+        {
+            return player.transform.position;
+        }
+
+        CharacterCore playerCore = FindObjectOfType<CharacterCore>();
+        return playerCore != null ? playerCore.transform.position : Vector3.zero;
+    }
+
+    private static GameObject LoadFallbackEnemyPrefab(string resourcePath, string editorAssetPath)
+    {
+        GameObject prefab = Resources.Load<GameObject>(resourcePath);
+        if (prefab != null)
+        {
+            return prefab;
+        }
+
+#if UNITY_EDITOR
+        return !string.IsNullOrWhiteSpace(editorAssetPath)
+            ? AssetDatabase.LoadAssetAtPath<GameObject>(editorAssetPath)
+            : null;
+#else
+        return null;
+#endif
+    }
+
+    private static string GetEditorFireMonsterPrefabPath()
+    {
+#if UNITY_EDITOR
+        return FireMonsterPrefabPath;
+#else
+        return null;
+#endif
+    }
+
+    private static string GetEditorStoneMonsterPrefabPath()
+    {
+#if UNITY_EDITOR
+        return StoneMonsterPrefabPath;
+#else
+        return null;
+#endif
     }
 
     private void PrepareEnemyInstance(GameObject enemyObject)

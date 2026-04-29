@@ -8,7 +8,7 @@ public static class SpriteCompanionRuntime
     private const string CompanionControllerResourcePath = "RuntimeSpriteCompanion";
     private const int DefaultSortingOrder = 4;
     private const float BaseCompanionScaleMultiplier = 0.54f;
-    private const float GameplayCompanionScaleMultiplier = BaseCompanionScaleMultiplier * 3f;
+    private const float GameplayCompanionScaleMultiplier = BaseCompanionScaleMultiplier * 1.35f;
     private const float FootColliderWidthFactor = 0.52f;
     private const float FootColliderHeightFactor = 0.28f;
     private const float FootColliderLiftFactor = 0.04f;

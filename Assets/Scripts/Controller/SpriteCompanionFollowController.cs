@@ -9,7 +9,7 @@ using UnityEngine;
 public sealed class SpriteCompanionFollowController : MonoBehaviour
 {
     private const float CompanionMoveSpeedMultiplier = 0.7f;
-    private const float IntroIdleVisualScaleMultiplier = 1.7f;
+    private const float IntroIdleVisualScaleMultiplier = 1.2f;
     private const string IntroIdleControllerResourcePath = "RuntimeSpriteCompanionIdle";
     private const string IntroIdleStateName = "SpriteIdle";
 

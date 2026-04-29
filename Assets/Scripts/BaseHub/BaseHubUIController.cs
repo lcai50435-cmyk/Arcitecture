@@ -133,6 +133,11 @@ public class BaseHubUIController : MonoBehaviour
             return;
         }
 
+        if (RuntimePauseMenu.TryOpenFromExternal())
+        {
+            return;
+        }
+
         OpenSettingsPanel();
     }
 

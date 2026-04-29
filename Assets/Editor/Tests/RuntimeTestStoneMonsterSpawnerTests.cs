@@ -30,6 +30,7 @@ public sealed class RuntimeTestStoneMonsterSpawnerTests
         Assert.IsNotNull(spawnedObject);
         Assert.AreEqual("RuntimeTestStoneMonster", spawnedObject.name);
         Assert.AreEqual(new Vector3(3f, 4f, 0f), spawnedObject.transform.position);
+        Assert.AreEqual(Vector3.one * 4f, spawnedObject.transform.localScale);
         Assert.IsNotNull(spawnedObject.GetComponent<EnemyStatsManager>());
         Assert.IsNotNull(spawnedObject.GetComponent<RuntimeTestStoneMonsterHealthOverride>());
         Assert.IsNotNull(spawnedObject.GetComponent<RuntimeTestStoneMonsterStationary>());
@@ -71,6 +72,7 @@ public sealed class RuntimeTestStoneMonsterSpawnerTests
     private static GameObject CreateStoneMonsterTemplate()
     {
         GameObject template = new GameObject("StoneMonster_Template");
+        template.transform.localScale = Vector3.one * 4f;
         template.AddComponent<Rigidbody2D>().gravityScale = 0f;
         template.AddComponent<BoxCollider2D>();
         CharacterCore core = template.AddComponent<CharacterCore>();
@@ -90,5 +92,42 @@ public sealed class RuntimeTestStoneMonsterSpawnerTests
         template.AddComponent<EnemyPatrol>();
         template.AddComponent<EnemyAttack>();
         return template;
+    }
+}
+
+public sealed class RunStageDirectorFallbackTemplateTests
+{
+    private GameObject directorObject;
+
+    [TearDown]
+    public void TearDown()
+    {
+        EnemyStatsManager[] enemies = Object.FindObjectsOfType<EnemyStatsManager>(true);
+        for (int i = 0; i < enemies.Length; i++)
+        {
+            if (enemies[i] != null)
+            {
+                Object.DestroyImmediate(enemies[i].gameObject);
+            }
+        }
+
+        if (directorObject != null)
+        {
+            Object.DestroyImmediate(directorObject);
+        }
+    }
+
+    [Test]
+    public void DebugSpawnEnemyUsesPrefabTemplateWhenSceneHasNoEnemyInstances()
+    {
+        directorObject = new GameObject("RunStageDirector");
+        RunStageDirector director = directorObject.AddComponent<RunStageDirector>();
+
+        bool spawned = director.DebugSpawnEnemy("StoneMonster", 1);
+
+        Assert.IsTrue(spawned);
+        EnemyStatsManager[] enemies = Object.FindObjectsOfType<EnemyStatsManager>();
+        Assert.AreEqual(1, enemies.Length);
+        Assert.That(enemies[0].gameObject.name, Does.Contain("StoneMonster"));
     }
 }

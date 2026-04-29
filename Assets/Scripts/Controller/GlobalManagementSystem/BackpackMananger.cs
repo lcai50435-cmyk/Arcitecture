@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 public class BackpackMananger : MonoBehaviour
 {
@@ -376,6 +377,7 @@ public class BackpackMananger : MonoBehaviour
 
         if (shouldShowFirstPick)
         {
+            EnsureFirstPickTipListener();
             OnFirstTimePickItemType?.Invoke(storedItem);
         }
 
@@ -384,6 +386,16 @@ public class BackpackMananger : MonoBehaviour
 
         Debug.Log($"拾取 {storedItem.DisplayName}，放入背包格子 {slotIndex}");
         return true;
+    }
+
+    private void EnsureFirstPickTipListener()
+    {
+        if (!GameplayStageCatalog.IsGameplayScene(SceneManager.GetActiveScene().name))
+        {
+            return;
+        }
+
+        Dialog.EnsureGameplayRuntimeInstance();
     }
 
     private ArchitecturalCrystal CreateStoredBackpackItem(ArchitecturalCrystal crystal)

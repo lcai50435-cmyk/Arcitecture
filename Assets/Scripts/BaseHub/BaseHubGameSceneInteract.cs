@@ -14,6 +14,11 @@ public class BaseHubGameSceneInteract : MonoBehaviour, IInteractable
 
     public void OnInteract()
     {
+        if (TryOpenLevelSelectionScene())
+        {
+            return;
+        }
+
         if (uiController == null)
         {
             uiController = FindObjectOfType<BaseHubUIController>();
@@ -35,5 +40,27 @@ public class BaseHubGameSceneInteract : MonoBehaviour, IInteractable
         }
 
         SceneManager.LoadScene(sceneName);
+    }
+
+    private static bool TryOpenLevelSelectionScene()
+    {
+        if (!LevelSelectionSceneController.CanLoadScene())
+        {
+            return false;
+        }
+
+        SceneLoader loader = SceneLoader.EnsureInstance();
+        if (loader != null)
+        {
+            LevelSelectionSceneController.CaptureBaseReturnPositionFromCurrentPlayer();
+            LevelSelectionSceneController.CaptureBackdropBeforeSceneLoad();
+            loader.ToScene(LevelSelectionSceneController.SceneName);
+            return true;
+        }
+
+        LevelSelectionSceneController.CaptureBaseReturnPositionFromCurrentPlayer();
+        LevelSelectionSceneController.CaptureBackdropBeforeSceneLoad();
+        SceneManager.LoadScene(LevelSelectionSceneController.SceneName);
+        return true;
     }
 }

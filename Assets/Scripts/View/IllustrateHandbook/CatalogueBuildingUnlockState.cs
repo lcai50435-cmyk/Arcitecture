@@ -83,6 +83,7 @@ public class CatalogueBuildingUnlockState : MonoBehaviour
             buildingSlider.minValue = 0f;
             buildingSlider.maxValue = definition.requiredProgress;
             buildingSlider.value = state.progress;
+            SliderFillGeometryUtility.ApplyExactFill(buildingSlider, true);
         }
 
         isSliderComplete = state.progress >= definition.requiredProgress;

@@ -1,5 +1,8 @@
 using System.Collections.Generic;
 using TMPro;
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -13,33 +16,50 @@ public static class GameplayStatusHudRuntime
     private const string HealthSliderName = "HealthSlider";
     private const string InkSliderName = "InkSlider";
     private const string StructureSliderName = "StructureSlider";
-    private const float ScenePanelWidth = 210f;
-    private const float ScenePanelHeight = 112f;
-    private const float SceneRowWidth = 200f;
-    private const float SceneRowHeight = 32f;
-    private const float SceneRowSpacing = 34f;
-    private const float SceneIconSize = 42f;
-    private const float SceneBarWidth = 156f;
-    private const float SceneBarHeight = 14f;
-    private const float SceneBarCenterX = 126f;
-    private const float SceneRowCenterY = -16f;
-    private const string HeartIconAssetPath = "Assets/File/Prop/UIProp/Heart.png";
-    private const string HealthTrackAssetPath = "Assets/File/Prop/UIProp/GrayHealth.png";
-    private const string HealthFillAssetPath = "Assets/File/Prop/UIProp/RedHealth.png";
-    private const string InkTrackAssetPath = "Assets/File/Prop/UIProp/BlackHealth.png";
-    private const string StructureIconAssetPath = "Assets/File/Prop/Prop/Prism.png";
-    private const string StructureTrackAssetPath = "Assets/File/Prop/UIProp/Bar.png";
-    private const float RootWidth = 204f;
-    private const float RootHeight = 78f;
-    private const float RowWidth = 190f;
-    private const float RowHeight = 22f;
+    private const float ScenePanelWidth = 430f;
+    private const float ScenePanelHeight = 220f;
+    private const float SceneRowWidth = 420f;
+    private const float SceneRowHeight = 68f;
+    private const float SceneRowSpacing = 64f;
+    private const float SceneIconSize = 82f;
+    private const float SceneBarWidth = 316f;
+    private const float SceneBarHeight = 28f;
+    private const float SceneBarCenterX = 216f;
+    private const float SceneRowCenterY = -34f;
+    private const float SceneValueTextX = 300f;
+    private const float FallbackPanelWidth = 360f;
+    private const float FallbackPanelHeight = 166f;
+    private const float FallbackRowWidth = 352f;
+    private const float FallbackRowHeight = 52f;
+    private const float FallbackRowSpacing = 50f;
+    private const float FallbackIconSize = 58f;
+    private const float FallbackIconX = 30f;
+    private const float FallbackBarLeftX = 50f;
+    private const float FallbackBarWidth = 252f;
+    private const float FallbackBarHeight = 22f;
+    private const float FallbackValueTextX = 238f;
+    private const float FallbackValueTextY = -12f;
+    private static readonly Vector2 FallbackHudAnchoredPosition = new Vector2(18f, -16f);
+    private const string HeartIconAssetPath = "Assets/File/Prop/UIProp/NewUI/NewUI_1.png";
+    private const string HeartIconSpriteName = "NewUI_1_0";
+    private const string InkIconAssetPath = "Assets/File/Prop/UIProp/NewUI/NewUI.png";
+    private const string InkIconSpriteName = "NewUI_0";
+    private const string StructureIconAssetPath = "Assets/File/Prop/UIProp/NewUI/NewUI.png";
+    private const string StructureIconSpriteName = "NewUI_1";
+    private const float RootWidth = FallbackPanelWidth;
+    private const float RootHeight = FallbackPanelHeight;
+    private const float RowWidth = FallbackRowWidth;
+    private const float RowHeight = FallbackRowHeight;
     private const int PixelFrameWidth = 96;
     private const int PixelFrameHeight = 36;
     private const int PixelFrameBorder = 6;
     private const int PixelFillWidth = 64;
     private const int PixelFillHeight = 12;
+    private const string CountdownFrameName = "GameplayCountdownFrame";
+    private const string CountdownFrameResourcePath = "UI/time";
     private static readonly Vector2 BoundCountdownTextSize = new Vector2(104f, 28f);
     private static readonly Vector2 RuntimeCountdownTextSize = new Vector2(220f, 52f);
+    private static readonly Vector2 RuntimeCountdownFrameSize = new Vector2(336f, 72f);
 
     private static Canvas hudCanvas;
     private static CanvasGroup hudCanvasGroup;
@@ -55,6 +75,8 @@ public static class GameplayStatusHudRuntime
     private static TextMeshProUGUI weaponValueText;
     private static TextMeshProUGUI structureValueText;
     private static TextMeshProUGUI countdownText;
+    private static RectTransform countdownFrameRect;
+    private static bool usingRuntimeCountdownFrame;
     private static BackpackMananger subscribedBackpack;
     private static bool externallyHidden;
     private static bool usingSceneShowPanel;
@@ -66,8 +88,38 @@ public static class GameplayStatusHudRuntime
     private static readonly Color GoldHighlightColor = new Color(1f, 0.83f, 0.46f, 1f);
     private static readonly Color DarkOutlineColor = new Color(0.14f, 0.08f, 0.04f, 1f);
     private static readonly Color HealthFillColor = new Color(0.82f, 0.19f, 0.16f, 1f);
-    private static readonly Color InkFillColor = new Color(0.20f, 0.58f, 0.86f, 1f);
+    private static readonly Color InkFillColor = new Color(0.08f, 0.08f, 0.08f, 1f);
     private static readonly Color StructureFillColor = new Color(0.20f, 0.78f, 0.82f, 1f);
+
+    public static void ApplyHealthStatusBarSkin(Slider slider)
+    {
+        ApplyStatusBarSkin(slider, HealthFillColor);
+    }
+
+    public static void ApplyInkStatusBarSkin(Slider slider)
+    {
+        ApplyStatusBarSkin(slider, InkFillColor);
+    }
+
+    public static void ApplyStructureStatusBarSkin(Slider slider)
+    {
+        ApplyStatusBarSkin(slider, StructureFillColor);
+    }
+
+    public static void ApplyHealthStatusIcon(Image image)
+    {
+        ApplyStatusIcon(image, HeartIconAssetPath, HeartIconSpriteName, HealthFillColor);
+    }
+
+    public static void ApplyInkStatusIcon(Image image)
+    {
+        ApplyStatusIcon(image, InkIconAssetPath, InkIconSpriteName, InkFillColor);
+    }
+
+    public static void ApplyStructureStatusIcon(Image image)
+    {
+        ApplyStatusIcon(image, StructureIconAssetPath, StructureIconSpriteName, StructureFillColor);
+    }
 
     public static ValueTrans EnsureHealthGauge(ValueTrans currentGauge)
     {
@@ -115,10 +167,7 @@ public static class GameplayStatusHudRuntime
 
     public static void RefreshWeaponText(float current, float max, WeaponType weaponType)
     {
-        if (weaponFillGraphic != null)
-        {
-            weaponFillGraphic.color = InkTypeCatalog.GetDisplayColor(weaponType);
-        }
+        ApplyFillColor(weaponFillGraphic, InkFillColor);
 
         if (weaponValueText != null)
         {
@@ -140,10 +189,7 @@ public static class GameplayStatusHudRuntime
             structureGauge.SetValue(current);
         }
 
-        if (structureFillGraphic != null)
-        {
-            structureFillGraphic.color = StructureFillColor;
-        }
+        ApplyFillColor(structureFillGraphic, StructureFillColor);
 
         if (structureValueText != null)
         {
@@ -179,6 +225,7 @@ public static class GameplayStatusHudRuntime
                 ApplyRuntimeCountdownTextLayout(currentText.rectTransform);
                 ConfigureCountdownText(currentText, 30f);
                 countdownText = currentText;
+                EnsureRuntimeCountdownFrame();
                 return currentText;
             }
 
@@ -188,6 +235,8 @@ public static class GameplayStatusHudRuntime
             }
             else
             {
+                usingRuntimeCountdownFrame = false;
+                SetRuntimeCountdownFrameVisible(false);
                 countdownText = currentText;
                 return currentText;
             }
@@ -202,6 +251,7 @@ public static class GameplayStatusHudRuntime
         {
             ApplyRuntimeCountdownTextLayout(countdownText.rectTransform);
             ConfigureCountdownText(countdownText, 30f);
+            EnsureRuntimeCountdownFrame();
             countdownText.gameObject.SetActive(!externallyHidden);
             return countdownText;
         }
@@ -216,6 +266,7 @@ public static class GameplayStatusHudRuntime
         countdownText = textObject.GetComponent<TextMeshProUGUI>();
         ApplyRuntimeCountdownTextLayout(textObject.GetComponent<RectTransform>());
         ConfigureCountdownText(countdownText, 30f);
+        EnsureRuntimeCountdownFrame();
         countdownText.gameObject.SetActive(!externallyHidden);
 
         return countdownText;
@@ -263,6 +314,76 @@ public static class GameplayStatusHudRuntime
         rect.SetAsLastSibling();
     }
 
+    private static void EnsureRuntimeCountdownFrame()
+    {
+        EnsureHudCanvas();
+
+        if (countdownFrameRect == null || countdownFrameRect.gameObject == null)
+        {
+            GameObject frameObject = GameObject.Find(CountdownFrameName);
+            if (frameObject == null)
+            {
+                frameObject = new GameObject(CountdownFrameName, typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+                frameObject.transform.SetParent(hudCanvas.transform, false);
+            }
+
+            countdownFrameRect = frameObject.GetComponent<RectTransform>();
+        }
+
+        ApplyRuntimeCountdownFrameLayout(countdownFrameRect);
+
+        Image frameImage = countdownFrameRect.GetComponent<Image>();
+        if (frameImage == null)
+        {
+            frameImage = countdownFrameRect.gameObject.AddComponent<Image>();
+        }
+
+        Sprite frameSprite = Resources.Load<Sprite>(CountdownFrameResourcePath);
+        if (frameSprite != null)
+        {
+            frameImage.sprite = frameSprite;
+            frameImage.type = Image.Type.Simple;
+            frameImage.preserveAspect = false;
+            frameImage.color = Color.white;
+        }
+        else
+        {
+            ApplyPixelFrame(frameImage, "countdown_frame", new Color(0.18f, 0.12f, 0.08f, 0.94f), 112, 24, 4);
+        }
+
+        frameImage.raycastTarget = false;
+        usingRuntimeCountdownFrame = true;
+        countdownFrameRect.gameObject.SetActive(!externallyHidden);
+        countdownFrameRect.SetAsLastSibling();
+        if (countdownText != null)
+        {
+            countdownText.rectTransform.SetAsLastSibling();
+        }
+    }
+
+    private static void ApplyRuntimeCountdownFrameLayout(RectTransform rect)
+    {
+        if (rect == null)
+        {
+            return;
+        }
+
+        rect.anchorMin = new Vector2(0.5f, 1f);
+        rect.anchorMax = new Vector2(0.5f, 1f);
+        rect.pivot = new Vector2(0.5f, 1f);
+        rect.anchoredPosition = new Vector2(0f, -12f);
+        rect.sizeDelta = RuntimeCountdownFrameSize;
+        rect.localScale = Vector3.one;
+    }
+
+    private static void SetRuntimeCountdownFrameVisible(bool visible)
+    {
+        if (countdownFrameRect != null && countdownFrameRect.gameObject != null)
+        {
+            countdownFrameRect.gameObject.SetActive(visible);
+        }
+    }
+
     private static void ConfigureCountdownText(TextMeshProUGUI text, float fontSize)
     {
         if (text == null)
@@ -296,6 +417,8 @@ public static class GameplayStatusHudRuntime
         {
             countdownText.gameObject.SetActive(shouldShow);
         }
+
+        SetRuntimeCountdownFrameVisible(shouldShow && countdownText != null && usingRuntimeCountdownFrame);
     }
 
     public static void SetAlpha(float alpha)
@@ -332,7 +455,11 @@ public static class GameplayStatusHudRuntime
         {
             rootRect.gameObject.SetActive(!externallyHidden);
             RefreshStructureProgressText();
+            return;
         }
+
+        EnsureRuntimeFallbackRoot();
+        RefreshStructureProgressText();
     }
 
     private static bool IsRuntimeGauge(ValueTrans gauge)
@@ -341,6 +468,47 @@ public static class GameplayStatusHudRuntime
             && rootRect != null
             && gauge.transform != null
             && gauge.transform.IsChildOf(rootRect);
+    }
+
+    private static void EnsureRuntimeFallbackRoot()
+    {
+        EnsureHudCanvas();
+
+        bool rootMissing = rootRect == null || rootRect.gameObject == null || usingSceneShowPanel;
+        if (rootMissing)
+        {
+            GameObject existingRoot = GameObject.Find(RootName);
+            if (existingRoot == null)
+            {
+                existingRoot = new GameObject(RootName, typeof(RectTransform), typeof(CanvasGroup), typeof(Image));
+            }
+
+            rootRect = existingRoot.GetComponent<RectTransform>();
+            usingSceneShowPanel = false;
+        }
+
+        if (rootRect == null)
+        {
+            return;
+        }
+
+        Image rootImage = rootRect.GetComponent<Image>();
+        if (rootImage != null)
+        {
+            rootImage.color = RootPanelColor;
+            rootImage.raycastTarget = false;
+        }
+
+        rootCanvasGroup = EnsureCanvasGroup(rootRect.gameObject, false);
+        ReattachToHudCanvas();
+
+        if (!IsRuntimeGauge(healthGauge) || !IsRuntimeGauge(weaponGauge) || !IsRuntimeGauge(structureGauge))
+        {
+            CreateRows(rootRect);
+        }
+
+        HideLegacyStatusPanels();
+        rootRect.gameObject.SetActive(!externallyHidden);
     }
 
     private static bool TryBindSceneShowPanel()
@@ -437,6 +605,97 @@ public static class GameplayStatusHudRuntime
         return slider != null && slider.fillRect != null ? slider.fillRect.GetComponent<Graphic>() : null;
     }
 
+    private static void ApplyStatusBarSkin(Slider slider, Color fillColor)
+    {
+        if (slider == null)
+        {
+            return;
+        }
+
+        Image background = FindStatusBarBackgroundImage(slider);
+        if (background != null)
+        {
+            ApplyPixelFrame(background, slider.name + "_track", GaugeTrackColor, 64, 20, 5);
+            slider.targetGraphic = background;
+        }
+
+        Image fillImage = null;
+        if (slider.fillRect != null)
+        {
+            fillImage = slider.fillRect.GetComponent<Image>();
+            if (fillImage == null)
+            {
+                fillImage = slider.fillRect.gameObject.AddComponent<Image>();
+            }
+        }
+
+        ApplyGaugeFill(fillImage, fillColor);
+        slider.direction = Slider.Direction.LeftToRight;
+        slider.interactable = false;
+        slider.transition = Selectable.Transition.None;
+        if (slider.targetGraphic != null)
+        {
+            slider.targetGraphic.raycastTarget = false;
+        }
+    }
+
+    private static Image FindStatusBarBackgroundImage(Slider slider)
+    {
+        if (slider == null)
+        {
+            return null;
+        }
+
+        Transform background = slider.transform.Find("Background");
+        if (background != null)
+        {
+            Image backgroundImage = background.GetComponent<Image>();
+            if (backgroundImage != null)
+            {
+                return backgroundImage;
+            }
+        }
+
+        Image targetImage = slider.targetGraphic as Image;
+        if (targetImage != null)
+        {
+            return targetImage;
+        }
+
+        return slider.GetComponent<Image>();
+    }
+
+    private static void ApplyStatusIcon(Image image, string iconAssetPath, string iconSpriteName, Color fallbackColor)
+    {
+        if (image == null)
+        {
+            return;
+        }
+
+        Sprite iconSprite = LoadHudSprite(iconAssetPath, iconSpriteName);
+        if (iconSprite != null)
+        {
+            image.sprite = iconSprite;
+            image.type = Image.Type.Simple;
+            image.preserveAspect = true;
+            image.color = Color.white;
+        }
+        else
+        {
+            ApplyPixelFrame(image, image.name + "_icon", fallbackColor, 28, 28, 5);
+        }
+
+        image.raycastTarget = false;
+    }
+
+    private static void ApplyFillColor(Graphic fillGraphic, Color fillColor)
+    {
+        if (fillGraphic != null)
+        {
+            fillGraphic.color = fillColor;
+        }
+    }
+
     private static void EnsureSceneShowPanelVisible(RectTransform panel)
     {
         if (panel == null)
@@ -490,14 +749,14 @@ public static class GameplayStatusHudRuntime
         panel.anchorMin = new Vector2(0f, 1f);
         panel.anchorMax = new Vector2(0f, 1f);
         panel.pivot = new Vector2(0f, 1f);
-        panel.anchoredPosition = new Vector2(18f, -22f);
+        panel.anchoredPosition = new Vector2(0f, -8f);
         panel.sizeDelta = new Vector2(ScenePanelWidth, ScenePanelHeight);
         panel.localScale = Vector3.one;
         panel.SetAsLastSibling();
 
-        NormalizeSceneSlider(healthSlider, new Vector2(0f, 0f));
-        NormalizeSceneSlider(weaponSlider, new Vector2(0f, -SceneRowSpacing));
-        NormalizeSceneSlider(structureSlider, new Vector2(0f, -SceneRowSpacing * 2f));
+        NormalizeSceneSlider(healthSlider, new Vector2(0f, 0f), HeartIconAssetPath, HeartIconSpriteName, HealthFillColor);
+        NormalizeSceneSlider(weaponSlider, new Vector2(0f, -SceneRowSpacing), InkIconAssetPath, InkIconSpriteName, InkFillColor);
+        NormalizeSceneSlider(structureSlider, new Vector2(0f, -SceneRowSpacing * 2f), StructureIconAssetPath, StructureIconSpriteName, StructureFillColor);
 
         Graphic[] graphics = panel.GetComponentsInChildren<Graphic>(true);
         foreach (Graphic graphic in graphics)
@@ -509,7 +768,12 @@ public static class GameplayStatusHudRuntime
         }
     }
 
-    private static void NormalizeSceneSlider(Slider slider, Vector2 anchoredPosition)
+    private static void NormalizeSceneSlider(
+        Slider slider,
+        Vector2 anchoredPosition,
+        string iconAssetPath,
+        string iconSpriteName,
+        Color fillColor)
     {
         if (slider == null)
         {
@@ -527,7 +791,8 @@ public static class GameplayStatusHudRuntime
             rect.localScale = Vector3.one;
         }
 
-        NormalizeSceneSliderChildren(slider);
+        NormalizeSceneSliderChildren(slider, iconAssetPath, iconSpriteName, fillColor);
+        ApplyStatusBarSkin(slider, fillColor);
         slider.gameObject.SetActive(true);
         slider.interactable = false;
         slider.transition = Selectable.Transition.None;
@@ -537,7 +802,7 @@ public static class GameplayStatusHudRuntime
         }
     }
 
-    private static void NormalizeSceneSliderChildren(Slider slider)
+    private static void NormalizeSceneSliderChildren(Slider slider, string iconAssetPath, string iconSpriteName, Color fillColor)
     {
         RectTransform sliderRect = slider.GetComponent<RectTransform>();
         if (sliderRect == null)
@@ -552,16 +817,26 @@ public static class GameplayStatusHudRuntime
                 continue;
             }
 
-            if (string.Equals(child.name, "Background", System.StringComparison.Ordinal)
-                || string.Equals(child.name, "Fill Area", System.StringComparison.Ordinal))
+            if (string.Equals(child.name, "Background", System.StringComparison.Ordinal))
             {
                 ApplySceneBarRect(child);
+                continue;
+            }
+
+            if (string.Equals(child.name, "Fill Area", System.StringComparison.Ordinal))
+            {
+                ApplySceneFillAreaRect(child);
                 continue;
             }
 
             if (slider.fillRect != null && child == slider.fillRect)
             {
                 ApplySceneFillRect(child);
+                Image fillImage = child.GetComponent<Image>();
+                if (fillImage != null)
+                {
+                    ApplyGaugeFill(fillImage, fillColor);
+                }
                 continue;
             }
 
@@ -573,7 +848,7 @@ public static class GameplayStatusHudRuntime
 
             if (child.name.EndsWith("BackGround", System.StringComparison.Ordinal))
             {
-                ApplySceneIconRect(child);
+                ApplySceneIconRect(child, iconAssetPath, iconSpriteName);
             }
         }
     }
@@ -585,6 +860,16 @@ public static class GameplayStatusHudRuntime
         rect.pivot = new Vector2(0.5f, 0.5f);
         rect.anchoredPosition = new Vector2(SceneBarCenterX, SceneRowCenterY);
         rect.sizeDelta = new Vector2(SceneBarWidth, SceneBarHeight);
+        rect.localScale = Vector3.one;
+    }
+
+    private static void ApplySceneFillAreaRect(RectTransform rect)
+    {
+        rect.anchorMin = new Vector2(0f, 1f);
+        rect.anchorMax = new Vector2(0f, 1f);
+        rect.pivot = new Vector2(0.5f, 0.5f);
+        rect.anchoredPosition = new Vector2(SceneBarCenterX, SceneRowCenterY);
+        rect.sizeDelta = new Vector2(SceneBarWidth - 12f, SceneBarHeight - 8f);
         rect.localScale = Vector3.one;
     }
 
@@ -602,20 +887,28 @@ public static class GameplayStatusHudRuntime
     {
         rect.anchorMin = new Vector2(0f, 1f);
         rect.anchorMax = new Vector2(0f, 1f);
-        rect.pivot = new Vector2(0.5f, 0.5f);
-        rect.anchoredPosition = new Vector2(SceneBarCenterX, SceneRowCenterY);
-        rect.sizeDelta = new Vector2(SceneBarWidth, 20f);
+        rect.pivot = new Vector2(0f, 1f);
+        rect.anchoredPosition = new Vector2(SceneValueTextX, -20f);
+        rect.sizeDelta = new Vector2(78f, 28f);
         rect.localScale = Vector3.one;
     }
 
-    private static void ApplySceneIconRect(RectTransform rect)
+    private static void ApplySceneIconRect(RectTransform rect, string iconAssetPath, string iconSpriteName)
     {
         rect.anchorMin = new Vector2(0f, 1f);
         rect.anchorMax = new Vector2(0f, 1f);
         rect.pivot = new Vector2(0.5f, 0.5f);
-        rect.anchoredPosition = new Vector2(21f, SceneRowCenterY);
+        rect.anchoredPosition = new Vector2(36f, SceneRowCenterY);
         rect.sizeDelta = new Vector2(SceneIconSize, SceneIconSize);
         rect.localScale = Vector3.one;
+
+        Image image = rect.GetComponent<Image>();
+        if (image == null)
+        {
+            image = rect.gameObject.AddComponent<Image>();
+        }
+
+        ApplyStatusIcon(image, iconAssetPath, iconSpriteName, Color.white);
     }
 
     private static TextMeshProUGUI FindSceneValueText(Slider slider)
@@ -634,8 +927,8 @@ public static class GameplayStatusHudRuntime
             }
 
             ApplySceneNumberRect(text.rectTransform);
-            text.fontSize = 10f;
-            text.alignment = TextAlignmentOptions.Center;
+            text.fontSize = 17f;
+            text.alignment = TextAlignmentOptions.MidlineRight;
             text.enableWordWrapping = false;
             text.raycastTarget = false;
             return text;
@@ -747,25 +1040,28 @@ public static class GameplayStatusHudRuntime
             parent,
             "HealthRow",
             HeartIconAssetPath,
-            HealthTrackAssetPath,
-            HealthFillAssetPath,
-            new Vector2(6f, -5f),
+            HeartIconSpriteName,
+            null,
+            null,
+            new Vector2(0f, 0f),
             HealthFillColor);
         StatusRow weaponRow = CreateRow(
             parent,
             "InkRow",
+            InkIconAssetPath,
+            InkIconSpriteName,
             null,
-            InkTrackAssetPath,
             null,
-            new Vector2(6f, -29f),
+            new Vector2(0f, -FallbackRowSpacing),
             InkFillColor);
         StatusRow structureRow = CreateRow(
             parent,
             "StructureRow",
             StructureIconAssetPath,
-            StructureTrackAssetPath,
+            StructureIconSpriteName,
             null,
-            new Vector2(6f, -53f),
+            null,
+            new Vector2(0f, -FallbackRowSpacing * 2f),
             StructureFillColor);
 
         healthGauge = healthRow.gauge;
@@ -791,6 +1087,7 @@ public static class GameplayStatusHudRuntime
         Transform parent,
         string rowName,
         string iconAssetPath,
+        string iconSpriteName,
         string trackAssetPath,
         string fillAssetPath,
         Vector2 anchoredPosition,
@@ -808,15 +1105,15 @@ public static class GameplayStatusHudRuntime
         background.color = RowPanelColor;
         background.raycastTarget = false;
 
-        CreateRowIcon(rowObject.transform, rowName, iconAssetPath, fillColor);
+        CreateRowIcon(rowObject.transform, rowName, iconAssetPath, iconSpriteName, fillColor);
 
         GameObject barObject = CreateUIObject("Bar", rowObject.transform);
         RectTransform barRect = barObject.GetComponent<RectTransform>();
         barRect.anchorMin = new Vector2(0f, 0.5f);
         barRect.anchorMax = new Vector2(0f, 0.5f);
         barRect.pivot = new Vector2(0f, 0.5f);
-        barRect.anchoredPosition = new Vector2(26f, -1f);
-        barRect.sizeDelta = new Vector2(132f, 11f);
+        barRect.anchoredPosition = new Vector2(FallbackBarLeftX, 0f);
+        barRect.sizeDelta = new Vector2(FallbackBarWidth, FallbackBarHeight);
 
         Image barBackground = barObject.AddComponent<Image>();
         Sprite trackSprite = LoadHudSprite(trackAssetPath);
@@ -844,8 +1141,8 @@ public static class GameplayStatusHudRuntime
         RectTransform fillAreaRect = fillArea.GetComponent<RectTransform>();
         fillAreaRect.anchorMin = Vector2.zero;
         fillAreaRect.anchorMax = Vector2.one;
-        fillAreaRect.offsetMin = new Vector2(4f, 2f);
-        fillAreaRect.offsetMax = new Vector2(-4f, -2f);
+        fillAreaRect.offsetMin = new Vector2(5f, 3f);
+        fillAreaRect.offsetMax = new Vector2(-5f, -3f);
 
         GameObject fillObject = CreateUIObject("Fill", fillArea.transform);
         RectTransform fillRect = fillObject.GetComponent<RectTransform>();
@@ -857,41 +1154,34 @@ public static class GameplayStatusHudRuntime
         Image fillImage = fillObject.AddComponent<Image>();
         ApplyGaugeFill(fillImage, fillColor, fillAssetPath);
         slider.fillRect = fillRect;
+        ApplyStatusBarSkin(slider, fillColor);
 
         ValueTrans gauge = barObject.AddComponent<ValueTrans>();
         gauge.slider = slider;
 
-        TextMeshProUGUI valueText = CreateText("Value", rowObject.transform, "100/100", 7f, new Vector2(118f, -6f), new Vector2(36f, 11f), TextAlignmentOptions.MidlineRight);
+        TextMeshProUGUI valueText = CreateText("Value", rowObject.transform, "100/100", 16f, new Vector2(FallbackValueTextX, FallbackValueTextY), new Vector2(78f, 28f), TextAlignmentOptions.MidlineRight);
         valueText.fontStyle = FontStyles.Bold;
 
         return new StatusRow(gauge, valueText, fillImage);
     }
 
-    private static Image CreateRowIcon(Transform parent, string rowName, string iconAssetPath, Color fallbackColor)
+    private static Image CreateRowIcon(
+        Transform parent,
+        string rowName,
+        string iconAssetPath,
+        string iconSpriteName,
+        Color fallbackColor)
     {
         GameObject iconObject = CreateUIObject("Icon", parent);
         RectTransform iconRect = iconObject.GetComponent<RectTransform>();
         iconRect.anchorMin = new Vector2(0f, 0.5f);
         iconRect.anchorMax = new Vector2(0f, 0.5f);
         iconRect.pivot = new Vector2(0.5f, 0.5f);
-        iconRect.anchoredPosition = new Vector2(13f, -1f);
-        iconRect.sizeDelta = new Vector2(20f, 20f);
+        iconRect.anchoredPosition = new Vector2(FallbackIconX, 0f);
+        iconRect.sizeDelta = new Vector2(FallbackIconSize, FallbackIconSize);
 
         Image iconImage = iconObject.AddComponent<Image>();
-        Sprite iconSprite = LoadHudSprite(iconAssetPath);
-        if (iconSprite != null)
-        {
-            iconImage.sprite = iconSprite;
-            iconImage.type = Image.Type.Simple;
-            iconImage.preserveAspect = true;
-            iconImage.color = Color.white;
-        }
-        else
-        {
-            ApplyPixelFrame(iconImage, rowName + "_icon", fallbackColor, 28, 28, 5);
-        }
-
-        iconImage.raycastTarget = false;
+        ApplyStatusIcon(iconImage, iconAssetPath, iconSpriteName, fallbackColor);
         return iconImage;
     }
 
@@ -1045,24 +1335,63 @@ public static class GameplayStatusHudRuntime
 
     private static Sprite LoadHudSprite(string assetPath)
     {
+        return LoadHudSprite(assetPath, null);
+    }
+
+    private static Sprite LoadHudSprite(string assetPath, string spriteName)
+    {
         if (string.IsNullOrWhiteSpace(assetPath))
         {
             return null;
         }
 
-        string cacheKey = $"asset_{assetPath}";
+        string cacheKey = string.IsNullOrWhiteSpace(spriteName)
+            ? $"asset_{assetPath}"
+            : $"asset_{assetPath}_{spriteName}";
         if (HudSpriteCache.TryGetValue(cacheKey, out Sprite cachedSprite) && cachedSprite != null)
         {
             return cachedSprite;
         }
 
-        Sprite sprite = RuntimeProjectSpriteLoader.LoadSprite(assetPath, true, SpriteMeshType.FullRect);
+        Sprite sprite = LoadNamedSprite(assetPath, spriteName) ??
+                        RuntimeProjectSpriteLoader.LoadSprite(assetPath, true, SpriteMeshType.FullRect);
         if (sprite != null)
         {
             HudSpriteCache[cacheKey] = sprite;
         }
 
         return sprite;
+    }
+
+    private static Sprite LoadNamedSprite(string assetPath, string spriteName)
+    {
+        if (string.IsNullOrWhiteSpace(spriteName))
+        {
+            return null;
+        }
+
+#if UNITY_EDITOR
+        Object[] assets = AssetDatabase.LoadAllAssetsAtPath(assetPath);
+        foreach (Object asset in assets)
+        {
+            if (asset is Sprite sprite &&
+                string.Equals(sprite.name, spriteName, System.StringComparison.Ordinal))
+            {
+                return sprite;
+            }
+        }
+#endif
+
+        Sprite[] loadedSprites = Resources.FindObjectsOfTypeAll<Sprite>();
+        foreach (Sprite sprite in loadedSprites)
+        {
+            if (sprite != null && string.Equals(sprite.name, spriteName, System.StringComparison.Ordinal))
+            {
+                return sprite;
+            }
+        }
+
+        return null;
     }
 
     private static Sprite GetGaugeFillSprite()
@@ -1216,7 +1545,7 @@ public static class GameplayStatusHudRuntime
         rootRect.anchorMin = new Vector2(0f, 1f);
         rootRect.anchorMax = new Vector2(0f, 1f);
         rootRect.pivot = new Vector2(0f, 1f);
-        rootRect.anchoredPosition = new Vector2(24f, -24f);
+        rootRect.anchoredPosition = FallbackHudAnchoredPosition;
         rootRect.sizeDelta = new Vector2(RootWidth, RootHeight);
         rootRect.localScale = Vector3.one;
         rootRect.SetAsLastSibling();

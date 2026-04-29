@@ -16,9 +16,26 @@ public sealed class IllustratedPhotoAlbumPageBinder
     private const string RuntimeDeleteConfirmRootName = "RuntimePhotoAlbumDeleteConfirm";
     private const string RuntimeConfirmDeleteButtonName = "RuntimePhotoAlbumConfirmDelete";
     private const string RuntimeCancelDeleteButtonName = "RuntimePhotoAlbumCancelDelete";
+    private const string RuntimeStageDropdownName = "RuntimePhotoAlbumStageDropdown";
+    private const string RuntimeSortDropdownName = "RuntimePhotoAlbumSortDropdown";
+    private const string BaseStageFilterValue = "__base__";
     private const string SceneDeleteButtonName = "DeleButton";
     private const float DeleteButtonShareGap = 8f;
     private const float ScenePagingButtonMaxHorizontalDistance = 160f;
+    private const float FilterDropdownMinWidth = 92f;
+    private const float FilterDropdownMinHeight = 22f;
+    private const float FilterDropdownHorizontalGap = 6f;
+    private const float FilterDropdownCaptionFontSize = 9.5f;
+    private const float FilterDropdownItemFontSize = 9f;
+    private const float FilterDropdownTextHorizontalInset = 6f;
+    private const float FilterDropdownTextVerticalInset = 1f;
+    private const float FilterDropdownArrowInset = 18f;
+    private const float PreviewTitleFontSize = 10f;
+    private const float PreviewTitleMinFontSize = 6f;
+    private const float PreviewDescriptionFontSize = 7f;
+    private const float PreviewDescriptionMinFontSize = 5f;
+    private const float PreviewTitleBottomPadding = 13f;
+    private const float PreviewDescriptionBottomPadding = 36f;
     private static readonly Color DeleteConfirmOverlayColor = new Color(0.05f, 0.04f, 0.03f, 0.54f);
     private static readonly Color DeleteConfirmPanelColor = new Color(0.72f, 0.60f, 0.40f, 0.98f);
     private static readonly Color DeleteConfirmTitleColor = new Color(0.13f, 0.09f, 0.04f, 1f);
@@ -30,7 +47,10 @@ public sealed class IllustratedPhotoAlbumPageBinder
     private readonly Func<PhotoAlbumEntry, Texture2D> textureLoader;
     private readonly Func<PhotoAlbumEntry, bool> entryDeleter;
     private readonly bool destroyLoadedTextures;
+    private readonly List<PhotoAlbumEntry> sourceEntries = new List<PhotoAlbumEntry>();
     private readonly List<PhotoAlbumEntry> entries = new List<PhotoAlbumEntry>();
+    private readonly List<Dropdown> sortFilterDropdowns = new List<Dropdown>();
+    private readonly List<TMP_Dropdown> tmpSortFilterDropdowns = new List<TMP_Dropdown>();
     private readonly List<RectTransform> slotRects = new List<RectTransform>();
     private readonly List<RawImage> slotImages = new List<RawImage>();
     private readonly List<Texture2D> loadedTextures = new List<Texture2D>();
@@ -48,8 +68,16 @@ public sealed class IllustratedPhotoAlbumPageBinder
     private Button deleteSelectedButton;
     private RectTransform deleteConfirmRoot;
     private CanvasGroup deleteConfirmCanvasGroup;
+    private PhotoAlbumSortMode selectedSortMode = PhotoAlbumSortMode.Time;
+    private bool suppressSortDropdownEvents;
     private int currentPageIndex;
     private int selectedEntryIndex = -1;
+
+    private enum PhotoAlbumSortMode
+    {
+        Time = 0,
+        Stage = 1
+    }
 
     public IllustratedPhotoAlbumPageBinder()
         : this(PhotoAlbumRepository.LoadEntries, PhotoAlbumRepository.LoadTexture, PhotoAlbumRepository.DeleteEntry, true)
@@ -126,8 +154,12 @@ public sealed class IllustratedPhotoAlbumPageBinder
         deleteSelectedButton = null;
         deleteConfirmRoot = null;
         deleteConfirmCanvasGroup = null;
+        sortFilterDropdowns.Clear();
+        tmpSortFilterDropdowns.Clear();
         slotRects.Clear();
         slotImages.Clear();
+        sourceEntries.Clear();
+        entries.Clear();
         currentPageIndex = 0;
         selectedEntryIndex = -1;
     }
@@ -147,6 +179,7 @@ public sealed class IllustratedPhotoAlbumPageBinder
         CollectSlotTargets(root, previewTarget, slotRects);
         SortSlotTargets(slotRects);
         TrimSlotTargets(slotRects);
+        NormalizeSlotGridLayout(slotRects);
 
         for (int i = 0; i < slotRects.Count; i++)
         {
@@ -157,10 +190,12 @@ public sealed class IllustratedPhotoAlbumPageBinder
 
         titleText = FindTextByName(root, "PhotoName") ?? FindTextByName(root, "Name");
         descriptionText = FindTextByName(root, "Introduction") ?? FindTextByContent(root, "New Text");
+        NormalizePreviewTextLayout(previewTarget as RectTransform);
         timeText = FindTextContaining(root, "拍摄时间");
         sceneText = FindTextContaining(root, "拍摄地点");
         unlockText = FindTextContaining(root, "解锁条件");
         pageNumberText = FindTextByName(root, "PageNumber");
+        EnsureFilterDropdowns();
         EnsurePagingButtons();
         EnsureDeleteSelectedButton(previewTarget as RectTransform);
         EnsureDeleteConfirmDialog();
@@ -168,20 +203,59 @@ public sealed class IllustratedPhotoAlbumPageBinder
 
     private void LoadEntries()
     {
+        sourceEntries.Clear();
         entries.Clear();
         IReadOnlyList<PhotoAlbumEntry> loadedEntries = entryLoader();
-        if (loadedEntries == null)
+        if (loadedEntries != null)
         {
-            return;
-        }
-
-        for (int i = 0; i < loadedEntries.Count; i++)
-        {
-            if (loadedEntries[i] != null)
+            for (int i = 0; i < loadedEntries.Count; i++)
             {
-                entries.Add(loadedEntries[i]);
+                if (loadedEntries[i] != null)
+                {
+                    sourceEntries.Add(loadedEntries[i]);
+                }
             }
         }
+
+        RefreshFilterDropdownOptions();
+        ApplyFiltersAndSort();
+    }
+
+    private void ApplyFiltersAndSort()
+    {
+        entries.Clear();
+        for (int i = 0; i < sourceEntries.Count; i++)
+        {
+            PhotoAlbumEntry entry = sourceEntries[i];
+            if (entry != null)
+            {
+                entries.Add(entry);
+            }
+        }
+
+        entries.Sort(CompareEntriesForCurrentSort);
+    }
+
+    private int CompareEntriesForCurrentSort(PhotoAlbumEntry left, PhotoAlbumEntry right)
+    {
+        if (selectedSortMode == PhotoAlbumSortMode.Stage)
+        {
+            int stageCompare = CompareEntryStage(left, right);
+            if (stageCompare != 0)
+            {
+                return stageCompare;
+            }
+        }
+
+        int timeCompare = CompareEntrySavedTime(left, right);
+        if (timeCompare != 0)
+        {
+            return -timeCompare;
+        }
+
+        string leftFile = left != null ? left.fileName : string.Empty;
+        string rightFile = right != null ? right.fileName : string.Empty;
+        return string.Compare(leftFile, rightFile, StringComparison.Ordinal);
     }
 
     private void ClampSelection()
@@ -241,7 +315,7 @@ public sealed class IllustratedPhotoAlbumPageBinder
         {
             SetTexture(previewImage, null);
             SetText(titleText, "暂无留念");
-            SetText(descriptionText, "在基地或关卡拍照并确认保存后，照片会展示在这里。");
+            SetText(descriptionText, "进入战斗场景或基地拍照并确认保存后，照片会展示在这里。");
             SetText(timeText, "拍摄时间 : --");
             SetText(sceneText, "拍摄地点 : --");
             SetText(unlockText, "解锁条件 : 保存一张留念照片");
@@ -254,7 +328,7 @@ public sealed class IllustratedPhotoAlbumPageBinder
 
         string stageName = ResolveStageName(entry);
         SetText(titleText, $"第 {selectedEntryIndex + 1} 张 · {stageName}");
-        SetText(descriptionText, "本地留念已保存，可在右页选择缩略图切换预览。");
+        SetText(descriptionText, "本地留念已保存，可在左页选择缩略图切换预览。");
         SetText(timeText, $"拍摄时间 : {FormatSavedTime(entry.savedAtUtc)}");
         SetText(sceneText, $"拍摄地点 : {ResolveSceneLabel(entry, stageName)}");
         SetText(unlockText, $"解锁条件 : {stageName}");
@@ -408,6 +482,7 @@ public sealed class IllustratedPhotoAlbumPageBinder
             return;
         }
 
+        RemoveEntry(sourceEntries, deletedEntry);
         entries[deletedIndex] = null;
         if (GetActiveEntryCount() == 0)
         {
@@ -421,6 +496,22 @@ public sealed class IllustratedPhotoAlbumPageBinder
         }
 
         RefreshCurrentSnapshot();
+    }
+
+    private static void RemoveEntry(List<PhotoAlbumEntry> targetEntries, PhotoAlbumEntry entry)
+    {
+        if (targetEntries == null || entry == null)
+        {
+            return;
+        }
+
+        for (int i = targetEntries.Count - 1; i >= 0; i--)
+        {
+            if (IsSameEntry(targetEntries[i], entry))
+            {
+                targetEntries.RemoveAt(i);
+            }
+        }
     }
 
     private Texture2D LoadEntryTexture(PhotoAlbumEntry entry)
@@ -708,6 +799,89 @@ public sealed class IllustratedPhotoAlbumPageBinder
         SetDeleteConfirmVisible(false);
     }
 
+    private void NormalizePreviewTextLayout(RectTransform previewTarget)
+    {
+        if (previewTarget == null || previewTarget.parent == null)
+        {
+            return;
+        }
+
+        RectTransform previewGroup = previewTarget.parent as RectTransform;
+        if (previewGroup == null)
+        {
+            return;
+        }
+
+        NormalizePreviewTitleText(titleText, previewTarget, previewGroup);
+        NormalizePreviewDescriptionText(descriptionText, previewTarget, previewGroup);
+    }
+
+    private static void NormalizePreviewTitleText(TMP_Text text, RectTransform previewTarget, RectTransform previewGroup)
+    {
+        if (!IsPreviewDetailText(text, previewGroup))
+        {
+            return;
+        }
+
+        RectTransform rect = text.rectTransform;
+        Vector2 previewSize = GetRectSize(previewTarget);
+        float width = Mathf.Max(GetRectSize(rect).x, previewSize.x * 1.55f, 180f);
+        float previewBottom = previewTarget.anchoredPosition.y - previewSize.y * previewTarget.pivot.y;
+
+        rect.anchorMin = previewTarget.anchorMin;
+        rect.anchorMax = previewTarget.anchorMax;
+        rect.pivot = new Vector2(0.5f, 0.5f);
+        rect.anchoredPosition = new Vector2(previewTarget.anchoredPosition.x, previewBottom - PreviewTitleBottomPadding);
+        rect.sizeDelta = new Vector2(width, 18f);
+        rect.localScale = Vector3.one;
+
+        text.enableAutoSizing = true;
+        text.fontSizeMin = PreviewTitleMinFontSize;
+        text.fontSizeMax = PreviewTitleFontSize;
+        text.fontSize = PreviewTitleFontSize;
+        text.enableWordWrapping = false;
+        text.overflowMode = TextOverflowModes.Ellipsis;
+        text.alignment = TextAlignmentOptions.Center;
+        text.raycastTarget = false;
+    }
+
+    private static void NormalizePreviewDescriptionText(TMP_Text text, RectTransform previewTarget, RectTransform previewGroup)
+    {
+        if (!IsPreviewDetailText(text, previewGroup))
+        {
+            return;
+        }
+
+        RectTransform rect = text.rectTransform;
+        Vector2 previewSize = GetRectSize(previewTarget);
+        float width = Mathf.Max(GetRectSize(rect).x, previewSize.x * 1.65f, 190f);
+        float previewBottom = previewTarget.anchoredPosition.y - previewSize.y * previewTarget.pivot.y;
+
+        rect.anchorMin = previewTarget.anchorMin;
+        rect.anchorMax = previewTarget.anchorMax;
+        rect.pivot = new Vector2(0.5f, 0.5f);
+        rect.anchoredPosition = new Vector2(previewTarget.anchoredPosition.x, previewBottom - PreviewDescriptionBottomPadding);
+        rect.sizeDelta = new Vector2(width, 32f);
+        rect.localScale = Vector3.one;
+
+        text.enableAutoSizing = true;
+        text.fontSizeMin = PreviewDescriptionMinFontSize;
+        text.fontSizeMax = PreviewDescriptionFontSize;
+        text.fontSize = PreviewDescriptionFontSize;
+        text.enableWordWrapping = true;
+        text.overflowMode = TextOverflowModes.Ellipsis;
+        text.alignment = TextAlignmentOptions.Center;
+        text.raycastTarget = false;
+    }
+
+    private static bool IsPreviewDetailText(TMP_Text text, RectTransform previewGroup)
+    {
+        return text != null &&
+               text.rectTransform != null &&
+               previewGroup != null &&
+               text.rectTransform.parent == previewGroup;
+    }
+
     private void SetDeleteConfirmVisible(bool visible)
     {
         if (deleteConfirmRoot == null || deleteConfirmCanvasGroup == null)
@@ -747,6 +921,416 @@ public sealed class IllustratedPhotoAlbumPageBinder
         targetButton.colors = shareButton.colors;
         targetButton.spriteState = shareButton.spriteState;
         targetButton.animationTriggers = shareButton.animationTriggers;
+    }
+
+    private void EnsureFilterDropdowns()
+    {
+        sortFilterDropdowns.Clear();
+        tmpSortFilterDropdowns.Clear();
+        CollectSceneAuthoredFilterDropdowns(root, sortFilterDropdowns, tmpSortFilterDropdowns);
+        if (sortFilterDropdowns.Count == 0 && tmpSortFilterDropdowns.Count == 0)
+        {
+            return;
+        }
+
+        List<RectTransform> filterRects = new List<RectTransform>(sortFilterDropdowns.Count + tmpSortFilterDropdowns.Count);
+        for (int i = 0; i < sortFilterDropdowns.Count; i++)
+        {
+            Dropdown dropdown = sortFilterDropdowns[i];
+            RectTransform rect = dropdown != null ? dropdown.transform as RectTransform : null;
+            if (rect != null)
+            {
+                filterRects.Add(rect);
+            }
+        }
+
+        for (int i = 0; i < tmpSortFilterDropdowns.Count; i++)
+        {
+            TMP_Dropdown dropdown = tmpSortFilterDropdowns[i];
+            RectTransform rect = dropdown != null ? dropdown.transform as RectTransform : null;
+            if (rect != null)
+            {
+                filterRects.Add(rect);
+            }
+        }
+
+        NormalizeFilterDropdownLayout(filterRects);
+
+        for (int i = 0; i < filterRects.Count; i++)
+        {
+            Transform parent = filterRects[i] != null && filterRects[i].parent != null ? filterRects[i].parent : root;
+            RemoveRuntimeFilterDropdown(parent, RuntimeStageDropdownName);
+            RemoveRuntimeFilterDropdown(parent, RuntimeSortDropdownName);
+        }
+
+        for (int i = 0; i < sortFilterDropdowns.Count; i++)
+        {
+            ConfigureDropdownRect(sortFilterDropdowns[i]);
+        }
+
+        for (int i = 0; i < tmpSortFilterDropdowns.Count; i++)
+        {
+            ConfigureTmpDropdownRect(tmpSortFilterDropdowns[i]);
+        }
+
+        BindSortFilterDropdownEvent();
+        RefreshFilterDropdownOptions();
+    }
+
+    private void RefreshFilterDropdownOptions()
+    {
+        suppressSortDropdownEvents = true;
+        try
+        {
+            for (int i = 0; i < sortFilterDropdowns.Count; i++)
+            {
+                SetDropdownOptions(
+                    sortFilterDropdowns[i],
+                    new[] { "按时间排序", "按关卡排序" },
+                    Mathf.Clamp((int)selectedSortMode, 0, 1));
+            }
+
+            for (int i = 0; i < tmpSortFilterDropdowns.Count; i++)
+            {
+                SetDropdownOptions(
+                    tmpSortFilterDropdowns[i],
+                    new[] { "按时间排序", "按关卡排序" },
+                    Mathf.Clamp((int)selectedSortMode, 0, 1));
+            }
+        }
+        finally
+        {
+            suppressSortDropdownEvents = false;
+        }
+    }
+
+    private void BindSortFilterDropdownEvent()
+    {
+        for (int i = 0; i < sortFilterDropdowns.Count; i++)
+        {
+            Dropdown dropdown = sortFilterDropdowns[i];
+            if (dropdown == null)
+            {
+                continue;
+            }
+
+            dropdown.onValueChanged.RemoveAllListeners();
+            dropdown.onValueChanged.AddListener(HandleSortChanged);
+        }
+
+        for (int i = 0; i < tmpSortFilterDropdowns.Count; i++)
+        {
+            TMP_Dropdown dropdown = tmpSortFilterDropdowns[i];
+            if (dropdown == null)
+            {
+                continue;
+            }
+
+            dropdown.onValueChanged.RemoveAllListeners();
+            dropdown.onValueChanged.AddListener(HandleSortChanged);
+        }
+    }
+
+    private void HandleSortChanged(int value)
+    {
+        if (suppressSortDropdownEvents)
+        {
+            return;
+        }
+
+        selectedSortMode = value == 1 ? PhotoAlbumSortMode.Stage : PhotoAlbumSortMode.Time;
+        ApplyFilterChange();
+    }
+
+    private void ApplyFilterChange()
+    {
+        currentPageIndex = 0;
+        selectedEntryIndex = -1;
+        ApplyFiltersAndSort();
+        ClampSelection();
+        RefreshFilterDropdownOptions();
+        SetDeleteConfirmVisible(false);
+        RefreshCurrentSnapshot();
+    }
+
+    private static void CollectSceneAuthoredFilterDropdowns(
+        Transform root,
+        List<Dropdown> legacyResults,
+        List<TMP_Dropdown> tmpResults)
+    {
+        if (root == null)
+        {
+            return;
+        }
+
+        if (legacyResults != null)
+        {
+            Dropdown[] dropdowns = root.GetComponentsInChildren<Dropdown>(true);
+            for (int i = 0; i < dropdowns.Length; i++)
+            {
+                Dropdown dropdown = dropdowns[i];
+                if (dropdown != null && IsSceneAuthoredFilterDropdownName(dropdown.name))
+                {
+                    legacyResults.Add(dropdown);
+                }
+            }
+        }
+
+        if (tmpResults != null)
+        {
+            TMP_Dropdown[] dropdowns = root.GetComponentsInChildren<TMP_Dropdown>(true);
+            for (int i = 0; i < dropdowns.Length; i++)
+            {
+                TMP_Dropdown dropdown = dropdowns[i];
+                if (dropdown != null && IsSceneAuthoredFilterDropdownName(dropdown.name))
+                {
+                    tmpResults.Add(dropdown);
+                }
+            }
+        }
+    }
+
+    private static bool IsSceneAuthoredFilterDropdownName(string name)
+    {
+        return string.Equals(name, "Dropdown", StringComparison.Ordinal) &&
+               !name.StartsWith("RuntimePhotoAlbum", StringComparison.Ordinal);
+    }
+
+    private static void RemoveRuntimeFilterDropdown(Transform parent, string name)
+    {
+        if (parent == null || string.IsNullOrWhiteSpace(name))
+        {
+            return;
+        }
+
+        Transform existing = parent.Find(name);
+        if (existing == null)
+        {
+            return;
+        }
+
+        if (Application.isPlaying)
+        {
+            UnityEngine.Object.Destroy(existing.gameObject);
+        }
+        else
+        {
+            UnityEngine.Object.DestroyImmediate(existing.gameObject);
+        }
+    }
+
+    private static void ConfigureDropdownRect(Dropdown dropdown)
+    {
+        RectTransform rect = dropdown != null ? dropdown.transform as RectTransform : null;
+        if (rect == null)
+        {
+            return;
+        }
+
+        rect.localScale = Vector3.one;
+
+        Image image = dropdown.GetComponent<Image>();
+        if (image != null)
+        {
+            image.raycastTarget = true;
+        }
+
+        ConfigureLegacyDropdownText(dropdown.captionText, true);
+        ConfigureLegacyDropdownText(dropdown.itemText, false);
+    }
+
+    private static void ConfigureTmpDropdownRect(TMP_Dropdown dropdown)
+    {
+        RectTransform rect = dropdown != null ? dropdown.transform as RectTransform : null;
+        if (rect == null)
+        {
+            return;
+        }
+
+        rect.localScale = Vector3.one;
+
+        Image image = dropdown.GetComponent<Image>();
+        if (image != null)
+        {
+            image.raycastTarget = true;
+        }
+
+        ConfigureTmpDropdownText(dropdown.captionText, true);
+        ConfigureTmpDropdownText(dropdown.itemText, false);
+    }
+
+    private static void NormalizeFilterDropdownLayout(List<RectTransform> dropdownRects)
+    {
+        if (dropdownRects == null || dropdownRects.Count == 0)
+        {
+            return;
+        }
+
+        dropdownRects.RemoveAll(rect => rect == null);
+        if (dropdownRects.Count == 0)
+        {
+            return;
+        }
+
+        dropdownRects.Sort(CompareFilterDropdownRects);
+        Vector2 targetSize = ResolveFilterDropdownSize(dropdownRects);
+        bool hasSharedParent = FilterDropdownsShareParent(dropdownRects);
+        Vector2 startPosition = dropdownRects[0].anchoredPosition;
+
+        for (int i = 0; i < dropdownRects.Count; i++)
+        {
+            RectTransform rect = dropdownRects[i];
+            rect.sizeDelta = targetSize;
+            if (hasSharedParent)
+            {
+                rect.anchoredPosition = new Vector2(
+                    startPosition.x + i * (targetSize.x + FilterDropdownHorizontalGap),
+                    startPosition.y);
+            }
+
+            rect.localScale = Vector3.one;
+        }
+    }
+
+    private static int CompareFilterDropdownRects(RectTransform left, RectTransform right)
+    {
+        if (left == right)
+        {
+            return 0;
+        }
+
+        if (left == null)
+        {
+            return 1;
+        }
+
+        if (right == null)
+        {
+            return -1;
+        }
+
+        int yCompare = -left.anchoredPosition.y.CompareTo(right.anchoredPosition.y);
+        return yCompare != 0 ? yCompare : left.anchoredPosition.x.CompareTo(right.anchoredPosition.x);
+    }
+
+    private static Vector2 ResolveFilterDropdownSize(List<RectTransform> dropdownRects)
+    {
+        Vector2 size = new Vector2(FilterDropdownMinWidth, FilterDropdownMinHeight);
+        for (int i = 0; i < dropdownRects.Count; i++)
+        {
+            Vector2 candidate = GetRectSize(dropdownRects[i]);
+            size.x = Mathf.Max(size.x, candidate.x);
+            size.y = Mathf.Max(size.y, candidate.y);
+        }
+
+        return size;
+    }
+
+    private static bool FilterDropdownsShareParent(List<RectTransform> dropdownRects)
+    {
+        Transform parent = dropdownRects != null && dropdownRects.Count > 0 && dropdownRects[0] != null
+            ? dropdownRects[0].parent
+            : null;
+        if (parent == null)
+        {
+            return false;
+        }
+
+        for (int i = 1; i < dropdownRects.Count; i++)
+        {
+            if (dropdownRects[i] == null || dropdownRects[i].parent != parent)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static void ConfigureLegacyDropdownText(Text text, bool reserveArrowSpace)
+    {
+        if (text == null)
+        {
+            return;
+        }
+
+        ConfigureDropdownTextRect(text.rectTransform, reserveArrowSpace);
+        text.alignment = TextAnchor.MiddleCenter;
+        text.resizeTextForBestFit = false;
+        text.fontSize = Mathf.RoundToInt(reserveArrowSpace ? FilterDropdownCaptionFontSize : FilterDropdownItemFontSize);
+        text.horizontalOverflow = HorizontalWrapMode.Overflow;
+        text.verticalOverflow = VerticalWrapMode.Truncate;
+        text.raycastTarget = false;
+        RuntimeTextFontRepair.RepairLegacyText(text);
+    }
+
+    private static void ConfigureTmpDropdownText(TMP_Text text, bool reserveArrowSpace)
+    {
+        if (text == null)
+        {
+            return;
+        }
+
+        ConfigureDropdownTextRect(text.rectTransform, reserveArrowSpace);
+        text.enableAutoSizing = false;
+        text.fontSize = reserveArrowSpace ? FilterDropdownCaptionFontSize : FilterDropdownItemFontSize;
+        text.fontSizeMin = FilterDropdownItemFontSize;
+        text.fontSizeMax = FilterDropdownCaptionFontSize;
+        text.enableWordWrapping = false;
+        text.overflowMode = TextOverflowModes.Ellipsis;
+        text.alignment = TextAlignmentOptions.Center;
+        text.raycastTarget = false;
+        RuntimeTextFontRepair.RepairTmpText(text);
+    }
+
+    private static void ConfigureDropdownTextRect(RectTransform textRect, bool reserveArrowSpace)
+    {
+        if (textRect == null)
+        {
+            return;
+        }
+
+        textRect.anchorMin = Vector2.zero;
+        textRect.anchorMax = Vector2.one;
+        textRect.offsetMin = new Vector2(FilterDropdownTextHorizontalInset, FilterDropdownTextVerticalInset);
+        textRect.offsetMax = new Vector2(
+            reserveArrowSpace ? -FilterDropdownArrowInset : -FilterDropdownTextHorizontalInset,
+            -FilterDropdownTextVerticalInset);
+        textRect.localScale = Vector3.one;
+    }
+
+    private static void SetDropdownOptions(Dropdown dropdown, string[] labels, int selectedIndex)
+    {
+        if (dropdown == null || labels == null || labels.Length == 0)
+        {
+            return;
+        }
+
+        dropdown.options.Clear();
+        for (int i = 0; i < labels.Length; i++)
+        {
+            dropdown.options.Add(new Dropdown.OptionData(labels[i]));
+        }
+
+        dropdown.value = Mathf.Clamp(selectedIndex, 0, labels.Length - 1);
+        dropdown.RefreshShownValue();
+    }
+
+    private static void SetDropdownOptions(TMP_Dropdown dropdown, string[] labels, int selectedIndex)
+    {
+        if (dropdown == null || labels == null || labels.Length == 0)
+        {
+            return;
+        }
+
+        dropdown.options.Clear();
+        for (int i = 0; i < labels.Length; i++)
+        {
+            dropdown.options.Add(new TMP_Dropdown.OptionData(labels[i]));
+        }
+
+        dropdown.value = Mathf.Clamp(selectedIndex, 0, labels.Length - 1);
+        dropdown.RefreshShownValue();
     }
 
     private static Image EnsureConfirmImage(RectTransform parent, string name, Color color)
@@ -1061,10 +1645,12 @@ public sealed class IllustratedPhotoAlbumPageBinder
             return null;
         }
 
+        PreparePhotoFrameTarget(targetRect);
+
         Transform existing = targetRect.Find(RuntimeTextureName);
         GameObject textureObject = existing != null
             ? existing.gameObject
-            : new GameObject(RuntimeTextureName, typeof(RectTransform), typeof(RawImage), typeof(AspectRatioFitter));
+            : new GameObject(RuntimeTextureName, typeof(RectTransform), typeof(RawImage));
         RectTransform textureRect = textureObject.GetComponent<RectTransform>();
         textureRect.SetParent(targetRect, false);
         textureRect.anchorMin = Vector2.zero;
@@ -1073,16 +1659,36 @@ public sealed class IllustratedPhotoAlbumPageBinder
         textureRect.offsetMax = Vector2.zero;
         textureRect.pivot = new Vector2(0.5f, 0.5f);
         textureRect.localScale = Vector3.one;
-        textureRect.SetAsLastSibling();
+        textureRect.SetAsFirstSibling();
 
         RawImage rawImage = textureObject.GetComponent<RawImage>();
         rawImage.raycastTarget = false;
         rawImage.color = Color.clear;
 
         AspectRatioFitter fitter = textureObject.GetComponent<AspectRatioFitter>();
-        fitter.aspectMode = AspectRatioFitter.AspectMode.FitInParent;
-        fitter.aspectRatio = 1.6f;
+        if (fitter != null)
+        {
+            fitter.enabled = false;
+        }
+
         return rawImage;
+    }
+
+    private static void PreparePhotoFrameTarget(RectTransform targetRect)
+    {
+        Image frameImage = targetRect != null ? targetRect.GetComponent<Image>() : null;
+        if (frameImage == null)
+        {
+            return;
+        }
+
+        frameImage.raycastTarget = true;
+        if (frameImage.sprite == null)
+        {
+            Color color = frameImage.color;
+            color.a = 0.001f;
+            frameImage.color = color;
+        }
     }
 
     private static void SetTexture(RawImage image, Texture2D texture)
@@ -1097,9 +1703,7 @@ public sealed class IllustratedPhotoAlbumPageBinder
         AspectRatioFitter fitter = image.GetComponent<AspectRatioFitter>();
         if (fitter != null)
         {
-            fitter.aspectRatio = texture != null && texture.height > 0
-                ? texture.width / (float)texture.height
-                : 1.6f;
+            fitter.enabled = false;
         }
     }
 
@@ -1218,7 +1822,6 @@ public sealed class IllustratedPhotoAlbumPageBinder
                 rect == panelRect ||
                 image == null ||
                 !image.enabled ||
-                image.color.a < 0.2f ||
                 !TryGetSceneSlotOrder(rect.name, out _) ||
                 size.x < 30f ||
                 size.y < 20f)
@@ -1254,7 +1857,7 @@ public sealed class IllustratedPhotoAlbumPageBinder
 
     private static bool IsSlotTarget(Image image, RectTransform rect, Transform previewTarget)
     {
-        if (image == null || rect == null || !image.enabled || image.color.a < 0.2f)
+        if (image == null || rect == null || !image.enabled)
         {
             return false;
         }
@@ -1278,6 +1881,11 @@ public sealed class IllustratedPhotoAlbumPageBinder
         if (TryGetSceneSlotOrder(rect.name, out _))
         {
             return size.x >= 30f && size.y >= 20f;
+        }
+
+        if (image.color.a < 0.2f)
+        {
+            return false;
         }
 
         if (size.x < 42f || size.y < 42f)
@@ -1362,6 +1970,81 @@ public sealed class IllustratedPhotoAlbumPageBinder
         }
     }
 
+    private static void NormalizeSlotGridLayout(List<RectTransform> slots)
+    {
+        if (slots == null || slots.Count < 2)
+        {
+            return;
+        }
+
+        Transform parent = slots[0] != null ? slots[0].parent : null;
+        if (parent == null)
+        {
+            return;
+        }
+
+        for (int i = 1; i < slots.Count; i++)
+        {
+            if (slots[i] == null || slots[i].parent != parent)
+            {
+                return;
+            }
+        }
+
+        int columnCount = Mathf.Min(3, slots.Count);
+        int rowCount = Mathf.CeilToInt(slots.Count / (float)columnCount);
+        Vector2 targetSize = ResolveCommonSlotSize(slots);
+        float minX = float.MaxValue;
+        float maxX = float.MinValue;
+        float minY = float.MaxValue;
+        float maxY = float.MinValue;
+
+        for (int i = 0; i < slots.Count; i++)
+        {
+            Vector2 position = slots[i].anchoredPosition;
+            minX = Mathf.Min(minX, position.x);
+            maxX = Mathf.Max(maxX, position.x);
+            minY = Mathf.Min(minY, position.y);
+            maxY = Mathf.Max(maxY, position.y);
+        }
+
+        float columnStep = columnCount > 1 && maxX > minX
+            ? (maxX - minX) / (columnCount - 1)
+            : targetSize.x + 24f;
+        float rowStep = rowCount > 1 && maxY > minY
+            ? (maxY - minY) / (rowCount - 1)
+            : targetSize.y + 34f;
+
+        for (int i = 0; i < slots.Count; i++)
+        {
+            int row = i / columnCount;
+            int column = i % columnCount;
+            RectTransform slot = slots[i];
+            slot.sizeDelta = targetSize;
+            slot.anchoredPosition = new Vector2(minX + columnStep * column, maxY - rowStep * row);
+        }
+    }
+
+    private static Vector2 ResolveCommonSlotSize(List<RectTransform> slots)
+    {
+        Vector2 size = Vector2.zero;
+        for (int i = 0; i < slots.Count; i++)
+        {
+            Vector2 candidate = GetRectSize(slots[i]);
+            if (candidate.x * candidate.y > size.x * size.y)
+            {
+                size = candidate;
+            }
+        }
+
+        if (size.x <= 0f || size.y <= 0f)
+        {
+            return new Vector2(50f, 30f);
+        }
+
+        return size;
+    }
+
     private static TMP_Text FindTextByName(Transform root, string name)
     {
         TMP_Text[] texts = root.GetComponentsInChildren<TMP_Text>(true);
@@ -1404,6 +2087,59 @@ public sealed class IllustratedPhotoAlbumPageBinder
         return null;
     }
 
+    private static string ResolveStageFilterValue(PhotoAlbumEntry entry)
+    {
+        if (entry == null)
+        {
+            return string.Empty;
+        }
+
+        GameplayStageDefinition stage = GameplayStageCatalog.GetStageById(entry.stageId);
+        if (stage != null)
+        {
+            return stage.stageId;
+        }
+
+        stage = GameplayStageCatalog.GetStageByScene(entry.sceneName);
+        if (stage != null)
+        {
+            return stage.stageId;
+        }
+
+        if (IsBaseScene(entry.sceneName))
+        {
+            return BaseStageFilterValue;
+        }
+
+        return string.IsNullOrWhiteSpace(entry.stageId) ? entry.sceneName : entry.stageId;
+    }
+
+    private static int CompareEntryStage(PhotoAlbumEntry left, PhotoAlbumEntry right)
+    {
+        int leftIndex = ResolveStageSortIndex(left);
+        int rightIndex = ResolveStageSortIndex(right);
+        if (leftIndex != rightIndex)
+        {
+            return leftIndex.CompareTo(rightIndex);
+        }
+
+        string leftStage = ResolveStageFilterValue(left);
+        string rightStage = ResolveStageFilterValue(right);
+        return string.Compare(leftStage, rightStage, StringComparison.Ordinal);
+    }
+
+    private static int ResolveStageSortIndex(PhotoAlbumEntry entry)
+    {
+        string stageValue = ResolveStageFilterValue(entry);
+        if (string.Equals(stageValue, BaseStageFilterValue, StringComparison.Ordinal))
+        {
+            return int.MaxValue - 1;
+        }
+
+        int stageIndex = GameplayStageCatalog.GetStageIndex(stageValue);
+        return stageIndex >= 0 ? stageIndex : int.MaxValue;
+    }
+
     private static string ResolveStageName(PhotoAlbumEntry entry)
     {
         GameplayStageDefinition stage = entry != null ? GameplayStageCatalog.GetStageById(entry.stageId) : null;
@@ -1412,7 +2148,7 @@ public sealed class IllustratedPhotoAlbumPageBinder
             return stage.displayName;
         }
 
-        if (entry != null && string.Equals(entry.sceneName, "NewBase", StringComparison.Ordinal))
+        if (entry != null && IsBaseScene(entry.sceneName))
         {
             return "基地";
         }
@@ -1420,6 +2156,64 @@ public sealed class IllustratedPhotoAlbumPageBinder
         return entry != null && !string.IsNullOrWhiteSpace(entry.sceneName)
             ? entry.sceneName
             : "未记录场景";
+    }
+
+    private static bool IsBaseScene(string sceneName)
+    {
+        return string.Equals(sceneName, "NewBase", StringComparison.Ordinal) ||
+               string.Equals(sceneName, "BaseScene", StringComparison.Ordinal);
+    }
+
+    private static bool IsSameEntry(PhotoAlbumEntry left, PhotoAlbumEntry right)
+    {
+        if (left == null || right == null)
+        {
+            return false;
+        }
+
+        if (!string.IsNullOrWhiteSpace(left.id) &&
+            !string.IsNullOrWhiteSpace(right.id) &&
+            string.Equals(left.id, right.id, StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        return !string.IsNullOrWhiteSpace(left.fileName) &&
+               !string.IsNullOrWhiteSpace(right.fileName) &&
+               string.Equals(left.fileName, right.fileName, StringComparison.Ordinal);
+    }
+
+    private static int CompareEntrySavedTime(PhotoAlbumEntry left, PhotoAlbumEntry right)
+    {
+        bool leftParsed = TryParseSavedTime(left, out DateTime leftTime);
+        bool rightParsed = TryParseSavedTime(right, out DateTime rightTime);
+        if (leftParsed && rightParsed)
+        {
+            int timeCompare = leftTime.CompareTo(rightTime);
+            if (timeCompare != 0)
+            {
+                return timeCompare;
+            }
+        }
+        else if (leftParsed != rightParsed)
+        {
+            return leftParsed ? 1 : -1;
+        }
+
+        string leftValue = left != null ? left.savedAtUtc : string.Empty;
+        string rightValue = right != null ? right.savedAtUtc : string.Empty;
+        return string.Compare(leftValue, rightValue, StringComparison.Ordinal);
+    }
+
+    private static bool TryParseSavedTime(PhotoAlbumEntry entry, out DateTime savedTime)
+    {
+        savedTime = default;
+        return entry != null &&
+               DateTime.TryParse(
+                   entry.savedAtUtc,
+                   CultureInfo.InvariantCulture,
+                   DateTimeStyles.RoundtripKind,
+                   out savedTime);
     }
 
     private static string ResolveSceneLabel(PhotoAlbumEntry entry, string stageName)

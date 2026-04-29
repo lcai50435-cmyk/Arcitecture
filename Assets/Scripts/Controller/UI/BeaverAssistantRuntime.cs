@@ -210,7 +210,7 @@ public sealed class BeaverAssistantHud : MonoBehaviour
 {
     private const string CanvasName = "BeaverAssistantCanvas";
     private const string AvatarResourcePath = "UI/dabb2b31-d671-4717-9918-6d60739a0f10_no_bg";
-    private const int SortingOrder = 245;
+    private const int SortingOrder = RuntimeModalStyle.BackdropSortingOrder + 10;
     private const float AvatarLeftMargin = 48f;
     private const float AvatarBottomMargin = 64f;
     private const float AvatarSize = 88f;
@@ -382,6 +382,11 @@ public sealed class BeaverAssistantHud : MonoBehaviour
     {
         if (IsAssistantBlockedByRuntimeUi())
         {
+            if (canvas != null && canvas.gameObject.activeSelf)
+            {
+                canvas.gameObject.SetActive(false);
+            }
+
             return;
         }
 
@@ -1224,8 +1229,7 @@ internal static class RuntimeUiEventSystemBootstrapper
         EventSystem eventSystem = EventSystem.current ?? UnityEngine.Object.FindObjectOfType<EventSystem>(true);
         if (eventSystem == null)
         {
-            GameObject eventSystemObject = new GameObject("EventSystem");
-            eventSystem = eventSystemObject.AddComponent<EventSystem>();
+            eventSystem = CreateEventSystem();
         }
 
         if (!eventSystem.gameObject.activeSelf)
@@ -1233,9 +1237,24 @@ internal static class RuntimeUiEventSystemBootstrapper
             eventSystem.gameObject.SetActive(true);
         }
 
-        if (eventSystem.GetComponent<BaseInputModule>() == null)
+        if (!eventSystem.gameObject.activeInHierarchy)
         {
-            eventSystem.gameObject.AddComponent<StandaloneInputModule>();
+            eventSystem = CreateEventSystem();
         }
+
+        eventSystem.enabled = true;
+        BaseInputModule inputModule = eventSystem.GetComponent<BaseInputModule>();
+        if (inputModule == null)
+        {
+            inputModule = eventSystem.gameObject.AddComponent<StandaloneInputModule>();
+        }
+
+        inputModule.enabled = true;
+    }
+
+    private static EventSystem CreateEventSystem()
+    {
+        GameObject eventSystemObject = new GameObject("EventSystem");
+        return eventSystemObject.AddComponent<EventSystem>();
     }
 }

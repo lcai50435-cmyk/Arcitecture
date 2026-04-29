@@ -121,8 +121,13 @@ public class InkBall : MonoBehaviour
             return;
         }
 
+        if (IsOwnerCollider(other))
+        {
+            return;
+        }
+
         bool hitEnemy = false;
-        CharacterCore enemyCore = other.GetComponent<CharacterCore>();
+        CharacterCore enemyCore = other.GetComponentInParent<CharacterCore>();
         if (enemyCore != null && enemyCore != character && character != null)
         {
             if (hitTargets.Contains(enemyCore))
@@ -147,6 +152,19 @@ public class InkBall : MonoBehaviour
         }
 
         FinishHit(hitEnemy);
+    }
+
+    private bool IsOwnerCollider(Collider2D other)
+    {
+        if (other == null || character == null)
+        {
+            return false;
+        }
+
+        CharacterCore ownerCore = other.GetComponentInParent<CharacterCore>();
+        return ownerCore == character ||
+               other.transform == character.transform ||
+               other.transform.IsChildOf(character.transform);
     }
 
     private void ApplyExplosion()

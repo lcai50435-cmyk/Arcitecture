@@ -92,6 +92,7 @@ public class Dialog : MonoBehaviour
         Dialog existing = FindUsableInstance();
         if (existing != null)
         {
+            existing.InitializeLifecycle(false);
             return existing;
         }
 
@@ -107,6 +108,7 @@ public class Dialog : MonoBehaviour
             if (IsUsableRuntimeDialog(dialog))
             {
                 dialog.gameObject.SetActive(true);
+                dialog.InitializeLifecycle(false);
                 return dialog;
             }
         }

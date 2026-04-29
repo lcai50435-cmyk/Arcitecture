@@ -1,12 +1,22 @@
 using System.Reflection;
 using NUnit.Framework;
+using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 public sealed class DialogRuntimeInteractionTests
 {
     private readonly System.Collections.Generic.List<GameObject> roots = new System.Collections.Generic.List<GameObject>();
+    private readonly System.Collections.Generic.List<Scene> createdScenes = new System.Collections.Generic.List<Scene>();
+    private Scene originalActiveScene;
+
+    [SetUp]
+    public void SetUp()
+    {
+        originalActiveScene = SceneManager.GetActiveScene();
+    }
 
     [TearDown]
     public void TearDown()
@@ -20,6 +30,22 @@ public sealed class DialogRuntimeInteractionTests
         }
 
         roots.Clear();
+
+        if (originalActiveScene.IsValid() && originalActiveScene.isLoaded)
+        {
+            SceneManager.SetActiveScene(originalActiveScene);
+        }
+
+        for (int i = createdScenes.Count - 1; i >= 0; i--)
+        {
+            Scene scene = createdScenes[i];
+            if (scene.IsValid() && scene.isLoaded)
+            {
+                EditorSceneManager.CloseScene(scene, true);
+            }
+        }
+
+        createdScenes.Clear();
     }
 
     [Test]
@@ -47,6 +73,61 @@ public sealed class DialogRuntimeInteractionTests
         Assert.IsTrue(dialog.dialogPanel.activeSelf);
         Assert.That(dialog.descriptionText.text, Does.Contain("精灵"));
         Assert.That(dialog.descriptionText.text, Does.Contain("斗拱"));
+    }
+
+    [Test]
+    public void GameplayFirstPickUsesRuntimeDialogCreatedBeforeBackpack()
+    {
+        DestroyRuntimeBackpackManager();
+        DestroyRuntimeDialogs();
+
+        Scene gameplayScene = CreateScene("FirstPass_1");
+        Assert.IsTrue(SceneManager.SetActiveScene(gameplayScene));
+
+        Dialog dialog = Dialog.EnsureGameplayRuntimeInstance();
+        Assert.IsNotNull(dialog);
+        Assert.IsFalse(dialog.dialogPanel.activeSelf);
+
+        CreateRoot("BackpackManager").AddComponent<BackpackMananger>();
+
+        ArchitecturalCrystal crystal = ArchitecturalCrystalFactory.CreateCommonStructure(ArchitecturalType.Brackets);
+        Assert.IsTrue(BackpackMananger.Instance.PickItem(crystal));
+
+        Assert.IsTrue(dialog.dialogPanel.activeSelf);
+        Assert.That(dialog.descriptionText.text, Does.Contain("精灵"));
+        Assert.That(dialog.descriptionText.text, Does.Contain("斗拱"));
+    }
+
+    [Test]
+    public void GameplayFirstPickStillCreatesRuntimeDialogWhenSceneDialogWasSubscribed()
+    {
+        DestroyRuntimeBackpackManager();
+        DestroyRuntimeDialogs();
+
+        Scene nonGameplayScene = CreateScene("NewBase");
+        Assert.IsTrue(SceneManager.SetActiveScene(nonGameplayScene));
+
+        CreateRoot("BackpackManager").AddComponent<BackpackMananger>();
+
+        GameObject sceneDialogObject = CreateRoot("SceneDialogController");
+        Dialog sceneDialog = sceneDialogObject.AddComponent<Dialog>();
+        sceneDialog.dialogPanel = CreateRoot("SceneDialogPanel");
+        sceneDialog.dialogPanel.transform.SetParent(sceneDialogObject.transform, false);
+        sceneDialog.descriptionText = CreateRoot("SceneDescriptionText").AddComponent<Text>();
+        sceneDialog.descriptionText.transform.SetParent(sceneDialog.dialogPanel.transform, false);
+        InvokePrivate(sceneDialog, "Start");
+
+        Scene gameplayScene = CreateScene("FirstPass_1");
+        Assert.IsTrue(SceneManager.SetActiveScene(gameplayScene));
+
+        ArchitecturalCrystal crystal = ArchitecturalCrystalFactory.CreateCommonStructure(ArchitecturalType.Tile);
+        Assert.IsTrue(BackpackMananger.Instance.PickItem(crystal));
+
+        Dialog runtimeDialog = Dialog.EnsureGameplayRuntimeInstance();
+        Assert.AreEqual("RuntimeDialogController", runtimeDialog.gameObject.name);
+        Assert.IsTrue(runtimeDialog.dialogPanel.activeSelf);
+        Assert.That(runtimeDialog.descriptionText.text, Does.Contain("精灵"));
+        Assert.That(runtimeDialog.descriptionText.text, Does.Contain("瓦片"));
     }
 
     [Test]
@@ -229,6 +310,13 @@ public sealed class DialogRuntimeInteractionTests
         GameObject root = new GameObject(name);
         roots.Add(root);
         return root;
+    }
+
+    private Scene CreateScene(string sceneName)
+    {
+        Scene scene = SceneManager.CreateScene(sceneName);
+        createdScenes.Add(scene);
+        return scene;
     }
 
     private static void DestroyRuntimeBackpackManager()

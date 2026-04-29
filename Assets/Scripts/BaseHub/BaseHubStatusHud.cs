@@ -1,6 +1,5 @@
 using TMPro;
 using UnityEngine;
-using UnityEngine.UI;
 
 public class BaseHubStatusHud : MonoBehaviour
 {
@@ -8,7 +7,6 @@ public class BaseHubStatusHud : MonoBehaviour
     [SerializeField] private PlayerProfileData profileData;
     [SerializeField] private ValueTrans healthTrans;
     [SerializeField] private ValueTrans weaponTrans;
-    [SerializeField] private Image weaponFillImage;
     [SerializeField] private TextMeshProUGUI healthValueText;
     [SerializeField] private TextMeshProUGUI weaponValueText;
 
@@ -17,7 +15,6 @@ public class BaseHubStatusHud : MonoBehaviour
         PlayerProfileData profile,
         ValueTrans healthGauge,
         ValueTrans weaponGauge,
-        Image weaponFill,
         TextMeshProUGUI healthText,
         TextMeshProUGUI weaponText)
     {
@@ -25,9 +22,19 @@ public class BaseHubStatusHud : MonoBehaviour
         profileData = profile;
         healthTrans = healthGauge;
         weaponTrans = weaponGauge;
-        weaponFillImage = weaponFill;
         healthValueText = healthText;
         weaponValueText = weaponText;
+
+        if (healthTrans != null)
+        {
+            GameplayStatusHudRuntime.ApplyHealthStatusBarSkin(healthTrans.slider);
+        }
+
+        if (weaponTrans != null)
+        {
+            GameplayStatusHudRuntime.ApplyInkStatusBarSkin(weaponTrans.slider);
+        }
+
         RefreshImmediate();
     }
 
@@ -52,8 +59,8 @@ public class BaseHubStatusHud : MonoBehaviour
 
         float maxHp = Mathf.Max(1f, characterCore.stats.maxHp);
         float currentHp = Mathf.Clamp(characterCore.currentHp, 0f, maxHp);
-        healthTrans.slider.maxValue = maxHp;
-        healthTrans.slider.value = currentHp;
+        healthTrans.SetMaxValue(maxHp);
+        healthTrans.SetValue(currentHp);
 
         if (healthValueText != null)
         {
@@ -68,13 +75,8 @@ public class BaseHubStatusHud : MonoBehaviour
 
         if (weaponTrans != null && weaponTrans.slider != null)
         {
-            weaponTrans.slider.maxValue = maxDurability;
-            weaponTrans.slider.value = currentDurability;
-        }
-
-        if (weaponFillImage != null)
-        {
-            weaponFillImage.color = InkTypeCatalog.GetDisplayColor(GetInkType());
+            weaponTrans.SetMaxValue(maxDurability);
+            weaponTrans.SetValue(currentDurability);
         }
 
         UpdateWeaponText();

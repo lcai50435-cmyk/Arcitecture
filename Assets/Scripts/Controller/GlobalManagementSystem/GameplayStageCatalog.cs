@@ -36,10 +36,10 @@ public static class GameplayStageCatalog
         {
             stageId = "stage_02",
             stageLabel = "第二关",
-            mapTitle = "赵州桥",
-            displayName = "第二关 · 赵州桥",
-            sceneName = "GameScene_02",
-            stageBuildingId = CatalogueBuildingId.Building2,
+            mapTitle = "安徽水乡民居",
+            displayName = "第二关 · 安徽水乡民居",
+            sceneName = "GameScene_03",
+            stageBuildingId = CatalogueBuildingId.Building3,
             gatingBuildingId = CatalogueBuildingId.Building1,
             lockedHint = "修复福建土楼后开放"
         },
@@ -47,12 +47,12 @@ public static class GameplayStageCatalog
         {
             stageId = "stage_03",
             stageLabel = "第三关",
-            mapTitle = "安徽水乡民居",
-            displayName = "第三关 · 安徽水乡民居",
-            sceneName = "GameScene_03",
-            stageBuildingId = CatalogueBuildingId.Building3,
-            gatingBuildingId = CatalogueBuildingId.Building2,
-            lockedHint = "修复赵州桥后开放"
+            mapTitle = "赵州桥",
+            displayName = "第三关 · 赵州桥",
+            sceneName = "GameScene_02",
+            stageBuildingId = CatalogueBuildingId.Building2,
+            gatingBuildingId = CatalogueBuildingId.Building3,
+            lockedHint = "修复安徽水乡民居后开放"
         },
         new GameplayStageDefinition
         {

@@ -146,7 +146,8 @@ public sealed class BeaverAssistantRuntimeTests
         Canvas canvas = hud.transform.Find("BeaverAssistantCanvas")?.GetComponent<Canvas>();
         Assert.IsNotNull(canvas);
         Assert.IsTrue(canvas.overrideSorting);
-        Assert.That(canvas.sortingOrder, Is.GreaterThan(244));
+        Assert.That(canvas.sortingOrder, Is.GreaterThan(RuntimeModalStyle.BackdropSortingOrder));
+        Assert.That(canvas.sortingOrder, Is.LessThan(RuntimeModalStyle.ModalSortingOrder));
     }
 
     [Test]

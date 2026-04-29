@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 [Serializable]
 public class BuildingRuntimeStateSaveData
@@ -24,6 +25,7 @@ public class SaveSlotSummary
     public string selectedStageId;
     public WeaponType currentWeaponType;
     public float progressPercent;
+    public string previewImagePath;
 }
 
 [Serializable]
@@ -46,6 +48,8 @@ public static class GameProgressPersistence
     private const string SaveDirectoryName = "Saves";
     private const string SlotDirectoryNameFormat = "slot_{0}";
     private const string SaveFileName = "game_progress.json";
+    private const string SlotPreviewFileName = "slot_preview.png";
+    private const string MainMenuSceneName = "MainScene";
 
     private static bool isReady;
     private static bool suppressSave;
@@ -125,7 +129,10 @@ public static class GameProgressPersistence
         int slotId = activeSlotId.Value;
         GameProgressSaveData existingData = ReadSaveDataFromSlot(slotId);
         string createdAtUtc = ResolveCreatedAtUtc(existingData, GetSlotSavePath(slotId));
-        SaveCurrentStateToSlot(slotId, createdAtUtc);
+        if (SaveCurrentStateToSlot(slotId, createdAtUtc))
+        {
+            TryCaptureSlotPreview(slotId);
+        }
     }
 
     public static void LoadSlot(int slotId)
@@ -184,6 +191,45 @@ public static class GameProgressPersistence
         }
 
         SaveCurrentStateToSlot(slotId, createdAtUtc);
+    }
+
+    public static Texture2D LoadSlotPreviewTexture(SaveSlotSummary summary)
+    {
+        if (summary == null || !summary.hasSave || string.IsNullOrWhiteSpace(summary.previewImagePath))
+        {
+            return null;
+        }
+
+        try
+        {
+            if (!File.Exists(summary.previewImagePath))
+            {
+                return null;
+            }
+
+            byte[] imageBytes = File.ReadAllBytes(summary.previewImagePath);
+            if (imageBytes == null || imageBytes.Length == 0)
+            {
+                return null;
+            }
+
+            Texture2D texture = new Texture2D(2, 2, TextureFormat.RGBA32, false);
+            if (!texture.LoadImage(imageBytes, false))
+            {
+                DestroyUnityObject(texture);
+                return null;
+            }
+
+            texture.name = $"SaveSlotPreview_{summary.slotId:00}";
+            texture.filterMode = FilterMode.Bilinear;
+            texture.wrapMode = TextureWrapMode.Clamp;
+            return texture;
+        }
+        catch (Exception exception)
+        {
+            Debug.LogWarning($"读取槽位预览图失败：{exception.Message}");
+            return null;
+        }
     }
 
     public static void DeleteSlot(int slotId)
@@ -255,7 +301,8 @@ public static class GameProgressPersistence
                 savedAtUtc = string.Empty,
                 selectedStageId = string.Empty,
                 currentWeaponType = WeaponType.DirectInk,
-                progressPercent = 0f
+                progressPercent = 0f,
+                previewImagePath = string.Empty
             };
         }
 
@@ -267,7 +314,8 @@ public static class GameProgressPersistence
             savedAtUtc = saveData.savedAtUtc ?? string.Empty,
             selectedStageId = saveData.selectedStageId ?? string.Empty,
             currentWeaponType = saveData.currentWeaponType,
-            progressPercent = CalculateProgressPercent(saveData)
+            progressPercent = CalculateProgressPercent(saveData),
+            previewImagePath = ResolveSlotPreviewImagePath(slotId)
         };
     }
 
@@ -310,18 +358,66 @@ public static class GameProgressPersistence
         return Mathf.Clamp01(totalProgress / (float)maxProgress) * 100f;
     }
 
-    private static void SaveCurrentStateToSlot(int slotId, string createdAtUtc)
+    private static bool SaveCurrentStateToSlot(int slotId, string createdAtUtc)
     {
         try
         {
             string slotSavePath = GetSlotSavePath(slotId);
             Directory.CreateDirectory(Path.GetDirectoryName(slotSavePath) ?? SaveRootPath);
             File.WriteAllText(slotSavePath, JsonUtility.ToJson(BuildCurrentSaveData(createdAtUtc), true));
+            return true;
         }
         catch (Exception exception)
         {
             Debug.LogWarning($"保存游戏进度失败：{exception.Message}");
+            return false;
         }
+    }
+
+    private static void TryCaptureSlotPreview(int slotId)
+    {
+#if UNITY_WEBGL && !UNITY_EDITOR
+        return;
+#else
+        if (!Application.isPlaying || !IsValidSlotId(slotId) || Screen.width <= 0 || Screen.height <= 0)
+        {
+            return;
+        }
+
+        Scene activeScene = SceneManager.GetActiveScene();
+        if (activeScene.IsValid() && string.Equals(activeScene.name, MainMenuSceneName, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        Texture2D screenshot = null;
+        try
+        {
+            screenshot = ScreenCapture.CaptureScreenshotAsTexture();
+            if (screenshot == null)
+            {
+                return;
+            }
+
+            byte[] pngBytes = screenshot.EncodeToPNG();
+            if (pngBytes == null || pngBytes.Length == 0)
+            {
+                return;
+            }
+
+            string previewPath = GetSlotPreviewImagePath(slotId);
+            Directory.CreateDirectory(Path.GetDirectoryName(previewPath) ?? GetSlotDirectoryPath(slotId));
+            File.WriteAllBytes(previewPath, pngBytes);
+        }
+        catch (Exception exception)
+        {
+            Debug.LogWarning($"保存槽位预览图失败：{exception.Message}");
+        }
+        finally
+        {
+            DestroyUnityObject(screenshot);
+        }
+#endif
     }
 
     private static GameProgressSaveData ReadSaveDataFromSlot(int slotId)
@@ -533,6 +629,25 @@ public static class GameProgressPersistence
         return Path.Combine(GetSlotDirectoryPath(slotId), SaveFileName);
     }
 
+    private static string GetSlotPreviewImagePath(int slotId)
+    {
+        return Path.Combine(GetSlotDirectoryPath(slotId), SlotPreviewFileName);
+    }
+
+    private static string ResolveSlotPreviewImagePath(int slotId)
+    {
+        try
+        {
+            string previewPath = GetSlotPreviewImagePath(slotId);
+            return File.Exists(previewPath) ? previewPath : string.Empty;
+        }
+        catch (Exception exception)
+        {
+            Debug.LogWarning($"检查槽位预览图失败：{exception.Message}");
+            return string.Empty;
+        }
+    }
+
     private static bool HasSaveInSlot(int slotId)
     {
         try
@@ -550,6 +665,23 @@ public static class GameProgressPersistence
     private static bool IsValidSlotId(int slotId)
     {
         return slotId >= 1 && slotId <= SlotCount;
+    }
+
+    private static void DestroyUnityObject(UnityEngine.Object target)
+    {
+        if (target == null)
+        {
+            return;
+        }
+
+        if (Application.isPlaying)
+        {
+            UnityEngine.Object.Destroy(target);
+        }
+        else
+        {
+            UnityEngine.Object.DestroyImmediate(target);
+        }
     }
 }
 

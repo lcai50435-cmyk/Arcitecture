@@ -129,6 +129,7 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
     private const string SceneHandbookItemIconName = "ItemIcon";
     private const int SceneHandbookBackpackSlotCount = 6;
     private const int SceneHandbookBackpackLaneCount = SceneHandbookBackpackSlotCount;
+    private const float SceneHandbookProprietarySlotContentInset = 4f;
 
     [SerializeField] private UIManager owner;
 
@@ -1657,9 +1658,12 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         Sprite slotSprite = LoadSceneHandbookSlotSprite(slotDefinition.iconAssetPath);
         if (contentImage != null && slotSprite != null)
         {
+            NormalizeSceneHandbookProprietarySlotSurface(slotRoot, contentImage);
             contentImage.sprite = slotSprite;
             contentImage.enabled = true;
             contentImage.preserveAspect = true;
+            contentImage.raycastTarget = false;
+            FitSceneHandbookProprietarySlotContent(contentImage.rectTransform, slotRoot as RectTransform);
         }
 
         TMP_Text[] slotTexts = slotRoot.GetComponentsInChildren<TMP_Text>(true);
@@ -1709,6 +1713,46 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         }
 
         return null;
+    }
+
+    private static void NormalizeSceneHandbookProprietarySlotSurface(Transform slotRoot, Image contentImage)
+    {
+        if (slotRoot == null || contentImage == null)
+        {
+            return;
+        }
+
+        Image slotSurface = slotRoot.GetComponent<Image>();
+        if (slotSurface == null || slotSurface == contentImage)
+        {
+            return;
+        }
+
+        slotSurface.color = Color.clear;
+        slotSurface.raycastTarget = true;
+    }
+
+    private static void FitSceneHandbookProprietarySlotContent(RectTransform contentRect, RectTransform slotRect)
+    {
+        if (contentRect == null || slotRect == null || contentRect == slotRect)
+        {
+            return;
+        }
+
+        Vector2 slotSize = ResolveRectSize(slotRect);
+        float targetSize = Mathf.Max(
+            1f,
+            Mathf.Min(slotSize.x, slotSize.y) - SceneHandbookProprietarySlotContentInset * 2f);
+
+        ConfigureAnchoredRect(
+            contentRect,
+            new Vector2(0.5f, 0.5f),
+            new Vector2(0.5f, 0.5f),
+            new Vector2(targetSize, targetSize),
+            Vector2.zero,
+            new Vector2(0.5f, 0.5f));
+        contentRect.localScale = Vector3.one;
+        contentRect.localRotation = Quaternion.identity;
     }
 
     private static Sprite LoadSceneHandbookSlotSprite(string assetPath)
@@ -1966,6 +2010,10 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
             slotIndex,
             out BuildingRewardDefinition slotReward,
             out BuildingRewardDefinition completionReward);
+        if (success && runtimeState.CanUnlockBuilding(buildingId))
+        {
+            runtimeState.TryUnlockBuilding(buildingId, out completionReward);
+        }
 
         RefreshSceneAuthoredRightIntroduction();
         RefreshSceneAuthoredBackpackSurfaces();
@@ -3393,6 +3441,8 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         {
             ConfigureSliderReadOnlyDisplay(sliders[i]);
         }
+
+        NormalizePersonalAttributeCurrentValueTexts(personalInformationCanvas.transform);
     }
 
     private static void ConfigureSliderReadOnlyDisplay(Slider slider)
@@ -3415,6 +3465,54 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
                 graphic.raycastTarget = false;
             }
         }
+
+        SliderFillGeometryUtility.ApplyExactFill(slider, true);
+    }
+
+    private static void NormalizePersonalAttributeCurrentValueTexts(Transform root)
+    {
+        if (root == null)
+        {
+            return;
+        }
+
+        TMP_Text[] texts = root.GetComponentsInChildren<TMP_Text>(true);
+        for (int i = 0; i < texts.Length; i++)
+        {
+            TMP_Text text = texts[i];
+            if (text == null || !TryExtractCurrentValue(text.text, out string currentValue))
+            {
+                continue;
+            }
+
+            text.text = currentValue;
+        }
+    }
+
+    private static bool TryExtractCurrentValue(string source, out string currentValue)
+    {
+        currentValue = string.Empty;
+        if (string.IsNullOrWhiteSpace(source))
+        {
+            return false;
+        }
+
+        int slashIndex = source.IndexOf('/');
+        if (slashIndex <= 0 || slashIndex >= source.Length - 1)
+        {
+            return false;
+        }
+
+        string left = source.Substring(0, slashIndex).Trim();
+        string right = source.Substring(slashIndex + 1).Trim();
+        if (!float.TryParse(left, NumberStyles.Float, CultureInfo.InvariantCulture, out _) ||
+            !float.TryParse(right, NumberStyles.Float, CultureInfo.InvariantCulture, out _))
+        {
+            return false;
+        }
+
+        currentValue = left;
+        return true;
     }
 
     private static Sprite ResolveRuntimePlayerPortraitSprite()
@@ -3534,8 +3632,12 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
             PersonalBackpackSlotHoverHandler hoverHandler = EnsurePersonalBackpackSlotHover(slotRect, slotIndex);
             Image iconImage = EnsurePersonalBackpackSlotIcon(slotRect);
             ArchitecturalCrystal? item = backpack != null ? backpack.GetItem(slotIndex) : null;
+            ApplyTransparentBackpackSlotSurface(slotRect.GetComponent<Image>());
             ApplyPersonalBackpackSlotIcon(iconImage, item);
-            SetSceneAuthoredSelectionVisual(slotRect, PersonalBackpackSelectionVisualName, slotIndex == selectedPersonalBackpackSlotIndex);
+            SetSceneAuthoredSelectionVisual(
+                slotRect,
+                PersonalBackpackSelectionVisualName,
+                item.HasValue && slotIndex == selectedPersonalBackpackSlotIndex);
             hoverHandler.RefreshHover();
         }
     }
@@ -3714,8 +3816,7 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
             new Vector2(SceneHandbookBackpackSlotSize, SceneHandbookBackpackSlotSize),
             new Vector2(ResolveSceneHandbookBackpackLaneX(slotIndex), 0f),
             new Vector2(0.5f, 0.5f));
-        slotImage.color = new Color(0.86f, 0.74f, 0.52f, 0.42f);
-        slotImage.raycastTarget = true;
+        ApplyTransparentBackpackSlotSurface(slotImage);
         return slotRect;
     }
 
@@ -3762,6 +3863,17 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         iconImage.raycastTarget = false;
         iconImage.preserveAspect = true;
         return iconImage;
+    }
+
+    private static void ApplyTransparentBackpackSlotSurface(Image slotImage)
+    {
+        if (slotImage == null)
+        {
+            return;
+        }
+
+        slotImage.color = Color.clear;
+        slotImage.raycastTarget = true;
     }
 
     private void RefreshSceneHandbookSpecialMaterialStack(RectTransform trayRect)
@@ -4395,9 +4507,9 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
 
         public void OnDrop(PointerEventData eventData)
         {
-            if (!SceneHandbookBackpackSlotDragHandler.TryGetDraggedSpecialStructureSlot(
-                    eventData?.pointerDrag,
-                    out int sourceSlotIndex))
+            GameObject pointerDrag = eventData?.pointerDrag;
+            if (!SceneHandbookBackpackSlotDragHandler.TryGetDraggedSpecialStructureSlot(pointerDrag, out int sourceSlotIndex) &&
+                !BackpackSlot.TryGetDraggedSpecialStructureSlot(pointerDrag, out sourceSlotIndex))
             {
                 return;
             }
@@ -4424,7 +4536,10 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         {
             sourceSlotIndex = -1;
             SceneHandbookBackpackSlotDragHandler handler =
-                pointerDrag != null ? pointerDrag.GetComponent<SceneHandbookBackpackSlotDragHandler>() : null;
+                pointerDrag != null
+                    ? pointerDrag.GetComponent<SceneHandbookBackpackSlotDragHandler>() ??
+                      pointerDrag.GetComponentInParent<SceneHandbookBackpackSlotDragHandler>()
+                    : null;
             if (handler == null)
             {
                 return false;

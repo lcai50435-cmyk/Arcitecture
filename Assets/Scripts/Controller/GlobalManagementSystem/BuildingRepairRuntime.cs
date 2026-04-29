@@ -306,6 +306,17 @@ public static class RepairableBuildingBootstrapper
             }
         }
 
+        RuntimeProgressState runtimeState = RuntimeProgressState.Instance ?? RuntimeProgressState.EnsureInstance();
+        BackpackMananger backpack = BackpackMananger.Instance;
+        bool hasRepairMaterial = backpack != null && backpack.HasRepairMaterial(stage.stageBuildingId);
+        if (!ShouldSpawnRepairableBuilding(
+                runtimeState.IsBuildingRepairReady(stage.stageBuildingId),
+                hasRepairMaterial,
+                runtimeState.IsBuildingRepaired(stage.stageBuildingId)))
+        {
+            return;
+        }
+
         Sprite broken = RuntimeProjectSpriteLoader.LoadSprite(GetBrokenSpritePath(stage.stageBuildingId), false, SpriteMeshType.FullRect);
         Sprite repaired = RuntimeProjectSpriteLoader.LoadSprite(GetRepairedSpritePath(stage.stageBuildingId), false, SpriteMeshType.FullRect);
 
@@ -332,6 +343,14 @@ public static class RepairableBuildingBootstrapper
         RepairableBuildingVisual visual = visualObject.AddComponent<RepairableBuildingVisual>();
         group.Configure(stage.stageBuildingId, broken, repaired);
         group.RegisterVisual(visual);
+    }
+
+    public static bool ShouldSpawnRepairableBuilding(
+        bool isRepairReady,
+        bool hasRepairMaterial,
+        bool isRepaired)
+    {
+        return isRepairReady || hasRepairMaterial || isRepaired;
     }
 
     private static Vector3 ResolveSpawnPosition()

@@ -87,18 +87,27 @@ public class ValueTrans : MonoBehaviour
 
     private void ApplyFillClip()
     {
+        SliderFillGeometryUtility.ApplyExactFill(slider);
+    }
+}
+
+public static class SliderFillGeometryUtility
+{
+    public static void ApplyExactFill(Slider slider, bool normalizeFillContainer = false)
+    {
         if (slider == null || slider.fillRect == null)
         {
             return;
         }
 
-        float range = slider.maxValue - slider.minValue;
-        float normalizedValue = Mathf.Approximately(range, 0f)
-            ? 0f
-            : Mathf.Clamp01((slider.value - slider.minValue) / range);
+        if (normalizeFillContainer)
+        {
+            NormalizeFillContainer(slider);
+        }
 
-        Vector2 anchorMin = slider.fillRect.anchorMin;
-        Vector2 anchorMax = slider.fillRect.anchorMax;
+        float normalizedValue = ResolveNormalizedValue(slider);
+        Vector2 anchorMin;
+        Vector2 anchorMax;
 
         switch (slider.direction)
         {
@@ -120,7 +129,57 @@ public class ValueTrans : MonoBehaviour
                 break;
         }
 
-        slider.fillRect.anchorMin = anchorMin;
-        slider.fillRect.anchorMax = anchorMax;
+        RectTransform fillRect = slider.fillRect;
+        fillRect.anchorMin = anchorMin;
+        fillRect.anchorMax = anchorMax;
+        fillRect.offsetMin = Vector2.zero;
+        fillRect.offsetMax = Vector2.zero;
+        fillRect.sizeDelta = Vector2.zero;
+        fillRect.localScale = Vector3.one;
+    }
+
+    private static float ResolveNormalizedValue(Slider slider)
+    {
+        float range = slider.maxValue - slider.minValue;
+        return Mathf.Approximately(range, 0f)
+            ? 0f
+            : Mathf.Clamp01((slider.value - slider.minValue) / range);
+    }
+
+    private static void NormalizeFillContainer(Slider slider)
+    {
+        RectTransform fillContainer = slider.fillRect.parent as RectTransform;
+        if (fillContainer == null || fillContainer == slider.transform)
+        {
+            return;
+        }
+
+        bool horizontal = slider.direction == Slider.Direction.LeftToRight ||
+            slider.direction == Slider.Direction.RightToLeft;
+        Vector2 anchorMin = fillContainer.anchorMin;
+        Vector2 anchorMax = fillContainer.anchorMax;
+        Vector2 offsetMin = fillContainer.offsetMin;
+        Vector2 offsetMax = fillContainer.offsetMax;
+
+        if (horizontal)
+        {
+            anchorMin.x = 0f;
+            anchorMax.x = 1f;
+            offsetMin.x = 0f;
+            offsetMax.x = 0f;
+        }
+        else
+        {
+            anchorMin.y = 0f;
+            anchorMax.y = 1f;
+            offsetMin.y = 0f;
+            offsetMax.y = 0f;
+        }
+
+        fillContainer.anchorMin = anchorMin;
+        fillContainer.anchorMax = anchorMax;
+        fillContainer.offsetMin = offsetMin;
+        fillContainer.offsetMax = offsetMax;
+        fillContainer.localScale = Vector3.one;
     }
 }

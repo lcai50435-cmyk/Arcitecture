@@ -33,11 +33,27 @@ public sealed class RuntimeFireflyAmbientEffectTests
     }
 
     [Test]
-    public void GameplayProfileUsesStrongVisibleParticleScale()
+    public void FirstStageProfileUsesSubtleParticleScale()
     {
         Type effectType = ResolveEffectType();
         MethodInfo resolveProfile = effectType.GetMethod("ResolveProfile", BindingFlags.Static | BindingFlags.NonPublic);
         object profile = resolveProfile.Invoke(null, new object[] { "GameScene" });
+        object canonicalProfile = resolveProfile.Invoke(null, new object[] { "FirstPass_1" });
+
+        Assert.IsNotNull(profile);
+        Assert.AreSame(profile, canonicalProfile);
+        Assert.LessOrEqual(ReadFloat(profile, "minSize"), 0.06f);
+        Assert.LessOrEqual(ReadFloat(profile, "maxSize"), 0.16f);
+        Assert.LessOrEqual(ReadFloat(profile, "emissionRate"), 18f);
+        Assert.LessOrEqual(ReadInt(profile, "maxParticles"), 120);
+    }
+
+    [Test]
+    public void LaterStageGameplayProfileKeepsVisibleParticleScale()
+    {
+        Type effectType = ResolveEffectType();
+        MethodInfo resolveProfile = effectType.GetMethod("ResolveProfile", BindingFlags.Static | BindingFlags.NonPublic);
+        object profile = resolveProfile.Invoke(null, new object[] { "GameScene_02" });
 
         Assert.IsNotNull(profile);
         Assert.GreaterOrEqual(ReadFloat(profile, "minSize"), 0.12f);

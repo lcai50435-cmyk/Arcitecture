@@ -9,8 +9,8 @@ public class SceneLoader : MonoBehaviour
 
     [SerializeField] private Animator animator;
     [SerializeField] private float fadeDuration = 0.35f;
-    [SerializeField] private int mainMenuIndex = 0;
-    [SerializeField] private int baseSceneIndex = 1;
+    [SerializeField] private int mainMenuIndex = 1;
+    [SerializeField] private int baseSceneIndex = 0;
     [SerializeField] private int gameSceneIndex = 2;
     [SerializeField] private string mainMenuSceneName = "MainScene";
     [SerializeField] private string baseSceneName = "NewBase";

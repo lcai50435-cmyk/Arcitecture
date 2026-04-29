@@ -1,6 +1,8 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.SceneManagement;
+using UnityEngine.Tilemaps;
 using UnityEngine.UI;
 
 public class GameSceneBaseReturnBootstrapper : MonoBehaviour
@@ -9,6 +11,7 @@ public class GameSceneBaseReturnBootstrapper : MonoBehaviour
     private const KeyCode PlayerPanelHotkey = KeyCode.I;
     private const string PlayerUiCanvasName = "PlayerUI";
     private const string RuntimePanelCanvasName = "RuntimePlayerPanelCanvas";
+    private const string RuntimeUiRootName = "RuntimeUIRootManager";
 
     private GameObject playerObject;
     private CharacterCore playerCore;
@@ -41,6 +44,7 @@ public class GameSceneBaseReturnBootstrapper : MonoBehaviour
     private void Build()
     {
         EnsureEventSystem();
+        EnsureGameplayUiRoot(true);
         ResolveRuntimePlayerPanel();
     }
 
@@ -55,13 +59,51 @@ public class GameSceneBaseReturnBootstrapper : MonoBehaviour
         HandlePlayerPanelHotkey();
     }
 
-    private static void EnsureEventSystem()
+    internal static void EnsureEventSystem()
     {
         if (FindObjectOfType<EventSystem>() != null) return;
 
         GameObject eventSystem = new GameObject("EventSystem");
         eventSystem.AddComponent<EventSystem>();
         eventSystem.AddComponent<StandaloneInputModule>();
+    }
+
+    private static UIRootManager EnsureGameplayUiRoot(bool refreshBindings = false)
+    {
+        UIRootManager rootManager = UIRootManager.Instance ?? FindObjectOfType<UIRootManager>(true);
+        if (rootManager != null)
+        {
+            if (refreshBindings)
+            {
+                rootManager.RefreshRuntimeBindings();
+            }
+
+            return rootManager;
+        }
+
+        GameObject rootObject = new GameObject(RuntimeUiRootName);
+        int uiLayer = LayerMask.NameToLayer("UI");
+        if (uiLayer >= 0)
+        {
+            rootObject.layer = uiLayer;
+        }
+
+        Canvas canvas = rootObject.AddComponent<Canvas>();
+        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        canvas.sortingOrder = RuntimeModalStyle.ModalSortingOrder - 20;
+        canvas.overrideSorting = true;
+
+        CanvasScaler scaler = rootObject.AddComponent<CanvasScaler>();
+        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+        scaler.referenceResolution = new Vector2(1920f, 1080f);
+        scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
+        scaler.matchWidthOrHeight = 0.5f;
+
+        rootObject.AddComponent<GraphicRaycaster>();
+        rootManager = rootObject.AddComponent<UIRootManager>();
+        BackpackUI.EnsureRuntimeInstance();
+        rootManager.RefreshRuntimeBindings();
+        return rootManager;
     }
 
     private void HandlePlayerPanelHotkey()
@@ -71,7 +113,7 @@ public class GameSceneBaseReturnBootstrapper : MonoBehaviour
             return;
         }
 
-        UIRootManager rootManager = UIRootManager.Instance ?? FindObjectOfType<UIRootManager>(true);
+        UIRootManager rootManager = EnsureGameplayUiRoot();
         if (rootManager == null)
         {
             return;
@@ -148,7 +190,7 @@ public class GameSceneBaseReturnBootstrapper : MonoBehaviour
         playerAttack = nextPlayerAttack;
         playerProfile = nextPlayerProfile;
 
-        UIRootManager rootManager = UIRootManager.Instance ?? FindObjectOfType<UIRootManager>(true);
+        UIRootManager rootManager = EnsureGameplayUiRoot();
 
         Transform panelParent = ResolvePanelParent(rootManager);
         spiritPanel = ResolveExistingSpiritPanel(rootManager);
@@ -504,5 +546,490 @@ public class GameSceneBaseReturnBootstrapper : MonoBehaviour
         }
 
         player.SubmitAllCachedExp();
+    }
+}
+
+public sealed class GameplayStageRuntimeBootstrapper : MonoBehaviour
+{
+    private const string BootstrapperObjectName = "GameplayStageRuntimeBootstrapper";
+    private const string RuntimeBackpackManagerName = "RuntimeBackpackManager";
+    private const string RuntimeCountdownManagerName = "RuntimeGameCountDownManager";
+    private const string RuntimeUiRootName = "UIRootManager";
+    private const string RuntimeReturnAnchorName = "RuntimeReturnToBaseInteractable";
+    private const string ReturnPortalTileResourcePath = "FirstPassReturnPortal";
+    private const string DeadSceneName = "DeadScene";
+    private const float ReturnAnchorRadius = 0.64f;
+    private const float ReturnPortalVisualScale = 2.08f;
+    private const float DefaultReturnPortalFrameRate = 8f;
+
+    private static bool sceneHookRegistered;
+    private static Sprite returnAnchorSprite;
+    private static AnimatedTile returnPortalTile;
+    private static readonly List<ReturnPortalAnimationState> returnPortalAnimations = new List<ReturnPortalAnimationState>();
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void ResetStatics()
+    {
+        if (sceneHookRegistered)
+        {
+            SceneManager.sceneLoaded -= HandleSceneLoaded;
+            sceneHookRegistered = false;
+        }
+
+        returnAnchorSprite = null;
+        returnPortalTile = null;
+        returnPortalAnimations.Clear();
+    }
+
+    private void Update()
+    {
+        UpdateReturnPortalAnimations();
+    }
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
+    private static void Bootstrap()
+    {
+        EnsureSceneHook();
+        PrepareScene(SceneManager.GetActiveScene());
+    }
+
+    private static void HandleSceneLoaded(Scene scene, LoadSceneMode mode)
+    {
+        PrepareScene(scene);
+    }
+
+    private static void EnsureSceneHook()
+    {
+        if (sceneHookRegistered)
+        {
+            return;
+        }
+
+        SceneManager.sceneLoaded -= HandleSceneLoaded;
+        SceneManager.sceneLoaded += HandleSceneLoaded;
+        sceneHookRegistered = true;
+    }
+
+    private static bool IsSupportedScene(string sceneName)
+    {
+        return GameplayStageCatalog.IsGameplayScene(sceneName);
+    }
+
+    private static GameplayStageRuntimeBootstrapper PrepareScene(Scene scene)
+    {
+        if (!scene.IsValid() || !scene.isLoaded || !IsSupportedScene(scene.name))
+        {
+            return null;
+        }
+
+        GameplayStageRuntimeBootstrapper bootstrapper = EnsureSceneBootstrapper(scene);
+        GameSceneBaseReturnBootstrapper.EnsureEventSystem();
+        EnsureUiRootManager(scene);
+        EnsureBackpackManager();
+        EnsureCountdownManager();
+        EnsureGameplayHud();
+        EnsurePlayerRuntimeComponents(scene);
+        EnsureReturnToBaseInteractable(scene);
+        return bootstrapper;
+    }
+
+    private static GameplayStageRuntimeBootstrapper EnsureSceneBootstrapper(Scene scene)
+    {
+        GameplayStageRuntimeBootstrapper[] existing = FindObjectsOfType<GameplayStageRuntimeBootstrapper>(true);
+        for (int i = 0; i < existing.Length; i++)
+        {
+            GameplayStageRuntimeBootstrapper candidate = existing[i];
+            if (candidate != null && candidate.gameObject.scene == scene)
+            {
+                return candidate;
+            }
+        }
+
+        GameObject bootstrapperObject = new GameObject(BootstrapperObjectName);
+        SceneManager.MoveGameObjectToScene(bootstrapperObject, scene);
+        return bootstrapperObject.AddComponent<GameplayStageRuntimeBootstrapper>();
+    }
+
+    private static UIRootManager EnsureUiRootManager(Scene scene)
+    {
+        UIRootManager manager = FindSceneComponent<UIRootManager>(scene);
+        if (manager == null)
+        {
+            GameObject managerObject = new GameObject(RuntimeUiRootName);
+            SceneManager.MoveGameObjectToScene(managerObject, scene);
+            manager = managerObject.AddComponent<UIRootManager>();
+        }
+
+        manager.RefreshRuntimeBindings();
+        manager.ShowBackpack(true);
+        return manager;
+    }
+
+    private static BackpackMananger EnsureBackpackManager()
+    {
+        if (BackpackMananger.Instance != null)
+        {
+            return BackpackMananger.Instance;
+        }
+
+        BackpackMananger existing = FindObjectOfType<BackpackMananger>(true);
+        if (existing != null)
+        {
+            return existing;
+        }
+
+        GameObject managerObject = new GameObject(RuntimeBackpackManagerName);
+        return managerObject.AddComponent<BackpackMananger>();
+    }
+
+    private static GameCountDownManager EnsureCountdownManager()
+    {
+        GameCountDownManager manager = GameCountDownManager.Instance != null
+            ? GameCountDownManager.Instance
+            : FindObjectOfType<GameCountDownManager>(true);
+
+        if (manager == null)
+        {
+            GameObject managerObject = new GameObject(RuntimeCountdownManagerName);
+            manager = managerObject.AddComponent<GameCountDownManager>();
+        }
+
+        manager.totalTime = 300f;
+        manager.SetInBaseState(GameplayStageIntroDirector.IsIntroActive);
+        return manager;
+    }
+
+    private static void EnsureGameplayHud()
+    {
+        RuntimeMiniMapHud.EnsureInstance();
+        BackpackUI.EnsureRuntimeInstance();
+        GameplayStatusHudRuntime.EnsureHealthGauge(null);
+        GameplayStatusHudRuntime.EnsureWeaponGauge(null);
+        GameplayStatusHudRuntime.RefreshStructureProgressText();
+    }
+
+    private static void EnsurePlayerRuntimeComponents(Scene scene)
+    {
+        GameObject playerObject = ResolveScenePlayer(scene);
+        if (playerObject == null)
+        {
+            return;
+        }
+
+        CharacterCore core = playerObject.GetComponent<CharacterCore>();
+        PlayerMove move = playerObject.GetComponent<PlayerMove>();
+        Animator animator = playerObject.GetComponent<Animator>();
+
+        PlayerAttack attack = playerObject.GetComponent<PlayerAttack>();
+        if (attack == null)
+        {
+            attack = playerObject.AddComponent<PlayerAttack>();
+        }
+
+        attack.anim = animator;
+        attack.moveScript = move;
+        if (attack.inkPoint == null)
+        {
+            attack.inkPoint = playerObject.transform;
+        }
+
+        BaseHubInkAttack baseHubAttack = playerObject.GetComponent<BaseHubInkAttack>();
+        if (baseHubAttack != null)
+        {
+            baseHubAttack.enabled = false;
+        }
+
+        PlayerTakeDamage takeDamage = playerObject.GetComponent<PlayerTakeDamage>();
+        if (takeDamage == null)
+        {
+            takeDamage = playerObject.AddComponent<PlayerTakeDamage>();
+        }
+
+        takeDamage.playerAnim = animator;
+        takeDamage.playerMovement = move;
+
+        PlayerDeathSceneLoader deathSceneLoader = playerObject.GetComponent<PlayerDeathSceneLoader>();
+        if (deathSceneLoader == null)
+        {
+            deathSceneLoader = playerObject.AddComponent<PlayerDeathSceneLoader>();
+        }
+
+        deathSceneLoader.characterCore = core;
+        deathSceneLoader.gameOverSceneName = DeadSceneName;
+
+        PlayerAttributeManager attributeManager = playerObject.GetComponent<PlayerAttributeManager>();
+        if (attributeManager != null)
+        {
+            attributeManager.characterCore = core;
+            attributeManager.playerAttack = attack;
+            attributeManager.playerTakeDamage = takeDamage;
+            attributeManager.profileData = playerObject.GetComponent<PlayerProfileData>();
+            attributeManager.ApplyAllBonus();
+        }
+
+        attack.RefreshInkUI();
+        if (core != null && core.stats != null)
+        {
+            GameplayStatusHudRuntime.RefreshHealthText(core.currentHp, core.stats.maxHp);
+        }
+    }
+
+    private static void EnsureReturnToBaseInteractable(Scene scene)
+    {
+        if (FindSceneComponent<BookInteract>(scene) != null)
+        {
+            return;
+        }
+
+        GameObject existingAnchor = FindSceneObject(scene, RuntimeReturnAnchorName);
+        if (existingAnchor != null)
+        {
+            return;
+        }
+
+        GameObject playerObject = ResolveScenePlayer(scene);
+        Vector3 spawnPosition = playerObject != null
+            ? playerObject.transform.position + new Vector3(0.78f, -0.18f, 0f)
+            : Vector3.zero;
+
+        GameObject anchor = new GameObject(RuntimeReturnAnchorName);
+        SceneManager.MoveGameObjectToScene(anchor, scene);
+        anchor.transform.position = spawnPosition;
+        anchor.transform.localScale = Vector3.one * 0.86f;
+
+        CircleCollider2D trigger = anchor.AddComponent<CircleCollider2D>();
+        trigger.isTrigger = true;
+        trigger.radius = ReturnAnchorRadius;
+
+        CreateReturnPortalVisual(anchor.transform);
+
+        anchor.AddComponent<BookInteract>();
+    }
+
+    private static void CreateReturnPortalVisual(Transform parent)
+    {
+        GameObject visual = new GameObject("ReturnPortalVisual");
+        visual.transform.SetParent(parent, false);
+
+        SpriteRenderer renderer = visual.AddComponent<SpriteRenderer>();
+        renderer.sortingOrder = 6;
+
+        Sprite[] portalSprites = GetReturnPortalSprites();
+        if (portalSprites.Length > 0)
+        {
+            visual.transform.localScale = Vector3.one * ReturnPortalVisualScale;
+            renderer.sprite = portalSprites[0];
+            CenterVisualOnSprite(visual.transform, portalSprites[0]);
+            RegisterReturnPortalAnimation(renderer, portalSprites, GetReturnPortalFrameRate());
+            return;
+        }
+
+        renderer.sprite = GetReturnAnchorSprite();
+    }
+
+    private static Sprite[] GetReturnPortalSprites()
+    {
+        AnimatedTile portalTile = GetReturnPortalTile();
+        return portalTile != null && portalTile.m_AnimatedSprites != null
+            ? portalTile.m_AnimatedSprites
+            : new Sprite[0];
+    }
+
+    private static AnimatedTile GetReturnPortalTile()
+    {
+        if (returnPortalTile == null)
+        {
+            returnPortalTile = Resources.Load<AnimatedTile>(ReturnPortalTileResourcePath);
+        }
+
+        return returnPortalTile;
+    }
+
+    private static float GetReturnPortalFrameRate()
+    {
+        AnimatedTile portalTile = GetReturnPortalTile();
+        if (portalTile == null)
+        {
+            return DefaultReturnPortalFrameRate;
+        }
+
+        float minSpeed = Mathf.Max(0f, portalTile.m_MinSpeed);
+        float maxSpeed = Mathf.Max(minSpeed, portalTile.m_MaxSpeed);
+        float averageSpeed = (minSpeed + maxSpeed) * 0.5f;
+        return averageSpeed > 0f ? averageSpeed : DefaultReturnPortalFrameRate;
+    }
+
+    private static void CenterVisualOnSprite(Transform visual, Sprite sprite)
+    {
+        if (visual == null || sprite == null)
+        {
+            return;
+        }
+
+        Vector3 scale = visual.localScale;
+        Vector3 centerOffset = sprite.bounds.center;
+        visual.localPosition = new Vector3(
+            -centerOffset.x * scale.x,
+            -centerOffset.y * scale.y,
+            0f);
+    }
+
+    private static void RegisterReturnPortalAnimation(SpriteRenderer renderer, Sprite[] frames, float frameRate)
+    {
+        if (renderer == null || frames == null || frames.Length == 0)
+        {
+            return;
+        }
+
+        returnPortalAnimations.Add(new ReturnPortalAnimationState(renderer, frames, Mathf.Max(1f, frameRate)));
+    }
+
+    private static void UpdateReturnPortalAnimations()
+    {
+        for (int i = returnPortalAnimations.Count - 1; i >= 0; i--)
+        {
+            ReturnPortalAnimationState state = returnPortalAnimations[i];
+            if (state.Renderer == null || state.Frames == null || state.Frames.Length == 0)
+            {
+                returnPortalAnimations.RemoveAt(i);
+                continue;
+            }
+
+            int frameIndex = Mathf.FloorToInt(Time.time * state.FrameRate) % state.Frames.Length;
+            Sprite frame = state.Frames[frameIndex];
+            if (frame != null)
+            {
+                state.Renderer.sprite = frame;
+            }
+        }
+    }
+
+    private static GameObject ResolveScenePlayer(Scene scene)
+    {
+        GameObject taggedPlayer = GameObject.FindGameObjectWithTag("Player");
+        if (taggedPlayer != null && taggedPlayer.scene == scene)
+        {
+            return taggedPlayer;
+        }
+
+        PlayerMove move = FindSceneComponent<PlayerMove>(scene);
+        return move != null ? move.gameObject : null;
+    }
+
+    private static T FindSceneComponent<T>(Scene scene)
+        where T : Component
+    {
+        T[] components = FindObjectsOfType<T>(true);
+        for (int i = 0; i < components.Length; i++)
+        {
+            T component = components[i];
+            if (component != null && component.gameObject.scene == scene)
+            {
+                return component;
+            }
+        }
+
+        return null;
+    }
+
+    private static GameObject FindSceneObject(Scene scene, string objectName)
+    {
+        GameObject[] roots = scene.GetRootGameObjects();
+        for (int i = 0; i < roots.Length; i++)
+        {
+            Transform match = FindChildByName(roots[i].transform, objectName);
+            if (match != null)
+            {
+                return match.gameObject;
+            }
+        }
+
+        return null;
+    }
+
+    private static Transform FindChildByName(Transform root, string objectName)
+    {
+        if (root == null)
+        {
+            return null;
+        }
+
+        if (root.name == objectName)
+        {
+            return root;
+        }
+
+        for (int i = 0; i < root.childCount; i++)
+        {
+            Transform match = FindChildByName(root.GetChild(i), objectName);
+            if (match != null)
+            {
+                return match;
+            }
+        }
+
+        return null;
+    }
+
+    private static Sprite GetReturnAnchorSprite()
+    {
+        if (returnAnchorSprite != null)
+        {
+            return returnAnchorSprite;
+        }
+
+        Texture2D texture = new Texture2D(32, 24, TextureFormat.RGBA32, false)
+        {
+            filterMode = FilterMode.Point,
+            wrapMode = TextureWrapMode.Clamp
+        };
+
+        Color clear = Color.clear;
+        Color page = new Color(0.78f, 0.58f, 0.34f, 1f);
+        Color pageLight = new Color(0.96f, 0.82f, 0.54f, 1f);
+        Color spine = new Color(0.34f, 0.18f, 0.08f, 1f);
+        Color outline = new Color(0.12f, 0.07f, 0.03f, 1f);
+
+        for (int y = 0; y < texture.height; y++)
+        {
+            for (int x = 0; x < texture.width; x++)
+            {
+                texture.SetPixel(x, y, clear);
+            }
+        }
+
+        for (int y = 4; y < 21; y++)
+        {
+            for (int x = 3; x < 29; x++)
+            {
+                bool border = x == 3 || x == 28 || y == 4 || y == 20 || x == 15 || x == 16;
+                texture.SetPixel(x, y, border ? outline : (x < 16 ? pageLight : page));
+            }
+        }
+
+        for (int y = 5; y < 20; y++)
+        {
+            texture.SetPixel(15, y, spine);
+            texture.SetPixel(16, y, spine);
+        }
+
+        texture.Apply();
+        returnAnchorSprite = Sprite.Create(texture, new Rect(0f, 0f, 32f, 24f), new Vector2(0.5f, 0.5f), 24f);
+        returnAnchorSprite.name = "RuntimeReturnToBaseBook";
+        return returnAnchorSprite;
+    }
+
+    private sealed class ReturnPortalAnimationState
+    {
+        public ReturnPortalAnimationState(SpriteRenderer renderer, Sprite[] frames, float frameRate)
+        {
+            Renderer = renderer;
+            Frames = frames;
+            FrameRate = frameRate;
+        }
+
+        public SpriteRenderer Renderer { get; }
+        public Sprite[] Frames { get; }
+        public float FrameRate { get; }
     }
 }

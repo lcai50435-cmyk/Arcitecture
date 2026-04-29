@@ -20,7 +20,8 @@ public sealed class RuntimePauseMenu : MonoBehaviour
     }
 
     private const string CanvasName = "RuntimePauseMenuCanvas";
-    private const int SortingOrder = 940;
+    // 暂停按钮必须高于 SceneLoader 淡入淡出遮罩（9999），避免透明残留遮罩吞掉点击。
+    private const int SortingOrder = 10050;
     private const string PauseReason = "RuntimePauseMenu";
     private const float PanelWidth = 1120f;
     private const float PanelHeight = 720f;
@@ -32,14 +33,14 @@ public sealed class RuntimePauseMenu : MonoBehaviour
     private const float MenuButtonRevealCurveX = 18f;
     private const float MenuButtonRevealStartScale = 0.965f;
 
-    private static readonly Color PrimaryButtonColor = new Color(0.84f, 0.67f, 0.36f, 0.66f);
-    private static readonly Color PrimaryButtonTextColor = new Color(0.16f, 0.11f, 0.07f, 1f);
-    private static readonly Color SecondaryButtonColor = new Color(0.20f, 0.28f, 0.38f, 0.48f);
-    private static readonly Color SecondaryButtonTextColor = new Color(0.92f, 0.96f, 1f, 1f);
-    private static readonly Color DangerButtonColor = new Color(0.58f, 0.22f, 0.20f, 0.54f);
-    private static readonly Color DangerButtonTextColor = new Color(0.99f, 0.94f, 0.90f, 1f);
-    private static readonly Color TitleColor = new Color(0.97f, 0.98f, 1f, 1f);
-    private static readonly Color DescriptionColor = new Color(0.70f, 0.78f, 0.88f, 1f);
+    private static readonly Color PrimaryButtonColor = Color.white;
+    private static readonly Color PrimaryButtonTextColor = new Color(0.14f, 0.11f, 0.08f, 1f);
+    private static readonly Color SecondaryButtonColor = new Color(0.90f, 0.77f, 0.55f, 0.92f);
+    private static readonly Color SecondaryButtonTextColor = new Color(0.18f, 0.15f, 0.11f, 0.98f);
+    private static readonly Color DangerButtonColor = new Color(0.93f, 0.62f, 0.48f, 0.94f);
+    private static readonly Color DangerButtonTextColor = new Color(0.24f, 0.08f, 0.06f, 1f);
+    private static readonly Color TitleColor = new Color(0.97f, 0.94f, 0.86f, 1f);
+    private static readonly Color DescriptionColor = new Color(0.84f, 0.79f, 0.70f, 1f);
 
     private sealed class MenuButtonRevealItem
     {
@@ -97,7 +98,7 @@ public sealed class RuntimePauseMenu : MonoBehaviour
         EnsureInstance();
         if (Instance != null)
         {
-            Instance.SetVisible(GameplayStageCatalog.IsGameplayScene(scene.name));
+            Instance.SetVisible(IsSupportedScene(scene.name));
         }
     }
 
@@ -114,9 +115,21 @@ public sealed class RuntimePauseMenu : MonoBehaviour
         }
     }
 
+    public static bool TryOpenFromExternal()
+    {
+        RuntimePauseMenu menu = EnsureInstance();
+        if (menu == null || !menu.CanOpenFromExternal())
+        {
+            return false;
+        }
+
+        menu.PauseGame();
+        return true;
+    }
+
     public static RuntimePauseMenu EnsureInstance()
     {
-        bool supportedScene = GameplayStageCatalog.IsGameplayScene(SceneManager.GetActiveScene().name);
+        bool supportedScene = IsSupportedScene(SceneManager.GetActiveScene().name);
 
         if (Instance != null)
         {
@@ -149,7 +162,7 @@ public sealed class RuntimePauseMenu : MonoBehaviour
         Instance = this;
         DontDestroyOnLoad(gameObject);
         EnsureUi();
-        SetVisible(GameplayStageCatalog.IsGameplayScene(SceneManager.GetActiveScene().name));
+        SetVisible(IsSupportedScene(SceneManager.GetActiveScene().name));
         HideImmediate();
     }
 
@@ -174,6 +187,11 @@ public sealed class RuntimePauseMenu : MonoBehaviour
         if (!visible || GameplayStageIntroDirector.IsIntroActive)
         {
             return;
+        }
+
+        if (isOpen || showingSettings)
+        {
+            RuntimeUiEventSystemBootstrapper.Ensure();
         }
 
         KeyCode pauseKey = GameSettingsStore.GetKeyBinding(GameInputAction.Pause);
@@ -253,12 +271,7 @@ public sealed class RuntimePauseMenu : MonoBehaviour
 
     private bool CanOpenForFocusLoss()
     {
-        if (!visible || isOpen || showingSettings)
-        {
-            return false;
-        }
-
-        if (!GameplayStageCatalog.IsGameplayScene(SceneManager.GetActiveScene().name))
+        if (!CanOpenFromExternal())
         {
             return false;
         }
@@ -274,6 +287,16 @@ public sealed class RuntimePauseMenu : MonoBehaviour
         }
 
         return !RuntimeUiInputGuard.IsBlockingGameplayUiOpen();
+    }
+
+    private bool CanOpenFromExternal()
+    {
+        return visible &&
+               !isOpen &&
+               !showingSettings &&
+               IsSupportedScene(SceneManager.GetActiveScene().name) &&
+               (settingsPanel == null || (!settingsPanel.IsShown && !settingsPanel.IsCapturingBinding)) &&
+               !RuntimeUiInputGuard.IsBlockingGameplayUiOpen();
     }
 
     private void PauseGame()
@@ -330,6 +353,11 @@ public sealed class RuntimePauseMenu : MonoBehaviour
     private void SetVisible(bool shouldShow)
     {
         visible = shouldShow;
+        if (shouldShow)
+        {
+            RuntimeUiEventSystemBootstrapper.Ensure();
+        }
+
         if (settingsPanel != null)
         {
             settingsPanel.SetVisible(shouldShow);
@@ -659,6 +687,8 @@ public sealed class RuntimePauseMenu : MonoBehaviour
 
     private void EnsureUi()
     {
+        RuntimeUiEventSystemBootstrapper.Ensure();
+
         if (canvas != null)
         {
             return;
@@ -848,7 +878,7 @@ public sealed class RuntimePauseMenu : MonoBehaviour
         buttonObject.transform.SetParent(parent, false);
 
         Image buttonImage = buttonObject.GetComponent<Image>();
-        RuntimeUiSpriteFactory.ApplyRoundedSprite(buttonImage, backgroundColor, 14, 14);
+        RuntimeUiSpriteFactory.ApplySettingButtonFrameSprite(buttonImage, backgroundColor);
 
         RectTransform rect = buttonObject.GetComponent<RectTransform>();
         rect.anchorMin = new Vector2(0.5f, 0.5f);
@@ -928,6 +958,11 @@ public sealed class RuntimePauseMenu : MonoBehaviour
         rectTransform.offsetMin = Vector2.zero;
         rectTransform.offsetMax = Vector2.zero;
         rectTransform.localScale = Vector3.one;
+    }
+
+    private static bool IsSupportedScene(string sceneName)
+    {
+        return RuntimeGameplayPauseController.IsRuntimePausableScene(sceneName);
     }
 }
 

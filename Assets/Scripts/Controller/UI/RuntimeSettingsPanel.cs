@@ -27,7 +27,8 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
     }
 
     private const string CanvasName = "RuntimeSettingsPanelCanvas";
-    private const int SortingOrder = 940;
+    // 设置页与暂停页保持同一交互层级，避免透明切场遮罩吞掉点击。
+    private const int SortingOrder = 10050;
     private const float PanelWidth = 1440f;
     private const float PanelHeight = 840f;
     private const float CardWidth = 1220f;
@@ -57,31 +58,31 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
         KeyCode.Mouse2
     };
 
-    private static readonly Color PanelColor = new Color(0.09f, 0.11f, 0.16f, 0.82f);
-    private static readonly Color BorderColor = new Color(0.31f, 0.45f, 0.57f, 0.88f);
-    private static readonly Color SectionColor = new Color(0.14f, 0.17f, 0.24f, 0.56f);
-    private static readonly Color TabIdleColor = new Color(0.21f, 0.26f, 0.34f, 0.72f);
-    private static readonly Color TabActiveColor = new Color(0.84f, 0.67f, 0.36f, 0.92f);
-    private static readonly Color TabIdleTextColor = new Color(0.78f, 0.84f, 0.92f, 1f);
-    private static readonly Color TabActiveTextColor = new Color(0.17f, 0.12f, 0.08f, 1f);
-    private static readonly Color PrimaryButtonColor = new Color(0.84f, 0.67f, 0.36f, 0.94f);
-    private static readonly Color PrimaryButtonTextColor = new Color(0.17f, 0.12f, 0.08f, 1f);
-    private static readonly Color SecondaryButtonColor = new Color(0.27f, 0.33f, 0.43f, 0.76f);
-    private static readonly Color SecondaryButtonTextColor = new Color(0.92f, 0.96f, 1f, 1f);
-    private static readonly Color DisabledButtonColor = new Color(0.19f, 0.22f, 0.30f, 0.48f);
-    private static readonly Color DisabledButtonTextColor = new Color(0.58f, 0.64f, 0.72f, 0.92f);
-    private static readonly Color DisabledPrimaryButtonColor = new Color(0.44f, 0.37f, 0.28f, 0.72f);
-    private static readonly Color DisabledPrimaryButtonTextColor = new Color(0.95f, 0.90f, 0.80f, 0.82f);
-    private static readonly Color DangerButtonColor = new Color(0.55f, 0.25f, 0.22f, 0.88f);
-    private static readonly Color DangerButtonArmedColor = new Color(0.84f, 0.30f, 0.26f, 0.96f);
-    private static readonly Color DangerButtonTextColor = new Color(0.99f, 0.95f, 0.92f, 1f);
+    private static readonly Color PanelColor = Color.white;
+    private static readonly Color BorderColor = new Color(0.42f, 0.24f, 0.09f, 0.52f);
+    private static readonly Color SectionColor = new Color(1f, 0.97f, 0.88f, 0.96f);
+    private static readonly Color TabIdleColor = new Color(0.86f, 0.72f, 0.48f, 0.86f);
+    private static readonly Color TabActiveColor = Color.white;
+    private static readonly Color TabIdleTextColor = new Color(0.24f, 0.20f, 0.15f, 0.92f);
+    private static readonly Color TabActiveTextColor = new Color(0.14f, 0.11f, 0.08f, 1f);
+    private static readonly Color PrimaryButtonColor = Color.white;
+    private static readonly Color PrimaryButtonTextColor = new Color(0.14f, 0.11f, 0.08f, 1f);
+    private static readonly Color SecondaryButtonColor = new Color(0.90f, 0.77f, 0.55f, 0.92f);
+    private static readonly Color SecondaryButtonTextColor = new Color(0.18f, 0.15f, 0.11f, 0.98f);
+    private static readonly Color DisabledButtonColor = new Color(0.64f, 0.56f, 0.44f, 0.56f);
+    private static readonly Color DisabledButtonTextColor = new Color(0.36f, 0.32f, 0.26f, 0.78f);
+    private static readonly Color DisabledPrimaryButtonColor = new Color(0.72f, 0.63f, 0.49f, 0.68f);
+    private static readonly Color DisabledPrimaryButtonTextColor = new Color(0.40f, 0.34f, 0.25f, 0.78f);
+    private static readonly Color DangerButtonColor = new Color(0.93f, 0.62f, 0.48f, 0.94f);
+    private static readonly Color DangerButtonArmedColor = new Color(0.95f, 0.36f, 0.30f, 0.96f);
+    private static readonly Color DangerButtonTextColor = new Color(0.24f, 0.08f, 0.06f, 1f);
     private static readonly Color ConfirmOverlayColor = new Color(0.03f, 0.04f, 0.06f, 0.82f);
-    private static readonly Color ConfirmPanelColor = new Color(0.11f, 0.13f, 0.18f, 0.96f);
-    private static readonly Color TitleColor = new Color(0.96f, 0.98f, 1f, 1f);
-    private static readonly Color DescriptionColor = new Color(0.70f, 0.78f, 0.88f, 1f);
-    private static readonly Color ValueChipColor = new Color(0.16f, 0.20f, 0.28f, 0.78f);
-    private static readonly Color ValueTextColor = new Color(0.98f, 0.99f, 1f, 1f);
-    private static readonly Color EmphasisColor = new Color(0.98f, 0.89f, 0.66f, 1f);
+    private static readonly Color ConfirmPanelColor = Color.white;
+    private static readonly Color TitleColor = new Color(0.16f, 0.14f, 0.11f, 1f);
+    private static readonly Color DescriptionColor = new Color(0.34f, 0.29f, 0.22f, 0.94f);
+    private static readonly Color ValueChipColor = new Color(0.93f, 0.79f, 0.56f, 0.94f);
+    private static readonly Color ValueTextColor = new Color(0.18f, 0.15f, 0.11f, 1f);
+    private static readonly Color EmphasisColor = new Color(0.38f, 0.22f, 0.08f, 1f);
 
     private static RuntimeSettingsPanel instance;
     private static TMP_FontAsset runtimeFontAsset;
@@ -413,6 +414,7 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
         overlayImage.raycastTarget = true;
 
         Image panel = CreateImage("Panel", canvasObject.transform, PanelColor, 28, 20);
+        RuntimeUiSpriteFactory.ApplySettingPanelFrameSprite(panel, PanelColor);
         panelRectTransform = panel.rectTransform;
         panelRectTransform.anchorMin = new Vector2(0.5f, 0.5f);
         panelRectTransform.anchorMax = new Vector2(0.5f, 0.5f);
@@ -575,6 +577,7 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
         overlay.raycastTarget = true;
 
         Image panel = CreateImage("ConfirmPanel", returnToMenuConfirmRoot, ConfirmPanelColor, 24, 18);
+        RuntimeUiSpriteFactory.ApplySettingPanelFrameSprite(panel, ConfirmPanelColor);
         RectTransform panelRect = panel.rectTransform;
         panelRect.anchorMin = new Vector2(0.5f, 0.5f);
         panelRect.anchorMax = new Vector2(0.5f, 0.5f);
@@ -733,6 +736,7 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
         RectTransform pageRoot = CreatePageRoot("DataPage", parent, SettingsTab.Data, 456f);
 
         Image card = CreateImage("SaveResetCard", pageRoot, SectionColor, 20, 16);
+        RuntimeUiSpriteFactory.ApplySettingPanelFrameSprite(card, SectionColor);
         RectTransform cardRect = card.rectTransform;
         cardRect.anchorMin = new Vector2(0.5f, 1f);
         cardRect.anchorMax = new Vector2(0.5f, 1f);
@@ -851,6 +855,7 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
         decreaseButton.onClick.AddListener(() => onDecrease?.Invoke());
 
         Image valueChip = CreateImage("ValueChip", controlsRoot, ValueChipColor, 18, 14);
+        RuntimeUiSpriteFactory.ApplySettingButtonFrameSprite(valueChip, ValueChipColor);
         RectTransform chipRect = valueChip.rectTransform;
         chipRect.anchorMin = new Vector2(0.5f, 0.5f);
         chipRect.anchorMax = new Vector2(0.5f, 0.5f);
@@ -875,6 +880,7 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
     private TextMeshProUGUI CreateStatusCard(Transform parent, float topOffset)
     {
         Image card = CreateImage("RuntimeInfoCard", parent, SectionColor, 20, 16);
+        RuntimeUiSpriteFactory.ApplySettingPanelFrameSprite(card, SectionColor);
         RectTransform cardRect = card.rectTransform;
         cardRect.anchorMin = new Vector2(0.5f, 1f);
         cardRect.anchorMax = new Vector2(0.5f, 1f);
@@ -959,6 +965,7 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
         descriptionText = FindCardDescription(cardRoot);
 
         Image valueChip = CreateImage("StaticChip", cardRoot, ValueChipColor, 18, 14);
+        RuntimeUiSpriteFactory.ApplySettingButtonFrameSprite(valueChip, ValueChipColor);
         RectTransform chipRect = valueChip.rectTransform;
         chipRect.anchorMin = new Vector2(1f, 0.5f);
         chipRect.anchorMax = new Vector2(1f, 0.5f);
@@ -973,6 +980,7 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
     private RectTransform CreateCardRoot(Transform parent, string title, string description, float topOffset)
     {
         Image card = CreateImage($"Card_{title}", parent, SectionColor, 20, 16);
+        RuntimeUiSpriteFactory.ApplySettingPanelFrameSprite(card, SectionColor);
         RectTransform cardRect = card.rectTransform;
         cardRect.anchorMin = new Vector2(0.5f, 1f);
         cardRect.anchorMax = new Vector2(0.5f, 1f);
@@ -2135,7 +2143,7 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
         buttonObject.transform.SetParent(parent, false);
 
         Image buttonImage = buttonObject.GetComponent<Image>();
-        RuntimeUiSpriteFactory.ApplyRoundedSprite(buttonImage, backgroundColor, 16, 14, 1.2f);
+        RuntimeUiSpriteFactory.ApplySettingButtonFrameSprite(buttonImage, backgroundColor);
 
         RectTransform rect = buttonObject.GetComponent<RectTransform>();
         rect.anchorMin = new Vector2(0.5f, 0.5f);

@@ -589,6 +589,268 @@ public sealed class IllustratedPhotoAlbumPageBinderTests
     }
 
     [Test]
+    public void RefreshCompactsSceneAuthoredPreviewTitleAndDescription()
+    {
+        RectTransform root = CreateRoot();
+        GameObject rightPanelObject = new GameObject("RightPanel", typeof(RectTransform));
+        RectTransform rightPanel = rightPanelObject.GetComponent<RectTransform>();
+        rightPanel.SetParent(root, false);
+        rightPanel.sizeDelta = new Vector2(520f, 520f);
+
+        GameObject photoPositionObject = new GameObject("PhotoPos", typeof(RectTransform));
+        RectTransform photoPosition = photoPositionObject.GetComponent<RectTransform>();
+        photoPosition.SetParent(rightPanel, false);
+        RectTransform preview = CreateImage(photoPosition, "Photo", Vector2.zero, new Vector2(120f, 80f));
+        TMP_Text title = CreateText(photoPosition, "PhotoName", "PhotoName");
+        title.rectTransform.sizeDelta = new Vector2(100f, 20f);
+        title.fontSize = 30f;
+        title.enableWordWrapping = true;
+        TMP_Text introduction = CreateText(photoPosition, "Introduction", "Here is an introduction for this photo");
+        introduction.rectTransform.sizeDelta = new Vector2(120f, 20f);
+        introduction.fontSize = 18f;
+
+        CreateText(rightPanel, "PhotoTimeText", "拍摄时间 : 2026/04/28 19:38");
+        CreateText(rightPanel, "PhotoLocationText", "拍摄地点 : GameScene");
+        CreateText(rightPanel, "PhotoConditionText", "解锁条件 : 第一关 · 福建土楼");
+        CreateText(root, "PageNumber", "1/1");
+
+        List<PhotoAlbumEntry> entries = CreateEntries(1);
+        IllustratedPhotoAlbumPageBinder binder = new IllustratedPhotoAlbumPageBinder(
+            () => entries,
+            entry => CreateTexture(entry.fileName),
+            false);
+
+        binder.Bind(root);
+        binder.Refresh();
+
+        Assert.That(title.text, Does.Contain("福建土楼"));
+        Assert.IsTrue(title.enableAutoSizing);
+        Assert.IsFalse(title.enableWordWrapping);
+        Assert.AreEqual(TextOverflowModes.Ellipsis, title.overflowMode);
+        Assert.AreEqual(10f, title.fontSizeMax, 0.001f);
+        Assert.Greater(title.rectTransform.sizeDelta.x, 100f);
+        Assert.Less(title.rectTransform.anchoredPosition.y, preview.anchoredPosition.y - 40f);
+
+        Assert.IsTrue(introduction.enableAutoSizing);
+        Assert.IsTrue(introduction.enableWordWrapping);
+        Assert.AreEqual(TextOverflowModes.Ellipsis, introduction.overflowMode);
+        Assert.AreEqual(7f, introduction.fontSizeMax, 0.001f);
+        Assert.GreaterOrEqual(introduction.rectTransform.sizeDelta.x, title.rectTransform.sizeDelta.x);
+        Assert.Less(introduction.rectTransform.anchoredPosition.y, title.rectTransform.anchoredPosition.y);
+    }
+
+    [Test]
+    public void RefreshConfiguresSceneAuthoredSortFilterDropdowns()
+    {
+        RectTransform root = CreateRoot();
+        RectTransform preview = CreateImage(root, "Photo", new Vector2(-420f, 70f), new Vector2(260f, 200f));
+        CreateText(root, "Name", "Name");
+        CreateText(root, "Time", "拍摄时间 : 0000/00/00 00:00");
+        CreateText(root, "Scene", "拍摄地点 : location");
+        CreateText(root, "PageNumber", "0/0");
+        Dropdown filterDropdown = CreateDropdown(root, "Dropdown", new Vector2(-210f, 290f), new Vector2(80f, 24f));
+        Dropdown secondaryFilterDropdown = CreateDropdown(root, "Dropdown", new Vector2(-120f, 290f), new Vector2(80f, 24f));
+
+        GameObject leftPanelObject = new GameObject("LeftPanel", typeof(RectTransform));
+        RectTransform leftPanel = leftPanelObject.GetComponent<RectTransform>();
+        leftPanel.SetParent(root, false);
+        leftPanel.sizeDelta = new Vector2(520f, 520f);
+        for (int i = 0; i < 3; i++)
+        {
+            CreateImage(leftPanel, $"Image_{i + 1}", new Vector2(80f + i * 130f, 150f), new Vector2(96f, 96f));
+        }
+
+        List<PhotoAlbumEntry> entries = CreateEntries(3);
+        entries[1].stageId = "stage_02";
+        entries[1].sceneName = "GameScene_02";
+        entries[2].stageId = string.Empty;
+        entries[2].sceneName = "NewBase";
+
+        IllustratedPhotoAlbumPageBinder binder = new IllustratedPhotoAlbumPageBinder(
+            () => entries,
+            entry => CreateTexture(entry.fileName),
+            false);
+
+        binder.Bind(root);
+        binder.Refresh();
+
+        Dropdown stageDropdown = FindDropdown(root, "RuntimePhotoAlbumStageDropdown");
+        Dropdown sortDropdown = FindDropdown(root, "RuntimePhotoAlbumSortDropdown");
+        Assert.IsNull(stageDropdown);
+        Assert.IsNull(sortDropdown);
+        Assert.AreEqual("按时间排序", filterDropdown.options[0].text);
+        Assert.AreEqual("按关卡排序", filterDropdown.options[1].text);
+        Assert.AreEqual(2, filterDropdown.options.Count);
+        Assert.AreEqual("按时间排序", secondaryFilterDropdown.options[0].text);
+        Assert.AreEqual("按关卡排序", secondaryFilterDropdown.options[1].text);
+        Assert.AreEqual(2, secondaryFilterDropdown.options.Count);
+
+        RawImage previewImage = preview.GetComponentInChildren<RawImage>(true);
+        Assert.AreEqual("photo_3.png", previewImage.texture.name);
+    }
+
+    [Test]
+    public void SortFilterCanSwitchBetweenTimeAndStageOrder()
+    {
+        RectTransform root = CreateRoot();
+        RectTransform preview = CreateImage(root, "Photo", new Vector2(-420f, 70f), new Vector2(260f, 200f));
+        CreateText(root, "Name", "Name");
+        CreateText(root, "Time", "拍摄时间 : 0000/00/00 00:00");
+        CreateText(root, "Scene", "拍摄地点 : location");
+        CreateText(root, "PageNumber", "0/0");
+        Dropdown primaryFilterDropdown = CreateDropdown(root, "Dropdown", new Vector2(-210f, 290f), new Vector2(80f, 24f));
+        Dropdown secondaryFilterDropdown = CreateDropdown(root, "Dropdown", new Vector2(-120f, 290f), new Vector2(80f, 24f));
+
+        GameObject leftPanelObject = new GameObject("LeftPanel", typeof(RectTransform));
+        RectTransform leftPanel = leftPanelObject.GetComponent<RectTransform>();
+        leftPanel.SetParent(root, false);
+        leftPanel.sizeDelta = new Vector2(520f, 520f);
+        for (int i = 0; i < 3; i++)
+        {
+            CreateImage(leftPanel, $"Image_{i + 1}", new Vector2(80f + i * 130f, 150f), new Vector2(96f, 96f));
+        }
+
+        List<PhotoAlbumEntry> entries = CreateEntries(3);
+        entries[0].stageId = "stage_03";
+        entries[0].sceneName = "GameScene_03";
+        entries[1].stageId = "stage_01";
+        entries[1].sceneName = "GameScene";
+        entries[2].stageId = "stage_02";
+        entries[2].sceneName = "GameScene_02";
+        IllustratedPhotoAlbumPageBinder binder = new IllustratedPhotoAlbumPageBinder(
+            () => entries,
+            entry => CreateTexture(entry.fileName),
+            false);
+
+        binder.Bind(root);
+        binder.Refresh();
+
+        RawImage previewImage = preview.GetComponentInChildren<RawImage>(true);
+        Assert.AreEqual("photo_3.png", previewImage.texture.name);
+
+        Dropdown filterDropdown = FindDropdown(root, "Dropdown");
+        Assert.IsNotNull(filterDropdown);
+        secondaryFilterDropdown.onValueChanged.Invoke(1);
+        Assert.AreEqual("photo_2.png", previewImage.texture.name);
+        Assert.AreEqual(1, primaryFilterDropdown.value);
+        Assert.AreEqual(1, secondaryFilterDropdown.value);
+    }
+
+    [Test]
+    public void RefreshConfiguresSceneAuthoredTmpSortFilterDropdownWithReadableSingleLineLayout()
+    {
+        RectTransform root = CreateRoot();
+        CreateImage(root, "Photo", new Vector2(-420f, 70f), new Vector2(260f, 200f));
+        CreateText(root, "Name", "Name");
+        CreateText(root, "Time", "拍摄时间 : 0000/00/00 00:00");
+        CreateText(root, "Scene", "拍摄地点 : location");
+        CreateText(root, "PageNumber", "0/0");
+        TMP_Dropdown filterDropdown = CreateTmpDropdown(root, "Dropdown", new Vector2(-210f, 290f), new Vector2(38f, 12f));
+
+        GameObject leftPanelObject = new GameObject("LeftPanel", typeof(RectTransform));
+        RectTransform leftPanel = leftPanelObject.GetComponent<RectTransform>();
+        leftPanel.SetParent(root, false);
+        leftPanel.sizeDelta = new Vector2(520f, 520f);
+        CreateImage(leftPanel, "Image_1", new Vector2(80f, 150f), new Vector2(96f, 96f));
+
+        List<PhotoAlbumEntry> entries = CreateEntries(1);
+        IllustratedPhotoAlbumPageBinder binder = new IllustratedPhotoAlbumPageBinder(
+            () => entries,
+            entry => CreateTexture(entry.fileName),
+            false);
+
+        binder.Bind(root);
+        binder.Refresh();
+
+        Assert.AreEqual(2, filterDropdown.options.Count);
+        Assert.AreEqual("按时间排序", filterDropdown.options[0].text);
+        Assert.AreEqual("按关卡排序", filterDropdown.options[1].text);
+
+        RectTransform dropdownRect = filterDropdown.transform as RectTransform;
+        Assert.GreaterOrEqual(dropdownRect.sizeDelta.x, 92f);
+        Assert.GreaterOrEqual(dropdownRect.sizeDelta.y, 22f);
+        Assert.IsFalse(filterDropdown.captionText.enableWordWrapping);
+        Assert.AreEqual(TextOverflowModes.Ellipsis, filterDropdown.captionText.overflowMode);
+        Assert.GreaterOrEqual(filterDropdown.captionText.fontSize, 9.5f);
+    }
+
+    [Test]
+    public void RuntimePhotoTextureAlignsWithSceneFrameAndStaysBehindFrame()
+    {
+        RectTransform root = CreateRoot();
+        RectTransform preview = CreateImage(root, "Photo", new Vector2(-420f, 70f), new Vector2(260f, 200f));
+        CreateText(root, "Name", "Name");
+        CreateText(root, "Time", "拍摄时间 : 0000/00/00 00:00");
+        CreateText(root, "Scene", "拍摄地点 : location");
+        CreateText(root, "PageNumber", "0/0");
+
+        GameObject leftPanelObject = new GameObject("LeftPanel", typeof(RectTransform));
+        RectTransform leftPanel = leftPanelObject.GetComponent<RectTransform>();
+        leftPanel.SetParent(root, false);
+        leftPanel.sizeDelta = new Vector2(520f, 520f);
+        RectTransform slot = CreateImage(leftPanel, "Image_1", new Vector2(80f, 150f), new Vector2(96f, 96f));
+        RectTransform slotFrame = CreateImage(slot, "Frame", Vector2.zero, new Vector2(96f, 96f));
+
+        List<PhotoAlbumEntry> entries = CreateEntries(1);
+        IllustratedPhotoAlbumPageBinder binder = new IllustratedPhotoAlbumPageBinder(
+            () => entries,
+            entry => CreateTexture(entry.fileName),
+            false);
+
+        binder.Bind(root);
+        binder.Refresh();
+
+        RectTransform previewTexture = preview.GetComponentInChildren<RawImage>(true).rectTransform;
+        Assert.AreEqual(Vector2.zero, previewTexture.offsetMin);
+        Assert.AreEqual(Vector2.zero, previewTexture.offsetMax);
+
+        RectTransform slotTexture = slot.GetComponentInChildren<RawImage>(true).rectTransform;
+        Assert.AreEqual(Vector2.zero, slotTexture.offsetMin);
+        Assert.AreEqual(Vector2.zero, slotTexture.offsetMax);
+        Assert.Less(slotTexture.GetSiblingIndex(), slotFrame.GetSiblingIndex());
+    }
+
+    [Test]
+    public void RefreshNormalizesSceneAuthoredSlotsIntoAlignedGrid()
+    {
+        RectTransform root = CreateRoot();
+        CreateImage(root, "Photo", new Vector2(-420f, 70f), new Vector2(260f, 200f));
+        CreateText(root, "Name", "Name");
+        CreateText(root, "Time", "拍摄时间 : 0000/00/00 00:00");
+        CreateText(root, "Scene", "拍摄地点 : location");
+        CreateText(root, "PageNumber", "0/0");
+
+        GameObject leftPanelObject = new GameObject("LeftPanel", typeof(RectTransform));
+        RectTransform leftPanel = leftPanelObject.GetComponent<RectTransform>();
+        leftPanel.SetParent(root, false);
+        leftPanel.sizeDelta = new Vector2(520f, 520f);
+        RectTransform slot1 = CreateImage(leftPanel, "Image_1", new Vector2(81f, 151f), new Vector2(50f, 30f));
+        RectTransform slot2 = CreateImage(leftPanel, "Image_2", new Vector2(229f, 143f), new Vector2(47f, 32f));
+        RectTransform slot3 = CreateImage(leftPanel, "Image_3", new Vector2(376f, 154f), new Vector2(51f, 29f));
+        RectTransform slot4 = CreateImage(leftPanel, "Image_4", new Vector2(73f, 20f), new Vector2(49f, 31f));
+        RectTransform slot5 = CreateImage(leftPanel, "Image_5", new Vector2(231f, 12f), new Vector2(50f, 30f));
+        RectTransform slot6 = CreateImage(leftPanel, "Image_6", new Vector2(388f, 22f), new Vector2(48f, 30f));
+
+        List<PhotoAlbumEntry> entries = CreateEntries(6);
+        IllustratedPhotoAlbumPageBinder binder = new IllustratedPhotoAlbumPageBinder(
+            () => entries,
+            entry => CreateTexture(entry.fileName),
+            false);
+
+        binder.Bind(root);
+        binder.Refresh();
+
+        Assert.AreEqual(slot1.anchoredPosition.y, slot2.anchoredPosition.y, 0.001f);
+        Assert.AreEqual(slot2.anchoredPosition.y, slot3.anchoredPosition.y, 0.001f);
+        Assert.AreEqual(slot4.anchoredPosition.y, slot5.anchoredPosition.y, 0.001f);
+        Assert.AreEqual(slot5.anchoredPosition.y, slot6.anchoredPosition.y, 0.001f);
+        Assert.AreEqual(slot1.anchoredPosition.x, slot4.anchoredPosition.x, 0.001f);
+        Assert.AreEqual(slot2.anchoredPosition.x, slot5.anchoredPosition.x, 0.001f);
+        Assert.AreEqual(slot3.anchoredPosition.x, slot6.anchoredPosition.x, 0.001f);
+        Assert.AreEqual(slot1.sizeDelta, slot6.sizeDelta);
+    }
+
+    [Test]
     public void DeleteSelectedButtonMatchesShareButtonSizeAndAlignsToItsLeft()
     {
         RectTransform root = CreateRoot();
@@ -680,6 +942,99 @@ public sealed class IllustratedPhotoAlbumPageBinderTests
         return button;
     }
 
+    private static Dropdown CreateDropdown(Transform parent, string name, Vector2 anchoredPosition, Vector2 size)
+    {
+        GameObject dropdownObject = new GameObject(name, typeof(RectTransform), typeof(Image), typeof(Dropdown));
+        RectTransform rectTransform = dropdownObject.GetComponent<RectTransform>();
+        rectTransform.SetParent(parent, false);
+        rectTransform.anchorMin = new Vector2(0.5f, 0.5f);
+        rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
+        rectTransform.pivot = new Vector2(0.5f, 0.5f);
+        rectTransform.anchoredPosition = anchoredPosition;
+        rectTransform.sizeDelta = size;
+
+        Image image = dropdownObject.GetComponent<Image>();
+        image.color = Color.white;
+        image.raycastTarget = true;
+
+        GameObject captionObject = new GameObject("Label", typeof(RectTransform), typeof(Text));
+        RectTransform captionRect = captionObject.GetComponent<RectTransform>();
+        captionRect.SetParent(dropdownObject.transform, false);
+        captionRect.anchorMin = Vector2.zero;
+        captionRect.anchorMax = Vector2.one;
+        captionRect.offsetMin = Vector2.zero;
+        captionRect.offsetMax = Vector2.zero;
+
+        Text caption = captionObject.GetComponent<Text>();
+        caption.text = "Option A";
+        caption.alignment = TextAnchor.MiddleCenter;
+        caption.color = Color.black;
+        caption.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+
+        Dropdown dropdown = dropdownObject.GetComponent<Dropdown>();
+        dropdown.targetGraphic = image;
+        dropdown.captionText = caption;
+        dropdown.options.Clear();
+        dropdown.options.Add(new Dropdown.OptionData("Option A"));
+        dropdown.options.Add(new Dropdown.OptionData("Option B"));
+        return dropdown;
+    }
+
+    private static TMP_Dropdown CreateTmpDropdown(Transform parent, string name, Vector2 anchoredPosition, Vector2 size)
+    {
+        GameObject dropdownObject = new GameObject(name, typeof(RectTransform), typeof(Image), typeof(TMP_Dropdown));
+        RectTransform rectTransform = dropdownObject.GetComponent<RectTransform>();
+        rectTransform.SetParent(parent, false);
+        rectTransform.anchorMin = new Vector2(0.5f, 0.5f);
+        rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
+        rectTransform.pivot = new Vector2(0.5f, 0.5f);
+        rectTransform.anchoredPosition = anchoredPosition;
+        rectTransform.sizeDelta = size;
+
+        Image image = dropdownObject.GetComponent<Image>();
+        image.color = Color.white;
+        image.raycastTarget = true;
+
+        GameObject captionObject = new GameObject("Label", typeof(RectTransform), typeof(TextMeshProUGUI));
+        RectTransform captionRect = captionObject.GetComponent<RectTransform>();
+        captionRect.SetParent(dropdownObject.transform, false);
+        captionRect.anchorMin = Vector2.zero;
+        captionRect.anchorMax = Vector2.one;
+        captionRect.offsetMin = Vector2.zero;
+        captionRect.offsetMax = Vector2.zero;
+
+        TMP_Text caption = captionObject.GetComponent<TMP_Text>();
+        caption.text = "Option A";
+        caption.fontSize = 5f;
+        caption.enableWordWrapping = true;
+        caption.alignment = TextAlignmentOptions.Center;
+        caption.color = Color.black;
+
+        GameObject itemObject = new GameObject("Item Label", typeof(RectTransform), typeof(TextMeshProUGUI));
+        RectTransform itemRect = itemObject.GetComponent<RectTransform>();
+        itemRect.SetParent(dropdownObject.transform, false);
+        itemRect.anchorMin = Vector2.zero;
+        itemRect.anchorMax = Vector2.one;
+        itemRect.offsetMin = Vector2.zero;
+        itemRect.offsetMax = Vector2.zero;
+
+        TMP_Text item = itemObject.GetComponent<TMP_Text>();
+        item.text = "Option A";
+        item.fontSize = 5f;
+        item.enableWordWrapping = true;
+        item.alignment = TextAlignmentOptions.Center;
+        item.color = Color.black;
+
+        TMP_Dropdown dropdown = dropdownObject.GetComponent<TMP_Dropdown>();
+        dropdown.targetGraphic = image;
+        dropdown.captionText = caption;
+        dropdown.itemText = item;
+        dropdown.options.Clear();
+        dropdown.options.Add(new TMP_Dropdown.OptionData("Option A"));
+        dropdown.options.Add(new TMP_Dropdown.OptionData("Option B"));
+        return dropdown;
+    }
+
     private static TMP_Text CreateText(Transform parent, string name, string content)
     {
         GameObject textObject = new GameObject(name, typeof(RectTransform), typeof(TextMeshProUGUI));
@@ -700,6 +1055,20 @@ public sealed class IllustratedPhotoAlbumPageBinderTests
             if (buttons[i] != null && buttons[i].name == name)
             {
                 return buttons[i];
+            }
+        }
+
+        return null;
+    }
+
+    private static Dropdown FindDropdown(Transform root, string name)
+    {
+        Dropdown[] dropdowns = root.GetComponentsInChildren<Dropdown>(true);
+        for (int i = 0; i < dropdowns.Length; i++)
+        {
+            if (dropdowns[i] != null && dropdowns[i].name == name)
+            {
+                return dropdowns[i];
             }
         }
 

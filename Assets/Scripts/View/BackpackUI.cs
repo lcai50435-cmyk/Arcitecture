@@ -11,26 +11,32 @@ public class BackpackUI : MonoBehaviour
     private static bool AllowManualCollapseToggle => false;
     private const string RuntimeCanvasRootName = "PackBagCanvas";
     private const string RuntimeSurfaceName = "RuntimeBackpackSurface";
+    private const string RuntimeSharedPanelName = "Panel";
     private const string RuntimeItemPanelName = "ItemPanel";
     private const string RuntimeAttackPanelName = "AttackPanel";
     private const string RuntimeSlotPrefix = "slot_";
     private const string RuntimeSlotIconName = "ItemIcon";
     private const string RuntimeSlotSelectionName = "SelectedBorder";
     private const string RuntimeSlotHoverShadeName = "HoverShade";
+    private const string RuntimeBackpackFrameSpriteResourcePath = "UI/BackpackSlotsHorizontal";
+    private const string RuntimeFallbackSlotSpriteResourcePath = "UI/AttackSlot";
     private const int RuntimeAttackSelectionIndex = -1;
     private const int RuntimeSlotCount = 6;
     private const int RuntimeCanvasSortingOrder = 1;
     private const float RuntimeFallbackSurfaceBottom = 24f;
     private const float RuntimeFallbackItemPanelWidth = 550f;
-    private const float RuntimeFallbackItemPanelHeight = 124f;
+    private const float RuntimeFallbackItemPanelHeight = 112f;
     private const float RuntimeSceneAuthoredLayoutBottom = 12f;
     private const float RuntimeSceneAuthoredLayoutWidth = 920f;
-    private const float RuntimeSceneAuthoredLayoutHeight = 220f;
+    private const float RuntimeSceneAuthoredLayoutHeight = 148f;
     private const float RuntimeFallbackAttackPanelX = 459f;
     private const float RuntimeFallbackAttackPanelY = 65f;
     private const float RuntimeFallbackAttackPanelSize = 130f;
     private const float RuntimeFallbackSlotSize = 80f;
     private const float RuntimeFallbackSlotGapX = 85.6f;
+    private const float RuntimeFallbackMergedSlotWidth = 70f;
+    private const float RuntimeFallbackMergedSlotHeight = 64f;
+    private const float RuntimeFallbackMergedSlotGapX = 70f;
     private const float RuntimeSelectionBorderThickness = 3f;
     private const float RuntimeSelectionFramePadding = 3f;
     private const float RuntimeSelectionFadeSpeed = 12f;
@@ -50,6 +56,8 @@ public class BackpackUI : MonoBehaviour
     private static readonly Color RuntimeBackpackSelectionBorderColor = new Color(1f, 0.86f, 0.32f, 0.98f);
     private static readonly Color RuntimeAttackSelectionBorderColor = new Color(1f, 0.12f, 0.08f, 0.98f);
     private static readonly Color RuntimeHoverShadeColor = new Color(0f, 0f, 0f, 0.12f);
+    private static Sprite runtimeBackpackFrameSprite;
+    private static Sprite runtimeFallbackSlotSprite;
 
     public Image[] backPackGrid;
     private BackpackMananger backpack;
@@ -474,6 +482,7 @@ public class BackpackUI : MonoBehaviour
         NormalizeSceneAuthoredRuntimeLayout(runtimeLayoutRootRect, runtimeCanvasRoot, itemPanel, attackPanel);
 
         runtimeAttackSlotRect = attackPanel;
+        ApplyRuntimeSlotFrame(attackPanel, ResolveRuntimeSlotFrameSprite(attackPanel));
         EnsureRuntimeAttackSlotBehaviour(attackPanel);
         runtimeAttackSelectionGroup = EnsureRuntimeSelectionFrame(
             attackPanel,
@@ -495,6 +504,7 @@ public class BackpackUI : MonoBehaviour
 
             runtimeSlotRects[i] = slot;
 
+            ApplyRuntimeSlotFrame(slot, ResolveRuntimeSlotFrameSprite(slot));
             EnsureSlotRaycastSurface(slot);
 
             runtimeSlotImages[i] = EnsureRuntimeSlotIcon(slot);
@@ -749,6 +759,17 @@ public class BackpackUI : MonoBehaviour
             return sharedParent;
         }
 
+        if (itemPanel != null &&
+            attackPanel != null &&
+            attackPanel.IsChildOf(itemPanel) &&
+            itemParent != null &&
+            itemParent != runtimeCanvasRoot &&
+            itemParent is RectTransform mergedSlotSharedParent)
+        {
+            mergedSlotSharedParent.gameObject.SetActive(true);
+            return mergedSlotSharedParent;
+        }
+
         return runtimeCanvasRoot;
     }
 
@@ -758,22 +779,29 @@ public class BackpackUI : MonoBehaviour
         RectTransform itemPanel,
         RectTransform attackPanel)
     {
-        if (layoutRoot == null || runtimeCanvasRoot == null || layoutRoot == runtimeCanvasRoot)
+        if (layoutRoot == null || runtimeCanvasRoot == null)
         {
             return;
         }
 
-        layoutRoot.anchorMin = new Vector2(0.5f, 0f);
-        layoutRoot.anchorMax = new Vector2(0.5f, 0f);
-        layoutRoot.pivot = new Vector2(0.5f, 0f);
-        layoutRoot.anchoredPosition = new Vector2(0f, RuntimeSceneAuthoredLayoutBottom);
-        layoutRoot.sizeDelta = ResolveSceneAuthoredLayoutSize(itemPanel, attackPanel);
-        layoutRoot.localScale = Vector3.one;
-        layoutRoot.localRotation = Quaternion.identity;
-        layoutRoot.gameObject.SetActive(true);
+        if (layoutRoot != runtimeCanvasRoot)
+        {
+            layoutRoot.anchorMin = new Vector2(0.5f, 0f);
+            layoutRoot.anchorMax = new Vector2(0.5f, 0f);
+            layoutRoot.pivot = new Vector2(0.5f, 0f);
+            layoutRoot.anchoredPosition = new Vector2(0f, RuntimeSceneAuthoredLayoutBottom);
+            layoutRoot.sizeDelta = ResolveSceneAuthoredLayoutSize(itemPanel, attackPanel);
+            layoutRoot.localScale = Vector3.one;
+            layoutRoot.localRotation = Quaternion.identity;
+            layoutRoot.gameObject.SetActive(true);
 
+            ClearLegacyBackpackBackground(layoutRoot);
+        }
+
+        ClearLegacyBackpackBackground(itemPanel);
         NormalizeSceneAuthoredItemPanel(itemPanel);
         NormalizeSceneAuthoredAttackPanel(attackPanel);
+        NormalizeMergedSevenSlotRow(itemPanel, attackPanel);
     }
 
     private static Vector2 ResolveSceneAuthoredLayoutSize(RectTransform itemPanel, RectTransform attackPanel)
@@ -818,9 +846,11 @@ public class BackpackUI : MonoBehaviour
         itemPanel.anchorMax = new Vector2(0.5f, 0f);
         itemPanel.pivot = new Vector2(0.5f, 0f);
         itemPanel.anchoredPosition = new Vector2(itemPanel.anchoredPosition.x, 0f);
+        itemPanel.sizeDelta = new Vector2(RuntimeFallbackItemPanelWidth, RuntimeFallbackItemPanelHeight);
         itemPanel.localScale = Vector3.one;
         itemPanel.localRotation = Quaternion.identity;
         itemPanel.gameObject.SetActive(true);
+        ApplyRuntimeBackpackFrame(itemPanel);
     }
 
     private static void NormalizeSceneAuthoredAttackPanel(RectTransform attackPanel)
@@ -840,6 +870,49 @@ public class BackpackUI : MonoBehaviour
         attackPanel.localScale = Vector3.one;
         attackPanel.localRotation = Quaternion.identity;
         attackPanel.gameObject.SetActive(true);
+    }
+
+    private static void NormalizeMergedSevenSlotRow(
+        RectTransform itemPanel,
+        RectTransform attackPanel)
+    {
+        if (itemPanel == null)
+        {
+            return;
+        }
+
+        if (attackPanel != null && attackPanel != itemPanel && !attackPanel.IsChildOf(itemPanel))
+        {
+            attackPanel.SetParent(itemPanel, false);
+        }
+
+        Sprite slotSprite = HasRuntimeBackpackFrame(itemPanel) ? null : LoadRuntimeFallbackSlotSprite();
+        for (int i = 0; i < RuntimeSlotCount + 1; i++)
+        {
+            RectTransform slot = i < RuntimeSlotCount
+                ? FindRuntimeSlot(itemPanel, i) ?? EnsureChildRect(itemPanel, $"{RuntimeSlotPrefix}{i + 1}")
+                : (attackPanel != null
+                    ? attackPanel
+                    : FindMergedAttackSlot(itemPanel) ?? EnsureChildRect(itemPanel, $"{RuntimeSlotPrefix}{RuntimeSlotCount + 1}"));
+
+            if (slot == null)
+            {
+                continue;
+            }
+
+            slot.anchorMin = new Vector2(0.5f, 0.5f);
+            slot.anchorMax = new Vector2(0.5f, 0.5f);
+            slot.pivot = new Vector2(0.5f, 0.5f);
+            slot.anchoredPosition = new Vector2(
+                (i - RuntimeSlotCount * 0.5f) * RuntimeFallbackMergedSlotGapX,
+                0f);
+            slot.sizeDelta = new Vector2(RuntimeFallbackMergedSlotWidth, RuntimeFallbackMergedSlotHeight);
+            slot.localScale = Vector3.one;
+            slot.localRotation = Quaternion.identity;
+            slot.gameObject.SetActive(true);
+
+            ApplyRuntimeSlotFrame(slot, slotSprite);
+        }
     }
 
     private static RectTransform FindRuntimeSlot(Transform itemPanel, int slotIndex)
@@ -887,29 +960,142 @@ public class BackpackUI : MonoBehaviour
 
     private static RectTransform CreateFallbackItemPanel(Transform runtimeCanvasRoot)
     {
-        RectTransform panel = EnsureChildRect(runtimeCanvasRoot, RuntimeItemPanelName);
+        RectTransform sharedPanel = EnsureFallbackSharedPanel(runtimeCanvasRoot);
+        RectTransform panel = EnsureChildRect(sharedPanel, RuntimeItemPanelName);
         panel.anchorMin = new Vector2(0.5f, 0f);
         panel.anchorMax = new Vector2(0.5f, 0f);
         panel.pivot = new Vector2(0.5f, 0f);
-        panel.anchoredPosition = new Vector2(0f, RuntimeFallbackSurfaceBottom);
+        panel.anchoredPosition = Vector2.zero;
         panel.sizeDelta = new Vector2(RuntimeFallbackItemPanelWidth, RuntimeFallbackItemPanelHeight);
         panel.localScale = Vector3.one;
         panel.gameObject.SetActive(true);
 
-        Image image = panel.GetComponent<Image>();
+        ApplyRuntimeBackpackFrame(panel);
+        EnsureFallbackMergedSlots(panel);
+        return panel;
+    }
+
+    private static RectTransform EnsureFallbackSharedPanel(Transform runtimeCanvasRoot)
+    {
+        RectTransform sharedPanel = EnsureChildRect(runtimeCanvasRoot, RuntimeSharedPanelName);
+        sharedPanel.anchorMin = new Vector2(0.5f, 0f);
+        sharedPanel.anchorMax = new Vector2(0.5f, 0f);
+        sharedPanel.pivot = new Vector2(0.5f, 0f);
+        sharedPanel.anchoredPosition = new Vector2(0f, RuntimeSceneAuthoredLayoutBottom);
+        sharedPanel.sizeDelta = new Vector2(RuntimeSceneAuthoredLayoutWidth, RuntimeSceneAuthoredLayoutHeight);
+        sharedPanel.localScale = Vector3.one;
+        sharedPanel.localRotation = Quaternion.identity;
+        sharedPanel.gameObject.SetActive(true);
+        return sharedPanel;
+    }
+
+    private static void EnsureFallbackMergedSlots(Transform itemPanel)
+    {
+        RectTransform itemPanelRect = itemPanel as RectTransform;
+        Sprite slotSprite = HasRuntimeBackpackFrame(itemPanelRect) ? null : LoadRuntimeFallbackSlotSprite();
+        for (int i = 0; i < RuntimeSlotCount + 1; i++)
+        {
+            RectTransform slot = EnsureChildRect(itemPanel, $"{RuntimeSlotPrefix}{i + 1}");
+            slot.anchorMin = new Vector2(0.5f, 0.5f);
+            slot.anchorMax = new Vector2(0.5f, 0.5f);
+            slot.pivot = new Vector2(0.5f, 0.5f);
+            slot.anchoredPosition = new Vector2(
+                (i - RuntimeSlotCount * 0.5f) * RuntimeFallbackMergedSlotGapX,
+                0f);
+            slot.sizeDelta = new Vector2(RuntimeFallbackMergedSlotWidth, RuntimeFallbackMergedSlotHeight);
+            slot.localScale = Vector3.one;
+            slot.localRotation = Quaternion.identity;
+            slot.gameObject.SetActive(true);
+
+            ApplyRuntimeSlotFrame(slot, slotSprite);
+        }
+    }
+
+    private static Sprite LoadRuntimeFallbackSlotSprite()
+    {
+        if (runtimeFallbackSlotSprite != null)
+        {
+            return runtimeFallbackSlotSprite;
+        }
+
+        runtimeFallbackSlotSprite = Resources.Load<Sprite>(RuntimeFallbackSlotSpriteResourcePath);
+        return runtimeFallbackSlotSprite;
+    }
+
+    private static Sprite LoadRuntimeBackpackFrameSprite()
+    {
+        if (runtimeBackpackFrameSprite != null)
+        {
+            return runtimeBackpackFrameSprite;
+        }
+
+        runtimeBackpackFrameSprite = Resources.Load<Sprite>(RuntimeBackpackFrameSpriteResourcePath);
+        return runtimeBackpackFrameSprite;
+    }
+
+    private static void ApplyRuntimeBackpackFrame(RectTransform itemPanel)
+    {
+        if (itemPanel == null)
+        {
+            return;
+        }
+
+        Image image = itemPanel.GetComponent<Image>();
         if (image == null)
         {
-            image = panel.gameObject.AddComponent<Image>();
+            image = itemPanel.gameObject.AddComponent<Image>();
         }
 
-        if (image.sprite == null)
+        Sprite frameSprite = LoadRuntimeBackpackFrameSprite();
+        if (frameSprite != null)
         {
-            image.color = new Color(0.25f, 0.19f, 0.13f, 0.96f);
+            image.sprite = frameSprite;
+            image.type = Image.Type.Simple;
+            image.color = Color.white;
+        }
+        else
+        {
+            image.sprite = null;
+            image.color = Color.clear;
         }
 
+        image.enabled = true;
         image.raycastTarget = false;
         image.preserveAspect = false;
-        return panel;
+    }
+
+    private static bool HasRuntimeBackpackFrame(RectTransform itemPanel)
+    {
+        if (itemPanel == null)
+        {
+            return false;
+        }
+
+        Sprite frameSprite = LoadRuntimeBackpackFrameSprite();
+        Image image = itemPanel.GetComponent<Image>();
+        return frameSprite != null && image != null && image.sprite == frameSprite && image.color.a > 0f;
+    }
+
+    private static Sprite ResolveRuntimeSlotFrameSprite(RectTransform slot)
+    {
+        RectTransform itemPanel = FindOwningItemPanel(slot);
+        return HasRuntimeBackpackFrame(itemPanel) ? null : LoadRuntimeFallbackSlotSprite();
+    }
+
+    private static RectTransform FindOwningItemPanel(RectTransform slot)
+    {
+        Transform current = slot;
+        while (current != null)
+        {
+            if (string.Equals(current.name, RuntimeItemPanelName))
+            {
+                return current as RectTransform;
+            }
+
+            current = current.parent;
+        }
+
+        return null;
     }
 
     private static RectTransform CreateFallbackAttackPanel(Transform runtimeCanvasRoot)
@@ -936,6 +1122,7 @@ public class BackpackUI : MonoBehaviour
 
         image.raycastTarget = true;
         image.preserveAspect = false;
+        ApplyRuntimeSlotFrame(panel);
         return panel;
     }
 
@@ -952,6 +1139,63 @@ public class BackpackUI : MonoBehaviour
         slot.localScale = Vector3.one;
         slot.gameObject.SetActive(true);
         return slot;
+    }
+
+    private static void ClearLegacyBackpackBackground(RectTransform target)
+    {
+        if (target == null)
+        {
+            return;
+        }
+
+        Image image = target.GetComponent<Image>();
+        if (image == null)
+        {
+            return;
+        }
+
+        image.sprite = null;
+        image.color = Color.clear;
+        image.raycastTarget = false;
+        image.preserveAspect = false;
+    }
+
+    private static void ApplyRuntimeSlotFrame(RectTransform slot)
+    {
+        ApplyRuntimeSlotFrame(slot, LoadRuntimeFallbackSlotSprite());
+    }
+
+    private static void ApplyRuntimeSlotFrame(
+        RectTransform slot,
+        Sprite slotSprite)
+    {
+        if (slot == null)
+        {
+            return;
+        }
+
+        Image slotImage = slot.GetComponent<Image>();
+        if (slotImage == null)
+        {
+            slotImage = slot.gameObject.AddComponent<Image>();
+        }
+
+        if (slotSprite != null)
+        {
+            slotImage.sprite = slotSprite;
+            slotImage.type = Image.Type.Simple;
+            slotImage.color = Color.white;
+        }
+        else
+        {
+            slotImage.sprite = null;
+            slotImage.type = Image.Type.Simple;
+            slotImage.color = new Color(1f, 1f, 1f, 0.001f);
+        }
+
+        slotImage.enabled = true;
+        slotImage.raycastTarget = true;
+        slotImage.preserveAspect = false;
     }
 
     private static void EnsureSlotRaycastSurface(RectTransform slot)

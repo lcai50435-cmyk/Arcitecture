@@ -11,6 +11,7 @@ using UnityEngine.UI;
 public class GameDebugPageBootstrapper : MonoBehaviour
 {
     private const string BaseSceneName = "NewBase";
+    private const string LegacyBaseSceneName = "BaseScene";
     private const int DebugCanvasSortingOrder = 13050;
     private const float RefreshInterval = 0.2f;
     private const float ManualScrollStep = 0.08f;
@@ -69,15 +70,37 @@ public class GameDebugPageBootstrapper : MonoBehaviour
     private static void TryCreate(Scene scene)
     {
         if (!CanCreateInScene(scene.name)) return;
-        if (FindObjectOfType<GameDebugPageBootstrapper>(true) != null) return;
+
+        GameDebugPageBootstrapper existing = FindObjectOfType<GameDebugPageBootstrapper>(true);
+        if (existing != null)
+        {
+            existing.EnsureBuilt();
+            return;
+        }
 
         GameObject bootstrapper = new GameObject("RuntimeDebugPage");
-        bootstrapper.AddComponent<GameDebugPageBootstrapper>().Build();
+        bootstrapper.AddComponent<GameDebugPageBootstrapper>().EnsureBuilt();
     }
 
     private static bool CanCreateInScene(string sceneName)
     {
         return !string.IsNullOrWhiteSpace(sceneName);
+    }
+
+    private void Awake()
+    {
+        if (!Application.isPlaying)
+        {
+            return;
+        }
+
+        if (!CanCreateInScene(SceneManager.GetActiveScene().name))
+        {
+            Destroy(gameObject);
+            return;
+        }
+
+        EnsureBuilt();
     }
 
     private void Update()
@@ -194,15 +217,41 @@ public class GameDebugPageBootstrapper : MonoBehaviour
         {
             BuildBaseSection(content);
         }
-        else
-        {
-            BuildAttributeSection(content);
-            BuildSkillSection(content);
-            BuildTimeSection(content);
-            BuildWorldSection(content);
-        }
+
+        BuildAttributeSection(content);
+        BuildSkillSection(content);
+        BuildTimeSection(content);
+        BuildWorldSection(content);
 
         panelRoot.SetActive(false);
+    }
+
+    private void EnsureBuilt()
+    {
+        if (panelRoot != null)
+        {
+            return;
+        }
+
+        ClearUnboundExistingCanvas();
+        Build();
+    }
+
+    private void ClearUnboundExistingCanvas()
+    {
+        Transform canvasTransform = transform.Find("RuntimeDebugCanvas");
+        if (canvasTransform == null)
+        {
+            return;
+        }
+
+        if (Application.isPlaying)
+        {
+            Destroy(canvasTransform.gameObject);
+            return;
+        }
+
+        DestroyImmediate(canvasTransform.gameObject);
     }
 
     private void SetPanelVisible(bool visible)
@@ -850,7 +899,8 @@ public class GameDebugPageBootstrapper : MonoBehaviour
 
     private static bool IsBaseScene(string sceneName)
     {
-        return string.Equals(sceneName, BaseSceneName, StringComparison.Ordinal);
+        return string.Equals(sceneName, BaseSceneName, StringComparison.Ordinal) ||
+               string.Equals(sceneName, LegacyBaseSceneName, StringComparison.Ordinal);
     }
 
     private static bool IsGameplayScene()

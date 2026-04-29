@@ -8,6 +8,7 @@ public sealed class RuntimeFireflyAmbientEffect : MonoBehaviour
     private const string EffectObjectName = "RuntimeFireflyAmbientEffect";
     private const string BaseSceneName = "NewBase";
     private const string LegacyBaseSceneName = "BaseScene";
+    private const string FirstStageId = "stage_01";
     private const int FireflySortingOrder = 28150;
     private const float ShapeWidthMultiplier = 1.15f;
     private const float ShapeHeightMultiplier = 1.05f;
@@ -27,6 +28,22 @@ public sealed class RuntimeFireflyAmbientEffect : MonoBehaviour
         0.18f,
         new Color(1f, 0.86f, 0.42f, 0.72f),
         new Color(0.66f, 0.96f, 1f, 0.52f));
+
+    private static readonly FireflyAmbientProfile FirstStageGameplayProfile = new FireflyAmbientProfile(
+        110,
+        16f,
+        4.8f,
+        7.2f,
+        0.045f,
+        0.14f,
+        0.06f,
+        0.18f,
+        0.032f,
+        0.11f,
+        0.28f,
+        0.18f,
+        new Color(1f, 0.84f, 0.34f, 0.82f),
+        new Color(0.64f, 0.96f, 1f, 0.62f));
 
     private static readonly FireflyAmbientProfile GameplayProfile = new FireflyAmbientProfile(
         240,
@@ -217,7 +234,15 @@ public sealed class RuntimeFireflyAmbientEffect : MonoBehaviour
             return BaseProfile;
         }
 
-        return GameplayStageCatalog.IsGameplayScene(sceneName) ? GameplayProfile : null;
+        GameplayStageDefinition stage = GameplayStageCatalog.GetStageByScene(sceneName);
+        if (stage == null)
+        {
+            return null;
+        }
+
+        return string.Equals(stage.stageId, FirstStageId, StringComparison.Ordinal)
+            ? FirstStageGameplayProfile
+            : GameplayProfile;
     }
 
     private void EnsureParticleSystem()

@@ -3,9 +3,11 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
-public class BackpackSlot : MonoBehaviour, IPointerDownHandler, IPointerUpHandler, IPointerEnterHandler, IPointerExitHandler, IBeginDragHandler, IDragHandler, IEndDragHandler
+public class BackpackSlot : MonoBehaviour, IPointerDownHandler, IPointerUpHandler, IPointerClickHandler, IPointerEnterHandler, IPointerExitHandler, IBeginDragHandler, IDragHandler, IEndDragHandler
 {
     private const string RuntimeSlotIconName = "ItemIcon";
+    private const int DropClickCount = 2;
+    private const float DroppedLootBagScale = 0.0875f;
 
     [Header("格子编号 0~5")]
     public int slotIndex;
@@ -27,7 +29,9 @@ public class BackpackSlot : MonoBehaviour, IPointerDownHandler, IPointerUpHandle
     {
         sourceSlotIndex = -1;
 
-        BackpackSlot slot = pointerDrag != null ? pointerDrag.GetComponent<BackpackSlot>() : null;
+        BackpackSlot slot = pointerDrag != null
+            ? pointerDrag.GetComponent<BackpackSlot>() ?? pointerDrag.GetComponentInParent<BackpackSlot>()
+            : null;
         if (slot == null)
         {
             return false;
@@ -70,7 +74,7 @@ public class BackpackSlot : MonoBehaviour, IPointerDownHandler, IPointerUpHandle
             legacyHoverOutline.enabled = false;
         }
 
-        backpack = BackpackMananger.Instance;
+        ResolveBackpackManager();
         if (backpackUI == null)
         {
             backpackUI = BackpackUI.EnsureRuntimeInstance();
@@ -160,6 +164,18 @@ public class BackpackSlot : MonoBehaviour, IPointerDownHandler, IPointerUpHandle
         }
     }
 
+    public void OnPointerClick(PointerEventData eventData)
+    {
+        if (eventData == null ||
+            eventData.button != PointerEventData.InputButton.Left ||
+            eventData.clickCount < DropClickCount)
+        {
+            return;
+        }
+
+        DropSingleItem();
+    }
+
     public void OnPointerEnter(PointerEventData eventData)
     {
         isHovered = true;
@@ -197,7 +213,7 @@ public class BackpackSlot : MonoBehaviour, IPointerDownHandler, IPointerUpHandle
 
     private void StartSingleHold()
     {
-        if (backpack == null)
+        if (ResolveBackpackManager() == null)
         {
             Debug.LogError("BackpackManager未找到！");
             return;
@@ -231,12 +247,7 @@ public class BackpackSlot : MonoBehaviour, IPointerDownHandler, IPointerUpHandle
     {
         crystal = default;
 
-        if (backpack == null)
-        {
-            backpack = BackpackMananger.Instance != null
-                ? BackpackMananger.Instance
-                : Object.FindObjectOfType<BackpackMananger>(true);
-        }
+        ResolveBackpackManager();
 
         ArchitecturalCrystal? item = backpack != null ? backpack.GetItem(slotIndex) : null;
         if (!item.HasValue || !item.Value.IsSpecialStructure)
@@ -395,7 +406,7 @@ public class BackpackSlot : MonoBehaviour, IPointerDownHandler, IPointerUpHandle
 
     private void DropSingleItem()
     {
-        if (backpack == null)
+        if (ResolveBackpackManager() == null)
         {
             return;
         }
@@ -421,23 +432,44 @@ public class BackpackSlot : MonoBehaviour, IPointerDownHandler, IPointerUpHandle
         RuntimeCrystalDropFactory.CreateInteractiveDrop(
             crystal,
             dropPosition,
-            0.3f,
-            0,
+            DroppedLootBagScale,
+            4,
             null,
-            $"Drop_{crystal.type}");
+            $"Drop_{crystal.type}",
+            RuntimeDropPresentation.ClosedLootBag);
 
         backpack.RemoveItem(slotIndex);
-        if (backpackUI != null)
-        {
-            backpackUI.RefreshUI();
-        }
-        else
-        {
-            Debug.LogError("BackpackUI未找到！");
-        }
+        RefreshBackpackView();
 
         HideHoverState();
         Debug.Log($"格子{slotIndex}的物品{crystal.type}已丢弃");
+    }
+
+    private BackpackMananger ResolveBackpackManager()
+    {
+        if (backpack != null)
+        {
+            return backpack;
+        }
+
+        backpack = BackpackMananger.Instance != null
+            ? BackpackMananger.Instance
+            : Object.FindObjectOfType<BackpackMananger>(true);
+        return backpack;
+    }
+
+    private void RefreshBackpackView()
+    {
+        BackpackUI view = backpackUI != null
+            ? backpackUI
+            : Object.FindObjectOfType<BackpackUI>(true);
+        if (view == null)
+        {
+            return;
+        }
+
+        backpackUI = view;
+        backpackUI.RefreshUI();
     }
 }
 

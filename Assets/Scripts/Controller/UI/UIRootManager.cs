@@ -33,6 +33,8 @@ public enum RuntimeModalOpenSource
 public static class RuntimeGameplayPauseController
 {
     private static readonly HashSet<string> PauseReasons = new HashSet<string>();
+    private const string BaseSceneName = "NewBase";
+    private const string LegacyBaseSceneName = "BaseScene";
     private static float resumeTimeScale = 1f;
     private static bool sceneHookRegistered;
 
@@ -51,7 +53,7 @@ public static class RuntimeGameplayPauseController
 
     public static void RequestPause(string reason)
     {
-        if (string.IsNullOrWhiteSpace(reason) || !GameplayStageCatalog.IsGameplayScene(SceneManager.GetActiveScene().name))
+        if (string.IsNullOrWhiteSpace(reason) || !IsRuntimePausableScene(SceneManager.GetActiveScene().name))
         {
             return;
         }
@@ -108,11 +110,7 @@ public static class RuntimeGameplayPauseController
         PauseReasons.Clear();
         resumeTimeScale = 1f;
         MusicManager.SetGameplayMusicPaused(false);
-
-        if (!GameplayStageCatalog.IsGameplayScene(scene.name))
-        {
-            Time.timeScale = 1f;
-        }
+        Time.timeScale = 1f;
     }
 
     private static void RestoreTimeScaleIfNeeded()
@@ -122,7 +120,7 @@ public static class RuntimeGameplayPauseController
             return;
         }
 
-        if (!GameplayStageCatalog.IsGameplayScene(SceneManager.GetActiveScene().name))
+        if (!IsRuntimePausableScene(SceneManager.GetActiveScene().name))
         {
             Time.timeScale = 1f;
             resumeTimeScale = 1f;
@@ -131,6 +129,13 @@ public static class RuntimeGameplayPauseController
 
         Time.timeScale = resumeTimeScale > 0.0001f ? resumeTimeScale : 1f;
         resumeTimeScale = 1f;
+    }
+
+    public static bool IsRuntimePausableScene(string sceneName)
+    {
+        return GameplayStageCatalog.IsGameplayScene(sceneName) ||
+               string.Equals(sceneName, BaseSceneName, StringComparison.Ordinal) ||
+               string.Equals(sceneName, LegacyBaseSceneName, StringComparison.Ordinal);
     }
 }
 
@@ -317,6 +322,11 @@ public class UIRootManager : MonoBehaviour
             {
                 spiritPanelUI = EnsureCanvasGroup(spiritPanel.gameObject);
             }
+        }
+        else if (isGameplayScene)
+        {
+            SpiritPanelUI spiritPanel = FindObjectOfType<SpiritPanelUI>(true);
+            spiritPanelUI = spiritPanel != null ? EnsureCanvasGroup(spiritPanel.gameObject) : null;
         }
         else if (!isBaseScene)
         {

@@ -142,27 +142,20 @@ public class BaseHubBootstrapper : MonoBehaviour
         rootRect.anchorMax = new Vector2(0f, 0f);
         rootRect.pivot = new Vector2(0f, 0f);
         rootRect.anchoredPosition = new Vector2(26f, 26f);
-        rootRect.sizeDelta = new Vector2(420f, 108f);
+        rootRect.sizeDelta = new Vector2(430f, 136f);
 
         Image background = root.AddComponent<Image>();
-        RuntimeUiSpriteFactory.ApplyRoundedSprite(
-            background,
-            new Color(0.04f, 0.03f, 0.03f, 0.78f),
-            10,
-            12);
+        background.color = new Color(1f, 1f, 1f, 0f);
+        background.raycastTarget = false;
 
         StatusHudWidgets healthWidgets = CreateStatusHudRow(
             root.transform,
             "Health",
-            "生命",
-            new Vector2(18f, 62f),
-            new Color(0.86f, 0.22f, 0.22f, 1f));
+            new Vector2(0f, 68f));
         StatusHudWidgets weaponWidgets = CreateStatusHudRow(
             root.transform,
             "Weapon",
-            "武器",
-            new Vector2(18f, 20f),
-            new Color(0.26f, 0.72f, 0.90f, 1f));
+            new Vector2(0f, 0f));
 
         BaseHubStatusHud hud = root.AddComponent<BaseHubStatusHud>();
         hud.Configure(
@@ -170,12 +163,11 @@ public class BaseHubBootstrapper : MonoBehaviour
             profileData,
             healthWidgets.valueTrans,
             weaponWidgets.valueTrans,
-            weaponWidgets.fillImage,
             healthWidgets.valueText,
             weaponWidgets.valueText);
     }
 
-    private StatusHudWidgets CreateStatusHudRow(Transform parent, string name, string title, Vector2 anchoredPosition, Color fillColor)
+    private StatusHudWidgets CreateStatusHudRow(Transform parent, string name, Vector2 anchoredPosition)
     {
         GameObject row = CreateUIObject($"{name}Row", parent);
         RectTransform rowRect = row.GetComponent<RectTransform>();
@@ -183,36 +175,34 @@ public class BaseHubBootstrapper : MonoBehaviour
         rowRect.anchorMax = new Vector2(0f, 0f);
         rowRect.pivot = new Vector2(0f, 0f);
         rowRect.anchoredPosition = anchoredPosition;
-        rowRect.sizeDelta = new Vector2(384f, 28f);
+        rowRect.sizeDelta = new Vector2(420f, 68f);
 
-        TextMeshProUGUI titleText = CreateText(
-            $"{name}Title",
-            row.transform,
-            title,
-            22,
-            new Color(0.96f, 0.91f, 0.80f, 1f),
-            TextAlignmentOptions.MidlineLeft);
-        RectTransform titleRect = titleText.rectTransform;
-        titleRect.anchorMin = new Vector2(0f, 0.5f);
-        titleRect.anchorMax = new Vector2(0f, 0.5f);
-        titleRect.pivot = new Vector2(0f, 0.5f);
-        titleRect.anchoredPosition = new Vector2(0f, 0f);
-        titleRect.sizeDelta = new Vector2(58f, 26f);
+        GameObject iconObject = CreateUIObject($"{name}Icon", row.transform);
+        RectTransform iconRect = iconObject.GetComponent<RectTransform>();
+        iconRect.anchorMin = new Vector2(0f, 0.5f);
+        iconRect.anchorMax = new Vector2(0f, 0.5f);
+        iconRect.pivot = new Vector2(0.5f, 0.5f);
+        iconRect.anchoredPosition = new Vector2(36f, 0f);
+        iconRect.sizeDelta = new Vector2(82f, 82f);
+        Image iconImage = iconObject.AddComponent<Image>();
+        if (string.Equals(name, "Health", StringComparison.Ordinal))
+        {
+            GameplayStatusHudRuntime.ApplyHealthStatusIcon(iconImage);
+        }
+        else
+        {
+            GameplayStatusHudRuntime.ApplyInkStatusIcon(iconImage);
+        }
 
         GameObject barObject = CreateUIObject($"{name}Bar", row.transform);
         RectTransform barRect = barObject.GetComponent<RectTransform>();
         barRect.anchorMin = new Vector2(0f, 0.5f);
         barRect.anchorMax = new Vector2(0f, 0.5f);
         barRect.pivot = new Vector2(0f, 0.5f);
-        barRect.anchoredPosition = new Vector2(70f, 0f);
-        barRect.sizeDelta = new Vector2(220f, 18f);
+        barRect.anchoredPosition = new Vector2(58f, 0f);
+        barRect.sizeDelta = new Vector2(316f, 28f);
 
         Image background = barObject.AddComponent<Image>();
-        RuntimeUiSpriteFactory.ApplyRoundedSprite(
-            background,
-            new Color(0.19f, 0.16f, 0.15f, 1f),
-            7,
-            10);
 
         Slider slider = barObject.AddComponent<Slider>();
         slider.direction = Slider.Direction.LeftToRight;
@@ -222,7 +212,7 @@ public class BaseHubBootstrapper : MonoBehaviour
         slider.targetGraphic = background;
 
         GameObject fillArea = CreateUIObject($"{name}FillArea", barObject.transform);
-        SetStretch(fillArea.GetComponent<RectTransform>(), 2f, 2f, 2f, 2f);
+        SetStretch(fillArea.GetComponent<RectTransform>(), 6f, 4f, 6f, 4f);
 
         GameObject fillObject = CreateUIObject($"{name}Fill", fillArea.transform);
         RectTransform fillRect = fillObject.GetComponent<RectTransform>();
@@ -230,9 +220,16 @@ public class BaseHubBootstrapper : MonoBehaviour
         fillRect.anchorMax = Vector2.one;
         fillRect.offsetMin = Vector2.zero;
         fillRect.offsetMax = Vector2.zero;
-        Image fillImage = fillObject.AddComponent<Image>();
-        RuntimeUiSpriteFactory.ApplyRoundedSprite(fillImage, fillColor, 7, 10);
+        fillObject.AddComponent<Image>();
         slider.fillRect = fillRect;
+        if (string.Equals(name, "Health", StringComparison.Ordinal))
+        {
+            GameplayStatusHudRuntime.ApplyHealthStatusBarSkin(slider);
+        }
+        else
+        {
+            GameplayStatusHudRuntime.ApplyInkStatusBarSkin(slider);
+        }
 
         ValueTrans valueTrans = barObject.AddComponent<ValueTrans>();
         valueTrans.slider = slider;
@@ -245,13 +242,13 @@ public class BaseHubBootstrapper : MonoBehaviour
             Color.white,
             TextAlignmentOptions.MidlineRight);
         RectTransform valueRect = valueText.rectTransform;
-        valueRect.anchorMin = new Vector2(1f, 0.5f);
-        valueRect.anchorMax = new Vector2(1f, 0.5f);
-        valueRect.pivot = new Vector2(1f, 0.5f);
-        valueRect.anchoredPosition = new Vector2(0f, 0f);
-        valueRect.sizeDelta = new Vector2(92f, 24f);
+        valueRect.anchorMin = new Vector2(0f, 0.5f);
+        valueRect.anchorMax = new Vector2(0f, 0.5f);
+        valueRect.pivot = new Vector2(0f, 0.5f);
+        valueRect.anchoredPosition = new Vector2(300f, 0f);
+        valueRect.sizeDelta = new Vector2(78f, 28f);
 
-        return new StatusHudWidgets(valueTrans, fillImage, valueText);
+        return new StatusHudWidgets(valueTrans, valueText);
     }
 
     private GameObject ResolveHudPrefab(GameObject prefab, string exactName)
@@ -2167,13 +2164,11 @@ public class BaseHubBootstrapper : MonoBehaviour
     private readonly struct StatusHudWidgets
     {
         public readonly ValueTrans valueTrans;
-        public readonly Image fillImage;
         public readonly TextMeshProUGUI valueText;
 
-        public StatusHudWidgets(ValueTrans trans, Image fill, TextMeshProUGUI text)
+        public StatusHudWidgets(ValueTrans trans, TextMeshProUGUI text)
         {
             valueTrans = trans;
-            fillImage = fill;
             valueText = text;
         }
     }

@@ -597,6 +597,8 @@ public sealed class RuntimePhotoCaptureManager : MonoBehaviour
 
     private void EnsureUi()
     {
+        RuntimeUiEventSystemBootstrapper.Ensure();
+
         if (canvas != null)
         {
             return;
@@ -828,6 +830,11 @@ public sealed class RuntimePhotoCaptureManager : MonoBehaviour
         if (confirmCanvasGroup == null)
         {
             return;
+        }
+
+        if (shouldShow)
+        {
+            RuntimeUiEventSystemBootstrapper.Ensure();
         }
 
         confirmCanvasGroup.gameObject.SetActive(shouldShow);

@@ -1033,8 +1033,10 @@ public class RuntimeMiniMapHud : MonoBehaviour
 
     private static void DrawMapFrame(Rect rect, float borderWidth, float borderHeight, float alpha)
     {
-        Texture2D frameTexture = RuntimeUiSpriteFactory.GetMapFrameTexture();
-        if (frameTexture == null)
+        if (!RuntimeUiSpriteFactory.TryGetMapPanelFrameRenderData(
+                out Texture2D frameTexture,
+                out Rect sourceRect,
+                out Vector4 sourceBorder))
         {
             Color fallbackFill = Color.Lerp(PanelColor, ExpandedPanelColor, alpha);
             fallbackFill.a = alpha;
@@ -1044,8 +1046,6 @@ public class RuntimeMiniMapHud : MonoBehaviour
             return;
         }
 
-        Rect sourceRect = RuntimeUiSpriteFactory.GetMapFramePixelRect();
-        Vector4 sourceBorder = RuntimeUiSpriteFactory.GetMapFrameBorder();
         Color tint = new Color(1f, 1f, 1f, alpha);
 
         float left = Mathf.Min(borderWidth, rect.width * 0.5f);
