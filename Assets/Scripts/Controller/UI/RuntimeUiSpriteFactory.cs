@@ -28,19 +28,23 @@ public static class RuntimeUiSpriteFactory
     private const string MainMenuStartButtonAssetPath = "Assets/File/MainSceneMaterial/G Home Page Atlas/Button Atlas/Start button.png";
     private const string MainMenuSettingsButtonAssetPath = "Assets/File/MainSceneMaterial/G Home Page Atlas/Button Atlas/Settings button.png";
     private const string MainMenuExitButtonAssetPath = "Assets/File/MainSceneMaterial/G Home Page Atlas/Button Atlas/Exit button.png";
+    private const string MainMenuTextButtonFrameAssetPath = "Assets/File/MainSceneMaterial/G Home Page Atlas/Settings Popup Image/ButtonFrame.png";
     private const string MainMenuStartButtonSpriteName = "游戏开始_0";
     private const string MainMenuSettingsButtonSpriteName = "设置_0";
     private const string MainMenuExitButtonSpriteName = "退出按钮_0";
+    private const string MainMenuTextButtonFrameSpriteName = "按钮框_0";
 
     private static readonly Dictionary<string, Sprite> RoundedSpriteCache = new Dictionary<string, Sprite>();
     private static readonly Rect MapFrameSpriteRectTopLeft = new Rect(17f, 16f, 38f, 34f);
     private static readonly Rect MainMenuStartButtonSpriteRect = new Rect(353f, 289f, 527f, 258f);
     private static readonly Rect MainMenuSettingsButtonSpriteRect = new Rect(400f, 231f, 430f, 149f);
     private static readonly Rect MainMenuExitButtonSpriteRect = new Rect(0f, 640f, 90f, 72f);
+    private static readonly Rect MainMenuTextButtonFrameSpriteRect = new Rect(427f, 364f, 68f, 68f);
     private static readonly Vector4 MapFrameSpriteBorder = new Vector4(5f, 5f, 5f, 5f);
     private static readonly Vector4 SpiritPanelFrameBorder = new Vector4(12f, 12f, 12f, 12f);
     private static readonly Vector4 SavePanelFrameBorder = new Vector4(24f, 24f, 24f, 24f);
     private static readonly Vector4 SaveButtonFrameBorder = new Vector4(18f, 18f, 18f, 18f);
+    private static readonly Vector4 MainMenuTextButtonFrameBorder = new Vector4(18f, 18f, 18f, 18f);
 
     private static Texture2D mapFrameTexture;
     private static Sprite mapFrameSprite;
@@ -61,6 +65,7 @@ public static class RuntimeUiSpriteFactory
     private static Sprite mainMenuStartButtonSprite;
     private static Sprite mainMenuSettingsButtonSprite;
     private static Sprite mainMenuExitButtonSprite;
+    private static Sprite mainMenuTextButtonFrameSprite;
 
     public static void ApplyRoundedSprite(
         Image image,
@@ -531,6 +536,26 @@ public static class RuntimeUiSpriteFactory
             "MainMenuExitButtonSprite");
     }
 
+    public static void ApplyMainMenuTextButtonFrameSprite(Image image, Color fallbackColor)
+    {
+        if (image == null)
+        {
+            return;
+        }
+
+        Sprite sprite = GetMainMenuTextButtonFrameSprite();
+        if (sprite == null)
+        {
+            ApplyRoundedSprite(image, fallbackColor, 10, 10, 1.1f);
+            return;
+        }
+
+        image.sprite = sprite;
+        image.type = Image.Type.Sliced;
+        image.preserveAspect = false;
+        image.color = Color.white;
+    }
+
     private static Rect GetMapFrameSpriteRect(Texture2D texture)
     {
         float x = Mathf.Clamp(MapFrameSpriteRectTopLeft.x, 0f, texture.width - 1f);
@@ -660,6 +685,22 @@ public static class RuntimeUiSpriteFactory
 
         runtimeUiSpriteCatalog = Resources.Load<RuntimeUiSpriteCatalog>(RuntimeUiSpriteCatalogResourcePath);
         return runtimeUiSpriteCatalog;
+    }
+
+    private static Sprite GetMainMenuTextButtonFrameSprite()
+    {
+        if (mainMenuTextButtonFrameSprite != null)
+        {
+            return mainMenuTextButtonFrameSprite;
+        }
+
+        mainMenuTextButtonFrameSprite = ResolveSpriteFromLoadedOrProjectAsset(
+            MainMenuTextButtonFrameSpriteName,
+            MainMenuTextButtonFrameAssetPath,
+            MainMenuTextButtonFrameSpriteRect,
+            MainMenuTextButtonFrameBorder,
+            "MainMenuTextButtonFrameSprite");
+        return mainMenuTextButtonFrameSprite;
     }
 
     private static Sprite ResolveMainMenuButtonSprite(

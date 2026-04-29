@@ -76,7 +76,6 @@ public sealed class MainMenuController : MonoBehaviour
     private static readonly Color MenuButtonHitColor = new Color(1f, 1f, 1f, 0f);
     private static readonly Color MenuButtonHitHighlightColor = new Color(1f, 0.92f, 0.68f, 0.18f);
     private static readonly Color MenuButtonHitPressedColor = new Color(1f, 0.76f, 0.38f, 0.28f);
-    private static readonly Color MenuButtonHitDisabledColor = new Color(1f, 1f, 1f, 0f);
     private static readonly Color MenuButtonArtHighlightColor = new Color(1f, 0.93f, 0.74f, 1f);
     private static readonly Color MenuButtonArtPressedColor = new Color(0.82f, 0.67f, 0.42f, 1f);
     private static readonly Color MenuButtonArtDisabledColor = new Color(1f, 1f, 1f, 0.36f);
@@ -1203,10 +1202,7 @@ public sealed class MainMenuController : MonoBehaviour
         }
         else
         {
-            image.sprite = null;
-            image.type = Image.Type.Simple;
-            image.preserveAspect = false;
-            image.color = MenuButtonHitColor;
+            RuntimeUiSpriteFactory.ApplyMainMenuTextButtonFrameSprite(image, MenuButtonHitColor);
         }
 
         Button button = buttonObject.AddComponent<Button>();
@@ -1223,13 +1219,14 @@ public sealed class MainMenuController : MonoBehaviour
         }
         else
         {
+            Color normal = image.color;
             ApplyButtonStyle(
                 button,
                 image,
-                MenuButtonHitColor,
-                MenuButtonHitHighlightColor,
-                MenuButtonHitPressedColor,
-                MenuButtonHitDisabledColor);
+                normal,
+                Color.Lerp(normal, MenuButtonHitHighlightColor, 0.24f),
+                Color.Lerp(normal, MenuButtonHitPressedColor, 0.32f),
+                MenuButtonArtDisabledColor);
         }
         button.onClick.AddListener(onClick);
 

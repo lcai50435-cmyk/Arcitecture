@@ -270,6 +270,36 @@ public sealed class MainMenuControllerSlotPanelTests
         Assert.IsNull(button.transform.Find("Label"));
     }
 
+    [Test]
+    public void TextOnlyMainMenuButtonUsesAuthoredButtonFrame()
+    {
+        _ = CreateController();
+
+        MethodInfo createMenuButton = typeof(MainMenuController).GetMethod(
+            "CreateMenuButton",
+            BindingFlags.Static | BindingFlags.NonPublic);
+        Assert.IsNotNull(createMenuButton);
+
+        Button button = (Button)createMenuButton.Invoke(
+            null,
+            new object[]
+            {
+                parentObject.transform,
+                "ContinueButton",
+                "继续游戏",
+                (UnityEngine.Events.UnityAction)(() => { })
+            });
+
+        Image image = button.GetComponent<Image>();
+        Assert.IsNotNull(image);
+        Assert.IsNotNull(image.sprite);
+        Assert.AreEqual("MainMenuTextButtonFrameSprite", image.sprite.name);
+        Assert.AreEqual(Image.Type.Sliced, image.type);
+        Assert.IsFalse(image.preserveAspect);
+        Assert.IsNotNull(button.transform.Find("Label"));
+        Assert.IsNull(button.transform.Find("Accent"));
+    }
+
     private MainMenuController CreateController()
     {
         controllerObject = new GameObject("MainMenuControllerTestHost");
