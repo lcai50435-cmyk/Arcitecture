@@ -1,8 +1,8 @@
 {
     "bundleVersion": "1.0",
-    "buildNumber": "172",
-    "gitShortSha": "508d05f",
-    "gitDescribe": "v3.0.2-60-g508d05f-dirty",
+    "buildNumber": "173",
+    "gitShortSha": "29e3f77",
+    "gitDescribe": "v3.0.2-61-g29e3f77-dirty",
     "isDirty": true,
-    "generatedAtUtc": "2026-04-29T14:32:26.0607343Z"
+    "generatedAtUtc": "2026-04-29T15:52:35.6757487Z"
 }
