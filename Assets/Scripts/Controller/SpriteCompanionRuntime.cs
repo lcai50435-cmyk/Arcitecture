@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.SceneManagement;
 
 public static class SpriteCompanionRuntime
@@ -6,9 +7,11 @@ public static class SpriteCompanionRuntime
     private const string CompanionName = "SpriteCompanion";
     private const string AuthoredIdleCompanionName = "SpriteIdle_0";
     private const string CompanionControllerResourcePath = "RuntimeSpriteCompanion";
+    private const string FirstStageId = "stage_01";
     private const int DefaultSortingOrder = 4;
     private const float BaseCompanionScaleMultiplier = 0.54f;
     private const float GameplayCompanionScaleMultiplier = BaseCompanionScaleMultiplier * 1.35f;
+    private const float FirstStageCompanionScaleMultiplier = GameplayCompanionScaleMultiplier * 0.8f * 0.8f;
     private const float FootColliderWidthFactor = 0.52f;
     private const float FootColliderHeightFactor = 0.28f;
     private const float FootColliderLiftFactor = 0.04f;
@@ -43,6 +46,7 @@ public static class SpriteCompanionRuntime
                 ApplyCompanionScale(activeCompanion.transform, player.scene.name);
                 ConfigureCompanionCollider(activeCompanion.GetComponent<BoxCollider2D>(), activeCompanion.GetComponent<SpriteRenderer>());
                 EnsureCompanionShadow(activeCompanion.gameObject);
+                EnsureAssistantClickProxy(activeCompanion.gameObject);
                 return activeCompanion;
             }
 
@@ -131,6 +135,7 @@ public static class SpriteCompanionRuntime
         animator.Update(0f);
         ConfigureCompanionCollider(collider, companionRenderer);
         EnsureCompanionShadow(companionObject);
+        EnsureAssistantClickProxy(companionObject);
 
         SpriteCompanionFollowController followController = GetOrAddComponent<SpriteCompanionFollowController>(companionObject);
         followController.Bind(playerTransform, playerCore, collider);
@@ -227,6 +232,16 @@ public static class SpriteCompanionRuntime
             CompanionShadowColor);
     }
 
+    private static void EnsureAssistantClickProxy(GameObject companionObject)
+    {
+        if (companionObject == null || companionObject.GetComponent<SpriteCompanionAssistantClickProxy>() != null)
+        {
+            return;
+        }
+
+        companionObject.AddComponent<SpriteCompanionAssistantClickProxy>();
+    }
+
     internal static void ConfigureCompanionCollider(BoxCollider2D collider, SpriteRenderer renderer)
     {
         if (collider == null)
@@ -253,8 +268,131 @@ public static class SpriteCompanionRuntime
 
     private static float ResolveCompanionScale(string sceneName)
     {
-        return GameplayStageCatalog.IsGameplayScene(sceneName)
-            ? GameplayCompanionScaleMultiplier
-            : BaseCompanionScaleMultiplier;
+        GameplayStageDefinition stage = GameplayStageCatalog.GetStageByScene(sceneName);
+        if (stage == null)
+        {
+            return BaseCompanionScaleMultiplier;
+        }
+
+        return stage.stageId == FirstStageId
+            ? FirstStageCompanionScaleMultiplier
+            : GameplayCompanionScaleMultiplier;
+    }
+}
+
+public sealed class SpriteCompanionAssistantClickProxy : MonoBehaviour
+{
+    private const float ClickDebounceSeconds = 0.12f;
+
+    private Collider2D companionCollider;
+    private SpriteRenderer companionRenderer;
+    private float nextAllowedClickTime;
+
+    private void Awake()
+    {
+        companionCollider = GetComponent<Collider2D>();
+        companionRenderer = GetComponent<SpriteRenderer>();
+    }
+
+    private void Update()
+    {
+        if (!GameplayStageCatalog.IsGameplayScene(SceneManager.GetActiveScene().name) ||
+            RuntimeUiInputGuard.IsBlockingGameplayUiOpen() ||
+            GameplayStageIntroDirector.IsIntroActive ||
+            GameplayFailureController.IsFailureActive)
+        {
+            return;
+        }
+
+        HandleMouseClick();
+        HandleTouchClick();
+    }
+
+    public void ToggleAssistantPanel()
+    {
+        if (Time.unscaledTime < nextAllowedClickTime)
+        {
+            return;
+        }
+
+        nextAllowedClickTime = Time.unscaledTime + ClickDebounceSeconds;
+        BeaverAssistantPanel.EnsureInstance().Toggle();
+    }
+
+    private void HandleMouseClick()
+    {
+        if (!Input.GetMouseButtonDown(0) || IsPointerOverUi())
+        {
+            return;
+        }
+
+        TryToggleFromScreenPosition(Input.mousePosition);
+    }
+
+    private void HandleTouchClick()
+    {
+        for (int i = 0; i < Input.touchCount; i++)
+        {
+            Touch touch = Input.GetTouch(i);
+            if (touch.phase != TouchPhase.Began || IsPointerOverUi(touch.fingerId))
+            {
+                continue;
+            }
+
+            if (TryToggleFromScreenPosition(touch.position))
+            {
+                return;
+            }
+        }
+    }
+
+    private bool TryToggleFromScreenPosition(Vector2 screenPosition)
+    {
+        Camera targetCamera = Camera.main ?? Object.FindObjectOfType<Camera>();
+        if (targetCamera == null || !ContainsScreenPoint(screenPosition, targetCamera))
+        {
+            return false;
+        }
+
+        ToggleAssistantPanel();
+        return true;
+    }
+
+    private bool ContainsScreenPoint(Vector2 screenPosition, Camera targetCamera)
+    {
+        float depth = Mathf.Abs(transform.position.z - targetCamera.transform.position.z);
+        Vector3 worldPoint = targetCamera.ScreenToWorldPoint(new Vector3(screenPosition.x, screenPosition.y, depth));
+        Vector2 worldPoint2D = new Vector2(worldPoint.x, worldPoint.y);
+
+        if (companionCollider == null)
+        {
+            companionCollider = GetComponent<Collider2D>();
+        }
+
+        if (companionCollider != null && companionCollider.OverlapPoint(worldPoint2D))
+        {
+            return true;
+        }
+
+        if (companionRenderer == null)
+        {
+            companionRenderer = GetComponent<SpriteRenderer>();
+        }
+
+        return companionRenderer != null &&
+               companionRenderer.bounds.Contains(new Vector3(worldPoint.x, worldPoint.y, companionRenderer.bounds.center.z));
+    }
+
+    private static bool IsPointerOverUi(int fingerId = -1)
+    {
+        EventSystem eventSystem = EventSystem.current;
+        if (eventSystem == null)
+        {
+            return false;
+        }
+
+        return fingerId >= 0
+            ? eventSystem.IsPointerOverGameObject(fingerId)
+            : eventSystem.IsPointerOverGameObject();
     }
 }

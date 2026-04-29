@@ -44,8 +44,10 @@ public sealed class RuntimeFireflyAmbientEffectTests
         Assert.AreSame(profile, canonicalProfile);
         Assert.LessOrEqual(ReadFloat(profile, "minSize"), 0.06f);
         Assert.LessOrEqual(ReadFloat(profile, "maxSize"), 0.16f);
-        Assert.LessOrEqual(ReadFloat(profile, "emissionRate"), 18f);
-        Assert.LessOrEqual(ReadInt(profile, "maxParticles"), 120);
+        Assert.LessOrEqual(ReadFloat(profile, "emissionRate"), 3f);
+        Assert.LessOrEqual(ReadInt(profile, "maxParticles"), 20);
+        Assert.LessOrEqual(ReadColor(profile, "warmColor").a, 0.39f);
+        Assert.LessOrEqual(ReadColor(profile, "coolColor").a, 0.29f);
     }
 
     [Test]
@@ -123,6 +125,13 @@ public sealed class RuntimeFireflyAmbientEffectTests
     private static int ReadInt(object target, string fieldName)
     {
         return (int)target.GetType()
+            .GetField(fieldName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
+            .GetValue(target);
+    }
+
+    private static Color ReadColor(object target, string fieldName)
+    {
+        return (Color)target.GetType()
             .GetField(fieldName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
             .GetValue(target);
     }

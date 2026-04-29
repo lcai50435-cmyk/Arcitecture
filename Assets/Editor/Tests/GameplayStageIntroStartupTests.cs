@@ -5,6 +5,7 @@ using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using UnityEngine.Tilemaps;
 
 public sealed class GameplayStageIntroStartupTests
 {
@@ -12,10 +13,17 @@ public sealed class GameplayStageIntroStartupTests
     private const string LegacyGameSceneName = "GameScene";
     private const string BaseSceneName = "NewBase";
     private const string BaseScenePath = "Assets/Scenes/NewBase.unity";
+    private const string OriginalFirstPassScenePath = "Assets/Scenes/FirstPass.unity";
     private const string FirstPassScenePath = "Assets/Scenes/FirstPass_1.unity";
     private const string LevelSelectionScenePath = "Assets/Scenes/LevelSelection.unity";
+    private const string PlayerAttackProjectilePrefabPath = "Assets/File/Prefab/WeaponPrefab/MagicBall.prefab";
     private const string StartAniPath = "Assets/Animation/PlayerAni/Start/StartAni.anim";
     private const float ExpectedFirstPassActorScale = 1.2f;
+    private const float ExpectedBaseCompanionScale = 0.54f;
+    private const float ExpectedGameplayCompanionScale = ExpectedBaseCompanionScale * 1.35f;
+    private const float ExpectedFirstPassCompanionScale = ExpectedGameplayCompanionScale * 0.8f * 0.8f;
+    private const float ExpectedPlayerAttackProjectileScale = 2.5f;
+    private const int ExpectedPlayerAttackProjectileSortingOrder = 12;
 
     [Test]
     public void FirstStageUsesFirstPassScene()
@@ -208,7 +216,7 @@ public sealed class GameplayStageIntroStartupTests
     }
 
     [Test]
-    public void FirstPassCompanionUsesGameplayScaleCloseToPlayer()
+    public void FirstPassCompanionUsesRepeatedTwentyPercentSmallerGameplayScale()
     {
         MethodInfo resolveScale = typeof(SpriteCompanionRuntime).GetMethod(
             "ResolveCompanionScale",
@@ -216,22 +224,89 @@ public sealed class GameplayStageIntroStartupTests
         Assert.IsNotNull(resolveScale);
 
         float firstPassScale = (float)resolveScale.Invoke(null, new object[] { FirstPassSceneName });
+        float legacyFirstPassScale = (float)resolveScale.Invoke(null, new object[] { LegacyGameSceneName });
         float baseScale = (float)resolveScale.Invoke(null, new object[] { "NewBase" });
 
-        Assert.That(firstPassScale, Is.InRange(0.72f, 0.74f));
-        Assert.That(firstPassScale, Is.GreaterThan(baseScale));
-        Assert.That(firstPassScale, Is.LessThan(1f));
+        Assert.That(firstPassScale, Is.EqualTo(ExpectedFirstPassCompanionScale).Within(0.0001f));
+        Assert.That(legacyFirstPassScale, Is.EqualTo(ExpectedFirstPassCompanionScale).Within(0.0001f));
+        Assert.That(firstPassScale, Is.LessThan(baseScale));
+        Assert.That(firstPassScale, Is.LessThan(ExpectedGameplayCompanionScale));
+    }
+
+    [Test]
+    public void LaterStageCompanionsKeepGameplayScale()
+    {
+        MethodInfo resolveScale = typeof(SpriteCompanionRuntime).GetMethod(
+            "ResolveCompanionScale",
+            BindingFlags.Static | BindingFlags.NonPublic);
+        Assert.IsNotNull(resolveScale);
+
+        float secondStageScale = (float)resolveScale.Invoke(null, new object[] { "GameScene_03" });
+        float thirdStageScale = (float)resolveScale.Invoke(null, new object[] { "GameScene_02" });
+
+        Assert.That(secondStageScale, Is.EqualTo(ExpectedGameplayCompanionScale).Within(0.0001f));
+        Assert.That(thirdStageScale, Is.EqualTo(ExpectedGameplayCompanionScale).Within(0.0001f));
     }
 
     [Test]
     public void FirstPassPlayerUsesReadableGameplayActorScale()
     {
         Scene scene = EditorSceneManager.OpenScene(FirstPassScenePath, OpenSceneMode.Single);
-        GameObject player = scene.GetRootGameObjects()
-            .FirstOrDefault(root => root.CompareTag("Player") || root.name == "Player");
+        GameObject player = FindScenePlayer(scene);
 
         Assert.IsNotNull(player, "FirstPass_1 must contain an authored Player root.");
         Assert.AreEqual(Vector3.one * ExpectedFirstPassActorScale, player.transform.localScale);
+    }
+
+    [Test]
+    public void FirstPassPortUsesOriginalFirstPassPlayerAttackPrefab()
+    {
+        Scene originalScene = EditorSceneManager.OpenScene(OriginalFirstPassScenePath, OpenSceneMode.Single);
+        GameObject originalPlayer = FindScenePlayer(originalScene);
+        Assert.IsNotNull(originalPlayer, "Original FirstPass must contain an authored Player root.");
+
+        PlayerAttack originalAttack = originalPlayer.GetComponent<PlayerAttack>();
+        Assert.IsNotNull(originalAttack, "Original FirstPass player must define the player attack component.");
+        Assert.IsNotNull(originalAttack.inkballPrefab, "Original FirstPass player attack must use a visible projectile prefab.");
+        string expectedProjectilePath = AssetDatabase.GetAssetPath(originalAttack.inkballPrefab);
+
+        Scene firstPassPortScene = EditorSceneManager.OpenScene(FirstPassScenePath, OpenSceneMode.Single);
+        GameObject firstPassPortPlayer = FindScenePlayer(firstPassPortScene);
+        Assert.IsNotNull(firstPassPortPlayer, "FirstPass_1 must contain an authored Player root.");
+
+        PlayerAttack firstPassPortAttack = firstPassPortPlayer.GetComponent<PlayerAttack>();
+        Assert.IsNotNull(firstPassPortAttack, "FirstPass_1 player must use the same attack component as FirstPass.");
+        Assert.IsNotNull(firstPassPortAttack.inkballPrefab, "FirstPass_1 attack must be visible in scene.");
+        Assert.AreEqual(expectedProjectilePath, AssetDatabase.GetAssetPath(firstPassPortAttack.inkballPrefab));
+        Assert.AreSame(firstPassPortPlayer.transform, firstPassPortAttack.inkPoint);
+
+        PlayerAttributeManager attributeManager = firstPassPortPlayer.GetComponent<PlayerAttributeManager>();
+        Assert.IsNotNull(attributeManager);
+        Assert.AreSame(firstPassPortAttack, attributeManager.playerAttack);
+    }
+
+    [Test]
+    public void PlayerAttackProjectilePrefabUsesHalfScale()
+    {
+        GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(PlayerAttackProjectilePrefabPath);
+
+        Assert.IsNotNull(prefab, "PlayerAttack must keep using the authored visible projectile prefab.");
+        Assert.That(prefab.transform.localScale.x, Is.EqualTo(ExpectedPlayerAttackProjectileScale).Within(0.001f));
+        Assert.That(prefab.transform.localScale.y, Is.EqualTo(ExpectedPlayerAttackProjectileScale).Within(0.001f));
+        Assert.That(prefab.transform.localScale.z, Is.EqualTo(ExpectedPlayerAttackProjectileScale).Within(0.001f));
+    }
+
+    [Test]
+    public void PlayerAttackProjectilePrefabRendersAboveFirstPassViewLayers()
+    {
+        GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(PlayerAttackProjectilePrefabPath);
+        SpriteRenderer projectileRenderer = prefab != null ? prefab.GetComponent<SpriteRenderer>() : null;
+        Scene firstPassPortScene = EditorSceneManager.OpenScene(FirstPassScenePath, OpenSceneMode.Single);
+        int highestViewSortingOrder = ResolveHighestSceneViewSortingOrder(firstPassPortScene);
+
+        Assert.IsNotNull(projectileRenderer, "PlayerAttack projectile must have a SpriteRenderer.");
+        Assert.AreEqual(ExpectedPlayerAttackProjectileSortingOrder, projectileRenderer.sortingOrder);
+        Assert.That(projectileRenderer.sortingOrder, Is.GreaterThan(highestViewSortingOrder));
     }
 
     [Test]
@@ -282,5 +357,19 @@ public sealed class GameplayStageIntroStartupTests
             0f,
             GameplayStageIntroDirector.ResolvePlayerStartAnimationRemainingDuration(1.35f, 1.4f),
             0.001f);
+    }
+
+    private static GameObject FindScenePlayer(Scene scene)
+    {
+        return scene.GetRootGameObjects()
+            .FirstOrDefault(root => root.CompareTag("Player") || root.name == "Player");
+    }
+
+    private static int ResolveHighestSceneViewSortingOrder(Scene scene)
+    {
+        return scene.GetRootGameObjects()
+            .SelectMany(root => root.GetComponentsInChildren<Renderer>(true))
+            .Where(renderer => renderer is TilemapRenderer || renderer is SpriteRenderer)
+            .Max(renderer => renderer.sortingOrder);
     }
 }

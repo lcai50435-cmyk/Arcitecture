@@ -2,26 +2,48 @@ using UnityEngine;
 
 public class CrackDamage : MonoBehaviour
 {
-    private float damage = 20; // 攻击伤害
+    private float damage = 20f; // 攻击伤害
 
+    private EnemyStatsManager sourceStatsManager;
+
+    public void BindSource(EnemyStatsManager statsManager)
+    {
+        sourceStatsManager = statsManager;
+    }
 
     // 因为碰撞矩阵已经过滤，这里进来的一定是玩家
     private void OnTriggerEnter2D(Collider2D other)
     {
-        // 只认玩家标签！敌人永远不会触发！
-        if (!other.CompareTag("Player")) return;
+        TryApplyDamage(other);
+    }
 
-        // 直接拿玩家脚本造成伤害
-        CharacterCore player = other.GetComponent<CharacterCore>();
-
-        if (other.CompareTag("Player")) 
+    private void TryApplyDamage(Collider2D other)
+    {
+        if (other == null || !other.CompareTag("Player") || !CanDealDamage())
         {
-            if (player != null)
-            {
-                player.TakeDamage(damage);
-            }
+            return;
         }
-       
 
+        CharacterCore player = other.GetComponent<CharacterCore>();
+        if (player != null)
+        {
+            player.TakeDamage(damage);
+        }
+    }
+
+    private bool CanDealDamage()
+    {
+        if (sourceStatsManager == null)
+        {
+            return true;
+        }
+
+        if (!sourceStatsManager.HasPlayerInRange || sourceStatsManager.PlayerTarget == null)
+        {
+            return false;
+        }
+
+        return sourceStatsManager.CurrentState == EnemyState.Chase ||
+               sourceStatsManager.CurrentState == EnemyState.Attack;
     }
 }

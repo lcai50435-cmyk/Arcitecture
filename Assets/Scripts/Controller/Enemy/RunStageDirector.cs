@@ -61,6 +61,7 @@ public class RunStageDirector : MonoBehaviour
 
     private readonly List<EnemySpawnTemplate> spawnTemplates = new List<EnemySpawnTemplate>();
     private readonly List<RunStageConfig> stageConfigs = new List<RunStageConfig>();
+    private readonly List<EnemyStatsManager> activeEnemies = new List<EnemyStatsManager>();
 
     [SerializeField] private DropTableConfig dropTable = new DropTableConfig();
 
@@ -126,6 +127,7 @@ public class RunStageDirector : MonoBehaviour
         float elapsedTime = GetElapsedTime();
         ApplyStage(GetStageForElapsed(elapsedTime));
         RefreshResolvedStage(elapsedTime, true);
+        EnforceActiveEnemyLimit();
     }
 
     private void Update()
@@ -262,8 +264,8 @@ public class RunStageDirector : MonoBehaviour
             enemyAttack = 10,
             enemyDefense = 0f,
             enemySpeed = 0.8f,
-            spawnInterval = 2f,
-            targetAliveCount = 4
+            spawnInterval = 3f,
+            targetAliveCount = 3
         });
         stageConfigs.Add(new RunStageConfig
         {
@@ -273,8 +275,8 @@ public class RunStageDirector : MonoBehaviour
             enemyAttack = 13,
             enemyDefense = 2f,
             enemySpeed = 1f,
-            spawnInterval = 1.5f,
-            targetAliveCount = 6
+            spawnInterval = 2.5f,
+            targetAliveCount = 4
         });
         stageConfigs.Add(new RunStageConfig
         {
@@ -284,8 +286,8 @@ public class RunStageDirector : MonoBehaviour
             enemyAttack = 18,
             enemyDefense = 4f,
             enemySpeed = 1.2f,
-            spawnInterval = 1f,
-            targetAliveCount = 8
+            spawnInterval = 2f,
+            targetAliveCount = 5
         });
     }
 
@@ -447,6 +449,7 @@ public class RunStageDirector : MonoBehaviour
 
         NightLightingController.EnsureProjectedShadow(enemyObject);
         NightLightingController.EnsureGameplayEnemyLight(enemyObject);
+        RegisterActiveEnemy(enemyObject.GetComponent<EnemyStatsManager>());
     }
 
     private void ApplyStage(RunStageConfig stage)
@@ -485,10 +488,14 @@ public class RunStageDirector : MonoBehaviour
         stageRefreshTimer = 0f;
         currentStageState = ResolveStageState(elapsedTime);
 
-        EnemyStatsManager[] aliveEnemies = FindObjectsOfType<EnemyStatsManager>();
-        for (int i = 0; i < aliveEnemies.Length; i++)
+        PruneActiveEnemies();
+        for (int i = 0; i < activeEnemies.Count; i++)
         {
-            ApplyStageToEnemy(aliveEnemies[i].gameObject, currentStageState);
+            EnemyStatsManager enemy = activeEnemies[i];
+            if (enemy != null)
+            {
+                ApplyStageToEnemy(enemy.gameObject, currentStageState);
+            }
         }
     }
 
@@ -646,6 +653,10 @@ public class RunStageDirector : MonoBehaviour
 
         float elapsedTime = GetElapsedTime();
         RefreshResolvedStage(elapsedTime, true);
+        if (currentStageState != null && GetAliveEnemyCount() >= currentStageState.targetAliveCount)
+        {
+            return false;
+        }
 
         int startIndex = UnityEngine.Random.Range(0, spawnTemplates.Count);
         for (int i = 0; i < spawnTemplates.Count; i++)
@@ -851,7 +862,7 @@ public class RunStageDirector : MonoBehaviour
         RuntimeCrystalDropFactory.CreateInteractiveDrop(
             crystal,
             position,
-            0.35f,
+            RuntimeCrystalDropFactory.ClosedLootBagWorldScale,
             4,
             transform,
             $"StageDrop_{crystal.DisplayName}",
@@ -890,7 +901,84 @@ public class RunStageDirector : MonoBehaviour
 
     private int GetAliveEnemyCount()
     {
-        return FindObjectsOfType<EnemyStatsManager>().Length;
+        PruneActiveEnemies();
+        return activeEnemies.Count;
+    }
+
+    public void HandleEnemyRemoved(EnemyStatsManager enemy)
+    {
+        if (enemy == null)
+        {
+            return;
+        }
+
+        activeEnemies.Remove(enemy);
+    }
+
+    private void RegisterActiveEnemy(EnemyStatsManager enemy)
+    {
+        if (enemy == null || !enemy.gameObject.activeInHierarchy || activeEnemies.Contains(enemy))
+        {
+            return;
+        }
+
+        activeEnemies.Add(enemy);
+    }
+
+    private void PruneActiveEnemies()
+    {
+        for (int i = activeEnemies.Count - 1; i >= 0; i--)
+        {
+            EnemyStatsManager enemy = activeEnemies[i];
+            if (enemy == null || !enemy.gameObject.activeInHierarchy)
+            {
+                activeEnemies.RemoveAt(i);
+            }
+        }
+    }
+
+    private void EnforceActiveEnemyLimit()
+    {
+        if (currentStageState == null)
+        {
+            currentStageState = ResolveStageState(GetElapsedTime());
+        }
+
+        if (currentStageState == null)
+        {
+            return;
+        }
+
+        PruneActiveEnemies();
+        int limit = Mathf.Max(0, currentStageState.targetAliveCount);
+        for (int i = activeEnemies.Count - 1; i >= limit; i--)
+        {
+            EnemyStatsManager enemy = activeEnemies[i];
+            activeEnemies.RemoveAt(i);
+            if (enemy != null)
+            {
+                DestroyEnemyObject(enemy.gameObject);
+            }
+        }
+    }
+
+    private static void DestroyEnemyObject(GameObject enemyObject)
+    {
+        if (enemyObject == null)
+        {
+            return;
+        }
+
+#if UNITY_EDITOR
+        if (!Application.isPlaying)
+        {
+            DestroyImmediate(enemyObject);
+            return;
+        }
+#endif
+
+        enemyObject.SetActive(false);
+        Destroy(enemyObject);
     }
 
     private void HandleCountdownFinished()
@@ -942,6 +1030,7 @@ public class RunStageEnemyBinding : MonoBehaviour
 
     private RunStageDirector director;
     private CharacterCore characterCore;
+    private EnemyStatsManager statsManager;
     private CharacterDeathBase deathBehaviour;
     private bool handledDeath;
 
@@ -949,6 +1038,7 @@ public class RunStageEnemyBinding : MonoBehaviour
     {
         director = owner;
         characterCore = GetComponent<CharacterCore>();
+        statsManager = GetComponent<EnemyStatsManager>();
         deathBehaviour = GetComponent<CharacterDeathBase>();
         handledDeath = false;
 
@@ -966,6 +1056,8 @@ public class RunStageEnemyBinding : MonoBehaviour
 
     private void OnDisable()
     {
+        director?.HandleEnemyRemoved(statsManager);
+
         if (deathBehaviour != null)
         {
             deathBehaviour.OnDeathSequenceCompleted -= HandleDeathSequenceCompleted;
@@ -985,6 +1077,7 @@ public class RunStageEnemyBinding : MonoBehaviour
         }
 
         handledDeath = true;
+        director?.HandleEnemyRemoved(statsManager);
         director?.HandleEnemyDeath(transform.position);
     }
 

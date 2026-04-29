@@ -30,8 +30,8 @@ public sealed class RuntimeFireflyAmbientEffect : MonoBehaviour
         new Color(0.66f, 0.96f, 1f, 0.52f));
 
     private static readonly FireflyAmbientProfile FirstStageGameplayProfile = new FireflyAmbientProfile(
-        110,
-        16f,
+        20,
+        3f,
         4.8f,
         7.2f,
         0.045f,
@@ -42,8 +42,8 @@ public sealed class RuntimeFireflyAmbientEffect : MonoBehaviour
         0.11f,
         0.28f,
         0.18f,
-        new Color(1f, 0.84f, 0.34f, 0.82f),
-        new Color(0.64f, 0.96f, 1f, 0.62f));
+        new Color(1f, 0.92f, 0.62f, 0.38f),
+        new Color(0.82f, 0.99f, 1f, 0.28f));
 
     private static readonly FireflyAmbientProfile GameplayProfile = new FireflyAmbientProfile(
         240,

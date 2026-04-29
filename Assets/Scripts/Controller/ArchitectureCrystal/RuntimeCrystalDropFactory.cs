@@ -9,6 +9,8 @@ public enum RuntimeDropPresentation
 
 public static class RuntimeCrystalDropFactory
 {
+    public const float ClosedLootBagWorldScale = 0.0875f;
+
     private const string ClosedLootBagSpritePath = "Assets/File/Prop/Prop/ItemBag_1.png";
     private static readonly Dictionary<string, Sprite> fallbackSpriteCache = new Dictionary<string, Sprite>();
     private static Sprite closedLootBagSprite;

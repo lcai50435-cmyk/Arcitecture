@@ -1,3 +1,4 @@
+using System.Reflection;
 using NUnit.Framework;
 using UnityEngine;
 
@@ -129,5 +130,149 @@ public sealed class RunStageDirectorFallbackTemplateTests
         EnemyStatsManager[] enemies = Object.FindObjectsOfType<EnemyStatsManager>();
         Assert.AreEqual(1, enemies.Length);
         Assert.That(enemies[0].gameObject.name, Does.Contain("StoneMonster"));
+    }
+
+    [Test]
+    public void StageDropLootBagUsesCompactWorldScale()
+    {
+        directorObject = new GameObject("RunStageDirector");
+        RunStageDirector director = directorObject.AddComponent<RunStageDirector>();
+        ArchitecturalCrystal crystal = ArchitecturalCrystalFactory.CreateCommonStructure(ArchitecturalType.Brackets);
+        MethodInfo createDropMethod = typeof(RunStageDirector).GetMethod(
+            "CreateDropObject",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+
+        Assert.IsNotNull(createDropMethod);
+
+        createDropMethod.Invoke(director, new object[] { crystal, Vector3.zero });
+
+        Transform droppedTransform = directorObject.transform.GetChild(0);
+        Assert.That(droppedTransform.name, Does.StartWith("StageDrop_"));
+        Assert.That(droppedTransform.localScale.x, Is.EqualTo(0.0875f).Within(0.001f));
+        Assert.That(droppedTransform.localScale.y, Is.EqualTo(0.0875f).Within(0.001f));
+    }
+}
+
+public sealed class RunStageDirectorMonsterBudgetTests
+{
+    private GameObject directorObject;
+
+    [TearDown]
+    public void TearDown()
+    {
+        EnemyStatsManager[] enemies = Object.FindObjectsOfType<EnemyStatsManager>(true);
+        for (int i = 0; i < enemies.Length; i++)
+        {
+            if (enemies[i] != null)
+            {
+                Object.DestroyImmediate(enemies[i].gameObject);
+            }
+        }
+
+        if (directorObject != null)
+        {
+            Object.DestroyImmediate(directorObject);
+        }
+    }
+
+    [Test]
+    public void CaptureExistingEnemiesTrimsActiveCountToBasicStageLimit()
+    {
+        RunStageDirector director = CreateDirector();
+        for (int i = 0; i < 5; i++)
+        {
+            CreateEnemy($"SceneEnemy_{i}", new Vector3(i, 0f, 0f));
+        }
+
+        InvokePrivate(director, "CaptureExistingEnemiesAsTemplates");
+        InvokePrivate(director, "RefreshResolvedStage", 0f, true);
+        InvokePrivate(director, "EnforceActiveEnemyLimit");
+
+        Assert.AreEqual(3, CountActiveEnemies());
+    }
+
+    [Test]
+    public void PickupAmbushDoesNotSpawnWhenActiveEnemyBudgetIsFull()
+    {
+        RunStageDirector director = CreateDirector();
+        for (int i = 0; i < 3; i++)
+        {
+            CreateEnemy($"BudgetEnemy_{i}", new Vector3(i, 0f, 0f));
+        }
+
+        InvokePrivate(director, "CaptureExistingEnemiesAsTemplates");
+        InvokePrivate(director, "RefreshResolvedStage", 0f, true);
+
+        bool spawned = (bool)InvokePrivate(director, "TrySpawnPickupAmbush", Vector3.zero);
+
+        Assert.IsFalse(spawned);
+        Assert.AreEqual(3, CountActiveEnemies());
+    }
+
+    [Test]
+    public void StageRefreshOnlyUpdatesTrackedActiveEnemies()
+    {
+        RunStageDirector director = CreateDirector();
+        GameObject tracked = CreateEnemy("TrackedEnemy", Vector3.zero);
+
+        InvokePrivate(director, "CaptureExistingEnemiesAsTemplates");
+
+        GameObject untracked = CreateEnemy("UntrackedEnemy", Vector3.right);
+        CharacterCore untrackedCore = untracked.GetComponent<CharacterCore>();
+        untrackedCore.stats.maxHp = 999f;
+        untrackedCore.currentHp = 999f;
+
+        InvokePrivate(director, "RefreshResolvedStage", 0f, true);
+
+        Assert.AreEqual(100f, tracked.GetComponent<CharacterCore>().stats.maxHp);
+        Assert.AreEqual(999f, untrackedCore.stats.maxHp);
+        Assert.AreEqual(999f, untrackedCore.currentHp);
+    }
+
+    private RunStageDirector CreateDirector()
+    {
+        directorObject = new GameObject("RunStageDirector");
+        return directorObject.AddComponent<RunStageDirector>();
+    }
+
+    private static GameObject CreateEnemy(string name, Vector3 position)
+    {
+        GameObject enemy = new GameObject(name, typeof(CharacterCore), typeof(EnemyStatsManager));
+        enemy.transform.position = position;
+        CharacterCore core = enemy.GetComponent<CharacterCore>();
+        core.stats = new CharacterStats
+        {
+            maxHp = 50f,
+            attackDamage = 5f,
+            moveSpeed = 0.8f,
+            defense = 0f
+        };
+        core.baseStats = core.stats.Clone();
+        core.currentHp = 50f;
+        return enemy;
+    }
+
+    private static int CountActiveEnemies()
+    {
+        EnemyStatsManager[] enemies = Object.FindObjectsOfType<EnemyStatsManager>();
+        int count = 0;
+        for (int i = 0; i < enemies.Length; i++)
+        {
+            if (enemies[i] != null && enemies[i].gameObject.activeInHierarchy)
+            {
+                count++;
+            }
+        }
+
+        return count;
+    }
+
+    private static object InvokePrivate(object target, string methodName, params object[] args)
+    {
+        MethodInfo method = target.GetType().GetMethod(
+            methodName,
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.IsNotNull(method);
+        return method.Invoke(target, args);
     }
 }
