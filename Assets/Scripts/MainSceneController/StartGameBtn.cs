@@ -1214,17 +1214,17 @@ public sealed class MainMenuController : MonoBehaviour
         switch (objectName)
         {
             case "NewGameButton":
-                return new MainMenuButtonLayout(new Vector2(640f, 118f), new Vector2(0f, 240f), 42);
+                return new MainMenuButtonLayout(new Vector2(520f, 96f), new Vector2(0f, 220f), 34);
             case "ContinueButton":
-                return new MainMenuButtonLayout(new Vector2(640f, 118f), new Vector2(0f, 80f), 42);
+                return new MainMenuButtonLayout(new Vector2(520f, 96f), new Vector2(0f, 96f), 34);
             case "HandbookButton":
-                return new MainMenuButtonLayout(new Vector2(640f, 118f), new Vector2(0f, -80f), 42);
+                return new MainMenuButtonLayout(new Vector2(520f, 96f), new Vector2(0f, -28f), 34);
             case "SettingsButton":
-                return new MainMenuButtonLayout(new Vector2(640f, 118f), new Vector2(0f, -240f), 42);
+                return new MainMenuButtonLayout(new Vector2(520f, 96f), new Vector2(0f, -152f), 34);
             case "ExitButton":
-                return new MainMenuButtonLayout(new Vector2(80f, 80f), new Vector2(0f, -380f), 32);
+                return new MainMenuButtonLayout(new Vector2(520f, 96f), new Vector2(0f, -276f), 34);
             default:
-                return new MainMenuButtonLayout(new Vector2(500f, 114f), Vector2.zero, 42);
+                return new MainMenuButtonLayout(new Vector2(520f, 96f), Vector2.zero, 34);
         }
     }
 

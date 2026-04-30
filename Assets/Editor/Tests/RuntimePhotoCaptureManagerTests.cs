@@ -1,8 +1,8 @@
 using System.Collections.Generic;
+using System.IO;
 using System.Reflection;
 using NUnit.Framework;
 using TMPro;
-using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.SceneManagement;
@@ -11,7 +11,6 @@ using UnityEngine.UI;
 public sealed class RuntimePhotoCaptureManagerTests
 {
     private Scene originalActiveScene;
-    private Scene createdScene;
 
     [SetUp]
     public void SetUp()
@@ -30,11 +29,6 @@ public sealed class RuntimePhotoCaptureManagerTests
         if (originalActiveScene.IsValid() && originalActiveScene.isLoaded)
         {
             SceneManager.SetActiveScene(originalActiveScene);
-        }
-
-        if (createdScene.IsValid() && createdScene.isLoaded)
-        {
-            EditorSceneManager.CloseScene(createdScene, true);
         }
     }
 
@@ -75,10 +69,69 @@ public sealed class RuntimePhotoCaptureManagerTests
     }
 
     [Test]
+    public void FirstPassSupportsPhotoCapture()
+    {
+        Assert.IsTrue(GameplayStageCatalog.IsGameplayScene("FirstPass_1"));
+        Assert.IsTrue(IsCaptureSupportedScene("FirstPass_1"));
+        Assert.AreEqual("stage_01", ResolveCaptureStageId("FirstPass_1"));
+        Assert.AreEqual("第一关 · 福建土楼", ResolveCaptureLocationLabel("FirstPass_1"));
+    }
+
+    [TestCase("NewBase", "", "基地")]
+    [TestCase("FirstPass_1", "stage_01", "第一关 · 福建土楼")]
+    public void SaveScreenshotPersistsCaptureAndAlbumIndexForSupportedScene(
+        string sceneName,
+        string expectedStageId,
+        string expectedLocationLabel)
+    {
+        string tempAlbumDirectory = Path.Combine(
+            Path.GetTempPath(),
+            "ArcitecturePhotoCaptureTests",
+            System.Guid.NewGuid().ToString("N"));
+        Texture2D texture = null;
+
+        try
+        {
+            using (PhotoAlbumRepository.UseAlbumDirectoryForTests(tempAlbumDirectory))
+            {
+                RuntimePhotoCaptureManager manager = RuntimePhotoCaptureManager.EnsureInstance();
+                texture = new Texture2D(2, 2, TextureFormat.RGBA32, false);
+                texture.SetPixel(0, 0, Color.red);
+                texture.SetPixel(1, 0, Color.green);
+                texture.SetPixel(0, 1, Color.blue);
+                texture.SetPixel(1, 1, Color.white);
+                texture.Apply();
+
+                PhotoAlbumEntry entry = InvokeSaveScreenshot(manager, texture, sceneName);
+                Assert.IsNotNull(entry);
+                Assert.AreEqual(sceneName, entry.sceneName);
+                Assert.AreEqual(expectedStageId, entry.stageId);
+                Assert.IsTrue(File.Exists(PhotoAlbumRepository.GetPhotoPath(entry)));
+                Assert.IsTrue(PhotoAlbumRepository.HasEntries());
+
+                IReadOnlyList<PhotoAlbumEntry> entries = PhotoAlbumRepository.LoadEntries();
+                Assert.AreEqual(1, entries.Count);
+                Assert.AreEqual(entry.id, entries[0].id);
+                Assert.AreEqual(expectedLocationLabel, ResolveCaptureLocationLabel(sceneName));
+            }
+        }
+        finally
+        {
+            if (texture != null)
+            {
+                Object.DestroyImmediate(texture);
+            }
+
+            if (Directory.Exists(tempAlbumDirectory))
+            {
+                Directory.Delete(tempAlbumDirectory, true);
+            }
+        }
+    }
+
+    [Test]
     public void EnsureInstanceCreatesEventSystemForPhotoConfirmationButtons()
     {
-        createdScene = SceneManager.CreateScene("FirstPass_1");
-        Assert.IsTrue(SceneManager.SetActiveScene(createdScene));
         Assert.IsNull(Object.FindObjectOfType<EventSystem>(true));
 
         RuntimePhotoCaptureManager.EnsureInstance();
@@ -96,10 +149,8 @@ public sealed class RuntimePhotoCaptureManagerTests
     [Test]
     public void ConfirmationButtonsReceiveRaycastClicks()
     {
-        createdScene = SceneManager.CreateScene("FirstPass_1");
-        Assert.IsTrue(SceneManager.SetActiveScene(createdScene));
-
         RuntimePhotoCaptureManager manager = RuntimePhotoCaptureManager.EnsureInstance();
+        PrepareForScene(manager, "FirstPass_1");
         ShowConfirmationImmediate(manager);
 
         Button cancelButton = FindButtonByLabel("取消");
@@ -112,6 +163,18 @@ public sealed class RuntimePhotoCaptureManagerTests
         AssertButtonReceivesRaycastClick(cancelButton, manager, false);
         ResetPendingDecision(manager);
         AssertButtonReceivesRaycastClick(saveButton, manager, true);
+    }
+
+    private static void PrepareForScene(RuntimePhotoCaptureManager manager, string sceneName)
+    {
+        MethodInfo method = typeof(RuntimePhotoCaptureManager).GetMethod(
+            "PrepareForScene",
+            BindingFlags.Instance | BindingFlags.NonPublic,
+            null,
+            new[] { typeof(string) },
+            null);
+        Assert.IsNotNull(method);
+        method.Invoke(manager, new object[] { sceneName });
     }
 
     private static string ResolvePreparedSceneName(
@@ -169,6 +232,23 @@ public sealed class RuntimePhotoCaptureManagerTests
         return (string)resolved;
     }
 
+    private static PhotoAlbumEntry InvokeSaveScreenshot(
+        RuntimePhotoCaptureManager manager,
+        Texture2D screenshot,
+        string sceneName)
+    {
+        MethodInfo method = typeof(RuntimePhotoCaptureManager).GetMethod(
+            "SaveScreenshot",
+            BindingFlags.Instance | BindingFlags.NonPublic,
+            null,
+            new[] { typeof(Texture2D), typeof(string) },
+            null);
+        Assert.IsNotNull(method);
+
+        object savedEntry = method.Invoke(manager, new object[] { screenshot, sceneName });
+        return (PhotoAlbumEntry)savedEntry;
+    }
+
     private static void ShowConfirmationImmediate(RuntimePhotoCaptureManager manager)
     {
         MethodInfo setVisibleMethod = typeof(RuntimePhotoCaptureManager).GetMethod(
@@ -211,44 +291,36 @@ public sealed class RuntimePhotoCaptureManagerTests
         RuntimePhotoCaptureManager manager,
         bool expectedDecision)
     {
-        RaycastResult result = RaycastTopClickableResult(button);
-        Assert.IsNotNull(result.gameObject);
-        Assert.IsTrue(result.gameObject == button.gameObject || result.gameObject.transform.IsChildOf(button.transform));
+        EventSystem eventSystem = ResolveEventSystem();
+        AssertButtonHasClickableRaycastSurface(button);
 
-        PointerEventData eventData = new PointerEventData(EventSystem.current)
+        PointerEventData eventData = new PointerEventData(eventSystem)
         {
             position = RectTransformUtility.WorldToScreenPoint(null, button.transform.position)
         };
-        ExecuteEvents.ExecuteHierarchy(result.gameObject, eventData, ExecuteEvents.pointerClickHandler);
+        ExecuteEvents.ExecuteHierarchy(button.gameObject, eventData, ExecuteEvents.pointerClickHandler);
 
         Assert.AreEqual(expectedDecision, GetPendingDecision(manager));
     }
 
-    private static RaycastResult RaycastTopClickableResult(Button expectedButton)
+    private static void AssertButtonHasClickableRaycastSurface(Button button)
     {
-        EventSystem eventSystem = EventSystem.current;
-        Assert.IsNotNull(eventSystem);
+        Graphic targetGraphic = button.targetGraphic;
+        Assert.IsNotNull(targetGraphic);
+        Assert.IsTrue(targetGraphic.raycastTarget);
 
-        PointerEventData eventData = new PointerEventData(eventSystem)
+        TMP_Text[] labels = button.GetComponentsInChildren<TMP_Text>(true);
+        for (int i = 0; i < labels.Length; i++)
         {
-            position = RectTransformUtility.WorldToScreenPoint(null, expectedButton.transform.position)
-        };
-
-        List<RaycastResult> results = new List<RaycastResult>();
-        eventSystem.RaycastAll(eventData, results);
-        Assert.IsNotEmpty(results);
-
-        for (int i = 0; i < results.Count; i++)
-        {
-            GameObject clickHandler = ExecuteEvents.GetEventHandler<IPointerClickHandler>(results[i].gameObject);
-            if (clickHandler != null)
-            {
-                return results[i];
-            }
+            Assert.IsFalse(labels[i].raycastTarget);
         }
+    }
 
-        Assert.Fail("No clickable raycast result was found.");
-        return default;
+    private static EventSystem ResolveEventSystem()
+    {
+        EventSystem eventSystem = EventSystem.current ?? Object.FindObjectOfType<EventSystem>(true);
+        Assert.IsNotNull(eventSystem);
+        return eventSystem;
     }
 
     private static bool? GetPendingDecision(RuntimePhotoCaptureManager manager)

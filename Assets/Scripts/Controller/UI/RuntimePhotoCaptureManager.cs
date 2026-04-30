@@ -115,6 +115,7 @@ public sealed class RuntimePhotoCaptureManager : MonoBehaviour
     {
         if (Instance != null)
         {
+            Instance.EnsureUi();
             return Instance;
         }
 
@@ -122,11 +123,13 @@ public sealed class RuntimePhotoCaptureManager : MonoBehaviour
         if (existing != null)
         {
             Instance = existing;
+            Instance.EnsureUi();
             return existing;
         }
 
         GameObject runtimeObject = new GameObject("RuntimePhotoCaptureManager");
         Instance = runtimeObject.AddComponent<RuntimePhotoCaptureManager>();
+        Instance.EnsureUi();
         return Instance;
     }
 
@@ -223,6 +226,7 @@ public sealed class RuntimePhotoCaptureManager : MonoBehaviour
     private IEnumerator CaptureRoutine()
     {
         captureInProgress = true;
+        string captureSceneName = SceneManager.GetActiveScene().name;
         Texture2D screenshot = null;
         bool pauseApplied = false;
         bool overlaysHidden = false;
@@ -259,7 +263,7 @@ public sealed class RuntimePhotoCaptureManager : MonoBehaviour
                 yield break;
             }
 
-            PhotoAlbumEntry savedEntry = SaveScreenshot(screenshot);
+            PhotoAlbumEntry savedEntry = SaveScreenshot(screenshot, captureSceneName);
             if (savedEntry != null)
             {
                 yield return PlayToastRoutine("留念已保存到本地相册", ToastSuccessTextColor, ToastSuccessBorderColor);
@@ -299,6 +303,11 @@ public sealed class RuntimePhotoCaptureManager : MonoBehaviour
 
     private PhotoAlbumEntry SaveScreenshot(Texture2D screenshot)
     {
+        return SaveScreenshot(screenshot, SceneManager.GetActiveScene().name);
+    }
+
+    private PhotoAlbumEntry SaveScreenshot(Texture2D screenshot, string sceneName)
+    {
         if (screenshot == null)
         {
             return null;
@@ -320,7 +329,6 @@ public sealed class RuntimePhotoCaptureManager : MonoBehaviour
             return null;
         }
 
-        string sceneName = SceneManager.GetActiveScene().name;
         return PhotoAlbumRepository.SaveCapture(
             pngBytes,
             screenshot.width,
