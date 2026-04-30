@@ -32,7 +32,7 @@ public sealed class RuntimePauseMenu : MonoBehaviour
     private const float MenuButtonRevealOffsetY = -42f;
     private const float MenuButtonRevealCurveX = 18f;
     private const float MenuButtonRevealStartScale = 0.965f;
-    private const float MenuButtonInteractionRevealProgress = 0.18f;
+    private const float MenuButtonInteractionRevealProgress = 0f;
 
     private static readonly Color PrimaryButtonColor = Color.white;
     private static readonly Color PrimaryButtonTextColor = new Color(0.14f, 0.11f, 0.08f, 1f);
@@ -142,6 +142,7 @@ public sealed class RuntimePauseMenu : MonoBehaviour
 
         if (Instance != null)
         {
+            Instance.EnsureUi();
             Instance.SetVisible(supportedScene);
             return Instance;
         }
@@ -150,12 +151,14 @@ public sealed class RuntimePauseMenu : MonoBehaviour
         if (existing != null)
         {
             Instance = existing;
+            Instance.EnsureUi();
             Instance.SetVisible(supportedScene);
             return existing;
         }
 
         GameObject runtimeObject = new GameObject("RuntimePauseMenu");
         Instance = runtimeObject.AddComponent<RuntimePauseMenu>();
+        Instance.EnsureUi();
         Instance.SetVisible(supportedScene);
         return Instance;
     }
@@ -330,7 +333,8 @@ public sealed class RuntimePauseMenu : MonoBehaviour
         showingSettings = false;
         StopMenuReveal(false);
         RuntimeCameraController.EnsureInstance().SetPauseFocusActive(false);
-        HideShell(false, () => RuntimeGameplayPauseController.ReleasePause(PauseReason));
+        RuntimeGameplayPauseController.ReleasePause(PauseReason);
+        HideShell(false, null);
 
         if (settingsPanel != null && settingsPanel.IsShown)
         {
@@ -444,8 +448,12 @@ public sealed class RuntimePauseMenu : MonoBehaviour
     private void ShowShell()
     {
         EnsureUi();
+        RuntimeUiEventSystemBootstrapper.Ensure();
         if (canvas != null)
         {
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            canvas.overrideSorting = true;
+            canvas.sortingOrder = SortingOrder;
             canvas.gameObject.SetActive(true);
         }
 

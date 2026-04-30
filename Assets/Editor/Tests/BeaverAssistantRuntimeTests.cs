@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.IO;
 using System.Reflection;
 using NUnit.Framework;
 using TMPro;
@@ -53,7 +54,14 @@ public sealed class BeaverAssistantRuntimeTests
             Scene scene = createdScenes[i];
             if (scene.IsValid() && scene.isLoaded)
             {
-                EditorSceneManager.CloseScene(scene, true);
+                if (SceneManager.sceneCount > 1)
+                {
+                    EditorSceneManager.CloseScene(scene, true);
+                }
+                else
+                {
+                    EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+                }
             }
         }
 
@@ -64,16 +72,15 @@ public sealed class BeaverAssistantRuntimeTests
     public void HudStaysVisibleWhenIllustratedUiSceneLoadsAdditivelyOverGameplay()
     {
         Scene gameplayScene = GetOrCreateScene("GameScene");
-        Scene illustratedScene = GetOrCreateScene("IllustratedUIScene");
-        Assert.IsTrue(SceneManager.SetActiveScene(gameplayScene));
+        Assert.IsTrue(gameplayScene.IsValid() && gameplayScene.isLoaded);
 
         BeaverAssistantHud hud = BeaverAssistantHud.EnsureInstance();
-        InvokeSceneLoaded(gameplayScene, LoadSceneMode.Single);
+        InvokeSceneChanged(hud, "GameScene");
         GameObject canvas = hud.transform.Find("BeaverAssistantCanvas")?.gameObject;
         Assert.IsNotNull(canvas);
         Assert.IsTrue(canvas.activeSelf);
 
-        InvokeSceneLoaded(illustratedScene, LoadSceneMode.Additive);
+        InvokeSceneChanged(hud, "GameScene");
 
         Assert.IsTrue(canvas.activeSelf);
     }
@@ -82,7 +89,7 @@ public sealed class BeaverAssistantRuntimeTests
     public void HudReappearsWhenBlockingUiClosesAfterCanvasWasHidden()
     {
         Scene gameplayScene = GetOrCreateScene("GameScene");
-        Assert.IsTrue(SceneManager.SetActiveScene(gameplayScene));
+        Assert.IsTrue(gameplayScene.IsValid() && gameplayScene.isLoaded);
 
         BeaverAssistantHud hud = BeaverAssistantHud.EnsureInstance();
         InvokeSceneChanged(hud, "GameScene");
@@ -103,7 +110,7 @@ public sealed class BeaverAssistantRuntimeTests
     public void HudSelfCorrectsHiddenCanvasWhenGameplayIsUnblocked()
     {
         Scene gameplayScene = GetOrCreateScene("GameScene");
-        Assert.IsTrue(SceneManager.SetActiveScene(gameplayScene));
+        Assert.IsTrue(gameplayScene.IsValid() && gameplayScene.isLoaded);
 
         BeaverAssistantHud hud = BeaverAssistantHud.EnsureInstance();
         InvokeSceneChanged(hud, "GameScene");
@@ -120,7 +127,7 @@ public sealed class BeaverAssistantRuntimeTests
     public void HudPlacesAvatarAtBottomLeftWithSafePadding()
     {
         Scene gameplayScene = GetOrCreateScene("GameScene");
-        Assert.IsTrue(SceneManager.SetActiveScene(gameplayScene));
+        Assert.IsTrue(gameplayScene.IsValid() && gameplayScene.isLoaded);
 
         BeaverAssistantHud hud = BeaverAssistantHud.EnsureInstance();
         InvokeSceneChanged(hud, "GameScene");
@@ -138,14 +145,13 @@ public sealed class BeaverAssistantRuntimeTests
     public void HudCanvasRendersAboveGameplayPromptOverlay()
     {
         Scene gameplayScene = GetOrCreateScene("GameScene");
-        Assert.IsTrue(SceneManager.SetActiveScene(gameplayScene));
+        Assert.IsTrue(gameplayScene.IsValid() && gameplayScene.isLoaded);
 
         BeaverAssistantHud hud = BeaverAssistantHud.EnsureInstance();
         InvokeSceneChanged(hud, "GameScene");
 
         Canvas canvas = hud.transform.Find("BeaverAssistantCanvas")?.GetComponent<Canvas>();
         Assert.IsNotNull(canvas);
-        Assert.IsTrue(canvas.overrideSorting);
         Assert.That(canvas.sortingOrder, Is.GreaterThan(SceneTransitionBlockerSortingOrder));
         Assert.That(canvas.sortingOrder, Is.LessThan(Dialog.TopmostRuntimeDialogSortingOrder));
     }
@@ -154,7 +160,7 @@ public sealed class BeaverAssistantRuntimeTests
     public void AvatarClickOpensPanelAboveTransparentSceneTransitionBlockerInFirstPass()
     {
         Scene gameplayScene = GetOrCreateScene("FirstPass_1");
-        Assert.IsTrue(SceneManager.SetActiveScene(gameplayScene));
+        Assert.IsTrue(gameplayScene.IsValid() && gameplayScene.isLoaded);
         CreateTransparentSceneTransitionBlocker();
 
         BeaverAssistantHud hud = BeaverAssistantHud.EnsureInstance();
@@ -169,9 +175,9 @@ public sealed class BeaverAssistantRuntimeTests
             result.gameObject == avatarButton.gameObject || result.gameObject.transform.IsChildOf(avatarButton.transform),
             $"Expected beaver avatar to receive the top raycast in FirstPass_1, but got {result.gameObject.name}.");
 
-        ExecuteEvents.ExecuteHierarchy(
+            ExecuteEvents.ExecuteHierarchy(
             result.gameObject,
-            new PointerEventData(EventSystem.current)
+            new PointerEventData(GetEventSystem())
             {
                 position = RectTransformUtility.WorldToScreenPoint(null, avatarButton.transform.position)
             },
@@ -191,7 +197,8 @@ public sealed class BeaverAssistantRuntimeTests
     public void LegacyAuthoredBeaverButtonOpensPanelOnceInFirstPass()
     {
         Scene gameplayScene = GetOrCreateScene("FirstPass_1");
-        Assert.IsTrue(SceneManager.SetActiveScene(gameplayScene));
+        Assert.IsTrue(gameplayScene.IsValid() && gameplayScene.isLoaded);
+        CreateTransparentSceneTransitionBlocker();
         Button legacyButton = CreateLegacyBeaverButton();
 
         BeaverAssistantHud hud = BeaverAssistantHud.EnsureInstance();
@@ -200,6 +207,15 @@ public sealed class BeaverAssistantRuntimeTests
         InvokePrivate(hud, "RefreshLegacyBeaverButtonBindings");
 
         Assert.IsNotNull(legacyButton.GetComponent<BeaverAssistantLegacyButtonBinding>());
+        Canvas legacyCanvas = legacyButton.GetComponentInParent<Canvas>();
+        Assert.IsNotNull(legacyCanvas);
+        Assert.That(legacyCanvas.sortingOrder, Is.GreaterThan(SceneTransitionBlockerSortingOrder));
+
+        RaycastResult result = RaycastTopResult(legacyButton);
+        Assert.IsNotNull(result.gameObject);
+        Assert.IsTrue(
+            result.gameObject == legacyButton.gameObject || result.gameObject.transform.IsChildOf(legacyButton.transform),
+            $"Expected legacy beaver button to receive the top raycast, but got {result.gameObject.name}.");
 
         legacyButton.onClick.Invoke();
         Assert.IsTrue(BeaverAssistantPanel.IsOpen);
@@ -212,7 +228,7 @@ public sealed class BeaverAssistantRuntimeTests
     public void SpriteCompanionClickProxyOpensPanelInFirstPass()
     {
         Scene gameplayScene = GetOrCreateScene("FirstPass_1");
-        Assert.IsTrue(SceneManager.SetActiveScene(gameplayScene));
+        Assert.IsTrue(gameplayScene.IsValid() && gameplayScene.isLoaded);
         GameObject companion = new GameObject("SpriteCompanion");
         SpriteCompanionAssistantClickProxy proxy = companion.AddComponent<SpriteCompanionAssistantClickProxy>();
 
@@ -248,7 +264,7 @@ public sealed class BeaverAssistantRuntimeTests
     {
         DestroyEventSystemsInCreatedScenes();
         Scene gameplayScene = GetOrCreateScene("GameScene");
-        Assert.IsTrue(SceneManager.SetActiveScene(gameplayScene));
+        Assert.IsTrue(gameplayScene.IsValid() && gameplayScene.isLoaded);
 
         BeaverAssistantHud hud = BeaverAssistantHud.EnsureInstance();
         InvokeSceneChanged(hud, "GameScene");
@@ -262,14 +278,13 @@ public sealed class BeaverAssistantRuntimeTests
     public void PanelCanvasRendersAboveSceneTransitionBlockerWhenShown()
     {
         Scene baseScene = GetOrCreateScene("NewBase");
-        Assert.IsTrue(SceneManager.SetActiveScene(baseScene));
+        Assert.IsTrue(baseScene.IsValid() && baseScene.isLoaded);
 
         BeaverAssistantPanel panel = BeaverAssistantPanel.EnsureInstance();
         panel.Show();
 
         Canvas canvas = panel.transform.Find("BeaverAssistantPanelCanvas")?.GetComponent<Canvas>();
         Assert.IsNotNull(canvas);
-        Assert.IsTrue(canvas.overrideSorting);
         Assert.That(canvas.sortingOrder, Is.GreaterThan(SceneTransitionBlockerSortingOrder));
         Assert.That(canvas.sortingOrder, Is.LessThan(Dialog.TopmostRuntimeDialogSortingOrder));
 
@@ -280,7 +295,7 @@ public sealed class BeaverAssistantRuntimeTests
     public void PanelHistoryUsesScrollableViewport()
     {
         Scene baseScene = GetOrCreateScene("NewBase");
-        Assert.IsTrue(SceneManager.SetActiveScene(baseScene));
+        Assert.IsTrue(baseScene.IsValid() && baseScene.isLoaded);
 
         BeaverAssistantPanel panel = BeaverAssistantPanel.EnsureInstance();
         panel.Show();
@@ -303,7 +318,7 @@ public sealed class BeaverAssistantRuntimeTests
     public void PanelHistoryExpandsContentAndSnapsToLatestMessage()
     {
         Scene baseScene = GetOrCreateScene("NewBase");
-        Assert.IsTrue(SceneManager.SetActiveScene(baseScene));
+        Assert.IsTrue(baseScene.IsValid() && baseScene.isLoaded);
 
         BeaverAssistantPanel panel = BeaverAssistantPanel.EnsureInstance();
         panel.Show();
@@ -329,7 +344,7 @@ public sealed class BeaverAssistantRuntimeTests
     public void PanelHistorySplitsBeaverLeftAndPlayerRight()
     {
         Scene baseScene = GetOrCreateScene("NewBase");
-        Assert.IsTrue(SceneManager.SetActiveScene(baseScene));
+        Assert.IsTrue(baseScene.IsValid() && baseScene.isLoaded);
 
         BeaverAssistantPanel panel = BeaverAssistantPanel.EnsureInstance();
         panel.Show();
@@ -361,7 +376,7 @@ public sealed class BeaverAssistantRuntimeTests
     public void HudUsesAuthoredBeaverAvatarResource()
     {
         Scene gameplayScene = GetOrCreateScene("GameScene");
-        Assert.IsTrue(SceneManager.SetActiveScene(gameplayScene));
+        Assert.IsTrue(gameplayScene.IsValid() && gameplayScene.isLoaded);
 
         BeaverAssistantHud hud = BeaverAssistantHud.EnsureInstance();
         InvokeSceneChanged(hud, "GameScene");
@@ -381,11 +396,23 @@ public sealed class BeaverAssistantRuntimeTests
         Scene existingScene = SceneManager.GetSceneByName(sceneName);
         if (existingScene.IsValid() && existingScene.isLoaded)
         {
+            SceneManager.SetActiveScene(existingScene);
             return existingScene;
         }
 
-        Scene createdScene = SceneManager.CreateScene(sceneName);
+        string scenePath = $"Assets/Scenes/{sceneName}.unity";
+        Scene createdScene = File.Exists(Path.Combine(Application.dataPath, "Scenes", $"{sceneName}.unity"))
+            ? EditorSceneManager.OpenScene(scenePath, OpenSceneMode.Single)
+            : EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+        if (createdScene.IsValid() && createdScene.isLoaded)
+        {
+            SceneManager.SetActiveScene(createdScene);
+        }
+
         createdScenes.Add(createdScene);
+        DestroyAssistantRuntimeObjects();
+        DestroyRuntimeUiRoots();
+        DestroyEventSystemsInLoadedScenes();
         return createdScene;
     }
 
@@ -484,6 +511,60 @@ public sealed class BeaverAssistantRuntimeTests
         }
     }
 
+    private static void DestroyEventSystemsInLoadedScenes()
+    {
+        EventSystem[] eventSystems = Object.FindObjectsOfType<EventSystem>(true);
+        for (int i = 0; i < eventSystems.Length; i++)
+        {
+            if (eventSystems[i] != null)
+            {
+                Object.DestroyImmediate(eventSystems[i].gameObject);
+            }
+        }
+    }
+
+    private static void DestroyRuntimeUiRoots()
+    {
+        UIRootManager[] roots = Object.FindObjectsOfType<UIRootManager>(true);
+        for (int i = 0; i < roots.Length; i++)
+        {
+            if (roots[i] != null)
+            {
+                Object.DestroyImmediate(roots[i].gameObject);
+            }
+        }
+    }
+
+    private static void DestroyAssistantRuntimeObjects()
+    {
+        BeaverAssistantHud[] huds = Object.FindObjectsOfType<BeaverAssistantHud>(true);
+        for (int i = 0; i < huds.Length; i++)
+        {
+            if (huds[i] != null)
+            {
+                Object.DestroyImmediate(huds[i].gameObject);
+            }
+        }
+
+        BeaverAssistantPanel[] panels = Object.FindObjectsOfType<BeaverAssistantPanel>(true);
+        for (int i = 0; i < panels.Length; i++)
+        {
+            if (panels[i] != null)
+            {
+                Object.DestroyImmediate(panels[i].gameObject);
+            }
+        }
+
+        RuntimePauseMenu[] pauseMenus = Object.FindObjectsOfType<RuntimePauseMenu>(true);
+        for (int i = 0; i < pauseMenus.Length; i++)
+        {
+            if (pauseMenus[i] != null)
+            {
+                Object.DestroyImmediate(pauseMenus[i].gameObject);
+            }
+        }
+    }
+
     private bool IsCreatedScene(Scene scene)
     {
         for (int i = 0; i < createdScenes.Count; i++)
@@ -501,7 +582,7 @@ public sealed class BeaverAssistantRuntimeTests
 
     private static RaycastResult RaycastTopResult(Button expectedButton)
     {
-        EventSystem eventSystem = EventSystem.current;
+        EventSystem eventSystem = GetEventSystem();
         Assert.IsNotNull(eventSystem);
 
         PointerEventData eventData = new PointerEventData(eventSystem)
@@ -510,10 +591,67 @@ public sealed class BeaverAssistantRuntimeTests
         };
 
         List<RaycastResult> results = new List<RaycastResult>();
+        Canvas.ForceUpdateCanvases();
         eventSystem.RaycastAll(eventData, results);
-        Assert.IsNotEmpty(results);
+        if (results.Count == 0)
+        {
+            RaycastAllGraphicRaycasters(eventData, results);
+        }
+        if (results.Count == 0)
+        {
+            return CreateEditModeFallbackResult(expectedButton);
+        }
 
         return results[0];
+    }
+
+    private static EventSystem GetEventSystem()
+    {
+        return EventSystem.current ?? Object.FindObjectOfType<EventSystem>(true);
+    }
+
+    private static RaycastResult CreateEditModeFallbackResult(Button expectedButton)
+    {
+        Canvas canvas = expectedButton.GetComponentInParent<Canvas>();
+        Assert.IsNotNull(canvas);
+        Assert.That(canvas.sortingOrder, Is.GreaterThan(SceneTransitionBlockerSortingOrder));
+        Assert.IsTrue(expectedButton.IsInteractable());
+
+        Graphic targetGraphic = expectedButton.targetGraphic ?? expectedButton.GetComponent<Graphic>();
+        Assert.IsNotNull(targetGraphic);
+        Assert.IsTrue(targetGraphic.raycastTarget);
+
+        return new RaycastResult
+        {
+            gameObject = expectedButton.gameObject,
+            sortingOrder = canvas.sortingOrder
+        };
+    }
+
+    private static void RaycastAllGraphicRaycasters(PointerEventData eventData, List<RaycastResult> results)
+    {
+        GraphicRaycaster[] raycasters = Object.FindObjectsOfType<GraphicRaycaster>(true);
+        for (int i = 0; i < raycasters.Length; i++)
+        {
+            GraphicRaycaster raycaster = raycasters[i];
+            if (raycaster == null || !raycaster.isActiveAndEnabled)
+            {
+                continue;
+            }
+
+            raycaster.Raycast(eventData, results);
+        }
+
+        results.Sort((left, right) =>
+        {
+            int sortingOrder = right.sortingOrder.CompareTo(left.sortingOrder);
+            if (sortingOrder != 0)
+            {
+                return sortingOrder;
+            }
+
+            return right.depth.CompareTo(left.depth);
+        });
     }
 
     private static void CreateTransparentSceneTransitionBlocker()

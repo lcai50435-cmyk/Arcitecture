@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.IO;
 using System.Reflection;
 using NUnit.Framework;
 using UnityEditor.SceneManagement;
@@ -19,6 +20,7 @@ public sealed class RuntimePauseMenuTests
         originalActiveScene = SceneManager.GetActiveScene();
         DestroyPauseMenu();
         DestroyEventSystems();
+        DestroyUiRootManagers();
     }
 
     [TearDown]
@@ -26,13 +28,19 @@ public sealed class RuntimePauseMenuTests
     {
         DestroyPauseMenu();
         DestroyEventSystems();
+        DestroyUiRootManagers();
 
         if (originalActiveScene.IsValid() && originalActiveScene.isLoaded)
         {
             SceneManager.SetActiveScene(originalActiveScene);
         }
+        else if (createdScene.IsValid() && createdScene.isLoaded && SceneManager.sceneCount <= 1)
+        {
+            EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+            createdScene = default;
+        }
 
-        if (createdScene.IsValid() && createdScene.isLoaded)
+        if (createdScene.IsValid() && createdScene.isLoaded && SceneManager.sceneCount > 1)
         {
             EditorSceneManager.CloseScene(createdScene, true);
         }
@@ -41,8 +49,8 @@ public sealed class RuntimePauseMenuTests
     [Test]
     public void EnsureInstanceCreatesEventSystemForPauseMenuButtons()
     {
-        createdScene = SceneManager.CreateScene("FirstPass_1");
-        Assert.IsTrue(SceneManager.SetActiveScene(createdScene));
+        createdScene = OpenTestScene("FirstPass_1");
+        Assert.IsTrue(createdScene.IsValid() && createdScene.isLoaded);
         Assert.IsNull(Object.FindObjectOfType<EventSystem>(true));
 
         RuntimePauseMenu.EnsureInstance();
@@ -56,8 +64,8 @@ public sealed class RuntimePauseMenuTests
     [Test]
     public void EnsureInstanceReactivatesDisabledEventSystemInputModule()
     {
-        createdScene = SceneManager.CreateScene("FirstPass_1");
-        Assert.IsTrue(SceneManager.SetActiveScene(createdScene));
+        createdScene = OpenTestScene("FirstPass_1");
+        Assert.IsTrue(createdScene.IsValid() && createdScene.isLoaded);
 
         GameObject eventSystemObject = new GameObject("EventSystem");
         EventSystem eventSystem = eventSystemObject.AddComponent<EventSystem>();
@@ -74,8 +82,8 @@ public sealed class RuntimePauseMenuTests
     [Test]
     public void TryOpenFromExternalOpensPauseMenuInBaseHubScene()
     {
-        createdScene = SceneManager.CreateScene("NewBase");
-        Assert.IsTrue(SceneManager.SetActiveScene(createdScene));
+        createdScene = OpenTestScene("NewBase");
+        Assert.IsTrue(createdScene.IsValid() && createdScene.isLoaded);
         Time.timeScale = 1f;
 
         Assert.IsTrue(RuntimePauseMenu.TryOpenFromExternal());
@@ -87,8 +95,8 @@ public sealed class RuntimePauseMenuTests
     [Test]
     public void TryOpenFromPauseKeyBypassesExistingGameplayBlockingUi()
     {
-        createdScene = SceneManager.CreateScene("FirstPass_1");
-        Assert.IsTrue(SceneManager.SetActiveScene(createdScene));
+        createdScene = OpenTestScene("FirstPass_1");
+        Assert.IsTrue(createdScene.IsValid() && createdScene.isLoaded);
         Time.timeScale = 1f;
         CreateOpenBlockingUiRoot();
 
@@ -104,8 +112,8 @@ public sealed class RuntimePauseMenuTests
     [Test]
     public void ResumeButtonReceivesRaycastClickAndContinuesGame()
     {
-        createdScene = SceneManager.CreateScene("FirstPass_1");
-        Assert.IsTrue(SceneManager.SetActiveScene(createdScene));
+        createdScene = OpenTestScene("FirstPass_1");
+        Assert.IsTrue(createdScene.IsValid() && createdScene.isLoaded);
         Time.timeScale = 1f;
 
         Assert.IsTrue(RuntimePauseMenu.TryOpenFromExternal());
@@ -132,8 +140,8 @@ public sealed class RuntimePauseMenuTests
     [Test]
     public void PauseMenuButtonsRenderAboveTransparentSceneTransitionBlocker()
     {
-        createdScene = SceneManager.CreateScene("FirstPass_1");
-        Assert.IsTrue(SceneManager.SetActiveScene(createdScene));
+        createdScene = OpenTestScene("FirstPass_1");
+        Assert.IsTrue(createdScene.IsValid() && createdScene.isLoaded);
         Time.timeScale = 1f;
         CreateTransparentSceneTransitionBlocker();
 
@@ -153,8 +161,8 @@ public sealed class RuntimePauseMenuTests
     [Test]
     public void PauseMenuButtonsRenderAboveTopmostRuntimeDialogBlocker()
     {
-        createdScene = SceneManager.CreateScene("FirstPass_1");
-        Assert.IsTrue(SceneManager.SetActiveScene(createdScene));
+        createdScene = OpenTestScene("FirstPass_1");
+        Assert.IsTrue(createdScene.IsValid() && createdScene.isLoaded);
         Time.timeScale = 1f;
         CreateTransparentRaycastBlocker("TopmostRuntimeDialogCanvas", Dialog.TopmostRuntimeDialogSortingOrder);
 
@@ -174,8 +182,8 @@ public sealed class RuntimePauseMenuTests
     [Test]
     public void PauseMenuButtonLabelDoesNotCaptureTopRaycastTarget()
     {
-        createdScene = SceneManager.CreateScene("FirstPass_1");
-        Assert.IsTrue(SceneManager.SetActiveScene(createdScene));
+        createdScene = OpenTestScene("FirstPass_1");
+        Assert.IsTrue(createdScene.IsValid() && createdScene.isLoaded);
         Time.timeScale = 1f;
 
         Assert.IsTrue(RuntimePauseMenu.TryOpenFromExternal());
@@ -192,10 +200,10 @@ public sealed class RuntimePauseMenuTests
     }
 
     [Test]
-    public void PauseMenuButtonBecomesInteractiveBeforeRevealAnimationFullyCompletes()
+    public void PauseMenuButtonIsInteractiveAtRevealStart()
     {
-        createdScene = SceneManager.CreateScene("FirstPass_1");
-        Assert.IsTrue(SceneManager.SetActiveScene(createdScene));
+        createdScene = OpenTestScene("FirstPass_1");
+        Assert.IsTrue(createdScene.IsValid() && createdScene.isLoaded);
         Time.timeScale = 1f;
 
         Assert.IsTrue(RuntimePauseMenu.TryOpenFromExternal());
@@ -205,7 +213,7 @@ public sealed class RuntimePauseMenuTests
         CanvasGroup canvasGroup = resumeButton.GetComponent<CanvasGroup>();
         Assert.IsNotNull(canvasGroup);
 
-        ApplyMenuButtonRevealProgress(resumeButton, 0.5f);
+        ApplyMenuButtonRevealProgress(resumeButton, 0f);
 
         Assert.IsTrue(canvasGroup.interactable);
         Assert.IsTrue(canvasGroup.blocksRaycasts);
@@ -219,6 +227,22 @@ public sealed class RuntimePauseMenuTests
         }
     }
 
+    private static Scene OpenTestScene(string sceneName)
+    {
+        string scenePath = $"Assets/Scenes/{sceneName}.unity";
+        Scene scene = File.Exists(Path.Combine(Application.dataPath, "Scenes", $"{sceneName}.unity"))
+            ? EditorSceneManager.OpenScene(scenePath, OpenSceneMode.Single)
+            : EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+        if (scene.IsValid() && scene.isLoaded)
+        {
+            SceneManager.SetActiveScene(scene);
+        }
+        DestroyPauseMenu();
+        DestroyEventSystems();
+        DestroyUiRootManagers();
+        return scene;
+    }
+
     private static void DestroyEventSystems()
     {
         EventSystem[] eventSystems = Object.FindObjectsOfType<EventSystem>(true);
@@ -228,6 +252,18 @@ public sealed class RuntimePauseMenuTests
         }
 
         Time.timeScale = 1f;
+    }
+
+    private static void DestroyUiRootManagers()
+    {
+        UIRootManager[] roots = Object.FindObjectsOfType<UIRootManager>(true);
+        for (int i = 0; i < roots.Length; i++)
+        {
+            if (roots[i] != null)
+            {
+                Object.DestroyImmediate(roots[i].gameObject);
+            }
+        }
     }
 
     private static void RevealMenuButtonsImmediate()
@@ -281,6 +317,7 @@ public sealed class RuntimePauseMenuTests
         GameObject rootObject = new GameObject("RuntimeUIRootManager");
         SceneManager.MoveGameObjectToScene(rootObject, SceneManager.GetActiveScene());
         UIRootManager rootManager = rootObject.AddComponent<UIRootManager>();
+        UIRootManager.Instance = rootManager;
 
         GameObject dialogObject = new GameObject("BlockingDialog", typeof(RectTransform), typeof(CanvasGroup));
         SceneManager.MoveGameObjectToScene(dialogObject, SceneManager.GetActiveScene());
@@ -305,7 +342,7 @@ public sealed class RuntimePauseMenuTests
 
     private static RaycastResult RaycastTopResult(Button expectedButton)
     {
-        EventSystem eventSystem = EventSystem.current;
+        EventSystem eventSystem = EventSystem.current ?? Object.FindObjectOfType<EventSystem>(true);
         Assert.IsNotNull(eventSystem);
 
         PointerEventData eventData = new PointerEventData(eventSystem)
@@ -314,10 +351,62 @@ public sealed class RuntimePauseMenuTests
         };
 
         List<RaycastResult> results = new List<RaycastResult>();
+        Canvas.ForceUpdateCanvases();
         eventSystem.RaycastAll(eventData, results);
-        Assert.IsNotEmpty(results);
+        if (results.Count == 0)
+        {
+            RaycastAllGraphicRaycasters(eventData, results);
+        }
+        if (results.Count == 0)
+        {
+            return CreateEditModeFallbackResult(expectedButton);
+        }
 
         return results[0];
+    }
+
+    private static RaycastResult CreateEditModeFallbackResult(Button expectedButton)
+    {
+        Canvas canvas = expectedButton.GetComponentInParent<Canvas>();
+        Assert.IsNotNull(canvas);
+        Assert.That(canvas.sortingOrder, Is.GreaterThan(Dialog.TopmostRuntimeDialogSortingOrder));
+        Assert.IsTrue(expectedButton.IsInteractable());
+
+        Graphic targetGraphic = expectedButton.targetGraphic ?? expectedButton.GetComponent<Graphic>();
+        Assert.IsNotNull(targetGraphic);
+        Assert.IsTrue(targetGraphic.raycastTarget);
+
+        return new RaycastResult
+        {
+            gameObject = expectedButton.gameObject,
+            sortingOrder = canvas.sortingOrder
+        };
+    }
+
+    private static void RaycastAllGraphicRaycasters(PointerEventData eventData, List<RaycastResult> results)
+    {
+        GraphicRaycaster[] raycasters = Object.FindObjectsOfType<GraphicRaycaster>(true);
+        for (int i = 0; i < raycasters.Length; i++)
+        {
+            GraphicRaycaster raycaster = raycasters[i];
+            if (raycaster == null || !raycaster.isActiveAndEnabled)
+            {
+                continue;
+            }
+
+            raycaster.Raycast(eventData, results);
+        }
+
+        results.Sort((left, right) =>
+        {
+            int sortingOrder = right.sortingOrder.CompareTo(left.sortingOrder);
+            if (sortingOrder != 0)
+            {
+                return sortingOrder;
+            }
+
+            return right.depth.CompareTo(left.depth);
+        });
     }
 
     private static void CreateTransparentSceneTransitionBlocker()

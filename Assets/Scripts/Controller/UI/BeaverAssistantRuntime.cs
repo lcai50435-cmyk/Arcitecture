@@ -70,7 +70,7 @@ public static class BuildingKnowledgeLibrary
         {
             for (int i = 0; i < Entries.Length; i++)
             {
-                if (runtimeState.IsBuildingRepaired(Entries[i].buildingId))
+                if (runtimeState.IsBuildingUnlocked(Entries[i].buildingId))
                 {
                     accessible.Add(Entries[i]);
                 }
@@ -84,7 +84,7 @@ public static class BuildingKnowledgeLibrary
         for (int i = 0; i < stages.Count && i < currentIndex; i++)
         {
             CatalogueBuildingId buildingId = stages[i].stageBuildingId;
-            if (!runtimeState.IsBuildingRepaired(buildingId))
+            if (!runtimeState.IsBuildingUnlocked(buildingId))
             {
                 continue;
             }
@@ -109,7 +109,7 @@ public static class BuildingKnowledgeLibrary
         IReadOnlyList<BuildingKnowledgeEntry> accessible = GetAccessibleEntries(sceneName, runtimeState);
         if (accessible.Count == 0)
         {
-            return "我还不能讲太多。先把上一处古建筑修复完整，相关知识就会在这里解锁。";
+            return "我还不能讲太多。先解锁上一处建筑图鉴，相关知识就会在这里开放。";
         }
 
         BuildingKnowledgeEntry selected = ResolveEntry(query, accessible);
@@ -140,8 +140,8 @@ public static class BuildingKnowledgeLibrary
         if (accessible.Count == 0)
         {
             return UnityEngine.Random.value > 0.5f
-                ? "河狸：把建筑修好，世界会更稳定。"
-                : "河狸：专用结构齐了，就能带材料回去修复。";
+                ? "河狸：解锁建筑图鉴后，下一段路线会更清晰。"
+                : "河狸：专用结构齐了，就能直接点亮对应建筑图鉴。";
         }
 
         BuildingKnowledgeEntry entry = accessible[UnityEngine.Random.Range(0, accessible.Count)];
@@ -266,6 +266,7 @@ public sealed class BeaverAssistantHud : MonoBehaviour
     {
         if (instance != null)
         {
+            instance.EnsureUi();
             return instance;
         }
 
@@ -273,11 +274,13 @@ public sealed class BeaverAssistantHud : MonoBehaviour
         if (existing != null)
         {
             instance = existing;
+            instance.EnsureUi();
             return instance;
         }
 
         GameObject hudObject = new GameObject("BeaverAssistantHud");
         instance = hudObject.AddComponent<BeaverAssistantHud>();
+        instance.EnsureUi();
         return instance;
     }
 
@@ -442,6 +445,7 @@ public sealed class BeaverAssistantHud : MonoBehaviour
 
         if (canvas != null && avatarButton != null && bubbleText != null)
         {
+            EnsureCanvasSurface();
             return;
         }
 
@@ -473,6 +477,23 @@ public sealed class BeaverAssistantHud : MonoBehaviour
         avatarButton = CreateAvatarButton(canvasRect);
         bubbleText = CreateBubble(canvasRect, out bubbleGroup);
         RefreshLegacyBeaverButtonBindings();
+    }
+
+    private void EnsureCanvasSurface()
+    {
+        RuntimeUiEventSystemBootstrapper.Ensure();
+        if (canvas == null)
+        {
+            return;
+        }
+
+        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        canvas.overrideSorting = true;
+        canvas.sortingOrder = SortingOrder;
+        if (canvas.GetComponent<GraphicRaycaster>() == null)
+        {
+            canvas.gameObject.AddComponent<GraphicRaycaster>();
+        }
     }
 
     private Button CreateAvatarButton(Transform parent)
@@ -664,8 +685,41 @@ public sealed class BeaverAssistantHud : MonoBehaviour
                 continue;
             }
 
+            EnsureLegacyBeaverButtonClickable(button);
             button.onClick.AddListener(TogglePanelFromLegacyButton);
             button.gameObject.AddComponent<BeaverAssistantLegacyButtonBinding>();
+        }
+    }
+
+    private static void EnsureLegacyBeaverButtonClickable(Button button)
+    {
+        if (button == null)
+        {
+            return;
+        }
+
+        Graphic targetGraphic = button.targetGraphic;
+        if (targetGraphic == null)
+        {
+            targetGraphic = button.GetComponent<Graphic>();
+            button.targetGraphic = targetGraphic;
+        }
+
+        if (targetGraphic != null)
+        {
+            targetGraphic.raycastTarget = true;
+        }
+
+        Canvas parentCanvas = button.GetComponentInParent<Canvas>();
+        if (parentCanvas != null)
+        {
+            parentCanvas.overrideSorting = true;
+            parentCanvas.sortingOrder = Mathf.Max(parentCanvas.sortingOrder, SortingOrder);
+        }
+
+        if (button.GetComponentInParent<GraphicRaycaster>() == null && parentCanvas != null)
+        {
+            parentCanvas.gameObject.AddComponent<GraphicRaycaster>();
         }
     }
 
@@ -769,6 +823,7 @@ public sealed class BeaverAssistantPanel : MonoBehaviour
     {
         if (instance != null)
         {
+            instance.EnsureUi();
             return instance;
         }
 
@@ -776,11 +831,14 @@ public sealed class BeaverAssistantPanel : MonoBehaviour
         if (existing != null)
         {
             instance = existing;
+            instance.EnsureUi();
             return instance;
         }
 
         GameObject panelObject = new GameObject("BeaverAssistantPanel");
         instance = panelObject.AddComponent<BeaverAssistantPanel>();
+        instance.EnsureUi();
+        instance.gameObject.SetActive(false);
         return instance;
     }
 
@@ -799,6 +857,7 @@ public sealed class BeaverAssistantPanel : MonoBehaviour
     public void Show()
     {
         EnsureUi();
+        EnsureCanvasSurface();
         gameObject.SetActive(true);
         rootGroup.alpha = 1f;
         rootGroup.interactable = true;
@@ -849,6 +908,7 @@ public sealed class BeaverAssistantPanel : MonoBehaviour
 
         if (canvas != null && historyScrollRect != null && historyContentRect != null && inputField != null)
         {
+            EnsureCanvasSurface();
             return;
         }
 
@@ -883,6 +943,23 @@ public sealed class BeaverAssistantPanel : MonoBehaviour
         inputField = CreateInput(panel.transform);
         CreateAskButton(panel.transform);
         CreateTopicButtons(panel.transform);
+    }
+
+    private void EnsureCanvasSurface()
+    {
+        RuntimeUiEventSystemBootstrapper.Ensure();
+        if (canvas == null)
+        {
+            return;
+        }
+
+        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        canvas.overrideSorting = true;
+        canvas.sortingOrder = SortingOrder;
+        if (canvas.GetComponent<GraphicRaycaster>() == null)
+        {
+            canvas.gameObject.AddComponent<GraphicRaycaster>();
+        }
     }
 
     private GameObject CreatePanel(Transform parent)

@@ -20,7 +20,8 @@ public static class RuntimeUiInputGuard
 
     public static bool IsBlockingGameplayUiOpen()
     {
-        if (UIRootManager.Instance != null && UIRootManager.Instance.IsAnyGameplayBlockingUIOpen())
+        UIRootManager rootManager = UIRootManager.Instance ?? Object.FindObjectOfType<UIRootManager>(true);
+        if (rootManager != null && rootManager.IsAnyGameplayBlockingUIOpen())
         {
             return true;
         }
