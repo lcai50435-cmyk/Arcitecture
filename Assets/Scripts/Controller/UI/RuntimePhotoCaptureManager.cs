@@ -11,7 +11,7 @@ public sealed class RuntimePhotoCaptureManager : MonoBehaviour
     private const string PauseReason = "RuntimePhotoCapture";
     private const string BaseSceneName = "NewBase";
     private const string BaseSceneDisplayName = "基地";
-    private const int SortingOrder = 290;
+    private const int SortingOrder = Dialog.TopmostRuntimeDialogSortingOrder + 80;
     private const float ShutterDuration = 0.18f;
     private const float ShutterMaxHeight = 132f;
     private const float FlashPeakAlpha = 0.92f;
@@ -609,6 +609,7 @@ public sealed class RuntimePhotoCaptureManager : MonoBehaviour
 
         if (canvas != null)
         {
+            EnsurePhotoCanvasOnTop();
             return;
         }
 
@@ -783,6 +784,18 @@ public sealed class RuntimePhotoCaptureManager : MonoBehaviour
         HideConfirmationImmediate();
     }
 
+    private void EnsurePhotoCanvasOnTop()
+    {
+        if (canvas == null)
+        {
+            return;
+        }
+
+        canvas.overrideSorting = true;
+        canvas.sortingOrder = SortingOrder;
+        canvas.transform.SetAsLastSibling();
+    }
+
     private void ApplyVisibilityState()
     {
         if (canvas != null)
@@ -843,9 +856,44 @@ public sealed class RuntimePhotoCaptureManager : MonoBehaviour
         if (shouldShow)
         {
             RuntimeUiEventSystemBootstrapper.Ensure();
+            EnsurePhotoCanvasOnTop();
+            RestoreConfirmationButtons();
         }
 
         confirmCanvasGroup.gameObject.SetActive(shouldShow);
+    }
+
+    private void RestoreConfirmationButtons()
+    {
+        RestoreConfirmationButton(saveButton);
+        RestoreConfirmationButton(cancelButton);
+    }
+
+    private static void RestoreConfirmationButton(Button button)
+    {
+        if (button == null)
+        {
+            return;
+        }
+
+        button.interactable = true;
+        Graphic targetGraphic = button.targetGraphic != null
+            ? button.targetGraphic
+            : button.GetComponent<Graphic>();
+        if (targetGraphic != null)
+        {
+            targetGraphic.raycastTarget = true;
+            button.targetGraphic = targetGraphic;
+        }
+
+        TMP_Text[] labels = button.GetComponentsInChildren<TMP_Text>(true);
+        for (int i = 0; i < labels.Length; i++)
+        {
+            if (labels[i] != null)
+            {
+                labels[i].raycastTarget = false;
+            }
+        }
     }
 
     private void SetShutterAmount(float amount)

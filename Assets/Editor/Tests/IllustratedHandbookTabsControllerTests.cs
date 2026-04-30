@@ -705,6 +705,76 @@ public sealed class IllustratedHandbookTabsControllerTests
     }
 
     [Test]
+    public void SceneAuthoredGotoButtonBindsAndOpensFujianDetailCanvas()
+    {
+        RuntimeProgressState progressState = RuntimeProgressState.EnsureInstance();
+        progressState.ResetProgress(false);
+
+        rootObject = CreateSceneAuthoredRoot();
+        GameObject handbookPage = rootObject.transform.Find("IllustratedHandbookCanvas").gameObject;
+        CreateSceneAuthoredHandbookSurface(handbookPage);
+        Text detailTitle = CreateSceneAuthoredDetailCanvas(rootObject.transform, "DetailInformationFuJianCanvas");
+
+        UIManager manager = rootObject.AddComponent<UIManager>();
+        manager.illustratedHandbook = rootObject;
+        IllustratedHandbookTabsController controller = IllustratedHandbookTabsController.EnsureInstalled(manager);
+        controller.SwitchToPage(IllustratedHandbookPage.IllustratedHandbook);
+
+        CompleteBuildingUnlock(progressState, CatalogueBuildingId.Building1);
+        controller.SwitchToPage(IllustratedHandbookPage.IllustratedHandbook);
+
+        Button gotoButton = FindDescendant(handbookPage.transform, "GotoButton").GetComponent<Button>();
+        Assert.IsTrue(gotoButton.interactable);
+        gotoButton.onClick.Invoke();
+
+        GameObject detailCanvas = detailTitle.transform.parent.gameObject;
+        CanvasGroup canvasGroup = detailCanvas.GetComponent<CanvasGroup>();
+        Assert.IsTrue(detailCanvas.activeSelf);
+        Assert.AreEqual(Vector3.one, detailCanvas.transform.localScale);
+        Assert.IsTrue(canvasGroup.interactable);
+        Assert.IsTrue(canvasGroup.blocksRaycasts);
+        Assert.AreEqual("福建土楼", detailTitle.text);
+        Assert.AreSame(detailCanvas, manager.detailedInformation);
+        Assert.IsNotNull(detailCanvas.GetComponent<DetailedInformationUI>());
+    }
+
+    [Test]
+    public void SceneAuthoredGotoButtonBindsAndOpensShuiXiangDetailCanvas()
+    {
+        RuntimeProgressState progressState = RuntimeProgressState.EnsureInstance();
+        progressState.ResetProgress(false);
+
+        rootObject = CreateSceneAuthoredRoot();
+        GameObject handbookPage = rootObject.transform.Find("IllustratedHandbookCanvas").gameObject;
+        CreateSceneAuthoredHandbookSurface(handbookPage);
+        CreateSceneAuthoredDetailCanvas(rootObject.transform, "DetailInformationFuJianCanvas");
+        Text shuiXiangTitle = CreateSceneAuthoredDetailCanvas(rootObject.transform, "DetailInformationShuiXiangCanvas");
+
+        UIManager manager = rootObject.AddComponent<UIManager>();
+        manager.illustratedHandbook = rootObject;
+        IllustratedHandbookTabsController controller = IllustratedHandbookTabsController.EnsureInstalled(manager);
+        controller.SwitchToPage(IllustratedHandbookPage.IllustratedHandbook);
+
+        GameObject thirdCard = FindDescendant(handbookPage.transform, "ArcitectureImage_3").gameObject;
+        CompleteBuildingUnlock(progressState, CatalogueBuildingId.Building3);
+        controller.SelectSceneAuthoredHandbookCard(thirdCard);
+
+        Button gotoButton = FindDescendant(handbookPage.transform, "GotoButton").GetComponent<Button>();
+        Assert.IsTrue(gotoButton.interactable);
+        gotoButton.onClick.Invoke();
+
+        GameObject shuiXiangCanvas = shuiXiangTitle.transform.parent.gameObject;
+        CanvasGroup canvasGroup = shuiXiangCanvas.GetComponent<CanvasGroup>();
+        Assert.IsTrue(shuiXiangCanvas.activeSelf);
+        Assert.AreEqual(Vector3.one, shuiXiangCanvas.transform.localScale);
+        Assert.IsTrue(canvasGroup.interactable);
+        Assert.IsTrue(canvasGroup.blocksRaycasts);
+        Assert.AreEqual("安徽水乡民居", shuiXiangTitle.text);
+        Assert.AreSame(shuiXiangCanvas, manager.detailedInformation);
+        Assert.IsNotNull(shuiXiangCanvas.GetComponent<DetailedInformationUI>());
+    }
+
+    [Test]
     public void DroppingRuntimeBackpackSlotOntoProprietarySlotConsumesBackpackItem()
     {
         RuntimeProgressState progressState = RuntimeProgressState.EnsureInstance();
@@ -859,6 +929,42 @@ public sealed class IllustratedHandbookTabsControllerTests
         AssertHasDropHandler(firstSlotRoot);
         AssertHasDropHandler(firstSlotButton);
         AssertHasDropHandler(visibleImage);
+    }
+
+    [Test]
+    public void SceneAuthoredGeneralMaterialDecorationsDoNotBlockFirstProprietarySlot()
+    {
+        RuntimeProgressState.EnsureInstance().ResetProgress(false);
+
+        rootObject = CreateSceneAuthoredRoot();
+        GameObject handbookPage = rootObject.transform.Find("IllustratedHandbookCanvas").gameObject;
+        CreateSceneAuthoredHandbookSurface(handbookPage);
+
+        Transform generalRoot = FindDescendant(handbookPage.transform, "MaterialForGeneralPurpose");
+        Image decorativeImage = CreateChild<Image>(generalRoot, "Image");
+        decorativeImage.raycastTarget = true;
+        TMP_Text decorativeText = CreateTmpText("TMP Blocker", generalRoot, "遮挡文本");
+        decorativeText.raycastTarget = true;
+        TMP_SubMeshUI decorativeSubMesh = CreateChild<TMP_SubMeshUI>(
+            generalRoot,
+            "TMP SubMeshUI [NotoSansSC-Black Atlas Material + NotoSansSC-Black Atlas 1]");
+        decorativeSubMesh.raycastTarget = true;
+
+        UIManager manager = rootObject.AddComponent<UIManager>();
+        manager.illustratedHandbook = rootObject;
+        IllustratedHandbookTabsController controller = IllustratedHandbookTabsController.EnsureInstalled(manager);
+        controller.SwitchToPage(IllustratedHandbookPage.IllustratedHandbook);
+
+        Transform proprietaryRoot = FindDescendant(handbookPage.transform, "ProprietaryMaterial");
+        Button firstSlotButton = FindDescendant(handbookPage.transform, "ProprietarySlot_1").GetComponent<Button>();
+        Button submitButton = FindDescendant(generalRoot, "SubmitCommonMaterialButton").GetComponent<Button>();
+
+        Assert.Greater(proprietaryRoot.GetSiblingIndex(), generalRoot.GetSiblingIndex());
+        Assert.IsFalse(decorativeImage.raycastTarget);
+        Assert.IsFalse(decorativeText.raycastTarget);
+        Assert.IsFalse(decorativeSubMesh.raycastTarget);
+        Assert.IsTrue(firstSlotButton.targetGraphic.raycastTarget);
+        Assert.IsTrue(submitButton.targetGraphic.raycastTarget);
     }
 
     [Test]
@@ -1172,6 +1278,28 @@ public sealed class IllustratedHandbookTabsControllerTests
         GameObject button = new GameObject("SubmitCommonMaterialButton", typeof(RectTransform), typeof(Image), typeof(Button));
         button.transform.SetParent(general.transform, false);
         CreateTmpText("Label", button.transform, "提交通用材料");
+    }
+
+    private static Text CreateSceneAuthoredDetailCanvas(Transform parent, string canvasName)
+    {
+        GameObject detailCanvas = new GameObject(
+            canvasName,
+            typeof(RectTransform),
+            typeof(Canvas),
+            typeof(CanvasScaler),
+            typeof(GraphicRaycaster),
+            typeof(CanvasGroup));
+        detailCanvas.transform.SetParent(parent, false);
+        detailCanvas.transform.localScale = Vector3.zero;
+
+        CanvasGroup canvasGroup = detailCanvas.GetComponent<CanvasGroup>();
+        canvasGroup.alpha = 0f;
+        canvasGroup.interactable = false;
+        canvasGroup.blocksRaycasts = false;
+
+        Text title = CreateChild<Text>(detailCanvas.transform, "Name");
+        CreateChild<Text>(detailCanvas.transform, "Introduction");
+        return title;
     }
 
     private static void CreateSceneAuthoredHandbookSurfaceWithSlotNamedProprietarySlots(GameObject handbookPage)

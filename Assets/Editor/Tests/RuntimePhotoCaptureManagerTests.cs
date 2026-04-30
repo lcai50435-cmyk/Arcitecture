@@ -165,6 +165,68 @@ public sealed class RuntimePhotoCaptureManagerTests
         AssertButtonReceivesRaycastClick(saveButton, manager, true);
     }
 
+    [Test]
+    public void ConfirmationCanvasSortsAboveRuntimeModals()
+    {
+        RuntimePhotoCaptureManager manager = RuntimePhotoCaptureManager.EnsureInstance();
+        ShowConfirmationImmediate(manager);
+
+        Canvas canvas = manager.transform.Find("RuntimePhotoCaptureCanvas").GetComponent<Canvas>();
+        Assert.Greater(canvas.sortingOrder, RuntimeModalStyle.ModalSortingOrder);
+        Assert.Greater(canvas.sortingOrder, Dialog.TopmostRuntimeDialogSortingOrder);
+    }
+
+    [Test]
+    public void SaveConfirmationClickPersistsCaptureAndAlbumIndex()
+    {
+        string tempAlbumDirectory = Path.Combine(
+            Path.GetTempPath(),
+            "ArcitecturePhotoCaptureTests",
+            System.Guid.NewGuid().ToString("N"));
+        Texture2D texture = null;
+
+        try
+        {
+            using (PhotoAlbumRepository.UseAlbumDirectoryForTests(tempAlbumDirectory))
+            {
+                RuntimePhotoCaptureManager manager = RuntimePhotoCaptureManager.EnsureInstance();
+                PrepareForScene(manager, "FirstPass_1");
+                ShowConfirmationImmediate(manager);
+
+                texture = new Texture2D(2, 2, TextureFormat.RGBA32, false);
+                texture.SetPixel(0, 0, Color.red);
+                texture.SetPixel(1, 0, Color.green);
+                texture.SetPixel(0, 1, Color.blue);
+                texture.SetPixel(1, 1, Color.white);
+                texture.Apply();
+
+                Button saveButton = FindButtonByLabel("保存留念");
+                Assert.IsNotNull(saveButton);
+                AssertButtonReceivesRaycastClick(saveButton, manager, true);
+
+                PhotoAlbumEntry entry = InvokeSaveScreenshot(manager, texture, "FirstPass_1");
+                Assert.IsNotNull(entry);
+                Assert.IsTrue(File.Exists(PhotoAlbumRepository.GetPhotoPath(entry)));
+                Assert.IsTrue(PhotoAlbumRepository.HasEntries());
+                IReadOnlyList<PhotoAlbumEntry> entries = PhotoAlbumRepository.LoadEntries();
+                Assert.AreEqual(1, entries.Count);
+                Assert.AreEqual(entry.id, entries[0].id);
+            }
+        }
+        finally
+        {
+            if (texture != null)
+            {
+                Object.DestroyImmediate(texture);
+            }
+
+            if (Directory.Exists(tempAlbumDirectory))
+            {
+                Directory.Delete(tempAlbumDirectory, true);
+            }
+        }
+    }
+
     private static void PrepareForScene(RuntimePhotoCaptureManager manager, string sceneName)
     {
         MethodInfo method = typeof(RuntimePhotoCaptureManager).GetMethod(
