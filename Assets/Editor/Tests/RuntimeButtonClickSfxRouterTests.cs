@@ -357,7 +357,7 @@ public sealed class PlayerLoadoutRuntimeTests
     }
 
     [Test]
-    public void RuntimeWeaponOverrideSurvivesLockedSelectionValidation()
+    public void RuntimeWeaponOverrideDoesNotBypassLockedSelectionValidation()
     {
         PlayerLoadoutRuntime.CurrentWeaponType = WeaponType.DirectInk;
 
@@ -365,7 +365,7 @@ public sealed class PlayerLoadoutRuntimeTests
         PlayerLoadoutRuntime.EnsureCurrentWeaponUnlocked();
 
         Assert.AreEqual(WeaponType.DirectInk, PlayerLoadoutRuntime.CurrentWeaponType);
-        Assert.AreEqual(WeaponType.PierceInk, RuntimeWeaponTypeResolver.ResolveEffectiveWeaponType(null));
+        Assert.AreEqual(WeaponType.DirectInk, RuntimeWeaponTypeResolver.ResolveEffectiveWeaponType(null));
     }
 
     [Test]

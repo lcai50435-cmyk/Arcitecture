@@ -8,7 +8,6 @@ public class WeaponSelectionPanelUI : MonoBehaviour
     private readonly List<WeaponOptionView> optionViews = new List<WeaponOptionView>();
 
     [SerializeField] private Color selectedColor = new Color(0.86f, 0.67f, 0.34f, 1f);
-    [SerializeField] private Color effectiveColor = new Color(0.34f, 0.76f, 0.92f, 1f);
     [SerializeField] private Color normalColor = new Color(0.18f, 0.15f, 0.12f, 0.92f);
     [SerializeField] private Color lockedColor = new Color(0.14f, 0.14f, 0.14f, 0.56f);
 
@@ -85,12 +84,7 @@ public class WeaponSelectionPanelUI : MonoBehaviour
         WeaponType baseWeaponType = PlayerLoadoutRuntime.CurrentWeaponType;
         bool hasDebugOverride = PlayerLoadoutRuntime.TryGetDebugWeaponOverride(out WeaponType debugWeaponType);
         WeaponType selectedWeaponType = hasDebugOverride ? debugWeaponType : baseWeaponType;
-        bool hasBackpackOverride = RuntimeWeaponTypeResolver.TryGetActiveWeaponOverride(
-            BackpackMananger.Instance,
-            out ArchitecturalCrystal overrideCrystal,
-            out WeaponType overrideWeaponType,
-            out int overrideSlotIndex);
-        WeaponType effectiveWeaponType = hasBackpackOverride ? overrideWeaponType : selectedWeaponType;
+        WeaponType effectiveWeaponType = selectedWeaponType;
         profileData.SetEffectiveWeapon(effectiveWeaponType);
 
         foreach (WeaponOptionView view in optionViews)
@@ -98,15 +92,10 @@ public class WeaponSelectionPanelUI : MonoBehaviour
             bool unlocked = PlayerLoadoutRuntime.IsWeaponUnlocked(view.Data.weaponType);
             bool selected = view.Data.weaponType == baseWeaponType;
             bool isDebugBase = hasDebugOverride && view.Data.weaponType == debugWeaponType;
-            bool isEffectiveOverride = hasBackpackOverride && view.Data.weaponType == effectiveWeaponType;
 
             if (view.Background != null)
             {
-                if (isEffectiveOverride)
-                {
-                    view.Background.color = effectiveColor;
-                }
-                else if (isDebugBase)
+                if (isDebugBase)
                 {
                     view.Background.color = selectedColor;
                 }
@@ -126,11 +115,7 @@ public class WeaponSelectionPanelUI : MonoBehaviour
 
             if (view.StateLabel != null)
             {
-                if (isEffectiveOverride)
-                {
-                    view.StateLabel.text = "当前实战墨水";
-                }
-                else if (isDebugBase)
+                if (isDebugBase)
                 {
                     view.StateLabel.text = "调试基础";
                 }
@@ -158,20 +143,14 @@ public class WeaponSelectionPanelUI : MonoBehaviour
             baseWeaponType,
             selectedWeaponType,
             effectiveWeaponType,
-            hasDebugOverride,
-            hasBackpackOverride,
-            overrideCrystal,
-            overrideSlotIndex);
+            hasDebugOverride);
     }
 
     private void RefreshRuntimeSummary(
         WeaponType baseWeaponType,
         WeaponType selectedWeaponType,
         WeaponType effectiveWeaponType,
-        bool hasDebugOverride,
-        bool hasBackpackOverride,
-        ArchitecturalCrystal overrideCrystal,
-        int overrideSlotIndex)
+        bool hasDebugOverride)
     {
         if (runtimeSummaryText == null)
         {
@@ -181,17 +160,6 @@ public class WeaponSelectionPanelUI : MonoBehaviour
         string baseWeaponName = InkTypeCatalog.GetDisplayName(baseWeaponType);
         string selectedWeaponName = InkTypeCatalog.GetDisplayName(selectedWeaponType);
         string effectiveWeaponName = InkTypeCatalog.GetDisplayName(effectiveWeaponType);
-
-        if (hasBackpackOverride)
-        {
-            string overrideDescription = overrideSlotIndex >= 0
-                ? $"{overrideCrystal.DisplayName}（背包槽 {overrideSlotIndex + 1}，最后拾取优先）"
-                : $"{overrideCrystal.DisplayName}（最后拾取优先）";
-            string debugLine = hasDebugOverride ? $"\n调试基础墨水：{selectedWeaponName}" : string.Empty;
-            runtimeSummaryText.text =
-                $"基础墨水：{baseWeaponName}{debugLine}\n当前实战墨水：{effectiveWeaponName}\n覆盖来源：{overrideDescription}，当前攻击按背包覆盖结果生效。";
-            return;
-        }
 
         runtimeSummaryText.text = hasDebugOverride
             ? $"基础墨水：{baseWeaponName}\n调试基础墨水：{selectedWeaponName}\n当前实战墨水：{effectiveWeaponName}\n覆盖来源：调试面板，本次运行临时生效。"

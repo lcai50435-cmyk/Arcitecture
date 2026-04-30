@@ -12,9 +12,7 @@ public static class RuntimeWeaponTypeResolver
             return debugWeaponType;
         }
 
-        return PlayerLoadoutRuntime.TryGetRuntimeWeaponOverride(out WeaponType runtimeWeaponType)
-            ? runtimeWeaponType
-            : fallbackWeaponType;
+        return fallbackWeaponType;
     }
 
     public static bool TryGetActiveWeaponOverride(
