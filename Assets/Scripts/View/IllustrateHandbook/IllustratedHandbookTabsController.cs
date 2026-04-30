@@ -123,6 +123,8 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
     private const string SceneAuthoredBuildingDetailButtonName = "GotoButton";
     private const string SceneAuthoredProprietaryMaterialName = "ProprietaryMaterial";
     private const string SceneAuthoredGeneralMaterialName = "MaterialForGeneralPurpose";
+    private const string SceneAuthoredFujianDetailCanvasName = "DetailInformationFuJianCanvas";
+    private const string SceneAuthoredShuiXiangDetailCanvasName = "DetailInformationShuiXiangCanvas";
     private const string SceneHandbookBackpackTrayName = "HandbookBackpackTray";
     private const string SceneHandbookBackpackSlotNamePrefix = "HandbookBackpackSlot_";
     private const string SceneHandbookSpecialStackName = "SpecialMaterialStack";
@@ -1623,7 +1625,7 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
             handler = targetObject.AddComponent<SceneHandbookBuildingDetailButtonHandler>();
         }
 
-        handler.Bind(binding.buildingId, binding.detailData, definition, previewSprite);
+        handler.Bind(this, binding.buildingId, binding.detailData, definition, previewSprite);
     }
 
     private void RefreshSceneAuthoredRightProgress(
@@ -1661,6 +1663,8 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         }
 
         Transform generalRoot = FindTransformByName(rightRoot, SceneAuthoredGeneralMaterialName);
+        SanitizeSceneHandbookGeneralMaterialRaycasts(generalRoot);
+        EnsureSceneHandbookProprietaryRootAboveGeneral(proprietaryRoot, generalRoot);
         BindSceneHandbookSubmitCommonButton(generalRoot, buildingId);
         Slider generalSlider = generalRoot != null ? generalRoot.GetComponentInChildren<Slider>(true) : null;
         if (generalSlider == null)
@@ -1676,6 +1680,61 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         generalSlider.SetValueWithoutNotify(progress);
         ConfigureSliderReadOnlyDisplay(generalSlider);
         RefreshSceneAuthoredHandbookBackpack(rightRoot);
+    }
+
+    private static void SanitizeSceneHandbookGeneralMaterialRaycasts(Transform generalRoot)
+    {
+        if (generalRoot == null)
+        {
+            return;
+        }
+
+        Graphic[] graphics = generalRoot.GetComponentsInChildren<Graphic>(true);
+        for (int i = 0; i < graphics.Length; i++)
+        {
+            Graphic graphic = graphics[i];
+            if (graphic == null)
+            {
+                continue;
+            }
+
+            if (ShouldKeepSceneHandbookGeneralGraphicInteractive(graphic))
+            {
+                graphic.raycastTarget = true;
+                continue;
+            }
+
+            graphic.raycastTarget = false;
+        }
+    }
+
+    private static bool ShouldKeepSceneHandbookGeneralGraphicInteractive(Graphic graphic)
+    {
+        if (graphic == null ||
+            graphic is TMP_Text ||
+            graphic is TMP_SubMeshUI)
+        {
+            return false;
+        }
+
+        Button button = graphic.GetComponentInParent<Button>(true);
+        return button != null && button.targetGraphic == graphic;
+    }
+
+    private static void EnsureSceneHandbookProprietaryRootAboveGeneral(
+        Transform proprietaryRoot,
+        Transform generalRoot)
+    {
+        if (proprietaryRoot == null ||
+            generalRoot == null ||
+            proprietaryRoot.parent == null ||
+            proprietaryRoot.parent != generalRoot.parent ||
+            proprietaryRoot.GetSiblingIndex() > generalRoot.GetSiblingIndex())
+        {
+            return;
+        }
+
+        proprietaryRoot.SetSiblingIndex(generalRoot.GetSiblingIndex());
     }
 
     private static List<Transform> CollectSceneHandbookProprietarySlotRoots(Transform proprietaryRoot)
@@ -4764,6 +4823,207 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         return false;
     }
 
+    private DetailedInformationUI ResolveSceneAuthoredDetailUi(CatalogueBuildingId buildingId)
+    {
+        DetailedInformationUI sceneDetailUi = EnsureSceneAuthoredDetailUi(ResolveSceneAuthoredDetailCanvas(buildingId));
+        if (sceneDetailUi != null)
+        {
+            return sceneDetailUi;
+        }
+
+        return FindObjectOfType<DetailedInformationUI>(true);
+    }
+
+    private Transform ResolveSceneAuthoredDetailCanvas(CatalogueBuildingId buildingId)
+    {
+        string canvasName = ResolveSceneAuthoredDetailCanvasName(buildingId);
+        if (string.IsNullOrEmpty(canvasName))
+        {
+            return null;
+        }
+
+        Transform ownerRoot = owner != null ? owner.transform : null;
+        Transform detailCanvas = FindTransformByName(ownerRoot, canvasName);
+        if (detailCanvas != null)
+        {
+            return detailCanvas;
+        }
+
+        GameObject sceneRoot = owner != null ? ResolveSceneAuthoredRoot(owner.illustratedHandbook) : null;
+        if (sceneRoot != null)
+        {
+            detailCanvas = FindTransformByName(sceneRoot.transform, canvasName);
+            if (detailCanvas != null)
+            {
+                return detailCanvas;
+            }
+        }
+
+        return FindTransformByName(transform.root, canvasName);
+    }
+
+    private static string ResolveSceneAuthoredDetailCanvasName(CatalogueBuildingId buildingId)
+    {
+        switch (buildingId)
+        {
+            case CatalogueBuildingId.Building1:
+                return SceneAuthoredFujianDetailCanvasName;
+            case CatalogueBuildingId.Building3:
+                return SceneAuthoredShuiXiangDetailCanvasName;
+            default:
+                return null;
+        }
+    }
+
+    private DetailedInformationUI EnsureSceneAuthoredDetailUi(Transform detailCanvas)
+    {
+        if (detailCanvas == null)
+        {
+            return null;
+        }
+
+        DetailedInformationUI detailUi = detailCanvas.GetComponent<DetailedInformationUI>();
+        if (detailUi == null)
+        {
+            detailUi = detailCanvas.gameObject.AddComponent<DetailedInformationUI>();
+        }
+
+        if (detailUi.illustratedHandbookPanel == null)
+        {
+            detailUi.illustratedHandbookPanel = illustratedHandbookCanvas != null
+                ? illustratedHandbookCanvas
+                : owner != null
+                    ? owner.illustratedHandbook
+                    : null;
+        }
+
+        detailUi.detailedInformationPanel = detailCanvas.gameObject;
+        BindSceneAuthoredDetailFields(detailUi, detailCanvas);
+
+        if (owner != null)
+        {
+            owner.detailedInformation = detailCanvas.gameObject;
+        }
+
+        UIRootManager.Instance?.RefreshRuntimeBindings();
+        return detailUi;
+    }
+
+    private static void BindSceneAuthoredDetailFields(DetailedInformationUI detailUi, Transform detailCanvas)
+    {
+        if (detailUi == null || detailCanvas == null)
+        {
+            return;
+        }
+
+        Transform firstBackground = FindTransformByName(detailCanvas, "BackGround");
+        if (detailUi.backGround1 == null && firstBackground != null)
+        {
+            detailUi.backGround1 = firstBackground.gameObject;
+        }
+
+        if (detailUi.page1NameText == null)
+        {
+            detailUi.page1NameText = FindSceneAuthoredDetailText(detailCanvas, "Name", "Title") ??
+                                     FindFirstSceneAuthoredDetailText(detailCanvas);
+        }
+
+        if (detailUi.page1IntroductionText == null)
+        {
+            detailUi.page1IntroductionText = FindSceneAuthoredDetailText(detailCanvas, "Introduction", "Content", "Body");
+        }
+
+        if (detailUi.page2FinallyIntroductionText == null)
+        {
+            detailUi.page2FinallyIntroductionText = FindSceneAuthoredDetailText(detailCanvas, "Finally", "Final");
+        }
+
+        if (detailUi.closeButton1 == null)
+        {
+            detailUi.closeButton1 = FindSceneAuthoredDetailButton(detailCanvas, "Close", "Setting", "关闭");
+        }
+    }
+
+    private static Text FindSceneAuthoredDetailText(Transform root, params string[] nameFragments)
+    {
+        if (root == null)
+        {
+            return null;
+        }
+
+        Text[] texts = root.GetComponentsInChildren<Text>(true);
+        for (int fragmentIndex = 0; fragmentIndex < nameFragments.Length; fragmentIndex++)
+        {
+            string fragment = nameFragments[fragmentIndex];
+            if (string.IsNullOrEmpty(fragment))
+            {
+                continue;
+            }
+
+            for (int i = 0; i < texts.Length; i++)
+            {
+                Text text = texts[i];
+                if (text != null &&
+                    text.name.IndexOf(fragment, StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    return text;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private static Text FindFirstSceneAuthoredDetailText(Transform root)
+    {
+        if (root == null)
+        {
+            return null;
+        }
+
+        Text[] texts = root.GetComponentsInChildren<Text>(true);
+        return texts.Length > 0 ? texts[0] : null;
+    }
+
+    private static Button FindSceneAuthoredDetailButton(Transform root, params string[] nameFragments)
+    {
+        if (root == null)
+        {
+            return null;
+        }
+
+        Button[] buttons = root.GetComponentsInChildren<Button>(true);
+        for (int fragmentIndex = 0; fragmentIndex < nameFragments.Length; fragmentIndex++)
+        {
+            string fragment = nameFragments[fragmentIndex];
+            if (string.IsNullOrEmpty(fragment))
+            {
+                continue;
+            }
+
+            for (int i = 0; i < buttons.Length; i++)
+            {
+                Button button = buttons[i];
+                if (button == null)
+                {
+                    continue;
+                }
+
+                Text label = button.GetComponentInChildren<Text>(true);
+                bool matchesName = button.name.IndexOf(fragment, StringComparison.OrdinalIgnoreCase) >= 0;
+                bool matchesLabel = label != null &&
+                                    label.text != null &&
+                                    label.text.IndexOf(fragment, StringComparison.OrdinalIgnoreCase) >= 0;
+                if (matchesName || matchesLabel)
+                {
+                    return button;
+                }
+            }
+        }
+
+        return buttons.Length > 0 ? buttons[0] : null;
+    }
+
     private sealed class SceneHandbookCommonSubmitButtonHandler : MonoBehaviour
     {
         private IllustratedHandbookTabsController owner;
@@ -4836,6 +5096,7 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
 
     private sealed class SceneHandbookBuildingDetailButtonHandler : MonoBehaviour
     {
+        private IllustratedHandbookTabsController owner;
         private Button button;
         private CatalogueBuildingId buildingId;
         private BuildingDetailData detailData;
@@ -4843,11 +5104,13 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         private Sprite previewSprite;
 
         public void Bind(
+            IllustratedHandbookTabsController controller,
             CatalogueBuildingId targetBuildingId,
             BuildingDetailData targetDetailData,
             BuildingDefinition targetDefinition,
             Sprite targetPreviewSprite)
         {
+            owner = controller;
             if (button == null)
             {
                 button = GetComponent<Button>();
@@ -4881,7 +5144,9 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
                 return;
             }
 
-            DetailedInformationUI detailUi = FindObjectOfType<DetailedInformationUI>(true);
+            DetailedInformationUI detailUi = owner != null
+                ? owner.ResolveSceneAuthoredDetailUi(buildingId)
+                : FindObjectOfType<DetailedInformationUI>(true);
             if (detailUi == null)
             {
                 RuntimeSubtitleFeedHud.PushMessage("详情界面暂未接入。");

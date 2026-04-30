@@ -90,8 +90,7 @@ public class DetailedInformationUI : MonoBehaviour
         if (page2FinallyIntroductionText != null)
             page2FinallyIntroductionText.text = data.finalIntroduction;
 
-        if (detailedInformationPanel != null)
-            detailedInformationPanel.SetActive(true);
+        PrepareDetailPanelForDisplay();
 
         if (UIRootManager.Instance != null)
         {
@@ -106,8 +105,7 @@ public class DetailedInformationUI : MonoBehaviour
     /// </summary>
     public void ShowPage1()
     {
-        if (detailedInformationPanel != null)
-            detailedInformationPanel.SetActive(true);
+        PrepareDetailPanelForDisplay();
 
         if (UIRootManager.Instance != null)
         {
@@ -122,8 +120,7 @@ public class DetailedInformationUI : MonoBehaviour
     /// </summary>
     public void ShowPage2()
     {
-        if (detailedInformationPanel != null)
-            detailedInformationPanel.SetActive(true);
+        PrepareDetailPanelForDisplay();
 
         if (UIRootManager.Instance != null)
         {
@@ -172,6 +169,52 @@ public class DetailedInformationUI : MonoBehaviour
         }
 
         ShowPage1Only();
+    }
+
+    private void PrepareDetailPanelForDisplay()
+    {
+        GameObject detailRoot = detailedInformationPanel != null
+            ? detailedInformationPanel
+            : gameObject;
+        detailRoot.SetActive(true);
+
+        RectTransform detailRect = detailRoot.transform as RectTransform;
+        if (detailRect != null &&
+            Mathf.Approximately(detailRect.localScale.x, 0f) &&
+            Mathf.Approximately(detailRect.localScale.y, 0f))
+        {
+            detailRect.localScale = Vector3.one;
+        }
+
+        CanvasGroup canvasGroup = detailRoot.GetComponent<CanvasGroup>();
+        if (canvasGroup == null)
+        {
+            canvasGroup = detailRoot.AddComponent<CanvasGroup>();
+        }
+
+        canvasGroup.alpha = 1f;
+        canvasGroup.interactable = true;
+        canvasGroup.blocksRaycasts = true;
+
+        Canvas canvas = detailRoot.GetComponent<Canvas>();
+        if (canvas == null)
+        {
+            canvas = detailRoot.AddComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        }
+
+        canvas.overrideSorting = true;
+        canvas.sortingOrder = RuntimeModalStyle.ModalSortingOrder;
+
+        if (detailRoot.GetComponent<GraphicRaycaster>() == null)
+        {
+            detailRoot.AddComponent<GraphicRaycaster>();
+        }
+
+        if (UIManager.Instance != null)
+        {
+            UIManager.Instance.detailedInformation = detailRoot;
+        }
     }
 
     private void ApplyRuntimeFonts()

@@ -275,7 +275,9 @@ public class UIRootManager : MonoBehaviour
         dialogController = isGameplayScene
             ? Dialog.EnsureGameplayRuntimeInstance()
             : Dialog.FindUsableInstance() ?? FindObjectOfType<Dialog>(true);
-        detailedInformationController = supportsBookDetailScene ? FindObjectOfType<DetailedInformationUI>(true) : null;
+        detailedInformationController = supportsBookDetailScene
+            ? ResolveDetailedInformationController(handbookManager)
+            : null;
         submitPanelControllers = isGameplayScene ? FindObjectsOfType<SubmitSelectionPanelUI>(true) : Array.Empty<SubmitSelectionPanelUI>();
 
         if (handbookManager != null && handbookManager.illustratedHandbook != null)
@@ -788,6 +790,27 @@ public class UIRootManager : MonoBehaviour
         RegisterModal(RuntimeModalType.Spirit, spiritPanelUI);
         RegisterModal(RuntimeModalType.Stage, stageSelectionPanelUI);
         RegisterModal(RuntimeModalType.Album, albumPanelUI);
+    }
+
+    private static DetailedInformationUI ResolveDetailedInformationController(UIManager manager)
+    {
+        if (manager != null && manager.detailedInformation != null)
+        {
+            DetailedInformationUI boundController =
+                manager.detailedInformation.GetComponent<DetailedInformationUI>();
+            if (boundController != null)
+            {
+                return boundController;
+            }
+
+            boundController = manager.detailedInformation.GetComponentInChildren<DetailedInformationUI>(true);
+            if (boundController != null)
+            {
+                return boundController;
+            }
+        }
+
+        return FindObjectOfType<DetailedInformationUI>(true);
     }
 
     private void RegisterModal(RuntimeModalType type, CanvasGroup canvasGroup)
