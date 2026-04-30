@@ -30,13 +30,15 @@ public sealed class IllustratedUISceneLoader : MonoBehaviour
             IllustratedHandbookPage page,
             GameObject[] hideTargets,
             GameObject interactTip,
-            GameObject playerObject)
+            GameObject playerObject,
+            bool includePersonalInformation)
         {
             Source = source;
             Page = page;
             HideTargets = hideTargets;
             InteractTip = interactTip;
             PlayerObject = playerObject;
+            IncludePersonalInformation = includePersonalInformation;
         }
 
         public RuntimeModalOpenSource Source { get; }
@@ -44,6 +46,7 @@ public sealed class IllustratedUISceneLoader : MonoBehaviour
         public GameObject[] HideTargets { get; }
         public GameObject InteractTip { get; }
         public GameObject PlayerObject { get; }
+        public bool IncludePersonalInformation { get; }
     }
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
@@ -80,7 +83,8 @@ public sealed class IllustratedUISceneLoader : MonoBehaviour
         IllustratedHandbookPage page,
         GameObject[] hideTargets = null,
         GameObject interactTip = null,
-        GameObject playerObject = null)
+        GameObject playerObject = null,
+        bool includePersonalInformation = true)
     {
         if (!CanLoadScene())
         {
@@ -90,12 +94,12 @@ public sealed class IllustratedUISceneLoader : MonoBehaviour
 
         if (TryGetUIManager(out UIManager manager))
         {
-            BindRuntimeContext(manager, hideTargets, interactTip, playerObject);
+            BindRuntimeContext(manager, hideTargets, interactTip, playerObject, includePersonalInformation);
             manager.OpenIllustratedHandbook(source, page);
             return true;
         }
 
-        EnsureInstance().QueueOpen(new OpenRequest(source, page, hideTargets, interactTip, playerObject));
+        EnsureInstance().QueueOpen(new OpenRequest(source, page, hideTargets, interactTip, playerObject, includePersonalInformation));
         return true;
     }
 
@@ -164,14 +168,16 @@ public sealed class IllustratedUISceneLoader : MonoBehaviour
         UIManager manager,
         GameObject[] hideTargets,
         GameObject interactTip,
-        GameObject playerObject)
+        GameObject playerObject,
+        bool includePersonalInformation)
     {
         if (manager == null)
         {
             return;
         }
 
-        IllustratedHandbookTabsController.EnsureInstalled(manager);
+        IllustratedHandbookTabsController tabsController = IllustratedHandbookTabsController.EnsureInstalled(manager);
+        tabsController?.SetPersonalInformationPageAvailable(includePersonalInformation);
         SetInitialCanvasStates(manager);
 
         GameObject resolvedInteractTip = interactTip != null
@@ -380,7 +386,12 @@ public sealed class IllustratedUISceneLoader : MonoBehaviour
 
             OpenRequest request = pendingRequest;
             pendingRequest = null;
-            BindRuntimeContext(manager, request.HideTargets, request.InteractTip, request.PlayerObject);
+            BindRuntimeContext(
+                manager,
+                request.HideTargets,
+                request.InteractTip,
+                request.PlayerObject,
+                request.IncludePersonalInformation);
             manager.OpenIllustratedHandbook(request.Source, request.Page);
 
             if (pendingRequest == null)

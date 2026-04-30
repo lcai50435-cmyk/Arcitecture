@@ -1,0 +1,20 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d2aa8e5e3d214e01b5f1d14f70ddbf77, type: 3}
+  m_Name: RuntimeUiSpriteCatalog
+  m_EditorClassIdentifier: 
+  settingPanelFrame: {fileID: 21300000, guid: 1b864f4e86e5545448937c1cc9157380, type: 3}
+  settingButtonFrame: {fileID: 21300000, guid: a2f2800d2442848468abeaab0d974ce3, type: 3}
+  mainMenuStartButton: {fileID: 686073570, guid: 2835e195825014b40991cef1612990f0, type: 3}
+  mainMenuSettingsButton: {fileID: -1310865416, guid: 7923aacf4d6057c4ca6da7c27bb00d8a, type: 3}
+  mainMenuExitButton: {fileID: 193997765, guid: e4ffeae73dfa9444695508923d8ffcc8, type: 3}
+  mainMenuTextButtonFrame: {fileID: 1851843728, guid: c4a01d65bbce091428db93d98d0b72db, type: 3}

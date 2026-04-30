@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 public class BackpackMananger : MonoBehaviour
 {
@@ -9,7 +10,8 @@ public class BackpackMananger : MonoBehaviour
     public List<ArchitecturalCrystal?> backpackItems = new List<ArchitecturalCrystal?>();
 
     private const int MaxCapacity = 6;
-    private const int MaxSpecialStructureMaterials = 3;
+    public const int MaxCommonMaterialCount = 3;
+    public const int MaxSpecialStructureMaterialCount = 3;
     private readonly HashSet<ArchitecturalType> alreadyPickedCommonTypes = new HashSet<ArchitecturalType>();
     private readonly HashSet<int> reservedSlots = new HashSet<int>();
     private int nextRuntimePickupOrder = 1;
@@ -65,9 +67,55 @@ public class BackpackMananger : MonoBehaviour
         return count;
     }
 
+    public int GetCommonMaterialCount()
+    {
+        EnsureCapacity();
+
+        int count = 0;
+        for (int i = 0; i < backpackItems.Count; i++)
+        {
+            ArchitecturalCrystal? item = backpackItems[i];
+            if (item.HasValue && item.Value.IsGenericCommonMaterial)
+            {
+                count++;
+            }
+        }
+
+        return count;
+    }
+
+    public int GetSpecialStructureMaterialCount()
+    {
+        EnsureCapacity();
+
+        int count = 0;
+        for (int i = 0; i < backpackItems.Count; i++)
+        {
+            ArchitecturalCrystal? item = backpackItems[i];
+            if (item.HasValue && item.Value.IsSpecialStructure)
+            {
+                count++;
+            }
+        }
+
+        return count;
+    }
+
     public bool PickItem(ArchitecturalCrystal crystal)
     {
         EnsureCapacity();
+
+        if (!CanStoreCommonMaterial(crystal))
+        {
+            Debug.LogWarning($"通用材料已达上限 {MaxCommonMaterialCount}，无法继续添加");
+            return false;
+        }
+
+        if (!CanStoreSpecialStructureMaterial(crystal))
+        {
+            Debug.LogWarning($"专用结构已达关卡上限 {MaxSpecialStructureMaterialCount}，无法继续添加");
+            return false;
+        }
 
         if (TryHandleImmediatePickup(crystal, out bool immediatePickupSucceeded))
         {
@@ -89,7 +137,12 @@ public class BackpackMananger : MonoBehaviour
         EnsureCapacity();
         slotIndex = -1;
 
-        if (!crystal.IsCommonStructure && !crystal.IsRepairMaterial)
+        if (!crystal.IsCommonStructure && !crystal.IsSpecialStructure && !crystal.IsRepairMaterial)
+        {
+            return false;
+        }
+
+        if (!CanStoreCommonMaterial(crystal) || !CanStoreSpecialStructureMaterial(crystal))
         {
             return false;
         }
@@ -119,6 +172,16 @@ public class BackpackMananger : MonoBehaviour
         EnsureCapacity();
 
         if (!reservedSlots.Remove(slotIndex))
+        {
+            return false;
+        }
+
+        if (!CanStoreCommonMaterial(crystal))
+        {
+            return false;
+        }
+
+        if (!CanStoreSpecialStructureMaterial(crystal))
         {
             return false;
         }
@@ -190,6 +253,45 @@ public class BackpackMananger : MonoBehaviour
         return false;
     }
 
+    public bool TryConsumeSpecialStructureMaterial(int index)
+    {
+        EnsureCapacity();
+
+        if (index < 0 || index >= backpackItems.Count)
+        {
+            return false;
+        }
+
+        ArchitecturalCrystal? item = backpackItems[index];
+        if (!item.HasValue || !item.Value.IsSpecialStructure)
+        {
+            return false;
+        }
+
+        backpackItems[index] = null;
+        RefreshPlayerTemporaryAttributes();
+        OnInventoryChanged?.Invoke();
+        Debug.Log($"消耗 {item.Value.DisplayName}，背包格子 {index} 已清空");
+        return true;
+    }
+
+    public bool TryConsumeFirstSpecialStructureMaterial(out int consumedIndex)
+    {
+        EnsureCapacity();
+        consumedIndex = -1;
+
+        for (int i = 0; i < backpackItems.Count; i++)
+        {
+            if (TryConsumeSpecialStructureMaterial(i))
+            {
+                consumedIndex = i;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     public void ClearAllItems()
     {
         bool removedAnyItem = false;
@@ -213,6 +315,16 @@ public class BackpackMananger : MonoBehaviour
         reservedSlots.Clear();
 
         Debug.Log("背包已清空");
+    }
+
+    private bool CanStoreCommonMaterial(ArchitecturalCrystal crystal)
+    {
+        return !crystal.IsGenericCommonMaterial || GetCommonMaterialCount() < MaxCommonMaterialCount;
+    }
+
+    private bool CanStoreSpecialStructureMaterial(ArchitecturalCrystal crystal)
+    {
+        return !crystal.IsSpecialStructure || GetSpecialStructureMaterialCount() < MaxSpecialStructureMaterialCount;
     }
 
     private void EnsureCapacity()
@@ -247,24 +359,6 @@ public class BackpackMananger : MonoBehaviour
             return true;
         }
 
-        if (crystal.IsSpecialStructure)
-        {
-            RuntimeProgressState progressState = RuntimeProgressState.EnsureInstance();
-            if (progressState.AvailableSpecialStructureInventory >= MaxSpecialStructureMaterials)
-            {
-                Debug.LogWarning($"材料库存已达获得上限 {MaxSpecialStructureMaterials}，无法继续拾取");
-                success = false;
-                return true;
-            }
-
-            progressState.AddSpecialStructureInventory(1);
-            OnItemPicked?.Invoke(crystal);
-            OnInventoryChanged?.Invoke();
-            Debug.Log($"拾取 {crystal.DisplayName}，已加入专用材料库存");
-            success = true;
-            return true;
-        }
-
         success = false;
         return false;
     }
@@ -283,6 +377,7 @@ public class BackpackMananger : MonoBehaviour
 
         if (shouldShowFirstPick)
         {
+            EnsureFirstPickTipListener();
             OnFirstTimePickItemType?.Invoke(storedItem);
         }
 
@@ -291,6 +386,16 @@ public class BackpackMananger : MonoBehaviour
 
         Debug.Log($"拾取 {storedItem.DisplayName}，放入背包格子 {slotIndex}");
         return true;
+    }
+
+    private void EnsureFirstPickTipListener()
+    {
+        if (!GameplayStageCatalog.IsGameplayScene(SceneManager.GetActiveScene().name))
+        {
+            return;
+        }
+
+        Dialog.EnsureGameplayRuntimeInstance();
     }
 
     private ArchitecturalCrystal CreateStoredBackpackItem(ArchitecturalCrystal crystal)

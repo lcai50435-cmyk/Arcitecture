@@ -16,11 +16,23 @@ public enum GameDisplayMode
     Fullscreen = 1
 }
 
+public enum GameAudioToggle
+{
+    MuteMode = 0,
+    MusicCrossfade = 1,
+    SfxDynamicRange = 2,
+    SpatialAudio = 3
+}
+
 public sealed class GameSettingsDraft
 {
     public float masterVolume;
     public float musicVolume;
     public float sfxVolume;
+    public bool muteMode;
+    public bool musicCrossfade;
+    public bool sfxDynamicRange;
+    public bool spatialAudio;
     public int resolutionIndex;
     public GameDisplayMode displayMode;
     public int viewZoomIndex;
@@ -37,6 +49,10 @@ public sealed class GameSettingsDraft
             masterVolume = masterVolume,
             musicVolume = musicVolume,
             sfxVolume = sfxVolume,
+            muteMode = muteMode,
+            musicCrossfade = musicCrossfade,
+            sfxDynamicRange = sfxDynamicRange,
+            spatialAudio = spatialAudio,
             resolutionIndex = resolutionIndex,
             displayMode = displayMode,
             viewZoomIndex = viewZoomIndex,
@@ -46,6 +62,42 @@ public sealed class GameSettingsDraft
             pauseKey = pauseKey,
             photoCaptureKey = photoCaptureKey
         };
+    }
+
+    public bool GetAudioToggle(GameAudioToggle toggle)
+    {
+        switch (toggle)
+        {
+            case GameAudioToggle.MuteMode:
+                return muteMode;
+            case GameAudioToggle.MusicCrossfade:
+                return musicCrossfade;
+            case GameAudioToggle.SfxDynamicRange:
+                return sfxDynamicRange;
+            case GameAudioToggle.SpatialAudio:
+                return spatialAudio;
+            default:
+                return false;
+        }
+    }
+
+    public void SetAudioToggle(GameAudioToggle toggle, bool enabled)
+    {
+        switch (toggle)
+        {
+            case GameAudioToggle.MuteMode:
+                muteMode = enabled;
+                break;
+            case GameAudioToggle.MusicCrossfade:
+                musicCrossfade = enabled;
+                break;
+            case GameAudioToggle.SfxDynamicRange:
+                sfxDynamicRange = enabled;
+                break;
+            case GameAudioToggle.SpatialAudio:
+                spatialAudio = enabled;
+                break;
+        }
     }
 
     public KeyCode GetBinding(GameInputAction action)
@@ -96,12 +148,20 @@ public static class GameSettingsStore
     private const string MasterVolumeKey = "GameSettings.MasterVolume";
     private const string MusicVolumeKey = "GameSettings.MusicVolume";
     private const string SfxVolumeKey = "GameSettings.SfxVolume";
+    private const string MuteModeKey = "GameSettings.Audio.MuteMode";
+    private const string MusicCrossfadeKey = "GameSettings.Audio.MusicCrossfade";
+    private const string SfxDynamicRangeKey = "GameSettings.Audio.SfxDynamicRange";
+    private const string SpatialAudioKey = "GameSettings.Audio.SpatialAudio";
     private const string ResolutionIndexKey = "ResolutionIndex";
     private const string DisplayModeKey = "GameSettings.DisplayMode";
     private const string ViewZoomIndexKey = "GameSettings.ViewZoomIndex";
     private const float DefaultMasterVolume = 1f;
     private const float DefaultMusicVolume = 0.85f;
     private const float DefaultSfxVolume = 1f;
+    private const bool DefaultMuteMode = false;
+    private const bool DefaultMusicCrossfade = true;
+    private const bool DefaultSfxDynamicRange = false;
+    private const bool DefaultSpatialAudio = false;
     private const int DefaultResolutionIndex = 3;
     private const int DefaultViewZoomIndex = 1;
 
@@ -135,6 +195,10 @@ public static class GameSettingsStore
             masterVolume = LoadSavedMasterVolume(),
             musicVolume = Mathf.Clamp01(PlayerPrefs.GetFloat(MusicVolumeKey, DefaultMusicVolume)),
             sfxVolume = Mathf.Clamp01(PlayerPrefs.GetFloat(SfxVolumeKey, DefaultSfxVolume)),
+            muteMode = LoadBool(MuteModeKey, DefaultMuteMode),
+            musicCrossfade = LoadBool(MusicCrossfadeKey, DefaultMusicCrossfade),
+            sfxDynamicRange = LoadBool(SfxDynamicRangeKey, DefaultSfxDynamicRange),
+            spatialAudio = LoadBool(SpatialAudioKey, DefaultSpatialAudio),
             resolutionIndex = Mathf.Clamp(PlayerPrefs.GetInt(ResolutionIndexKey, DefaultResolutionIndex), 0, ResolutionOptions.Length - 1),
             displayMode = LoadSavedDisplayMode(),
             viewZoomIndex = Mathf.Clamp(PlayerPrefs.GetInt(ViewZoomIndexKey, DefaultViewZoomIndex), 0, ViewZoomMultipliers.Length - 1),
@@ -158,6 +222,10 @@ public static class GameSettingsStore
             masterVolume = DefaultMasterVolume,
             musicVolume = DefaultMusicVolume,
             sfxVolume = DefaultSfxVolume,
+            muteMode = DefaultMuteMode,
+            musicCrossfade = DefaultMusicCrossfade,
+            sfxDynamicRange = DefaultSfxDynamicRange,
+            spatialAudio = DefaultSpatialAudio,
             resolutionIndex = DefaultResolutionIndex,
             displayMode = GameDisplayMode.Windowed,
             viewZoomIndex = DefaultViewZoomIndex,
@@ -180,15 +248,16 @@ public static class GameSettingsStore
         float masterVolume = Mathf.Clamp01(source.masterVolume);
         float musicVolume = Mathf.Clamp01(source.musicVolume);
         float sfxVolume = Mathf.Clamp01(source.sfxVolume);
+        float effectiveMasterVolume = source.muteMode ? 0f : masterVolume;
 
-        AudioListener.volume = masterVolume;
+        AudioListener.volume = effectiveMasterVolume;
 
         MusicManager manager = MusicManager.Instance != null
             ? MusicManager.Instance
             : MusicManager.EnsureInstance();
         if (manager != null)
         {
-            manager.ApplyVolumeSettings(masterVolume, musicVolume, sfxVolume);
+            manager.ApplyVolumeSettings(effectiveMasterVolume, musicVolume, sfxVolume);
         }
     }
 
@@ -199,6 +268,10 @@ public static class GameSettingsStore
         PlayerPrefs.SetFloat(MasterVolumeKey, Mathf.Clamp01(source.masterVolume));
         PlayerPrefs.SetFloat(MusicVolumeKey, Mathf.Clamp01(source.musicVolume));
         PlayerPrefs.SetFloat(SfxVolumeKey, Mathf.Clamp01(source.sfxVolume));
+        SaveBool(MuteModeKey, source.muteMode);
+        SaveBool(MusicCrossfadeKey, source.musicCrossfade);
+        SaveBool(SfxDynamicRangeKey, source.sfxDynamicRange);
+        SaveBool(SpatialAudioKey, source.spatialAudio);
         PlayerPrefs.SetInt(ResolutionIndexKey, Mathf.Clamp(source.resolutionIndex, 0, ResolutionOptions.Length - 1));
         PlayerPrefs.SetInt(DisplayModeKey, (int)source.displayMode);
         PlayerPrefs.SetInt(ViewZoomIndexKey, Mathf.Clamp(source.viewZoomIndex, 0, ViewZoomMultipliers.Length - 1));
@@ -223,6 +296,10 @@ public static class GameSettingsStore
         return !Mathf.Approximately(savedSettings.masterVolume, draftSettings.masterVolume) ||
                !Mathf.Approximately(savedSettings.musicVolume, draftSettings.musicVolume) ||
                !Mathf.Approximately(savedSettings.sfxVolume, draftSettings.sfxVolume) ||
+               savedSettings.muteMode != draftSettings.muteMode ||
+               savedSettings.musicCrossfade != draftSettings.musicCrossfade ||
+               savedSettings.sfxDynamicRange != draftSettings.sfxDynamicRange ||
+               savedSettings.spatialAudio != draftSettings.spatialAudio ||
                savedSettings.resolutionIndex != draftSettings.resolutionIndex ||
                savedSettings.displayMode != draftSettings.displayMode ||
                savedSettings.viewZoomIndex != draftSettings.viewZoomIndex ||
@@ -278,13 +355,36 @@ public static class GameSettingsStore
         return LoadSavedSettings().sfxVolume;
     }
 
+    public static bool GetAudioToggle(GameAudioToggle toggle)
+    {
+        return LoadSavedSettings().GetAudioToggle(toggle);
+    }
+
     public static void ApplyDisplaySettings()
     {
         GameSettingsDraft savedSettings = LoadSavedSettings();
-        Vector2Int resolution = GetResolutionOption(savedSettings.resolutionIndex);
-        bool fullscreen = savedSettings.displayMode == GameDisplayMode.Fullscreen;
-        Screen.SetResolution(resolution.x, resolution.y, fullscreen);
+        if (ShouldApplyExplicitResolutionForCurrentPlatform())
+        {
+            Vector2Int resolution = GetResolutionOption(savedSettings.resolutionIndex);
+            bool fullscreen = savedSettings.displayMode == GameDisplayMode.Fullscreen;
+            Screen.SetResolution(resolution.x, resolution.y, fullscreen);
+        }
+
         ScreenAdaptationManager.RefreshNow();
+    }
+
+    public static bool ShouldApplyExplicitResolutionForPlatform(bool isWebGlPlayer)
+    {
+        return !isWebGlPlayer;
+    }
+
+    private static bool ShouldApplyExplicitResolutionForCurrentPlatform()
+    {
+#if UNITY_WEBGL && !UNITY_EDITOR
+        return ShouldApplyExplicitResolutionForPlatform(true);
+#else
+        return ShouldApplyExplicitResolutionForPlatform(false);
+#endif
     }
 
     public static void ApplyAudioSettings()
@@ -322,6 +422,13 @@ public static class GameSettingsStore
     {
         GameSettingsDraft savedSettings = LoadSavedSettings();
         savedSettings.sfxVolume = Mathf.Clamp01(value);
+        SaveCompatChange(savedSettings, applyImmediately);
+    }
+
+    public static void SetAudioToggle(GameAudioToggle toggle, bool enabled, bool applyImmediately = true)
+    {
+        GameSettingsDraft savedSettings = LoadSavedSettings();
+        savedSettings.SetAudioToggle(toggle, enabled);
         SaveCompatChange(savedSettings, applyImmediately);
     }
 
@@ -485,6 +592,10 @@ public static class GameSettingsStore
         PlayerPrefs.SetFloat(MasterVolumeKey, Mathf.Clamp01(draft.masterVolume));
         PlayerPrefs.SetFloat(MusicVolumeKey, Mathf.Clamp01(draft.musicVolume));
         PlayerPrefs.SetFloat(SfxVolumeKey, Mathf.Clamp01(draft.sfxVolume));
+        SaveBool(MuteModeKey, draft.muteMode);
+        SaveBool(MusicCrossfadeKey, draft.musicCrossfade);
+        SaveBool(SfxDynamicRangeKey, draft.sfxDynamicRange);
+        SaveBool(SpatialAudioKey, draft.spatialAudio);
         PlayerPrefs.SetInt(ResolutionIndexKey, Mathf.Clamp(draft.resolutionIndex, 0, ResolutionOptions.Length - 1));
         PlayerPrefs.SetInt(DisplayModeKey, (int)draft.displayMode);
         PlayerPrefs.SetInt(ViewZoomIndexKey, Mathf.Clamp(draft.viewZoomIndex, 0, ViewZoomMultipliers.Length - 1));
@@ -512,6 +623,16 @@ public static class GameSettingsStore
         }
 
         return Mathf.Clamp01(PlayerPrefs.GetFloat(LegacyMasterVolumeKey, DefaultMasterVolume));
+    }
+
+    private static bool LoadBool(string key, bool defaultValue)
+    {
+        return PlayerPrefs.GetInt(key, defaultValue ? 1 : 0) != 0;
+    }
+
+    private static void SaveBool(string key, bool value)
+    {
+        PlayerPrefs.SetInt(key, value ? 1 : 0);
     }
 
     private static KeyCode LoadSavedKeyBinding(GameInputAction action)

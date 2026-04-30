@@ -10,12 +10,18 @@ public static class RuntimeUiInputGuard
             return true;
         }
 
+        if (!BackpackUI.IsRuntimeAttackSlotSelected())
+        {
+            return true;
+        }
+
         return IsMouseKey(attackKey) && IsPointerOverUi();
     }
 
     public static bool IsBlockingGameplayUiOpen()
     {
-        if (UIRootManager.Instance != null && UIRootManager.Instance.IsAnyGameplayBlockingUIOpen())
+        UIRootManager rootManager = UIRootManager.Instance ?? Object.FindObjectOfType<UIRootManager>(true);
+        if (rootManager != null && rootManager.IsAnyGameplayBlockingUIOpen())
         {
             return true;
         }

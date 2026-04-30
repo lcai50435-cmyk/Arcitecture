@@ -222,10 +222,17 @@ public sealed class ScreenAdaptationManager : MonoBehaviour
             return false;
         }
 
-        if (!baseOrthographicSizes.TryGetValue(camera.GetInstanceID(), out float baseSize) || baseSize <= 0.01f)
+        int cameraId = camera.GetInstanceID();
+        if (!baseOrthographicSizes.TryGetValue(cameraId, out float baseSize) || baseSize <= 0.01f)
         {
-            size = camera.orthographicSize;
-            return true;
+            baseSize = camera.orthographicSize;
+            if (baseSize <= 0.01f)
+            {
+                size = 0f;
+                return false;
+            }
+
+            baseOrthographicSizes[cameraId] = baseSize;
         }
 
         size = ResolveAdaptedOrthographicSize(baseSize, GetCurrentAspect());

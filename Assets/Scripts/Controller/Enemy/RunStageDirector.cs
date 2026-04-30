@@ -3,6 +3,10 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
+
 public enum RunStagePhase
 {
     Basic,
@@ -33,6 +37,12 @@ public class DropTableConfig
 
 public class RunStageDirector : MonoBehaviour
 {
+    private const string FireMonsterResourcePath = "EnemyPrefab/FireMonster";
+    private const string StoneMonsterResourcePath = "EnemyPrefab/StoneMonster";
+#if UNITY_EDITOR
+    private const string FireMonsterPrefabPath = "Assets/File/Prefab/EnemyPrefab/FireMonster.prefab";
+    private const string StoneMonsterPrefabPath = "Assets/File/Prefab/EnemyPrefab/StoneMonster.prefab";
+#endif
     private const float StageRefreshInterval = 0.2f;
     private const float SpawnProbeRadius = 3.5f;
     private const int SpawnProbeAttempts = 16;
@@ -51,6 +61,7 @@ public class RunStageDirector : MonoBehaviour
 
     private readonly List<EnemySpawnTemplate> spawnTemplates = new List<EnemySpawnTemplate>();
     private readonly List<RunStageConfig> stageConfigs = new List<RunStageConfig>();
+    private readonly List<EnemyStatsManager> activeEnemies = new List<EnemyStatsManager>();
 
     [SerializeField] private DropTableConfig dropTable = new DropTableConfig();
 
@@ -116,6 +127,7 @@ public class RunStageDirector : MonoBehaviour
         float elapsedTime = GetElapsedTime();
         ApplyStage(GetStageForElapsed(elapsedTime));
         RefreshResolvedStage(elapsedTime, true);
+        EnforceActiveEnemyLimit();
     }
 
     private void Update()
@@ -252,8 +264,8 @@ public class RunStageDirector : MonoBehaviour
             enemyAttack = 10,
             enemyDefense = 0f,
             enemySpeed = 0.8f,
-            spawnInterval = 2f,
-            targetAliveCount = 4
+            spawnInterval = 3f,
+            targetAliveCount = 3
         });
         stageConfigs.Add(new RunStageConfig
         {
@@ -263,8 +275,8 @@ public class RunStageDirector : MonoBehaviour
             enemyAttack = 13,
             enemyDefense = 2f,
             enemySpeed = 1f,
-            spawnInterval = 1.5f,
-            targetAliveCount = 6
+            spawnInterval = 2.5f,
+            targetAliveCount = 4
         });
         stageConfigs.Add(new RunStageConfig
         {
@@ -274,8 +286,8 @@ public class RunStageDirector : MonoBehaviour
             enemyAttack = 18,
             enemyDefense = 4f,
             enemySpeed = 1.2f,
-            spawnInterval = 1f,
-            targetAliveCount = 8
+            spawnInterval = 2f,
+            targetAliveCount = 5
         });
     }
 
@@ -309,7 +321,7 @@ public class RunStageDirector : MonoBehaviour
             return;
         }
 
-        EnemyStatsManager[] existingEnemies = FindObjectsOfType<EnemyStatsManager>();
+        EnemyStatsManager[] existingEnemies = FindObjectsOfType<EnemyStatsManager>(true);
         for (int i = 0; i < existingEnemies.Length; i++)
         {
             EnemyStatsManager enemy = existingEnemies[i];
@@ -318,19 +330,98 @@ public class RunStageDirector : MonoBehaviour
                 continue;
             }
 
-            GameObject templateObject = Instantiate(enemy.gameObject, enemy.transform.position, enemy.transform.rotation, transform);
-            templateObject.name = $"{enemy.gameObject.name}_Template";
-            templateObject.SetActive(false);
-
-            spawnTemplates.Add(new EnemySpawnTemplate
-            {
-                template = templateObject,
-                position = enemy.transform.position,
-                rotation = enemy.transform.rotation
-            });
-
+            AddSpawnTemplate(enemy.gameObject, enemy.transform.position, enemy.transform.rotation);
             PrepareEnemyInstance(enemy.gameObject);
         }
+
+        if (spawnTemplates.Count == 0)
+        {
+            CaptureFallbackEnemyPrefabsAsTemplates();
+        }
+    }
+
+    private void CaptureFallbackEnemyPrefabsAsTemplates()
+    {
+        Vector3 fallbackPosition = ResolveFallbackTemplatePosition();
+        AddFallbackEnemyTemplate(FireMonsterResourcePath, GetEditorFireMonsterPrefabPath(), fallbackPosition);
+        AddFallbackEnemyTemplate(StoneMonsterResourcePath, GetEditorStoneMonsterPrefabPath(), fallbackPosition);
+    }
+
+    private void AddFallbackEnemyTemplate(string resourcePath, string editorAssetPath, Vector3 fallbackPosition)
+    {
+        GameObject prefab = LoadFallbackEnemyPrefab(resourcePath, editorAssetPath);
+        if (prefab == null || prefab.GetComponent<EnemyStatsManager>() == null)
+        {
+            return;
+        }
+
+        AddSpawnTemplate(prefab, fallbackPosition, prefab.transform.rotation);
+    }
+
+    private void AddSpawnTemplate(GameObject source, Vector3 position, Quaternion rotation)
+    {
+        if (source == null)
+        {
+            return;
+        }
+
+        GameObject templateObject = Instantiate(source, position, rotation, transform);
+        templateObject.name = $"{source.name}_Template";
+        templateObject.SetActive(false);
+
+        spawnTemplates.Add(new EnemySpawnTemplate
+        {
+            template = templateObject,
+            position = position,
+            rotation = rotation
+        });
+    }
+
+    private static Vector3 ResolveFallbackTemplatePosition()
+    {
+        GameObject player = GameObject.FindGameObjectWithTag("Player");
+        if (player != null)
+        {
+            return player.transform.position;
+        }
+
+        CharacterCore playerCore = FindObjectOfType<CharacterCore>();
+        return playerCore != null ? playerCore.transform.position : Vector3.zero;
+    }
+
+    private static GameObject LoadFallbackEnemyPrefab(string resourcePath, string editorAssetPath)
+    {
+        GameObject prefab = Resources.Load<GameObject>(resourcePath);
+        if (prefab != null)
+        {
+            return prefab;
+        }
+
+#if UNITY_EDITOR
+        return !string.IsNullOrWhiteSpace(editorAssetPath)
+            ? AssetDatabase.LoadAssetAtPath<GameObject>(editorAssetPath)
+            : null;
+#else
+        return null;
+#endif
+    }
+
+    private static string GetEditorFireMonsterPrefabPath()
+    {
+#if UNITY_EDITOR
+        return FireMonsterPrefabPath;
+#else
+        return null;
+#endif
+    }
+
+    private static string GetEditorStoneMonsterPrefabPath()
+    {
+#if UNITY_EDITOR
+        return StoneMonsterPrefabPath;
+#else
+        return null;
+#endif
     }
 
     private void PrepareEnemyInstance(GameObject enemyObject)
@@ -358,6 +449,7 @@ public class RunStageDirector : MonoBehaviour
 
         NightLightingController.EnsureProjectedShadow(enemyObject);
         NightLightingController.EnsureGameplayEnemyLight(enemyObject);
+        RegisterActiveEnemy(enemyObject.GetComponent<EnemyStatsManager>());
     }
 
     private void ApplyStage(RunStageConfig stage)
@@ -396,10 +488,14 @@ public class RunStageDirector : MonoBehaviour
         stageRefreshTimer = 0f;
         currentStageState = ResolveStageState(elapsedTime);
 
-        EnemyStatsManager[] aliveEnemies = FindObjectsOfType<EnemyStatsManager>();
-        for (int i = 0; i < aliveEnemies.Length; i++)
+        PruneActiveEnemies();
+        for (int i = 0; i < activeEnemies.Count; i++)
         {
-            ApplyStageToEnemy(aliveEnemies[i].gameObject, currentStageState);
+            EnemyStatsManager enemy = activeEnemies[i];
+            if (enemy != null)
+            {
+                ApplyStageToEnemy(enemy.gameObject, currentStageState);
+            }
         }
     }
 
@@ -461,6 +557,11 @@ public class RunStageDirector : MonoBehaviour
     private void ApplyStageToEnemy(GameObject enemyObject, ResolvedStageState stage)
     {
         if (enemyObject == null || stage == null)
+        {
+            return;
+        }
+
+        if (RuntimeTestStoneMonsterSpawner.TryPreserveHealthOverride(enemyObject))
         {
             return;
         }
@@ -552,6 +653,10 @@ public class RunStageDirector : MonoBehaviour
 
         float elapsedTime = GetElapsedTime();
         RefreshResolvedStage(elapsedTime, true);
+        if (currentStageState != null && GetAliveEnemyCount() >= currentStageState.targetAliveCount)
+        {
+            return false;
+        }
 
         int startIndex = UnityEngine.Random.Range(0, spawnTemplates.Count);
         for (int i = 0; i < spawnTemplates.Count; i++)
@@ -757,7 +862,7 @@ public class RunStageDirector : MonoBehaviour
         RuntimeCrystalDropFactory.CreateInteractiveDrop(
             crystal,
             position,
-            0.35f,
+            RuntimeCrystalDropFactory.ClosedLootBagWorldScale,
             4,
             transform,
             $"StageDrop_{crystal.DisplayName}",
@@ -796,7 +901,84 @@ public class RunStageDirector : MonoBehaviour
 
     private int GetAliveEnemyCount()
     {
-        return FindObjectsOfType<EnemyStatsManager>().Length;
+        PruneActiveEnemies();
+        return activeEnemies.Count;
+    }
+
+    public void HandleEnemyRemoved(EnemyStatsManager enemy)
+    {
+        if (enemy == null)
+        {
+            return;
+        }
+
+        activeEnemies.Remove(enemy);
+    }
+
+    private void RegisterActiveEnemy(EnemyStatsManager enemy)
+    {
+        if (enemy == null || !enemy.gameObject.activeInHierarchy || activeEnemies.Contains(enemy))
+        {
+            return;
+        }
+
+        activeEnemies.Add(enemy);
+    }
+
+    private void PruneActiveEnemies()
+    {
+        for (int i = activeEnemies.Count - 1; i >= 0; i--)
+        {
+            EnemyStatsManager enemy = activeEnemies[i];
+            if (enemy == null || !enemy.gameObject.activeInHierarchy)
+            {
+                activeEnemies.RemoveAt(i);
+            }
+        }
+    }
+
+    private void EnforceActiveEnemyLimit()
+    {
+        if (currentStageState == null)
+        {
+            currentStageState = ResolveStageState(GetElapsedTime());
+        }
+
+        if (currentStageState == null)
+        {
+            return;
+        }
+
+        PruneActiveEnemies();
+        int limit = Mathf.Max(0, currentStageState.targetAliveCount);
+        for (int i = activeEnemies.Count - 1; i >= limit; i--)
+        {
+            EnemyStatsManager enemy = activeEnemies[i];
+            activeEnemies.RemoveAt(i);
+            if (enemy != null)
+            {
+                DestroyEnemyObject(enemy.gameObject);
+            }
+        }
+    }
+
+    private static void DestroyEnemyObject(GameObject enemyObject)
+    {
+        if (enemyObject == null)
+        {
+            return;
+        }
+
+#if UNITY_EDITOR
+        if (!Application.isPlaying)
+        {
+            DestroyImmediate(enemyObject);
+            return;
+        }
+#endif
+
+        enemyObject.SetActive(false);
+        Destroy(enemyObject);
     }
 
     private void HandleCountdownFinished()
@@ -848,6 +1030,7 @@ public class RunStageEnemyBinding : MonoBehaviour
 
     private RunStageDirector director;
     private CharacterCore characterCore;
+    private EnemyStatsManager statsManager;
     private CharacterDeathBase deathBehaviour;
     private bool handledDeath;
 
@@ -855,6 +1038,7 @@ public class RunStageEnemyBinding : MonoBehaviour
     {
         director = owner;
         characterCore = GetComponent<CharacterCore>();
+        statsManager = GetComponent<EnemyStatsManager>();
         deathBehaviour = GetComponent<CharacterDeathBase>();
         handledDeath = false;
 
@@ -872,6 +1056,8 @@ public class RunStageEnemyBinding : MonoBehaviour
 
     private void OnDisable()
     {
+        director?.HandleEnemyRemoved(statsManager);
+
         if (deathBehaviour != null)
         {
             deathBehaviour.OnDeathSequenceCompleted -= HandleDeathSequenceCompleted;
@@ -891,6 +1077,7 @@ public class RunStageEnemyBinding : MonoBehaviour
         }
 
         handledDeath = true;
+        director?.HandleEnemyRemoved(statsManager);
         director?.HandleEnemyDeath(transform.position);
     }
 

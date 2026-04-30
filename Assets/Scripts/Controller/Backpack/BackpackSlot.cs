@@ -3,9 +3,10 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
-public class BackpackSlot : MonoBehaviour, IPointerDownHandler, IPointerUpHandler, IPointerEnterHandler, IPointerExitHandler
+public class BackpackSlot : MonoBehaviour, IPointerDownHandler, IPointerUpHandler, IPointerClickHandler, IPointerEnterHandler, IPointerExitHandler, IBeginDragHandler, IDragHandler, IEndDragHandler
 {
     private const string RuntimeSlotIconName = "ItemIcon";
+    private const int DropClickCount = 2;
 
     [Header("格子编号 0~5")]
     public int slotIndex;
@@ -21,6 +22,38 @@ public class BackpackSlot : MonoBehaviour, IPointerDownHandler, IPointerUpHandle
     private bool isHolding;
     private float holdTimer;
     private bool isHovered;
+    private RectTransform dragGhost;
+
+    public static bool TryGetDraggedSpecialStructureSlot(GameObject pointerDrag, out int sourceSlotIndex)
+    {
+        sourceSlotIndex = -1;
+
+        BackpackSlot slot = pointerDrag != null
+            ? pointerDrag.GetComponent<BackpackSlot>() ?? pointerDrag.GetComponentInParent<BackpackSlot>()
+            : null;
+
+        int resolvedSlotIndex;
+        if (slot != null)
+        {
+            resolvedSlotIndex = slot.slotIndex;
+        }
+        else if (!DraggedSpecialStructureSlotSource.TryResolve(pointerDrag, out resolvedSlotIndex))
+        {
+            return false;
+        }
+
+        BackpackMananger runtimeBackpack = BackpackMananger.Instance != null
+            ? BackpackMananger.Instance
+            : Object.FindObjectOfType<BackpackMananger>(true);
+        ArchitecturalCrystal? item = runtimeBackpack != null ? runtimeBackpack.GetItem(resolvedSlotIndex) : null;
+        if (!item.HasValue || !item.Value.IsSpecialStructure)
+        {
+            return false;
+        }
+
+        sourceSlotIndex = resolvedSlotIndex;
+        return true;
+    }
 
     private void Start()
     {
@@ -46,7 +79,7 @@ public class BackpackSlot : MonoBehaviour, IPointerDownHandler, IPointerUpHandle
             legacyHoverOutline.enabled = false;
         }
 
-        backpack = BackpackMananger.Instance;
+        ResolveBackpackManager();
         if (backpackUI == null)
         {
             backpackUI = BackpackUI.EnsureRuntimeInstance();
@@ -136,6 +169,18 @@ public class BackpackSlot : MonoBehaviour, IPointerDownHandler, IPointerUpHandle
         }
     }
 
+    public void OnPointerClick(PointerEventData eventData)
+    {
+        if (eventData == null ||
+            eventData.button != PointerEventData.InputButton.Left ||
+            eventData.clickCount < DropClickCount)
+        {
+            return;
+        }
+
+        DropSingleItem();
+    }
+
     public void OnPointerEnter(PointerEventData eventData)
     {
         isHovered = true;
@@ -149,9 +194,31 @@ public class BackpackSlot : MonoBehaviour, IPointerDownHandler, IPointerUpHandle
         HideHoverState();
     }
 
+    public void OnBeginDrag(PointerEventData eventData)
+    {
+        if (!TryGetCurrentSpecialStructure(out ArchitecturalCrystal crystal))
+        {
+            return;
+        }
+
+        backpackUI?.SelectSlot(slotIndex);
+        HideHoverTooltip();
+        dragGhost = CreateDragGhost(crystal, eventData != null ? eventData.position : (Vector2)Input.mousePosition);
+    }
+
+    public void OnDrag(PointerEventData eventData)
+    {
+        UpdateDragGhost(eventData != null ? eventData.position : (Vector2)Input.mousePosition);
+    }
+
+    public void OnEndDrag(PointerEventData eventData)
+    {
+        DestroyDragGhost();
+    }
+
     private void StartSingleHold()
     {
-        if (backpack == null)
+        if (ResolveBackpackManager() == null)
         {
             Debug.LogError("BackpackManager未找到！");
             return;
@@ -179,6 +246,125 @@ public class BackpackSlot : MonoBehaviour, IPointerDownHandler, IPointerUpHandle
     {
         isHolding = false;
         holdTimer = 0f;
+    }
+
+    private bool TryGetCurrentSpecialStructure(out ArchitecturalCrystal crystal)
+    {
+        crystal = default;
+
+        ResolveBackpackManager();
+
+        ArchitecturalCrystal? item = backpack != null ? backpack.GetItem(slotIndex) : null;
+        if (!item.HasValue || !item.Value.IsSpecialStructure)
+        {
+            return false;
+        }
+
+        crystal = item.Value;
+        return true;
+    }
+
+    private RectTransform CreateDragGhost(ArchitecturalCrystal crystal, Vector2 screenPosition)
+    {
+        Canvas canvas = GetComponentInParent<Canvas>();
+        RectTransform canvasRect = canvas != null ? canvas.transform as RectTransform : null;
+        if (canvasRect == null)
+        {
+            return null;
+        }
+
+        GameObject ghostObject = new GameObject(
+            "BackpackSpecialStructureDragGhost",
+            typeof(RectTransform),
+            typeof(CanvasRenderer),
+            typeof(Image),
+            typeof(CanvasGroup));
+        RectTransform ghostRect = ghostObject.GetComponent<RectTransform>();
+        ghostRect.SetParent(canvasRect, false);
+        ghostRect.SetAsLastSibling();
+        ghostRect.anchorMin = new Vector2(0.5f, 0.5f);
+        ghostRect.anchorMax = new Vector2(0.5f, 0.5f);
+        ghostRect.pivot = new Vector2(0.5f, 0.5f);
+        ghostRect.sizeDelta = ResolveDragGhostSize();
+
+        Image ghostImage = ghostObject.GetComponent<Image>();
+        Sprite displaySprite = crystal.backIcon != null ? crystal.backIcon : crystal.icon;
+        ghostImage.sprite = RuntimeSpriteDisplaySanitizer.GetDisplaySprite(displaySprite);
+        ghostImage.color = new Color(1f, 1f, 1f, 0.88f);
+        ghostImage.preserveAspect = true;
+        ghostImage.raycastTarget = false;
+
+        CanvasGroup canvasGroup = ghostObject.GetComponent<CanvasGroup>();
+        canvasGroup.blocksRaycasts = false;
+        canvasGroup.interactable = false;
+
+        DraggedSpecialStructureSlotSource dragSource = ghostObject.AddComponent<DraggedSpecialStructureSlotSource>();
+        dragSource.Bind(slotIndex);
+
+        UpdateDragGhost(ghostRect, canvas, screenPosition);
+        return ghostRect;
+    }
+
+    private Vector2 ResolveDragGhostSize()
+    {
+        RectTransform rectTransform = transform as RectTransform;
+        if (rectTransform == null)
+        {
+            return new Vector2(64f, 64f);
+        }
+
+        Vector2 slotSize = rectTransform.rect.size;
+        float size = Mathf.Clamp(Mathf.Min(slotSize.x, slotSize.y), 48f, 86f);
+        return new Vector2(size, size);
+    }
+
+    private void UpdateDragGhost(Vector2 screenPosition)
+    {
+        if (dragGhost == null)
+        {
+            return;
+        }
+
+        Canvas canvas = dragGhost.GetComponentInParent<Canvas>();
+        UpdateDragGhost(dragGhost, canvas, screenPosition);
+    }
+
+    private static void UpdateDragGhost(RectTransform ghostRect, Canvas canvas, Vector2 screenPosition)
+    {
+        RectTransform canvasRect = canvas != null ? canvas.transform as RectTransform : null;
+        if (ghostRect == null || canvasRect == null)
+        {
+            return;
+        }
+
+        Camera canvasCamera = canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : canvas.worldCamera;
+        if (RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                canvasRect,
+                screenPosition,
+                canvasCamera,
+                out Vector2 localPoint))
+        {
+            ghostRect.anchoredPosition = localPoint;
+        }
+    }
+
+    private void DestroyDragGhost()
+    {
+        if (dragGhost == null)
+        {
+            return;
+        }
+
+        if (Application.isPlaying)
+        {
+            Destroy(dragGhost.gameObject);
+        }
+        else
+        {
+            DestroyImmediate(dragGhost.gameObject);
+        }
+
+        dragGhost = null;
     }
 
     private void RefreshHoverState()
@@ -228,7 +414,7 @@ public class BackpackSlot : MonoBehaviour, IPointerDownHandler, IPointerUpHandle
 
     private void DropSingleItem()
     {
-        if (backpack == null)
+        if (ResolveBackpackManager() == null)
         {
             return;
         }
@@ -254,23 +440,71 @@ public class BackpackSlot : MonoBehaviour, IPointerDownHandler, IPointerUpHandle
         RuntimeCrystalDropFactory.CreateInteractiveDrop(
             crystal,
             dropPosition,
-            0.3f,
-            0,
+            RuntimeCrystalDropFactory.ClosedLootBagWorldScale,
+            4,
             null,
-            $"Drop_{crystal.type}");
+            $"Drop_{crystal.type}",
+            RuntimeDropPresentation.ClosedLootBag);
 
         backpack.RemoveItem(slotIndex);
-        if (backpackUI != null)
-        {
-            backpackUI.RefreshUI();
-        }
-        else
-        {
-            Debug.LogError("BackpackUI未找到！");
-        }
+        RefreshBackpackView();
 
         HideHoverState();
         Debug.Log($"格子{slotIndex}的物品{crystal.type}已丢弃");
+    }
+
+    private BackpackMananger ResolveBackpackManager()
+    {
+        if (backpack != null)
+        {
+            return backpack;
+        }
+
+        backpack = BackpackMananger.Instance != null
+            ? BackpackMananger.Instance
+            : Object.FindObjectOfType<BackpackMananger>(true);
+        return backpack;
+    }
+
+    private void RefreshBackpackView()
+    {
+        BackpackUI view = backpackUI != null
+            ? backpackUI
+            : Object.FindObjectOfType<BackpackUI>(true);
+        if (view == null)
+        {
+            return;
+        }
+
+        backpackUI = view;
+        backpackUI.RefreshUI();
+    }
+}
+
+internal sealed class DraggedSpecialStructureSlotSource : MonoBehaviour
+{
+    [SerializeField] private int slotIndex = -1;
+
+    public void Bind(int sourceSlotIndex)
+    {
+        slotIndex = sourceSlotIndex;
+    }
+
+    public static bool TryResolve(GameObject pointerDrag, out int sourceSlotIndex)
+    {
+        sourceSlotIndex = -1;
+        DraggedSpecialStructureSlotSource source =
+            pointerDrag != null
+                ? pointerDrag.GetComponent<DraggedSpecialStructureSlotSource>() ??
+                  pointerDrag.GetComponentInParent<DraggedSpecialStructureSlotSource>()
+                : null;
+        if (source == null || source.slotIndex < 0)
+        {
+            return false;
+        }
+
+        sourceSlotIndex = source.slotIndex;
+        return true;
     }
 }
 

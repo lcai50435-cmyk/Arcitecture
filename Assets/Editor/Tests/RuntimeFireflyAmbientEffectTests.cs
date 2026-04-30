@@ -26,20 +26,42 @@ public sealed class RuntimeFireflyAmbientEffectTests
         Assert.IsNotNull(resolveProfile.Invoke(null, new object[] { "BaseScene" }));
         Assert.IsNotNull(resolveProfile.Invoke(null, new object[] { "GameScene" }));
         Assert.IsNotNull(resolveProfile.Invoke(null, new object[] { "GameScene_02" }));
+        Assert.IsNotNull(resolveProfile.Invoke(null, new object[] { "SecondPassSence" }));
         Assert.IsNotNull(resolveProfile.Invoke(null, new object[] { "GameScene_03" }));
+        Assert.IsNotNull(resolveProfile.Invoke(null, new object[] { "SecondPass" }));
         Assert.IsNull(resolveProfile.Invoke(null, new object[] { "MainScene" }));
         Assert.IsNull(resolveProfile.Invoke(null, new object[] { "DeadScene" }));
         Assert.IsNull(resolveProfile.Invoke(null, new object[] { "IllustratedUIScene" }));
     }
 
     [Test]
-    public void GameplayProfileUsesStrongVisibleParticleScale()
+    public void FirstStageProfileUsesSubtleParticleScale()
     {
         Type effectType = ResolveEffectType();
         MethodInfo resolveProfile = effectType.GetMethod("ResolveProfile", BindingFlags.Static | BindingFlags.NonPublic);
         object profile = resolveProfile.Invoke(null, new object[] { "GameScene" });
+        object canonicalProfile = resolveProfile.Invoke(null, new object[] { "FirstPass_1" });
 
         Assert.IsNotNull(profile);
+        Assert.AreSame(profile, canonicalProfile);
+        Assert.LessOrEqual(ReadFloat(profile, "minSize"), 0.06f);
+        Assert.LessOrEqual(ReadFloat(profile, "maxSize"), 0.16f);
+        Assert.LessOrEqual(ReadFloat(profile, "emissionRate"), 3f);
+        Assert.LessOrEqual(ReadInt(profile, "maxParticles"), 20);
+        Assert.LessOrEqual(ReadColor(profile, "warmColor").a, 0.39f);
+        Assert.LessOrEqual(ReadColor(profile, "coolColor").a, 0.29f);
+    }
+
+    [Test]
+    public void LaterStageGameplayProfileKeepsVisibleParticleScale()
+    {
+        Type effectType = ResolveEffectType();
+        MethodInfo resolveProfile = effectType.GetMethod("ResolveProfile", BindingFlags.Static | BindingFlags.NonPublic);
+        object profile = resolveProfile.Invoke(null, new object[] { "SecondPassSence" });
+        object legacyProfile = resolveProfile.Invoke(null, new object[] { "GameScene_03" });
+
+        Assert.IsNotNull(profile);
+        Assert.AreSame(profile, legacyProfile);
         Assert.GreaterOrEqual(ReadFloat(profile, "minSize"), 0.12f);
         Assert.GreaterOrEqual(ReadFloat(profile, "maxSize"), 0.28f);
         Assert.GreaterOrEqual(ReadFloat(profile, "emissionRate"), 32f);
@@ -107,6 +129,13 @@ public sealed class RuntimeFireflyAmbientEffectTests
     private static int ReadInt(object target, string fieldName)
     {
         return (int)target.GetType()
+            .GetField(fieldName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
+            .GetValue(target);
+    }
+
+    private static Color ReadColor(object target, string fieldName)
+    {
+        return (Color)target.GetType()
             .GetField(fieldName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
             .GetValue(target);
     }

@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 public static class RuntimeModalStyle
@@ -332,8 +333,19 @@ public sealed class RuntimeModalShell : MonoBehaviour
     private RectTransform activeRectTransform;
     private Vector2 activeVisibleAnchoredPosition;
     private Vector3 activeVisibleScale = Vector3.one;
+    private Action backdropClickHandler;
+    private BackdropClickTarget backdropClickTarget;
 
     public bool IsVisible { get; private set; }
+
+    public void SetBackdropClickHandler(Action clickHandler)
+    {
+        backdropClickHandler = clickHandler;
+        if (backdropClickTarget != null)
+        {
+            backdropClickTarget.Clicked = backdropClickHandler;
+        }
+    }
 
     public void Show(CanvasGroup targetCanvasGroup, Action onShown = null)
     {
@@ -561,6 +573,8 @@ public sealed class RuntimeModalShell : MonoBehaviour
         overlayImage.color = Color.clear;
         StretchRect(overlayImage.rectTransform);
         overlayImage.raycastTarget = true;
+        backdropClickTarget = overlayImage.gameObject.AddComponent<BackdropClickTarget>();
+        backdropClickTarget.Clicked = backdropClickHandler;
 
         canvas.gameObject.SetActive(false);
     }
@@ -580,5 +594,15 @@ public sealed class RuntimeModalShell : MonoBehaviour
         rectTransform.anchorMax = Vector2.one;
         rectTransform.offsetMin = Vector2.zero;
         rectTransform.offsetMax = Vector2.zero;
+    }
+
+    private sealed class BackdropClickTarget : MonoBehaviour, IPointerClickHandler
+    {
+        public Action Clicked { private get; set; }
+
+        public void OnPointerClick(PointerEventData eventData)
+        {
+            Clicked?.Invoke();
+        }
     }
 }

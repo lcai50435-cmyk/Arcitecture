@@ -10,7 +10,7 @@ public class CrystalInteractHandler : MonoBehaviour, IInteractable
     private const float PickupAmbushProbability = 0.3f;
     private const int LegacyDefaultCommonExpValue = 30;
 
-    [Header("是否为专用材料")]
+    [Header("是否为专用结构")]
     public bool isUnlockMaterial = false;
 
     [Header("资源分类")]

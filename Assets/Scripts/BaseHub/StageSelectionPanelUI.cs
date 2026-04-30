@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
-using UnityEngine.EventSystems;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
@@ -12,6 +11,9 @@ public class StageCardView
     public GameplayStageDefinition definition;
     public RectTransform root;
     public Image background;
+    public CanvasGroup selectionGroup;
+    public RectTransform pointer;
+    public Vector2 pointerBasePosition;
     public Button selectButton;
     public Button enterButton;
     public TextMeshProUGUI titleText;
@@ -20,8 +22,11 @@ public class StageCardView
     public TextMeshProUGUI lockHintText;
 }
 
-public class StageSelectionPanelUI : MonoBehaviour, IBeginDragHandler, IEndDragHandler
+public class StageSelectionPanelUI : MonoBehaviour
 {
+    private const float PointerTravel = 8f;
+    private const float PointerAnimationSpeed = 1.8f;
+
     [SerializeField] private ScrollRect scrollRect;
     [SerializeField] private Button closeButton;
     [SerializeField] private Button previousButton;
@@ -34,9 +39,6 @@ public class StageSelectionPanelUI : MonoBehaviour, IBeginDragHandler, IEndDragH
 
     private BaseHubUIController uiController;
     private int selectedIndex;
-    private bool isDragging;
-    private bool isSnapping;
-    private float snapVelocity;
 
     private void Awake()
     {
@@ -73,6 +75,11 @@ public class StageSelectionPanelUI : MonoBehaviour, IBeginDragHandler, IEndDragH
         }
 
         cardViews.Add(view);
+        if (view.pointer != null)
+        {
+            view.pointerBasePosition = view.pointer.anchoredPosition;
+        }
+
         BindCardListeners(cardViews.Count - 1);
     }
 
@@ -84,55 +91,7 @@ public class StageSelectionPanelUI : MonoBehaviour, IBeginDragHandler, IEndDragH
 
     private void Update()
     {
-        if (scrollRect != null && scrollRect.viewport != null)
-        {
-            if (!isDragging &&
-                Input.GetMouseButtonDown(0) &&
-                RectTransformUtility.RectangleContainsScreenPoint(scrollRect.viewport, Input.mousePosition, null))
-            {
-                isDragging = true;
-                isSnapping = false;
-            }
-            else if (isDragging && Input.GetMouseButtonUp(0))
-            {
-                isDragging = false;
-                SelectStage(GetNearestIndex(), false);
-            }
-        }
-
-        if (!isSnapping || scrollRect == null || isDragging)
-        {
-            return;
-        }
-
-        float target = GetNormalizedPositionForIndex(selectedIndex);
-        float nextValue = Mathf.SmoothDamp(
-            scrollRect.horizontalNormalizedPosition,
-            target,
-            ref snapVelocity,
-            0.12f,
-            Mathf.Infinity,
-            Time.unscaledDeltaTime);
-        scrollRect.horizontalNormalizedPosition = nextValue;
-
-        if (Mathf.Abs(scrollRect.horizontalNormalizedPosition - target) <= 0.001f)
-        {
-            scrollRect.horizontalNormalizedPosition = target;
-            isSnapping = false;
-            snapVelocity = 0f;
-        }
-    }
-
-    public void OnBeginDrag(PointerEventData eventData)
-    {
-        isDragging = true;
-        isSnapping = false;
-    }
-
-    public void OnEndDrag(PointerEventData eventData)
-    {
-        isDragging = false;
-        SelectStage(GetNearestIndex(), false);
+        AnimateSelectedPointer();
     }
 
     public void Open()
@@ -144,17 +103,17 @@ public class StageSelectionPanelUI : MonoBehaviour, IBeginDragHandler, IEndDragH
         selectedIndex = Mathf.Clamp(runtimeIndex >= 0 ? runtimeIndex : 0, 0, Mathf.Max(0, cardViews.Count - 1));
 
         RefreshView();
-        SnapToSelection(true);
+        ScrollToSelection(true);
     }
 
     private void SelectPreviousStage()
     {
-        SelectStage(selectedIndex - 1, false);
+        SelectStage(selectedIndex - 1, true);
     }
 
     private void SelectNextStage()
     {
-        SelectStage(selectedIndex + 1, false);
+        SelectStage(selectedIndex + 1, true);
     }
 
     private void SelectStage(int index, bool immediate)
@@ -166,12 +125,12 @@ public class StageSelectionPanelUI : MonoBehaviour, IBeginDragHandler, IEndDragH
 
         selectedIndex = Mathf.Clamp(index, 0, cardViews.Count - 1);
         RefreshView();
-        SnapToSelection(immediate);
+        ScrollToSelection(immediate);
     }
 
     private void EnterSelectedStage(GameplayStageDefinition definition)
     {
-        if (definition == null || !GameplayStageCatalog.IsStageUnlocked(definition))
+        if (definition == null || definition.isPlaceholder || !GameplayStageCatalog.IsStageUnlocked(definition))
         {
             return;
         }
@@ -198,14 +157,18 @@ public class StageSelectionPanelUI : MonoBehaviour, IBeginDragHandler, IEndDragH
             StageCardView view = cardViews[i];
             bool unlocked = GameplayStageCatalog.IsStageUnlocked(view.definition, runtimeState);
             bool selected = i == selectedIndex;
+            bool placeholder = view.definition != null && view.definition.isPlaceholder;
 
             if (view.background != null)
             {
                 view.background.color = !unlocked
                     ? new Color(0.16f, 0.16f, 0.16f, 0.92f)
-                    : selected
-                        ? new Color(0.44f, 0.33f, 0.16f, 0.96f)
-                        : new Color(0.18f, 0.22f, 0.18f, 0.92f);
+                    : new Color(0.18f, 0.22f, 0.18f, 0.92f);
+            }
+
+            if (view.selectionGroup != null)
+            {
+                view.selectionGroup.alpha = selected ? 1f : 0f;
             }
 
             if (view.titleText != null)
@@ -215,31 +178,38 @@ public class StageSelectionPanelUI : MonoBehaviour, IBeginDragHandler, IEndDragH
 
             if (view.sceneNameText != null)
             {
-                view.sceneNameText.text = $"地图 Scene：{view.definition.sceneName}";
+                view.sceneNameText.text = placeholder
+                    ? "地图：未开放"
+                    : $"地图 Scene：{view.definition.sceneName}";
             }
 
             if (view.statusText != null)
             {
-                view.statusText.text = unlocked
+                view.statusText.text = placeholder
+                    ? "未开放"
+                    : unlocked
                     ? (selected ? "当前选中" : "已解锁")
                     : "未解锁";
             }
 
             if (view.lockHintText != null)
             {
-                view.lockHintText.text = unlocked
+                view.lockHintText.text = placeholder
+                    ? view.definition.lockedHint
+                    : unlocked
                     ? "可进入该关卡"
                     : view.definition.lockedHint;
             }
 
             if (view.enterButton != null)
             {
-                view.enterButton.interactable = unlocked;
+                view.enterButton.interactable = unlocked && !placeholder;
             }
         }
 
         GameplayStageDefinition selectedStage = cardViews.Count > 0 ? cardViews[selectedIndex].definition : null;
         bool isSelectedStageUnlocked = GameplayStageCatalog.IsStageUnlocked(selectedStage, runtimeState);
+        bool isSelectedStagePlaceholder = selectedStage != null && selectedStage.isPlaceholder;
         if (headerTitleText != null)
         {
             headerTitleText.text = selectedStage != null ? selectedStage.displayName : "选择关卡";
@@ -249,7 +219,9 @@ public class StageSelectionPanelUI : MonoBehaviour, IBeginDragHandler, IEndDragH
         {
             headerStatusText.text = selectedStage == null
                 ? string.Empty
-                : isSelectedStageUnlocked
+                : isSelectedStagePlaceholder
+                    ? $"状态：{selectedStage.lockedHint}"
+                    : isSelectedStageUnlocked
                     ? $"地图：{selectedStage.sceneName}    状态：可进入"
                     : $"地图：{selectedStage.sceneName}    状态：{selectedStage.lockedHint}";
         }
@@ -272,46 +244,44 @@ public class StageSelectionPanelUI : MonoBehaviour, IBeginDragHandler, IEndDragH
         }
     }
 
-    private void SnapToSelection(bool immediate)
+    private void AnimateSelectedPointer()
     {
-        if (scrollRect == null)
+        if (cardViews.Count == 0 || selectedIndex < 0 || selectedIndex >= cardViews.Count)
         {
             return;
         }
 
-        float target = GetNormalizedPositionForIndex(selectedIndex);
-        if (immediate)
+        StageCardView view = cardViews[selectedIndex];
+        if (view == null || view.pointer == null)
         {
-            scrollRect.horizontalNormalizedPosition = target;
-            isSnapping = false;
-            snapVelocity = 0f;
             return;
         }
 
-        isSnapping = true;
+        float progress = Mathf.PingPong(Time.unscaledTime * PointerAnimationSpeed, 1f);
+        float eased = 0.5f - Mathf.Cos(progress * Mathf.PI) * 0.5f;
+        float xOffset = Mathf.Lerp(-PointerTravel, PointerTravel, eased);
+        view.pointer.anchoredPosition = view.pointerBasePosition + new Vector2(xOffset, 0f);
     }
 
-    private int GetNearestIndex()
+    private void ScrollToSelection(bool shouldScroll)
     {
-        if (cardViews.Count <= 1 || scrollRect == null)
+        if (!shouldScroll || scrollRect == null)
         {
-            return 0;
+            return;
         }
 
-        return Mathf.Clamp(
-            Mathf.RoundToInt(scrollRect.horizontalNormalizedPosition * (cardViews.Count - 1)),
-            0,
-            cardViews.Count - 1);
+        Canvas.ForceUpdateCanvases();
+        scrollRect.verticalNormalizedPosition = GetVerticalNormalizedPositionForIndex(selectedIndex);
     }
 
-    private float GetNormalizedPositionForIndex(int index)
+    private float GetVerticalNormalizedPositionForIndex(int index)
     {
         if (cardViews.Count <= 1)
         {
-            return 0f;
+            return 1f;
         }
 
-        return Mathf.Clamp01(index / (float)(cardViews.Count - 1));
+        return 1f - Mathf.Clamp01(index / (float)(cardViews.Count - 1));
     }
 
     public void BindController(BaseHubUIController controller)
@@ -416,11 +386,17 @@ public class StageSelectionPanelUI : MonoBehaviour, IBeginDragHandler, IEndDragH
                 continue;
             }
 
+            CanvasGroup selectionGroup = FindNamedComponent<CanvasGroup>(cardRoot, "SelectedState");
+            RectTransform pointer = selectionGroup != null
+                ? selectionGroup.transform.Find("SelectedPointer") as RectTransform
+                : null;
             RegisterCard(new StageCardView
             {
                 definition = definition,
                 root = cardRoot,
                 background = cardRoot.GetComponent<Image>(),
+                selectionGroup = selectionGroup,
+                pointer = pointer,
                 selectButton = selectButtonView,
                 enterButton = FindStageEnterButton(cardRoot),
                 titleText = titleTextView,

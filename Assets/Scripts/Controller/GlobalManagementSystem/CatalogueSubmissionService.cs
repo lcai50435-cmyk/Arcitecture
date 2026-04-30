@@ -2,7 +2,7 @@ using UnityEngine;
 
 public struct CatalogueAutoSubmitResult
 {
-    public int specialStructureCount;
+    public int remainingSpecialStructureCount;
     public int inkSupplyCount;
     public int remainingCommonStructureCount;
 }
@@ -19,6 +19,18 @@ public struct CatalogueSubmitCommonStructureResult
     public BuildingRewardDefinition completionReward;
 }
 
+public struct CatalogueSubmitCommonStructuresResult
+{
+    public bool success;
+    public CatalogueBuildingId buildingId;
+    public int submittedCount;
+    public int requestedProgress;
+    public int appliedProgress;
+    public int previousProgress;
+    public int currentProgress;
+    public BuildingRewardDefinition completionReward;
+}
+
 public static class CatalogueSubmissionService
 {
     public static CatalogueAutoSubmitResult SubmitAllAuto(BackpackMananger backpack)
@@ -28,8 +40,6 @@ public static class CatalogueSubmissionService
         {
             return result;
         }
-
-        RuntimeProgressState runtimeState = RuntimeProgressState.EnsureInstance();
 
         for (int i = backpack.backpackItems.Count - 1; i >= 0; i--)
         {
@@ -48,9 +58,7 @@ public static class CatalogueSubmissionService
 
             if (crystal.IsSpecialStructure)
             {
-                runtimeState.AddSpecialStructureInventory(1);
-                backpack.RemoveItem(i);
-                result.specialStructureCount++;
+                result.remainingSpecialStructureCount++;
                 continue;
             }
 
@@ -119,6 +127,56 @@ public static class CatalogueSubmissionService
 
         backpack.RemoveItem(slotIndex);
         result.success = true;
+        return result;
+    }
+
+    public static CatalogueSubmitCommonStructuresResult SubmitAllCommonStructures(
+        BackpackMananger backpack,
+        CatalogueBuildingId buildingId)
+    {
+        RuntimeProgressState runtimeState = RuntimeProgressState.EnsureInstance();
+        CatalogueSubmitCommonStructuresResult result = new CatalogueSubmitCommonStructuresResult
+        {
+            buildingId = buildingId,
+            previousProgress = runtimeState.GetBuildingProgress(buildingId)
+        };
+
+        if (backpack == null)
+        {
+            result.currentProgress = result.previousProgress;
+            return result;
+        }
+
+        for (int i = backpack.backpackItems.Count - 1; i >= 0; i--)
+        {
+            ArchitecturalCrystal? nullableItem = backpack.GetItem(i);
+            if (!nullableItem.HasValue || !nullableItem.Value.IsCommonStructure)
+            {
+                continue;
+            }
+
+            CatalogueSubmitCommonStructureResult singleResult = SubmitSingleCommonStructure(backpack, i, buildingId);
+            if (!singleResult.success)
+            {
+                continue;
+            }
+
+            result.submittedCount++;
+            result.requestedProgress += singleResult.requestedProgress;
+            result.appliedProgress += singleResult.appliedProgress;
+            result.currentProgress = singleResult.currentProgress;
+            if (singleResult.completionReward != null)
+            {
+                result.completionReward = singleResult.completionReward;
+            }
+        }
+
+        if (result.currentProgress <= 0)
+        {
+            result.currentProgress = runtimeState.GetBuildingProgress(buildingId);
+        }
+
+        result.success = result.submittedCount > 0 && result.appliedProgress > 0;
         return result;
     }
 }

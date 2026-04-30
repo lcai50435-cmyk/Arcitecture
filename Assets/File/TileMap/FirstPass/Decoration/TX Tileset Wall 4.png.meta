@@ -1,0 +1,244 @@
+fileFormatVersion: 2
+guid: b40e18d10541a744abedb100b3b8dcd4
+TextureImporter:
+  internalIDToNameTable: []
+  externalObjects: {}
+  serializedVersion: 13
+  mipmaps:
+    mipMapMode: 0
+    enableMipMap: 0
+    sRGBTexture: 1
+    linearTexture: 0
+    fadeOut: 0
+    borderMipMap: 0
+    mipMapsPreserveCoverage: 0
+    alphaTestReferenceValue: 0.5
+    mipMapFadeDistanceStart: 1
+    mipMapFadeDistanceEnd: 3
+  bumpmap:
+    convertToNormalMap: 0
+    externalNormalMap: 0
+    heightScale: 0.25
+    normalMapFilter: 0
+    flipGreenChannel: 0
+  isReadable: 0
+  streamingMipmaps: 0
+  streamingMipmapsPriority: 0
+  vTOnly: 0
+  ignoreMipmapLimit: 0
+  grayScaleToAlpha: 0
+  generateCubemap: 6
+  cubemapConvolution: 0
+  seamlessCubemap: 0
+  textureFormat: 1
+  maxTextureSize: 2048
+  textureSettings:
+    serializedVersion: 2
+    filterMode: 0
+    aniso: 1
+    mipBias: 0
+    wrapU: 1
+    wrapV: 1
+    wrapW: 1
+  nPOTScale: 0
+  lightmap: 0
+  compressionQuality: 50
+  spriteMode: 2
+  spriteExtrude: 1
+  spriteMeshType: 1
+  alignment: 0
+  spritePivot: {x: 0.5, y: 0.5}
+  spritePixelsToUnits: 100
+  spriteBorder: {x: 0, y: 0, z: 0, w: 0}
+  spriteGenerateFallbackPhysicsShape: 1
+  alphaUsage: 1
+  alphaIsTransparency: 1
+  spriteTessellationDetail: -1
+  textureType: 8
+  textureShape: 1
+  singleChannelComponent: 0
+  flipbookRows: 1
+  flipbookColumns: 1
+  maxTextureSizeSet: 0
+  compressionQualitySet: 0
+  textureFormatSet: 0
+  ignorePngGamma: 0
+  applyGammaDecoding: 0
+  swizzle: 50462976
+  cookieLightType: 0
+  platformSettings:
+  - serializedVersion: 3
+    buildTarget: DefaultTexturePlatform
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: 4
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 3
+    buildTarget: Standalone
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 3
+    buildTarget: WebGL
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  spriteSheet:
+    serializedVersion: 2
+    sprites:
+    - serializedVersion: 2
+      name: TX Tileset Wall 4_0
+      rect:
+        serializedVersion: 2
+        x: 152
+        y: 376
+        width: 32
+        height: 32
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 14cf71a2cb0d9af41af9237ebb064b4f
+      internalID: -1881071273
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: TX Tileset Wall 4_1
+      rect:
+        serializedVersion: 2
+        x: 120
+        y: 472
+        width: 32
+        height: 32
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: c110bbfaac0790347a9be8aadc7a6ae7
+      internalID: -1178853256
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    outline: []
+    physicsShape: []
+    bones: []
+    spriteID: 5e97eb03825dee720800000000000000
+    internalID: 0
+    vertices: []
+    indices: 
+    edges: []
+    weights: []
+    secondaryTextures: []
+    nameFileIdTable:
+      TX Tileset Wall 3_0: 97091595
+      TX Tileset Wall 3_1: 1661727966
+      TX Tileset Wall 3_10: -1481388490
+      TX Tileset Wall 3_11: -1571911255
+      TX Tileset Wall 3_12: -1131774539
+      TX Tileset Wall 3_13: 1034133969
+      TX Tileset Wall 3_14: -1308337839
+      TX Tileset Wall 3_15: 1466434001
+      TX Tileset Wall 3_16: -1192345163
+      TX Tileset Wall 3_17: 2029596229
+      TX Tileset Wall 3_18: -879005507
+      TX Tileset Wall 3_19: -37482446
+      TX Tileset Wall 3_2: -1740241773
+      TX Tileset Wall 3_20: 961672997
+      TX Tileset Wall 3_21: -1058186080
+      TX Tileset Wall 3_22: -1554510271
+      TX Tileset Wall 3_23: 2019937225
+      TX Tileset Wall 3_24: -1396741363
+      TX Tileset Wall 3_25: -1348279273
+      TX Tileset Wall 3_26: 1986271926
+      TX Tileset Wall 3_27: 294454750
+      TX Tileset Wall 3_28: 1780649743
+      TX Tileset Wall 3_29: -57207329
+      TX Tileset Wall 3_3: -540709197
+      TX Tileset Wall 3_30: 1823889373
+      TX Tileset Wall 3_31: -1938939397
+      TX Tileset Wall 3_32: 981656827
+      TX Tileset Wall 3_33: -333187427
+      TX Tileset Wall 3_34: -794758608
+      TX Tileset Wall 3_35: -89129242
+      TX Tileset Wall 3_36: -1232763059
+      TX Tileset Wall 3_37: -1866265397
+      TX Tileset Wall 3_38: 1886124298
+      TX Tileset Wall 3_39: 977667311
+      TX Tileset Wall 3_4: 2133137772
+      TX Tileset Wall 3_40: 1491253424
+      TX Tileset Wall 3_41: -836361380
+      TX Tileset Wall 3_42: 1016372198
+      TX Tileset Wall 3_43: -1944397156
+      TX Tileset Wall 3_44: 75977834
+      TX Tileset Wall 3_45: -958457898
+      TX Tileset Wall 3_46: 248345990
+      TX Tileset Wall 3_47: -949909375
+      TX Tileset Wall 3_48: 152728827
+      TX Tileset Wall 3_49: 1444224819
+      TX Tileset Wall 3_5: -855211624
+      TX Tileset Wall 3_50: 1017644327
+      TX Tileset Wall 3_51: 204849358
+      TX Tileset Wall 3_52: -1762992998
+      TX Tileset Wall 3_53: -478927951
+      TX Tileset Wall 3_54: -1956673525
+      TX Tileset Wall 3_55: -1325265063
+      TX Tileset Wall 3_56: 80827650
+      TX Tileset Wall 3_57: 282501676
+      TX Tileset Wall 3_58: 358209282
+      TX Tileset Wall 3_59: -156246800
+      TX Tileset Wall 3_6: 1871214952
+      TX Tileset Wall 3_60: -323980985
+      TX Tileset Wall 3_61: -525131047
+      TX Tileset Wall 3_62: 2104781877
+      TX Tileset Wall 3_63: 1900663747
+      TX Tileset Wall 3_64: -567046697
+      TX Tileset Wall 3_65: -908249842
+      TX Tileset Wall 3_66: -1594767209
+      TX Tileset Wall 3_67: 577569102
+      TX Tileset Wall 3_68: -677634666
+      TX Tileset Wall 3_69: -216454415
+      TX Tileset Wall 3_7: -1343777444
+      TX Tileset Wall 3_70: -1309742076
+      TX Tileset Wall 3_71: -310926862
+      TX Tileset Wall 3_72: 1729632531
+      TX Tileset Wall 3_8: -1485305076
+      TX Tileset Wall 3_9: -545231146
+      TX Tileset Wall 4_0: -1881071273
+      TX Tileset Wall 4_1: -1178853256
+  mipmapLimitGroupName: 
+  pSDRemoveMatte: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 

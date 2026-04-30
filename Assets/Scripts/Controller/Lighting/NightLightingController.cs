@@ -70,6 +70,7 @@ public sealed class NightLightingController : MonoBehaviour
     private const string AccentRootObjectName = "NightAccentRoot";
     private const string MainSceneName = "MainScene";
     private const string BaseSceneName = "NewBase";
+    private const string FirstPassSceneName = "FirstPass_1";
     private const string DeadSceneName = "DeadScene";
     internal const int OverlaySortingOrder = 28000;
     internal const int ShadowSortingOrder = OverlaySortingOrder + 20;
@@ -103,6 +104,10 @@ public sealed class NightLightingController : MonoBehaviour
             CreateReadableSceneProfile(BaseSceneName, false, 0.55f, 0.20f, 0.40f, 0.84f, 1.00f)
         },
         {
+            FirstPassSceneName,
+            CreateReadableSceneProfile(FirstPassSceneName, true, 0f, 0.16f, 0.58f, 0.82f, 1.02f)
+        },
+        {
             "GameScene",
             CreateReadableSceneProfile("GameScene", true, 0f, 0.16f, 0.58f, 0.82f, 1.02f)
         },
@@ -113,6 +118,10 @@ public sealed class NightLightingController : MonoBehaviour
         {
             "GameScene_03",
             CreateReadableSceneProfile("GameScene_03", true, 0f, 0.16f, 0.58f, 0.82f, 1.02f)
+        },
+        {
+            "SecondPassSence",
+            CreateReadableSceneProfile("SecondPassSence", true, 0f, 0.16f, 0.58f, 0.82f, 1.02f)
         },
         {
             DeadSceneName,

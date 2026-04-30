@@ -88,6 +88,7 @@ public struct ArchitecturalCrystal
     public bool IsSpecialStructure => Category == ArchitecturalResourceCategory.SpecialStructure;
     public bool IsInkSupply => Category == ArchitecturalResourceCategory.InkSupply;
     public bool IsRepairMaterial => Category == ArchitecturalResourceCategory.RepairMaterial;
+    public bool IsGenericCommonMaterial => IsCommonStructure && IsGenericCommonMaterialType(type);
 
     public string DisplayName
     {
@@ -100,11 +101,23 @@ public struct ArchitecturalCrystal
 
             if (IsSpecialStructure)
             {
-                return "专用结构材料";
+                return "专用结构";
+            }
+
+            if (IsGenericCommonMaterial)
+            {
+                return "通用材料";
             }
 
             return ArchitecturalCrystalFactory.GetDisplayName(type);
         }
+    }
+
+    public static bool IsGenericCommonMaterialType(ArchitecturalType type)
+    {
+        return type == ArchitecturalType.Green ||
+               type == ArchitecturalType.Gold ||
+               type == ArchitecturalType.White;
     }
 
     public ArchitecturalCrystal(
@@ -218,56 +231,56 @@ public static class ArchitecturalCrystalFactory
             {
                 ArchitecturalType.MortiseAndTenonJoint,
                 new CommonStructureCrystalDefinition(
-                    AttributeBonusType.AttackPower,
-                    3f,
-                    AttributeBonusType.MoveSpeed,
-                    3f,
-                    "榫卯可提升命中次数，让墨迹继续向前穿透。")
+                    AttributeBonusType.None,
+                    0f,
+                    AttributeBonusType.None,
+                    0f,
+                    "榫卯会让墨迹按扇形发射，最多形成 6 发齐射。")
             },
             {
                 ArchitecturalType.GroundMass,
                 new CommonStructureCrystalDefinition(
-                    AttributeBonusType.Defense,
-                    5f,
-                    AttributeBonusType.MoveSpeed,
-                    -3f,
-                    "台基让墨迹附带击退，帮你拉开安全距离。")
+                    AttributeBonusType.None,
+                    0f,
+                    AttributeBonusType.None,
+                    0f,
+                    "石基会同步提升墨迹体积与伤害。")
             },
             {
                 ArchitecturalType.BeamFrame,
                 new CommonStructureCrystalDefinition(
-                    AttributeBonusType.AttackPower,
-                    3f,
-                    AttributeBonusType.MoveSpeed,
-                    3f,
-                    "梁架会同步提升弹道速度与射程。")
+                    AttributeBonusType.None,
+                    0f,
+                    AttributeBonusType.None,
+                    0f,
+                    "梁架会提升攻击速度，最低攻击间隔为 0.4 秒。")
             },
             {
                 ArchitecturalType.TampedEarth,
                 new CommonStructureCrystalDefinition(
-                    AttributeBonusType.CurrentHealth,
-                    10f,
-                    AttributeBonusType.Defense,
-                    5f,
-                    "夯土会附带减速，让敌人行动迟缓。")
+                    AttributeBonusType.None,
+                    0f,
+                    AttributeBonusType.None,
+                    0f,
+                    "夯土会同步提升墨迹射程与飞行速度。")
             },
             {
                 ArchitecturalType.Tile,
                 new CommonStructureCrystalDefinition(
-                    AttributeBonusType.Durability,
-                    10f,
-                    AttributeBonusType.MoveSpeed,
-                    3f,
-                    "瓦可增大墨迹体积，提升命中覆盖面。")
+                    AttributeBonusType.None,
+                    0f,
+                    AttributeBonusType.None,
+                    0f,
+                    "瓦片会增大墨迹体积，并降低攻击墨水消耗。")
             },
             {
                 ArchitecturalType.Brackets,
                 new CommonStructureCrystalDefinition(
-                    AttributeBonusType.Defense,
-                    5f,
-                    AttributeBonusType.CurrentHealth,
-                    10f,
-                    "斗拱可增加弹体数量，让一次攻击覆盖更大区域。")
+                    AttributeBonusType.None,
+                    0f,
+                    AttributeBonusType.None,
+                    0f,
+                    "斗拱会追加攻击波次，最多连续发出 3 波。")
             }
         };
 
@@ -317,7 +330,7 @@ public static class ArchitecturalCrystalFactory
             0,
             specialIcon,
             specialBackIcon,
-            "专用结构材料，可用于点亮建筑录槽位。",
+            "专用结构，可用于点亮建筑录槽位。",
             AttributeBonusType.None,
             0f,
             AttributeBonusType.None,
@@ -325,6 +338,19 @@ public static class ArchitecturalCrystalFactory
             true,
             ArchitecturalResourceCategory.SpecialStructure,
             0);
+    }
+
+    public static ArchitecturalCrystal CreateGenericCommonMaterial(
+        Sprite icon = null,
+        Sprite backIcon = null)
+    {
+        ArchitecturalCrystal crystal = CreateCommonStructure(
+            ArchitecturalType.Green,
+            icon,
+            backIcon,
+            MaximumBuildProgressPercent);
+        crystal.textDescription = "通用材料，可带回基地提交到建筑录。";
+        return crystal;
     }
 
     public static ArchitecturalCrystal CreateRepairMaterial(
@@ -455,13 +481,13 @@ public static class ArchitecturalCrystalFactory
             case ArchitecturalType.MortiseAndTenonJoint:
                 return "榫卯";
             case ArchitecturalType.GroundMass:
-                return "台基";
+                return "石基";
             case ArchitecturalType.BeamFrame:
                 return "梁架";
             case ArchitecturalType.TampedEarth:
                 return "夯土";
             case ArchitecturalType.Tile:
-                return "瓦";
+                return "瓦片";
             case ArchitecturalType.Brackets:
                 return "斗拱";
             case ArchitecturalType.SmallInkBottle:
@@ -484,17 +510,17 @@ public static class ArchitecturalCrystalFactory
         switch (type)
         {
             case ArchitecturalType.Brackets:
-                return "斗拱可增加弹体数量，让一次攻击覆盖更大区域。";
+                return "斗拱会追加攻击波次，最多连续发出 3 波。";
             case ArchitecturalType.MortiseAndTenonJoint:
-                return "榫卯可提升命中次数，让墨迹继续向前穿透。";
+                return "榫卯会让墨迹按扇形发射，最多形成 6 发齐射。";
             case ArchitecturalType.Tile:
-                return "瓦可增大墨迹体积，提升命中覆盖面。";
+                return "瓦片会增大墨迹体积，并降低攻击墨水消耗。";
             case ArchitecturalType.TampedEarth:
-                return "夯土会附带减速，让敌人行动迟缓。";
+                return "夯土会同步提升墨迹射程与飞行速度。";
             case ArchitecturalType.GroundMass:
-                return "台基让墨迹附带击退，帮你拉开安全距离。";
+                return "石基会同步提升墨迹体积与伤害。";
             case ArchitecturalType.BeamFrame:
-                return "梁架会同步提升弹道速度与射程。";
+                return "梁架会提升攻击速度，最低攻击间隔为 0.4 秒。";
             default:
                 return $"拾取 {GetDisplayName(type)} 后会立即生效。";
         }
