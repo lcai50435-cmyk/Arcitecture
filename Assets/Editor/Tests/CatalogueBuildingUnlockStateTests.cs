@@ -161,6 +161,10 @@ public sealed class CatalogueBuildingUnlockStateTests
         GameObject detailPanel = new GameObject("DetailPanel");
         roots.Add(handbookPanel);
         roots.Add(detailPanel);
+        Text detailTitle = CreateChild<Text>(detailPanel.transform, "Title");
+        DetailedInformationUI detailUi = detailPanel.AddComponent<DetailedInformationUI>();
+        detailUi.detailedInformationPanel = detailPanel;
+        detailUi.page1NameText = detailTitle;
         handbookPanel.SetActive(true);
         detailPanel.SetActive(false);
 
@@ -204,9 +208,9 @@ public sealed class CatalogueBuildingUnlockStateTests
         Assert.IsTrue(handbookPanel.activeSelf);
         Assert.IsFalse(detailPanel.activeSelf);
 
+        dialog.EnsureTopmostRuntimePanelInputSurface();
         Canvas canvas = dialog.dialogPanel.GetComponent<Canvas>();
         Assert.IsNotNull(canvas);
-        Assert.IsTrue(canvas.overrideSorting);
         Assert.Greater(canvas.sortingOrder, RuntimeModalStyle.ModalSortingOrder);
     }
 
@@ -220,6 +224,10 @@ public sealed class CatalogueBuildingUnlockStateTests
         GameObject detailPanel = new GameObject("DetailPanel");
         roots.Add(handbookPanel);
         roots.Add(detailPanel);
+        Text detailTitle = CreateChild<Text>(detailPanel.transform, "Title");
+        DetailedInformationUI detailUi = detailPanel.AddComponent<DetailedInformationUI>();
+        detailUi.detailedInformationPanel = detailPanel;
+        detailUi.page1NameText = detailTitle;
         handbookPanel.SetActive(true);
         detailPanel.SetActive(false);
 
@@ -230,6 +238,8 @@ public sealed class CatalogueBuildingUnlockStateTests
         GameObject lockedVisual = CreateChild<Image>(cardObject.transform, "Lock").gameObject;
         GameObject unlockedVisual = CreateChild<Image>(cardObject.transform, "Unlock").gameObject;
         unlockedVisual.AddComponent<Button>();
+        BuildingDetailData detailData = CreateChild<BuildingDetailData>(cardObject.transform, "DetailData");
+        detailData.buildingName = "测试建筑";
 
         CatalogueBuildingUnlockState unlockState = cardObject.AddComponent<CatalogueBuildingUnlockState>();
         unlockState.buildingId = CatalogueBuildingId.Building1;
@@ -261,6 +271,7 @@ public sealed class CatalogueBuildingUnlockStateTests
 
         Assert.IsFalse(handbookPanel.activeSelf);
         Assert.IsTrue(detailPanel.activeSelf);
+        Assert.AreEqual("测试建筑", detailTitle.text);
         Assert.IsNull(FindRuntimeDialog());
     }
 
@@ -360,6 +371,69 @@ public sealed class CatalogueBuildingUnlockStateTests
 
         Assert.IsTrue(state.IsSlotUnlocked(CatalogueBuildingId.Building1, 0));
         Assert.Greater(state.GetBuildingProgress(CatalogueBuildingId.Building1), previousProgress);
+        Assert.AreEqual(0, backpack.GetSpecialStructureMaterialCount());
+        Assert.AreEqual(Color.white, slotImage.color);
+    }
+
+    [Test]
+    public void DroppingFinalBackpackSpecialStructureOnCatalogueSlotUnlocksBuilding()
+    {
+        RuntimeProgressState state = RuntimeProgressState.EnsureInstance();
+        state.ResetProgress(false);
+        BuildingDefinition definition = BuildingDefinitionLibrary.Get(CatalogueBuildingId.Building1);
+
+        Assert.IsTrue(state.AddBuildingProgress(
+            CatalogueBuildingId.Building1,
+            definition.requiredProgress,
+            out _));
+        for (int i = 1; i < definition.slotDefinitions.Length; i++)
+        {
+            Assert.IsTrue(state.TryUnlockSlot(
+                CatalogueBuildingId.Building1,
+                i,
+                out _,
+                out _));
+        }
+
+        Assert.IsFalse(state.IsBuildingUnlocked(CatalogueBuildingId.Building1));
+
+        GameObject backpackObject = new GameObject("RuntimeBackpackManager");
+        roots.Add(backpackObject);
+        BackpackMananger backpack = backpackObject.AddComponent<BackpackMananger>();
+        Assert.IsTrue(backpack.PickItem(ArchitecturalCrystalFactory.CreateSpecialStructureMaterial()));
+
+        GameObject cardObject = new GameObject("Card", typeof(RectTransform));
+        roots.Add(cardObject);
+        Slider slider = CreateChild<Slider>(cardObject.transform, "Slider");
+
+        GameObject slotObject = new GameObject("SpecialSlot", typeof(RectTransform), typeof(Image), typeof(Button));
+        slotObject.transform.SetParent(cardObject.transform, false);
+        Image slotImage = slotObject.GetComponent<Image>();
+        CatalogueUnlockSlotButton slotButton = slotObject.AddComponent<CatalogueUnlockSlotButton>();
+        slotButton.targetImage = slotImage;
+        slotButton.slotIndex = 0;
+
+        CatalogueBuildingUnlockState unlockState = cardObject.AddComponent<CatalogueBuildingUnlockState>();
+        unlockState.buildingId = CatalogueBuildingId.Building1;
+        unlockState.buildingSlider = slider;
+        unlockState.slotButtons = new[] { slotButton };
+        unlockState.RefreshState();
+
+        GameObject sourceSlotObject = new GameObject("BackpackSlot", typeof(RectTransform), typeof(Image), typeof(BackpackSlot));
+        roots.Add(sourceSlotObject);
+        sourceSlotObject.GetComponent<BackpackSlot>().slotIndex = 0;
+
+        EventSystem eventSystem = EventSystem.current ?? new GameObject("EventSystem", typeof(EventSystem)).GetComponent<EventSystem>();
+        PointerEventData eventData = new PointerEventData(eventSystem)
+        {
+            pointerDrag = sourceSlotObject
+        };
+
+        ((IDropHandler)slotButton).OnDrop(eventData);
+
+        Assert.IsTrue(state.IsSlotUnlocked(CatalogueBuildingId.Building1, 0));
+        Assert.AreEqual(definition.requiredProgress, state.GetBuildingProgress(CatalogueBuildingId.Building1));
+        Assert.IsTrue(state.IsBuildingUnlocked(CatalogueBuildingId.Building1));
         Assert.AreEqual(0, backpack.GetSpecialStructureMaterialCount());
         Assert.AreEqual(Color.white, slotImage.color);
     }

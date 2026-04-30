@@ -41,7 +41,7 @@ public static class GameplayStageCatalog
             sceneName = "GameScene_03",
             stageBuildingId = CatalogueBuildingId.Building3,
             gatingBuildingId = CatalogueBuildingId.Building1,
-            lockedHint = "修复福建土楼后开放"
+            lockedHint = "解锁福建土楼图鉴后开放"
         },
         new GameplayStageDefinition
         {
@@ -52,7 +52,7 @@ public static class GameplayStageCatalog
             sceneName = "GameScene_02",
             stageBuildingId = CatalogueBuildingId.Building2,
             gatingBuildingId = CatalogueBuildingId.Building3,
-            lockedHint = "修复安徽水乡民居后开放"
+            lockedHint = "解锁安徽水乡民居图鉴后开放"
         },
         new GameplayStageDefinition
         {
@@ -189,7 +189,7 @@ public static class GameplayStageCatalog
         }
 
         runtimeState = runtimeState ?? RuntimeProgressState.Instance ?? RuntimeProgressState.EnsureInstance();
-        return runtimeState.IsBuildingRepaired(definition.gatingBuildingId);
+        return runtimeState.IsBuildingUnlocked(definition.gatingBuildingId);
     }
 
     public static GameplayStageDefinition GetFirstUnlockedStage(RuntimeProgressState runtimeState = null)

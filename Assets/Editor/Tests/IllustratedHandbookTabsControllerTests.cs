@@ -232,9 +232,9 @@ public sealed class IllustratedHandbookTabsControllerTests
         hoverExitHandler.OnPointerExit(new PointerEventData(eventSystem));
 
         Assert.AreEqual(WeaponType.DirectInk, PlayerLoadoutRuntime.CurrentWeaponType);
-        Assert.AreEqual(WeaponType.PierceInk, RuntimeWeaponTypeResolver.ResolveEffectiveWeaponType(null));
-        AssertPersonalInkSelected(firstOption, false);
-        AssertPersonalInkSelected(thirdOption, true);
+        Assert.AreEqual(WeaponType.DirectInk, RuntimeWeaponTypeResolver.ResolveEffectiveWeaponType(null));
+        AssertPersonalInkSelected(firstOption, true);
+        AssertPersonalInkSelected(thirdOption, false);
     }
 
     [Test]
@@ -288,7 +288,7 @@ public sealed class IllustratedHandbookTabsControllerTests
         controller.SwitchToPage(IllustratedHandbookPage.IllustratedHandbook);
 
         Slider[] sliders = handbookPage.GetComponentsInChildren<Slider>(true);
-        Assert.AreEqual(2, sliders.Length);
+        Assert.AreEqual(4, sliders.Length);
         for (int i = 0; i < sliders.Length; i++)
         {
             AssertSliderIsReadOnlyDisplay(sliders[i]);

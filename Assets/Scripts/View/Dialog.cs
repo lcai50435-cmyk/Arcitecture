@@ -119,7 +119,7 @@ public class Dialog : MonoBehaviour
     public static Dialog EnsureTopmostRuntimeInstance()
     {
         Dialog dialog = EnsureGameplayRuntimeInstance();
-        dialog?.EnsureRuntimePanelInputSurface();
+        dialog?.EnsureTopmostRuntimePanelInputSurface();
         return dialog;
     }
 
@@ -293,6 +293,10 @@ public class Dialog : MonoBehaviour
         }
 
         currentCoroutine = StartCoroutine(PlayDialogSequence(autoClose));
+        if (IsRuntimeDialog())
+        {
+            EnsureTopmostRuntimePanelInputSurface();
+        }
 
         return true;
     }
@@ -735,6 +739,16 @@ public class Dialog : MonoBehaviour
     private void EnsureRuntimePanelInputSurface()
     {
         if (dialogPanel == null || !IsRuntimeDialog())
+        {
+            return;
+        }
+
+        EnsureTopmostRuntimePanelInputSurface();
+    }
+
+    public void EnsureTopmostRuntimePanelInputSurface()
+    {
+        if (dialogPanel == null)
         {
             return;
         }

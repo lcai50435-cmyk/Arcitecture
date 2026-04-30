@@ -432,7 +432,7 @@ public sealed class LevelSelectionSceneController : MonoBehaviour
         EnsureStageCardText(
             cardRect,
             StageActionName,
-            placeholder ? "敬请期待" : unlocked ? "进入关卡" : "先完成前置修复",
+            placeholder ? "敬请期待" : unlocked ? "进入关卡" : "先解锁图鉴",
             23f,
             new Vector2(0f, -270f),
             new Vector2(300f, 46f),

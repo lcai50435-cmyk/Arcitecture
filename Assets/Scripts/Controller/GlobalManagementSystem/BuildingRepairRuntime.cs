@@ -8,48 +8,11 @@ public sealed class BaseHubRepairWorkbenchInteract : MonoBehaviour, IInteractabl
     private readonly Dictionary<CatalogueBuildingId, GameObject> activeDrops =
         new Dictionary<CatalogueBuildingId, GameObject>();
 
-    public string InteractionTip => ResolveReadyBuilding(out _) ? "领取修复材料" : "修复工作台";
+    public string InteractionTip => "图鉴解锁即开放关卡";
 
     public void OnInteract()
     {
-        RuntimeProgressState runtimeState = RuntimeProgressState.EnsureInstance();
-        BackpackMananger backpack = BackpackMananger.Instance;
-        if (backpack == null)
-        {
-            RuntimeSubtitleFeedHud.PushMessage("修复工作台暂未连接背包。");
-            return;
-        }
-
-        if (!ResolveReadyBuilding(out CatalogueBuildingId buildingId))
-        {
-            RuntimeSubtitleFeedHud.PushMessage("图鉴进度和专用结构都完成后，这里会生成修复材料。");
-            return;
-        }
-
-        BuildingDefinition definition = BuildingDefinitionLibrary.Get(buildingId);
-        if (backpack.HasRepairMaterial(buildingId))
-        {
-            RuntimeSubtitleFeedHud.PushMessage($"{definition.displayName}修复材料已在背包中。");
-            return;
-        }
-
-        if (activeDrops.TryGetValue(buildingId, out GameObject existingDrop) && existingDrop != null)
-        {
-            RuntimeSubtitleFeedHud.PushMessage($"{definition.displayName}修复材料已经生成。");
-            return;
-        }
-
-        ArchitecturalCrystal material = ArchitecturalCrystalFactory.CreateRepairMaterial(buildingId);
-        Vector3 dropPosition = transform.position + new Vector3(0.92f, -0.34f, 0f);
-        GameObject drop = RuntimeCrystalDropFactory.CreateInteractiveDrop(
-            material,
-            dropPosition,
-            0.55f,
-            5,
-            null,
-            $"RepairMaterial_{definition.displayName}");
-        activeDrops[buildingId] = drop;
-        RuntimeSubtitleFeedHud.PushMessage($"{definition.displayName}修复材料已生成，拾取后带回对应关卡。");
+        RuntimeSubtitleFeedHud.PushMessage("现在解锁建筑图鉴后即可开放下一关，不再需要领取修复材料。");
     }
 
     private static bool ResolveReadyBuilding(out CatalogueBuildingId buildingId)
@@ -297,6 +260,11 @@ public static class RepairableBuildingBootstrapper
             return;
         }
 
+        if (!ShouldSpawnRepairableBuilding())
+        {
+            return;
+        }
+
         RepairableBuildingGroup[] existingGroups = Object.FindObjectsOfType<RepairableBuildingGroup>(true);
         for (int i = 0; i < existingGroups.Length; i++)
         {
@@ -345,12 +313,17 @@ public static class RepairableBuildingBootstrapper
         group.RegisterVisual(visual);
     }
 
+    public static bool ShouldSpawnRepairableBuilding()
+    {
+        return false;
+    }
+
     public static bool ShouldSpawnRepairableBuilding(
         bool isRepairReady,
         bool hasRepairMaterial,
         bool isRepaired)
     {
-        return isRepairReady || hasRepairMaterial || isRepaired;
+        return false;
     }
 
     private static Vector3 ResolveSpawnPosition()

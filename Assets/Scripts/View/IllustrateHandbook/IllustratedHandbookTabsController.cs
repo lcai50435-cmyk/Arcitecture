@@ -1094,7 +1094,7 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
             GameObject cardObject = Instantiate(template.gameObject, leftPanel, false);
             cardObject.name = $"{HandbookCardNamePrefix}{i + 1}";
             RectTransform cardRect = cardObject.transform as RectTransform;
-            ApplyCatalogueBuildingId(cardObject, i);
+            ApplyCatalogueBuildingId(cardObject, i, false);
             AddUniqueCardRect(cardRects, cardRect);
         }
 
@@ -1423,6 +1423,7 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
             buildingImage.sprite = previewSprite;
             buildingImage.enabled = previewSprite != null;
             buildingImage.preserveAspect = true;
+            BindSceneAuthoredBuildingDetailButton(buildingImage, binding, definition);
         }
 
         TMP_Text introductionText = buildingImageRoot != null
@@ -1509,6 +1510,37 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         }
 
         return binding?.descriptionText != null ? binding.descriptionText.text : string.Empty;
+    }
+
+    private void BindSceneAuthoredBuildingDetailButton(
+        Image buildingImage,
+        SceneAuthoredHandbookCardBinding binding,
+        BuildingDefinition definition)
+    {
+        if (buildingImage == null || binding == null || definition == null)
+        {
+            return;
+        }
+
+        buildingImage.raycastTarget = true;
+
+        Button button = buildingImage.GetComponent<Button>();
+        if (button == null)
+        {
+            button = buildingImage.gameObject.AddComponent<Button>();
+        }
+
+        button.targetGraphic = buildingImage;
+        button.interactable = RuntimeProgressState.EnsureInstance().IsBuildingUnlocked(binding.buildingId);
+
+        SceneHandbookBuildingDetailButtonHandler handler =
+            buildingImage.GetComponent<SceneHandbookBuildingDetailButtonHandler>();
+        if (handler == null)
+        {
+            handler = buildingImage.gameObject.AddComponent<SceneHandbookBuildingDetailButtonHandler>();
+        }
+
+        handler.Bind(binding.buildingId, binding.detailData, definition, buildingImage.sprite);
     }
 
     private void RefreshSceneAuthoredRightProgress(
@@ -2080,20 +2112,20 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
 
     private static CatalogueBuildingId ResolveCatalogueBuildingId(GameObject cardObject, int zeroBasedIndex)
     {
-        if (cardObject != null &&
-            TryResolveCatalogueBuildingIdFromTitle(
-                ResolveSceneAuthoredCardTitleText(cardObject.transform)?.text,
-                out CatalogueBuildingId titleBuildingId))
-        {
-            return titleBuildingId;
-        }
-
         CatalogueBuildingUnlockState unlockState = cardObject != null
             ? cardObject.GetComponent<CatalogueBuildingUnlockState>()
             : null;
         if (unlockState != null)
         {
             return unlockState.buildingId;
+        }
+
+        if (cardObject != null &&
+            TryResolveCatalogueBuildingIdFromTitle(
+                ResolveSceneAuthoredCardTitleText(cardObject.transform)?.text,
+                out CatalogueBuildingId titleBuildingId))
+        {
+            return titleBuildingId;
         }
 
         return (CatalogueBuildingId)Mathf.Clamp(
@@ -2375,12 +2407,12 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
             cardObject.name = $"{HandbookCardNamePrefix}{i + 1}";
 
             RectTransform cardRect = cardObject.transform as RectTransform;
-            ApplyCatalogueBuildingId(cardObject, i);
+            ApplyCatalogueBuildingId(cardObject, i, false);
             AddUniqueCardRect(cardRects, cardRect);
         }
     }
 
-    private static void ApplyCatalogueBuildingId(GameObject cardObject, int zeroBasedIndex)
+    private static void ApplyCatalogueBuildingId(GameObject cardObject, int zeroBasedIndex, bool preferTitle = true)
     {
         if (cardObject == null)
         {
@@ -2391,8 +2423,25 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
             zeroBasedIndex,
             0,
             Enum.GetValues(typeof(CatalogueBuildingId)).Length - 1);
+        TMP_Text titleText = ResolveSceneAuthoredCardTitleText(cardObject.transform);
+        if (preferTitle &&
+            TryResolveCatalogueBuildingIdFromTitle(titleText?.text, out CatalogueBuildingId titleBuildingId))
+        {
+            buildingId = titleBuildingId;
+        }
 
         CatalogueBuildingUnlockState unlockState = cardObject.GetComponent<CatalogueBuildingUnlockState>();
+        if (unlockState == null)
+        {
+            unlockState = cardObject.AddComponent<CatalogueBuildingUnlockState>();
+        }
+
+        BuildingDefinition definition = BuildingDefinitionLibrary.Get(buildingId);
+        if (!preferTitle && titleText != null && definition != null)
+        {
+            titleText.text = definition.displayName;
+        }
+
         if (unlockState != null)
         {
             unlockState.buildingId = buildingId;
@@ -4156,12 +4205,15 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
 
     private void SelectPersonalInkWeapon(WeaponType weaponType)
     {
-        bool canPersistSelectedWeapon = PlayerLoadoutRuntime.IsWeaponUnlocked(weaponType);
-        PlayerLoadoutRuntime.SetRuntimeWeaponOverride(weaponType);
-        if (canPersistSelectedWeapon)
+        if (!PlayerLoadoutRuntime.IsWeaponUnlocked(weaponType))
         {
-            PlayerLoadoutRuntime.CurrentWeaponType = weaponType;
+            RuntimeSubtitleFeedHud.PushMessage("该墨水基型尚未解锁。解锁对应建筑图鉴后即可装备。");
+            RefreshSceneAuthoredPersonalInkOptions();
+            return;
         }
+
+        PlayerLoadoutRuntime.ClearRuntimeWeaponOverride();
+        PlayerLoadoutRuntime.CurrentWeaponType = weaponType;
 
         PlayerProfileData profile = FindObjectOfType<PlayerProfileData>(true);
         if (profile != null)
@@ -4177,10 +4229,7 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
             playerAttack.RefreshInkUI();
         }
 
-        if (canPersistSelectedWeapon)
-        {
-            GameProgressPersistence.SaveIfReady();
-        }
+        GameProgressPersistence.SaveIfReady();
 
         RefreshSceneAuthoredPersonalInkOptions();
         MusicManager.PlaySfx(SfxCueId.SlotSwitch);
@@ -4525,6 +4574,86 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
             }
 
             owner?.TryDropSpecialMaterialOnProprietarySlot(buildingId, slotIndex, sourceSlotIndex);
+        }
+    }
+
+    private sealed class SceneHandbookBuildingDetailButtonHandler : MonoBehaviour
+    {
+        private Button button;
+        private CatalogueBuildingId buildingId;
+        private BuildingDetailData detailData;
+        private BuildingDefinition definition;
+        private Sprite previewSprite;
+
+        public void Bind(
+            CatalogueBuildingId targetBuildingId,
+            BuildingDetailData targetDetailData,
+            BuildingDefinition targetDefinition,
+            Sprite targetPreviewSprite)
+        {
+            if (button == null)
+            {
+                button = GetComponent<Button>();
+            }
+
+            if (button != null)
+            {
+                button.onClick.RemoveListener(OpenDetail);
+                button.onClick.AddListener(OpenDetail);
+            }
+
+            buildingId = targetBuildingId;
+            detailData = targetDetailData;
+            definition = targetDefinition;
+            previewSprite = targetPreviewSprite;
+        }
+
+        private void OnDestroy()
+        {
+            if (button != null)
+            {
+                button.onClick.RemoveListener(OpenDetail);
+            }
+        }
+
+        private void OpenDetail()
+        {
+            RuntimeProgressState runtimeState = RuntimeProgressState.Instance ?? RuntimeProgressState.EnsureInstance();
+            if (!runtimeState.IsBuildingUnlocked(buildingId))
+            {
+                return;
+            }
+
+            DetailedInformationUI detailUi = FindObjectOfType<DetailedInformationUI>(true);
+            if (detailUi == null)
+            {
+                RuntimeSubtitleFeedHud.PushMessage("详情界面暂未接入。");
+                return;
+            }
+
+            detailUi.ShowDetail(ResolveDetailData());
+        }
+
+        private BuildingDetailData ResolveDetailData()
+        {
+            if (detailData != null)
+            {
+                return detailData;
+            }
+
+            detailData = GetComponent<BuildingDetailData>();
+            if (detailData == null)
+            {
+                detailData = gameObject.AddComponent<BuildingDetailData>();
+            }
+
+            detailData.buildingName = !string.IsNullOrWhiteSpace(definition.detailTitle)
+                ? definition.detailTitle
+                : definition.displayName;
+            detailData.detailSprite1 = previewSprite;
+            detailData.introduction1 = definition.detailDescription;
+            detailData.finalIntroduction = definition.detailDescription;
+            return detailData;
         }
     }
 

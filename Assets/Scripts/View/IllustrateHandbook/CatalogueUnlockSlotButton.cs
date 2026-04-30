@@ -145,6 +145,10 @@ public class CatalogueUnlockSlotButton : MonoBehaviour, IDropHandler
             resolvedSlotIndex,
             out BuildingRewardDefinition slotReward,
             out BuildingRewardDefinition completionReward);
+        if (success && runtimeState.CanUnlockBuilding(buildingId))
+        {
+            runtimeState.TryUnlockBuilding(buildingId, out completionReward);
+        }
 
         pendingUnlockArmed = false;
         buildingState?.RefreshState();

@@ -59,7 +59,7 @@ public sealed class GameplayStageIntroStartupTests
         Assert.AreEqual("GameScene_03", secondStage.sceneName);
         Assert.AreEqual(CatalogueBuildingId.Building3, secondStage.stageBuildingId);
         Assert.AreEqual(CatalogueBuildingId.Building1, secondStage.gatingBuildingId);
-        Assert.AreEqual("修复福建土楼后开放", secondStage.lockedHint);
+        Assert.AreEqual("解锁福建土楼图鉴后开放", secondStage.lockedHint);
         Assert.AreSame(secondStage, GameplayStageCatalog.GetStageByScene("GameScene_03"));
 
         GameplayStageDefinition thirdStage = stages[2];
@@ -70,8 +70,26 @@ public sealed class GameplayStageIntroStartupTests
         Assert.AreEqual("GameScene_02", thirdStage.sceneName);
         Assert.AreEqual(CatalogueBuildingId.Building2, thirdStage.stageBuildingId);
         Assert.AreEqual(CatalogueBuildingId.Building3, thirdStage.gatingBuildingId);
-        Assert.AreEqual("修复安徽水乡民居后开放", thirdStage.lockedHint);
+        Assert.AreEqual("解锁安徽水乡民居图鉴后开放", thirdStage.lockedHint);
         Assert.AreSame(thirdStage, GameplayStageCatalog.GetStageByScene("GameScene_02"));
+    }
+
+    [Test]
+    public void StageUnlockFollowsCatalogueBuildingUnlockInsteadOfRepair()
+    {
+        RuntimeProgressState state = RuntimeProgressState.EnsureInstance();
+        state.ResetProgress(false);
+        GameplayStageDefinition secondStage = GameplayStageCatalog.GetStageById("stage_02");
+
+        Assert.IsFalse(GameplayStageCatalog.IsStageUnlocked(secondStage, state));
+
+        CompleteBuildingUnlock(state, CatalogueBuildingId.Building1);
+
+        Assert.IsTrue(state.IsBuildingUnlocked(CatalogueBuildingId.Building1));
+        Assert.IsFalse(state.IsBuildingRepaired(CatalogueBuildingId.Building1));
+        Assert.IsTrue(GameplayStageCatalog.IsStageUnlocked(secondStage, state));
+
+        Object.DestroyImmediate(state.gameObject);
     }
 
     [Test]
@@ -79,7 +97,10 @@ public sealed class GameplayStageIntroStartupTests
     {
         MethodInfo resolvePreviewPath = typeof(LevelSelectionSceneController).GetMethod(
             "ResolveStagePreviewSpritePath",
-            BindingFlags.Static | BindingFlags.NonPublic);
+            BindingFlags.Static | BindingFlags.NonPublic,
+            null,
+            new[] { typeof(string) },
+            null);
         Assert.IsNotNull(resolvePreviewPath);
 
         GameplayStageDefinition secondStage = GameplayStageCatalog.GetStageById("stage_02");
@@ -98,7 +119,10 @@ public sealed class GameplayStageIntroStartupTests
     {
         MethodInfo resolvePreviewPath = typeof(LevelSelectionSceneController).GetMethod(
             "ResolveStagePreviewSpritePath",
-            BindingFlags.Static | BindingFlags.NonPublic);
+            BindingFlags.Static | BindingFlags.NonPublic,
+            null,
+            new[] { typeof(string) },
+            null);
         MethodInfo resolveLegacyRoot = typeof(LevelSelectionSceneController).GetMethod(
             "ResolveLegacyStageRootName",
             BindingFlags.Static | BindingFlags.NonPublic);
@@ -185,7 +209,7 @@ public sealed class GameplayStageIntroStartupTests
             core.stats = new CharacterStats { maxHp = 1f, moveSpeed = 4f };
             core.baseStats = core.stats.Clone();
             companion.AddComponent<EnemyAvoidObstacle>();
-            EnemyMove move = companion.AddComponent<EnemyMove>();
+            EnemyMove move = companion.GetComponent<EnemyMove>();
             companion.AddComponent<SpriteRenderer>();
             followController = companion.AddComponent<SpriteCompanionFollowController>();
             followController.Bind(player.transform, player.GetComponent<CharacterCore>());
@@ -317,15 +341,15 @@ public sealed class GameplayStageIntroStartupTests
             hasRepairMaterial: false,
             isRepaired: false));
 
-        Assert.IsTrue(RepairableBuildingBootstrapper.ShouldSpawnRepairableBuilding(
+        Assert.IsFalse(RepairableBuildingBootstrapper.ShouldSpawnRepairableBuilding(
             isRepairReady: true,
             hasRepairMaterial: false,
             isRepaired: false));
-        Assert.IsTrue(RepairableBuildingBootstrapper.ShouldSpawnRepairableBuilding(
+        Assert.IsFalse(RepairableBuildingBootstrapper.ShouldSpawnRepairableBuilding(
             isRepairReady: false,
             hasRepairMaterial: true,
             isRepaired: false));
-        Assert.IsTrue(RepairableBuildingBootstrapper.ShouldSpawnRepairableBuilding(
+        Assert.IsFalse(RepairableBuildingBootstrapper.ShouldSpawnRepairableBuilding(
             isRepairReady: false,
             hasRepairMaterial: false,
             isRepaired: true));
@@ -371,5 +395,18 @@ public sealed class GameplayStageIntroStartupTests
             .SelectMany(root => root.GetComponentsInChildren<Renderer>(true))
             .Where(renderer => renderer is TilemapRenderer || renderer is SpriteRenderer)
             .Max(renderer => renderer.sortingOrder);
+    }
+
+    private static void CompleteBuildingUnlock(RuntimeProgressState state, CatalogueBuildingId buildingId)
+    {
+        BuildingDefinition definition = BuildingDefinitionLibrary.Get(buildingId);
+        Assert.IsTrue(state.AddBuildingProgress(buildingId, definition.requiredProgress, out _));
+
+        for (int i = 0; i < definition.slotDefinitions.Length; i++)
+        {
+            Assert.IsTrue(state.TryUnlockSlot(buildingId, i, out _, out _));
+        }
+
+        Assert.IsTrue(state.TryUnlockBuilding(buildingId, out _));
     }
 }

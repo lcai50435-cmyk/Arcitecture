@@ -215,6 +215,7 @@ public class CatalogueBuildingUnlockState : MonoBehaviour
         }
 
         dialogUI.ShowClickCloseDialog(content);
+        dialogUI.EnsureTopmostRuntimePanelInputSurface();
     }
 
     private string BuildBuildingIntroductionContent()
