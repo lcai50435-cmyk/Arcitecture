@@ -19,6 +19,7 @@ public sealed class RuntimePauseMenuTests
     {
         originalActiveScene = SceneManager.GetActiveScene();
         DestroyPauseMenu();
+        DestroyRuntimeSettingsPanels();
         DestroyEventSystems();
         DestroyUiRootManagers();
     }
@@ -27,6 +28,7 @@ public sealed class RuntimePauseMenuTests
     public void TearDown()
     {
         DestroyPauseMenu();
+        DestroyRuntimeSettingsPanels();
         DestroyEventSystems();
         DestroyUiRootManagers();
 
@@ -219,11 +221,100 @@ public sealed class RuntimePauseMenuTests
         Assert.IsTrue(canvasGroup.blocksRaycasts);
     }
 
+    [Test]
+    public void ReturnToMainConfirmButtonsAreClickableAndCanCancel()
+    {
+        createdScene = OpenTestScene("FirstPass_1");
+        Assert.IsTrue(createdScene.IsValid() && createdScene.isLoaded);
+        Time.timeScale = 1f;
+
+        Assert.IsTrue(RuntimePauseMenu.TryOpenFromExternal());
+        RevealMenuButtonsImmediate();
+
+        ClickButtonByLabel("回到主界面");
+
+        Assert.AreEqual("ReturnConfirm", GetCurrentPageName());
+        AssertButtonClickable("确认返回");
+        ClickButtonByLabel("取消");
+        Assert.AreEqual("Menu", GetCurrentPageName());
+        AssertButtonClickable("返回游戏");
+    }
+
+    [Test]
+    public void AboutPageBackButtonReturnsToPauseMenu()
+    {
+        createdScene = OpenTestScene("FirstPass_1");
+        Assert.IsTrue(createdScene.IsValid() && createdScene.isLoaded);
+        Time.timeScale = 1f;
+
+        Assert.IsTrue(RuntimePauseMenu.TryOpenFromExternal());
+        RevealMenuButtonsImmediate();
+
+        ClickButtonByLabel("关于我们");
+
+        Assert.AreEqual("About", GetCurrentPageName());
+        AssertButtonClickable("返回暂停页");
+        ClickButtonByLabel("返回暂停页");
+        Assert.AreEqual("Menu", GetCurrentPageName());
+        AssertButtonClickable("返回游戏");
+    }
+
+    [Test]
+    public void SettingsButtonStartsSettingsFlowAndCanReturnToMenu()
+    {
+        createdScene = OpenTestScene("FirstPass_1");
+        Assert.IsTrue(createdScene.IsValid() && createdScene.isLoaded);
+        Time.timeScale = 1f;
+
+        Assert.IsTrue(RuntimePauseMenu.TryOpenFromExternal());
+        RevealMenuButtonsImmediate();
+
+        ClickButtonByLabel("游戏设置");
+
+        Assert.IsTrue(GetPrivateBool("showingSettings"));
+        Assert.IsNotNull(RuntimeSettingsPanel.Instance);
+
+        InvokePrivate("HandleSettingsClosed");
+
+        Assert.IsFalse(GetPrivateBool("showingSettings"));
+        Assert.AreEqual("Menu", GetCurrentPageName());
+        AssertButtonClickable("返回游戏");
+    }
+
+    [Test]
+    public void QuitConfirmButtonIsClickableWithoutRunningQuitAction()
+    {
+        createdScene = OpenTestScene("FirstPass_1");
+        Assert.IsTrue(createdScene.IsValid() && createdScene.isLoaded);
+        Time.timeScale = 1f;
+
+        Assert.IsTrue(RuntimePauseMenu.TryOpenFromExternal());
+        RevealMenuButtonsImmediate();
+
+        ClickButtonByLabel("退出游戏");
+
+        Assert.AreEqual("QuitConfirm", GetCurrentPageName());
+        AssertButtonClickable("确认退出");
+        AssertButtonClickable("取消");
+    }
+
     private static void DestroyPauseMenu()
     {
         if (RuntimePauseMenu.Instance != null)
         {
             Object.DestroyImmediate(RuntimePauseMenu.Instance.gameObject);
+        }
+    }
+
+    private static void DestroyRuntimeSettingsPanels()
+    {
+        RuntimeSettingsPanel[] panels = Object.FindObjectsOfType<RuntimeSettingsPanel>(true);
+        for (int i = 0; i < panels.Length; i++)
+        {
+            if (panels[i] != null)
+            {
+                Object.DestroyImmediate(panels[i].gameObject);
+            }
         }
     }
 
@@ -295,6 +386,49 @@ public sealed class RuntimePauseMenuTests
             BindingFlags.Static | BindingFlags.NonPublic);
         Assert.IsNotNull(applyMethod);
         applyMethod.Invoke(null, new[] { revealItem, progress });
+    }
+
+    private static void ClickButtonByLabel(string label)
+    {
+        Button button = FindButtonByLabel(label);
+        Assert.IsNotNull(button, label);
+        Assert.IsTrue(button.IsInteractable(), label);
+        button.onClick.Invoke();
+    }
+
+    private static void AssertButtonClickable(string label)
+    {
+        Button button = FindButtonByLabel(label);
+        Assert.IsNotNull(button, label);
+        Assert.IsTrue(button.IsInteractable(), label);
+        Assert.IsNotNull(RaycastTopClickableResult(button).gameObject, label);
+    }
+
+    private static string GetCurrentPageName()
+    {
+        FieldInfo field = typeof(RuntimePauseMenu).GetField(
+            "currentPage",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.IsNotNull(field);
+        return field.GetValue(RuntimePauseMenu.Instance).ToString();
+    }
+
+    private static bool GetPrivateBool(string fieldName)
+    {
+        FieldInfo field = typeof(RuntimePauseMenu).GetField(
+            fieldName,
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.IsNotNull(field);
+        return (bool)field.GetValue(RuntimePauseMenu.Instance);
+    }
+
+    private static void InvokePrivate(string methodName)
+    {
+        MethodInfo method = typeof(RuntimePauseMenu).GetMethod(
+            methodName,
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.IsNotNull(method);
+        method.Invoke(RuntimePauseMenu.Instance, null);
     }
 
     private static Button FindButtonByLabel(string label)
