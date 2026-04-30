@@ -38,7 +38,8 @@ public static class GameplayStageCatalog
             stageLabel = "第二关",
             mapTitle = "安徽水乡民居",
             displayName = "第二关 · 安徽水乡民居",
-            sceneName = "GameScene_03",
+            sceneName = "SecondPassSence",
+            sceneAliases = new[] { "GameScene_03", "SecondPass" },
             stageBuildingId = CatalogueBuildingId.Building3,
             gatingBuildingId = CatalogueBuildingId.Building1,
             lockedHint = "解锁福建土楼图鉴后开放"
