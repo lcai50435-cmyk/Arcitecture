@@ -822,6 +822,73 @@ public sealed class IllustratedHandbookTabsControllerTests
     }
 
     [Test]
+    public void ClickingFirstProprietaryButtonConsumesFirstSpecialBackpackItem()
+    {
+        RuntimeProgressState progressState = RuntimeProgressState.EnsureInstance();
+        progressState.ResetProgress(false);
+
+        BackpackMananger backpack = CreateRuntimeBackpack();
+        Assert.IsTrue(backpack.PickItem(ArchitecturalCrystalFactory.CreateSpecialStructureMaterial()));
+
+        rootObject = CreateSceneAuthoredRoot();
+        GameObject handbookPage = rootObject.transform.Find("IllustratedHandbookCanvas").gameObject;
+        CreateSceneAuthoredHandbookSurfaceWithNestedProprietarySlots(handbookPage);
+
+        UIManager manager = rootObject.AddComponent<UIManager>();
+        manager.illustratedHandbook = rootObject;
+        IllustratedHandbookTabsController controller = IllustratedHandbookTabsController.EnsureInstalled(manager);
+        controller.SwitchToPage(IllustratedHandbookPage.IllustratedHandbook);
+
+        Transform firstSlotRoot = FindDescendant(handbookPage.transform, "Material_1");
+        Button firstSlotButton = FindDescendant(firstSlotRoot, "Button_1").GetComponent<Button>();
+        AssertHasClickHandler(firstSlotButton.transform);
+
+        EventSystem eventSystem = EventSystem.current ?? new GameObject("EventSystem", typeof(EventSystem)).GetComponent<EventSystem>();
+        ExecuteEvents.ExecuteHierarchy(
+            firstSlotButton.gameObject,
+            new PointerEventData(eventSystem) { button = PointerEventData.InputButton.Left },
+            ExecuteEvents.pointerClickHandler);
+
+        Assert.IsTrue(progressState.IsSlotUnlocked(CatalogueBuildingId.Building1, 0));
+        Assert.IsFalse(backpack.GetItem(0).HasValue);
+        Assert.AreEqual(0, backpack.GetSpecialStructureMaterialCount());
+    }
+
+    [Test]
+    public void ClickingUnlockedProprietaryButtonDoesNotConsumeSpecialBackpackItem()
+    {
+        RuntimeProgressState progressState = RuntimeProgressState.EnsureInstance();
+        progressState.ResetProgress(false);
+        Assert.IsTrue(progressState.TryUnlockSlot(CatalogueBuildingId.Building1, 0, out _, out _));
+
+        BackpackMananger backpack = CreateRuntimeBackpack();
+        Assert.IsTrue(backpack.PickItem(ArchitecturalCrystalFactory.CreateSpecialStructureMaterial()));
+
+        rootObject = CreateSceneAuthoredRoot();
+        GameObject handbookPage = rootObject.transform.Find("IllustratedHandbookCanvas").gameObject;
+        CreateSceneAuthoredHandbookSurfaceWithNestedProprietarySlots(handbookPage);
+
+        UIManager manager = rootObject.AddComponent<UIManager>();
+        manager.illustratedHandbook = rootObject;
+        IllustratedHandbookTabsController controller = IllustratedHandbookTabsController.EnsureInstalled(manager);
+        controller.SwitchToPage(IllustratedHandbookPage.IllustratedHandbook);
+
+        Transform firstSlotRoot = FindDescendant(handbookPage.transform, "Material_1");
+        Button firstSlotButton = FindDescendant(firstSlotRoot, "Button_1").GetComponent<Button>();
+        AssertHasClickHandler(firstSlotButton.transform);
+
+        EventSystem eventSystem = EventSystem.current ?? new GameObject("EventSystem", typeof(EventSystem)).GetComponent<EventSystem>();
+        ExecuteEvents.ExecuteHierarchy(
+            firstSlotButton.gameObject,
+            new PointerEventData(eventSystem) { button = PointerEventData.InputButton.Left },
+            ExecuteEvents.pointerClickHandler);
+
+        Assert.IsTrue(progressState.IsSlotUnlocked(CatalogueBuildingId.Building1, 0));
+        Assert.IsTrue(backpack.GetItem(0).HasValue);
+        Assert.AreEqual(1, backpack.GetSpecialStructureMaterialCount());
+    }
+
+    [Test]
     public void DroppingRuntimeBackpackIconOntoFirstProprietaryButtonConsumesItem()
     {
         RuntimeProgressState progressState = RuntimeProgressState.EnsureInstance();
@@ -1188,10 +1255,22 @@ public sealed class IllustratedHandbookTabsControllerTests
         Assert.IsNotNull(ResolveDropHandler(target), target != null ? target.name : "null");
     }
 
+    private static void AssertHasClickHandler(Transform target)
+    {
+        Assert.IsNotNull(ResolveClickHandler(target), target != null ? target.name : "null");
+    }
+
     private static IDropHandler ResolveDropHandler(Transform target)
     {
         return target != null
             ? target.GetComponents<MonoBehaviour>().OfType<IDropHandler>().FirstOrDefault()
+            : null;
+    }
+
+    private static IPointerClickHandler ResolveClickHandler(Transform target)
+    {
+        return target != null
+            ? target.GetComponents<MonoBehaviour>().OfType<IPointerClickHandler>().FirstOrDefault(handler => !(handler is Button))
             : null;
     }
 

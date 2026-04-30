@@ -2140,6 +2140,33 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         return true;
     }
 
+    private bool TryClickProprietarySlot(CatalogueBuildingId buildingId, int slotIndex)
+    {
+        RuntimeProgressState runtimeState = RuntimeProgressState.EnsureInstance();
+        if (runtimeState.IsSlotUnlocked(buildingId, slotIndex))
+        {
+            return false;
+        }
+
+        BackpackMananger backpack = ResolveRuntimeBackpackManager();
+        if (backpack != null)
+        {
+            for (int i = 0; i < SceneHandbookBackpackSlotCount; i++)
+            {
+                ArchitecturalCrystal? item = backpack.GetItem(i);
+                if (item.HasValue && item.Value.IsSpecialStructure)
+                {
+                    return TryDropSpecialMaterialOnProprietarySlot(buildingId, slotIndex, i);
+                }
+            }
+        }
+
+        RefreshSceneAuthoredRightIntroduction();
+        RefreshSceneAuthoredBackpackSurfaces();
+        RuntimeSubtitleFeedHud.PushMessage("需要从背包拖动专用结构，才能点亮槽位。");
+        return false;
+    }
+
     public bool SubmitCommonMaterialsToBuilding(CatalogueBuildingId buildingId)
     {
         BackpackMananger backpack = ResolveRuntimeBackpackManager();
@@ -4613,7 +4640,7 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         }
     }
 
-    private sealed class SceneHandbookProprietarySlotDropHandler : MonoBehaviour, IDropHandler
+    private sealed class SceneHandbookProprietarySlotDropHandler : MonoBehaviour, IDropHandler, IPointerClickHandler
     {
         private IllustratedHandbookTabsController owner;
         private CatalogueBuildingId buildingId;
@@ -4636,6 +4663,11 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
             }
 
             owner?.TryDropSpecialMaterialOnProprietarySlot(buildingId, slotIndex, sourceSlotIndex);
+        }
+
+        public void OnPointerClick(PointerEventData eventData)
+        {
+            owner?.TryClickProprietarySlot(buildingId, slotIndex);
         }
     }
 
