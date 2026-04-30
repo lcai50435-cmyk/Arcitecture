@@ -61,14 +61,6 @@ public sealed class MainMenuController : MonoBehaviour
         public Text deleteButtonText;
     }
 
-    private enum MainMenuButtonArt
-    {
-        None = 0,
-        Start = 1,
-        Settings = 2,
-        Exit = 3
-    }
-
     private readonly struct MainMenuButtonLayout
     {
         public MainMenuButtonLayout(Vector2 size, Vector2 anchoredPosition, int labelFontSize)
@@ -87,11 +79,8 @@ public sealed class MainMenuController : MonoBehaviour
     private const int UiLayer = 5;
     private const string RuntimeCanvasName = "MainMenuRuntimeCanvas";
 
-    private static readonly Color MenuButtonHitColor = new Color(1f, 1f, 1f, 0f);
     private static readonly Color MenuButtonHitHighlightColor = new Color(1f, 0.92f, 0.68f, 0.18f);
     private static readonly Color MenuButtonHitPressedColor = new Color(1f, 0.76f, 0.38f, 0.28f);
-    private static readonly Color MenuButtonArtHighlightColor = new Color(1f, 0.93f, 0.74f, 1f);
-    private static readonly Color MenuButtonArtPressedColor = new Color(0.82f, 0.67f, 0.42f, 1f);
     private static readonly Color MenuButtonArtDisabledColor = new Color(1f, 1f, 1f, 0.36f);
     private static readonly Color TextPrimaryColor = new Color(0.98f, 0.95f, 0.88f, 1f);
     private static readonly Color SaveBackdropColor = new Color(0.04f, 0.035f, 0.03f, 0.54f);
@@ -1199,50 +1188,23 @@ public sealed class MainMenuController : MonoBehaviour
         layoutElement.preferredHeight = buttonLayout.Size.y;
 
         Image image = buttonObject.AddComponent<Image>();
-        Sprite authoredSprite = GetMenuButtonSprite(objectName);
-        if (authoredSprite != null)
-        {
-            image.sprite = authoredSprite;
-            image.type = Image.Type.Simple;
-            image.preserveAspect = false;
-            image.color = Color.white;
-        }
-        else
-        {
-            RuntimeUiSpriteFactory.ApplyMainMenuTextButtonFrameSprite(image, MenuButtonHitColor);
-        }
+        RuntimeUiSpriteFactory.ApplySavePanelFrameSprite(image, Color.white);
 
         Button button = buttonObject.AddComponent<Button>();
         button.targetGraphic = image;
-        if (authoredSprite != null)
-        {
-            ApplyButtonStyle(
-                button,
-                image,
-                Color.white,
-                MenuButtonArtHighlightColor,
-                MenuButtonArtPressedColor,
-                MenuButtonArtDisabledColor);
-        }
-        else
-        {
-            Color normal = image.color;
-            ApplyButtonStyle(
-                button,
-                image,
-                normal,
-                Color.Lerp(normal, MenuButtonHitHighlightColor, 0.24f),
-                Color.Lerp(normal, MenuButtonHitPressedColor, 0.32f),
-                MenuButtonArtDisabledColor);
-        }
+        Color normal = image.color;
+        ApplyButtonStyle(
+            button,
+            image,
+            normal,
+            Color.Lerp(normal, MenuButtonHitHighlightColor, 0.24f),
+            Color.Lerp(normal, MenuButtonHitPressedColor, 0.32f),
+            MenuButtonArtDisabledColor);
         button.onClick.AddListener(onClick);
 
-        if (authoredSprite == null)
-        {
-            Text labelText = CreateText(buttonObject.transform, "Label", label, buttonLayout.LabelFontSize, TextPrimaryColor, TextAnchor.MiddleCenter, FontStyle.Bold);
-            ConfigureRect(labelText.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), buttonLayout.Size - new Vector2(60f, 34f), new Vector2(0f, -4f));
-            AddTextOutline(labelText);
-        }
+        Text labelText = CreateText(buttonObject.transform, "Label", label, buttonLayout.LabelFontSize, TextPrimaryColor, TextAnchor.MiddleCenter, FontStyle.Bold);
+        ConfigureRect(labelText.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), buttonLayout.Size - new Vector2(60f, 34f), new Vector2(0f, -4f));
+        AddTextOutline(labelText);
 
         return button;
     }
@@ -1263,36 +1225,6 @@ public sealed class MainMenuController : MonoBehaviour
                 return new MainMenuButtonLayout(new Vector2(80f, 80f), new Vector2(0f, -405f), 32);
             default:
                 return new MainMenuButtonLayout(new Vector2(500f, 114f), Vector2.zero, 42);
-        }
-    }
-
-    private static Sprite GetMenuButtonSprite(string objectName)
-    {
-        switch (ResolveMenuButtonArt(objectName))
-        {
-            case MainMenuButtonArt.Start:
-                return RuntimeUiSpriteFactory.GetMainMenuStartButtonSprite();
-            case MainMenuButtonArt.Settings:
-                return RuntimeUiSpriteFactory.GetMainMenuSettingsButtonSprite();
-            case MainMenuButtonArt.Exit:
-                return RuntimeUiSpriteFactory.GetMainMenuExitButtonSprite();
-            default:
-                return null;
-        }
-    }
-
-    private static MainMenuButtonArt ResolveMenuButtonArt(string objectName)
-    {
-        switch (objectName)
-        {
-            case "NewGameButton":
-                return MainMenuButtonArt.Start;
-            case "SettingsButton":
-                return MainMenuButtonArt.Settings;
-            case "ExitButton":
-                return MainMenuButtonArt.Exit;
-            default:
-                return MainMenuButtonArt.None;
         }
     }
 
