@@ -227,6 +227,21 @@ public sealed class RuntimePhotoCaptureManagerTests
         }
     }
 
+    [Test]
+    public void SaveConfirmationRuntimeHandlerWorksWhenButtonOnClickListenersAreCleared()
+    {
+        RuntimePhotoCaptureManager manager = RuntimePhotoCaptureManager.EnsureInstance();
+        PrepareForScene(manager, "NewBase");
+        ShowConfirmationImmediate(manager);
+
+        Button saveButton = FindButtonByLabel("保存留念");
+        Assert.IsNotNull(saveButton);
+        saveButton.onClick.RemoveAllListeners();
+        ResetPendingDecision(manager);
+
+        AssertButtonReceivesRaycastClick(saveButton, manager, true);
+    }
+
     private static void PrepareForScene(RuntimePhotoCaptureManager manager, string sceneName)
     {
         MethodInfo method = typeof(RuntimePhotoCaptureManager).GetMethod(
