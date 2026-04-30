@@ -624,6 +624,47 @@ public sealed class IllustratedHandbookTabsControllerTests
     }
 
     [Test]
+    public void SceneAuthoredBuildingImageBecomesDetailEntryAfterRuntimeUnlock()
+    {
+        RuntimeProgressState progressState = RuntimeProgressState.EnsureInstance();
+        progressState.ResetProgress(false);
+
+        rootObject = CreateSceneAuthoredRoot();
+        GameObject handbookPage = rootObject.transform.Find("IllustratedHandbookCanvas").gameObject;
+        CreateSceneAuthoredHandbookSurface(handbookPage);
+
+        GameObject firstCard = FindDescendant(handbookPage.transform, "ArcitectureImage_1").gameObject;
+        BuildingDetailData detailData = firstCard.AddComponent<BuildingDetailData>();
+        detailData.buildingName = "福建土楼详情";
+        detailData.introduction1 = "解锁后展示完整建筑详情。";
+
+        GameObject detailPanel = new GameObject("DetailedInformationCanvas", typeof(RectTransform));
+        detailPanel.transform.SetParent(rootObject.transform, false);
+        Text detailTitle = CreateChild<Text>(detailPanel.transform, "Title");
+        DetailedInformationUI detailUi = detailPanel.AddComponent<DetailedInformationUI>();
+        detailUi.detailedInformationPanel = detailPanel;
+        detailUi.page1NameText = detailTitle;
+        detailPanel.SetActive(false);
+
+        UIManager manager = rootObject.AddComponent<UIManager>();
+        manager.illustratedHandbook = rootObject;
+        IllustratedHandbookTabsController controller = IllustratedHandbookTabsController.EnsureInstalled(manager);
+        controller.SwitchToPage(IllustratedHandbookPage.IllustratedHandbook);
+
+        Button detailButton = FindDescendant(handbookPage.transform, "BuildingImage").GetComponent<Button>();
+        Assert.IsNotNull(detailButton);
+        Assert.IsFalse(detailButton.interactable);
+
+        CompleteBuildingUnlock(progressState, CatalogueBuildingId.Building1);
+
+        Assert.IsTrue(detailButton.interactable);
+        detailButton.onClick.Invoke();
+
+        Assert.IsTrue(detailPanel.activeSelf);
+        Assert.AreEqual("福建土楼详情", detailTitle.text);
+    }
+
+    [Test]
     public void DroppingRuntimeBackpackSlotOntoProprietarySlotConsumesBackpackItem()
     {
         RuntimeProgressState progressState = RuntimeProgressState.EnsureInstance();
@@ -918,6 +959,22 @@ public sealed class IllustratedHandbookTabsControllerTests
     {
         GameObject backpackObject = new GameObject("RuntimeBackpackManager");
         return backpackObject.AddComponent<BackpackMananger>();
+    }
+
+    private static void CompleteBuildingUnlock(RuntimeProgressState progressState, CatalogueBuildingId buildingId)
+    {
+        BuildingDefinition definition = BuildingDefinitionLibrary.Get(buildingId);
+        Assert.IsTrue(progressState.AddBuildingProgress(buildingId, definition.requiredProgress, out _));
+        int slotCount = definition.slotDefinitions != null ? definition.slotDefinitions.Length : 0;
+        for (int i = 0; i < slotCount; i++)
+        {
+            if (!progressState.IsSlotUnlocked(buildingId, i))
+            {
+                Assert.IsTrue(progressState.TryUnlockSlot(buildingId, i, out _, out _));
+            }
+        }
+
+        Assert.IsTrue(progressState.TryUnlockBuilding(buildingId, out _));
     }
 
     private static void CreateSceneAuthoredHandbookSurface(GameObject handbookPage)
