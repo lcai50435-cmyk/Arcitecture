@@ -260,7 +260,7 @@ public sealed class MainMenuControllerSlotPanelTests
                 (UnityEngine.Events.UnityAction)(() => { })
             });
 
-        AssertSettingSceneMenuButton(button, new Vector2(500f, 250f), new Vector2(0f, 310f));
+        AssertSettingSceneMenuButton(button, new Vector2(640f, 118f), new Vector2(0f, 240f));
     }
 
     [Test]
@@ -283,7 +283,7 @@ public sealed class MainMenuControllerSlotPanelTests
                 (UnityEngine.Events.UnityAction)(() => { })
             });
 
-        AssertSettingSceneMenuButton(button, new Vector2(760f, 140f), new Vector2(0f, 115f));
+        AssertSettingSceneMenuButton(button, new Vector2(640f, 118f), new Vector2(0f, 80f));
     }
 
     [Test]
@@ -305,7 +305,7 @@ public sealed class MainMenuControllerSlotPanelTests
                 "图鉴/手册",
                 (UnityEngine.Events.UnityAction)(() => { })
             });
-        AssertSettingSceneMenuButton(handbookButton, new Vector2(760f, 140f), new Vector2(0f, -80f));
+        AssertSettingSceneMenuButton(handbookButton, new Vector2(640f, 118f), new Vector2(0f, -80f));
 
         Button settingsButton = (Button)createMenuButton.Invoke(
             null,
@@ -316,7 +316,7 @@ public sealed class MainMenuControllerSlotPanelTests
                 "设置",
                 (UnityEngine.Events.UnityAction)(() => { })
             });
-        AssertSettingSceneMenuButton(settingsButton, new Vector2(420f, 180f), new Vector2(0f, -275f));
+        AssertSettingSceneMenuButton(settingsButton, new Vector2(640f, 118f), new Vector2(0f, -240f));
 
         Button exitButton = (Button)createMenuButton.Invoke(
             null,
@@ -327,7 +327,7 @@ public sealed class MainMenuControllerSlotPanelTests
                 "退出",
                 (UnityEngine.Events.UnityAction)(() => { })
             });
-        AssertSettingSceneMenuButton(exitButton, new Vector2(80f, 80f), new Vector2(0f, -405f));
+        AssertSettingSceneMenuButton(exitButton, new Vector2(80f, 80f), new Vector2(0f, -380f));
     }
 
     private MainMenuController CreateController()
@@ -392,7 +392,11 @@ public sealed class MainMenuControllerSlotPanelTests
         Assert.AreEqual(Image.Type.Sliced, image.type);
         Assert.IsFalse(image.preserveAspect);
         Assert.IsNull(button.transform.Find("Accent"));
-        Assert.IsNotNull(button.transform.Find("Label"));
+        Transform label = button.transform.Find("Label");
+        Assert.IsNotNull(label);
+        Text labelText = label.GetComponent<Text>();
+        Assert.IsNotNull(labelText);
+        Assert.IsFalse(labelText.raycastTarget);
         AssertMainMenuButtonGeometry(button, expectedSize, expectedPosition);
     }
 
