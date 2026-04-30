@@ -324,6 +324,90 @@ public sealed class CatalogueBuildingUnlockStateTests
     }
 
     [Test]
+    public void MixedDetailButtonsPreferFujianSceneAuthoredDetailCanvasOverGenericBindings()
+    {
+        RuntimeProgressState state = RuntimeProgressState.EnsureInstance();
+        state.ResetProgress(false);
+
+        DetailedInformationUI genericUi = CreateDetailPanel("DetailedInformationCanvas", out GameObject genericPanel, out _);
+        DetailedInformationUI fujianUi = CreateDetailPanel("DetailInformationFuJianCanvas", out GameObject fujianPanel, out _);
+        CreateDetailPanel("DetailInformationShuiXiangCanvas", out GameObject shuiXiangPanel, out _);
+        genericPanel.SetActive(false);
+        fujianPanel.SetActive(false);
+        shuiXiangPanel.SetActive(true);
+
+        GameObject cardObject = CreateUnlockedCard(CatalogueBuildingId.Building1, state, out CatalogueBuildingUnlockState unlockState);
+        BuildingDetailData detailData = CreateChild<BuildingDetailData>(cardObject.transform, "DetailData");
+        detailData.buildingName = "福建土楼测试";
+
+        GameObject buttonObject = new GameObject("GotoButton", typeof(RectTransform), typeof(Image), typeof(Button));
+        buttonObject.transform.SetParent(cardObject.transform, false);
+        Button button = buttonObject.GetComponent<Button>();
+
+        BuildingDetailOpenButton openButton = buttonObject.AddComponent<BuildingDetailOpenButton>();
+        openButton.buildingUnlockState = unlockState;
+        openButton.buildingDetailData = detailData;
+        openButton.detailedInformationUI = genericUi;
+
+        UnlockedBuildingImageButton imageButton = buttonObject.AddComponent<UnlockedBuildingImageButton>();
+        imageButton.buildingUnlockState = unlockState;
+        imageButton.buildingDetailData = detailData;
+        imageButton.detailedInformationPanel = genericPanel;
+        imageButton.detailedInformationUI = genericUi;
+
+        InvokePrivate(openButton, "Awake");
+        InvokePrivate(imageButton, "Awake");
+        InvokePrivate(openButton, "Start");
+        InvokePrivate(imageButton, "Start");
+
+        Assert.IsTrue(button.interactable);
+        button.onClick.Invoke();
+
+        Assert.IsTrue(fujianPanel.activeSelf);
+        Assert.IsFalse(genericPanel.activeSelf);
+        Assert.IsFalse(shuiXiangPanel.activeSelf);
+        Assert.AreSame(fujianUi, openButton.detailedInformationUI);
+        Assert.AreSame(fujianUi, imageButton.detailedInformationUI);
+    }
+
+    [Test]
+    public void DetailOpenButtonPrefersShuiXiangSceneAuthoredDetailCanvas()
+    {
+        RuntimeProgressState state = RuntimeProgressState.EnsureInstance();
+        state.ResetProgress(false);
+
+        DetailedInformationUI genericUi = CreateDetailPanel("DetailedInformationCanvas", out GameObject genericPanel, out _);
+        CreateDetailPanel("DetailInformationFuJianCanvas", out GameObject fujianPanel, out _);
+        CreateDetailPanel("DetailInformationShuiXiangCanvas", out GameObject shuiXiangPanel, out _);
+        genericPanel.SetActive(false);
+        fujianPanel.SetActive(true);
+        shuiXiangPanel.SetActive(false);
+
+        GameObject cardObject = CreateUnlockedCard(CatalogueBuildingId.Building3, state, out CatalogueBuildingUnlockState unlockState);
+        BuildingDetailData detailData = CreateChild<BuildingDetailData>(cardObject.transform, "DetailData");
+        detailData.buildingName = "苏浙水乡测试";
+
+        GameObject buttonObject = new GameObject("GotoButton", typeof(RectTransform), typeof(Image), typeof(Button));
+        buttonObject.transform.SetParent(cardObject.transform, false);
+        Button button = buttonObject.GetComponent<Button>();
+        BuildingDetailOpenButton openButton = buttonObject.AddComponent<BuildingDetailOpenButton>();
+        openButton.buildingUnlockState = unlockState;
+        openButton.buildingDetailData = detailData;
+        openButton.detailedInformationUI = genericUi;
+
+        InvokePrivate(openButton, "Awake");
+        InvokePrivate(openButton, "Start");
+
+        Assert.IsTrue(button.interactable);
+        button.onClick.Invoke();
+
+        Assert.IsTrue(shuiXiangPanel.activeSelf);
+        Assert.IsFalse(genericPanel.activeSelf);
+        Assert.IsFalse(fujianPanel.activeSelf);
+        Assert.AreSame(shuiXiangPanel, openButton.detailedInformationUI.detailedInformationPanel);
+    }
+
+    [Test]
     public void DroppingBackpackSpecialStructureOnCatalogueSlotUnlocksSlotAndAddsProgress()
     {
         RuntimeProgressState state = RuntimeProgressState.EnsureInstance();
@@ -444,6 +528,43 @@ public sealed class CatalogueBuildingUnlockStateTests
         GameObject child = new GameObject(name, typeof(RectTransform), typeof(T));
         child.transform.SetParent(parent, false);
         return child.GetComponent<T>();
+    }
+
+    private DetailedInformationUI CreateDetailPanel(
+        string panelName,
+        out GameObject panel,
+        out Text title)
+    {
+        panel = new GameObject(panelName, typeof(RectTransform));
+        roots.Add(panel);
+        title = CreateChild<Text>(panel.transform, "Name");
+        DetailedInformationUI detailUi = panel.AddComponent<DetailedInformationUI>();
+        detailUi.detailedInformationPanel = panel;
+        detailUi.page1NameText = title;
+        return detailUi;
+    }
+
+    private GameObject CreateUnlockedCard(
+        CatalogueBuildingId buildingId,
+        RuntimeProgressState state,
+        out CatalogueBuildingUnlockState unlockState)
+    {
+        GameObject cardObject = new GameObject("Card", typeof(RectTransform));
+        roots.Add(cardObject);
+
+        Slider slider = CreateChild<Slider>(cardObject.transform, "Slider");
+        unlockState = cardObject.AddComponent<CatalogueBuildingUnlockState>();
+        unlockState.buildingId = buildingId;
+        unlockState.buildingSlider = slider;
+
+        state.AddBuildingProgress(
+            buildingId,
+            BuildingDefinitionLibrary.Get(buildingId).requiredProgress,
+            out _);
+        CompleteBuildingUnlockPrerequisites(state, buildingId);
+        Assert.IsTrue(state.TryUnlockBuilding(buildingId, out _));
+        unlockState.RefreshState();
+        return cardObject;
     }
 
     private static void CompleteBuildingUnlockPrerequisites(
