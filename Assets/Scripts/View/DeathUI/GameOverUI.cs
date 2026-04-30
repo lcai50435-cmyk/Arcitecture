@@ -8,6 +8,8 @@ using UnityEngine.UI;
 /// </summary>
 public class GameOverUI : MonoBehaviour
 {
+    private const string BaseSceneName = "NewBase";
+
     [Header("按钮")]
     public Button restartButton;
     public Button mainMenuButton;
@@ -101,8 +103,7 @@ public class GameOverUI : MonoBehaviour
     public void RestartGame()
     {
         ResetRuntimeState();
-        GameplayStageRuntime.EnsureSelectedStageUnlocked();
-        string targetSceneName = GameplayStageRuntime.GetSelectedSceneName();
+        string targetSceneName = ResolveRestartSceneName();
 
         SceneLoader loader = SceneLoader.EnsureInstance();
         if (loader != null)
@@ -112,6 +113,11 @@ public class GameOverUI : MonoBehaviour
         }
 
         SceneManager.LoadScene(string.IsNullOrWhiteSpace(targetSceneName) ? gameSceneName : targetSceneName);
+    }
+
+    private static string ResolveRestartSceneName()
+    {
+        return BaseSceneName;
     }
 
     public void GoToMainMenu()

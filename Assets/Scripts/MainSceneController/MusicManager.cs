@@ -193,7 +193,7 @@ public class MusicManager : MonoBehaviour
             return;
         }
 
-        PlayMusicCue(ResolveDesiredCue(), immediate ? 0f : fadeDuration);
+        PlayMusicCue(ResolveDesiredCue(), immediate ? 0f : ResolveMusicFadeDuration(fadeDuration));
     }
 
     private void UpdateCombatMusicState()
@@ -217,7 +217,7 @@ public class MusicManager : MonoBehaviour
             if (!isCombatMusicActive)
             {
                 isCombatMusicActive = true;
-                PlayMusicCue(ResolveDesiredCue(), CombatEnterFadeDuration);
+                PlayMusicCue(ResolveDesiredCue(), ResolveMusicFadeDuration(CombatEnterFadeDuration));
             }
 
             return;
@@ -234,7 +234,7 @@ public class MusicManager : MonoBehaviour
         }
 
         isCombatMusicActive = false;
-        PlayMusicCue(ResolveDesiredCue(), CombatExitFadeDuration);
+        PlayMusicCue(ResolveDesiredCue(), ResolveMusicFadeDuration(CombatExitFadeDuration));
     }
 
     private bool HasCombatThreat()
@@ -292,6 +292,13 @@ public class MusicManager : MonoBehaviour
         }
 
         bgmTransitionCoroutine = StartCoroutine(CrossfadeRoutine(targetCue, targetClip, fadeDuration));
+    }
+
+    private static float ResolveMusicFadeDuration(float fadeDuration)
+    {
+        return GameSettingsStore.GetAudioToggle(GameAudioToggle.MusicCrossfade)
+            ? fadeDuration
+            : 0f;
     }
 
     private bool TryAdoptExistingPlayback(MusicCueId targetCue, AudioClip targetClip)

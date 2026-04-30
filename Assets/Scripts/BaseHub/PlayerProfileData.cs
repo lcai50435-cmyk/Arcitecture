@@ -42,6 +42,7 @@ public class PlayerProfileData : MonoBehaviour
 
         currentWeaponType = weaponType;
         currentInkType = weaponType.ToInkType();
+        PlayerLoadoutRuntime.ClearRuntimeWeaponOverride();
         PlayerLoadoutRuntime.CurrentWeaponType = weaponType;
         SetEffectiveWeapon(weaponType);
         GameProgressPersistence.SaveIfReady();
@@ -62,6 +63,7 @@ public class PlayerProfileData : MonoBehaviour
 
         currentInkType = inkType;
         currentWeaponType = weaponType;
+        PlayerLoadoutRuntime.ClearRuntimeWeaponOverride();
         PlayerLoadoutRuntime.CurrentInkType = inkType;
         SetEffectiveWeapon(weaponType);
         GameProgressPersistence.SaveIfReady();

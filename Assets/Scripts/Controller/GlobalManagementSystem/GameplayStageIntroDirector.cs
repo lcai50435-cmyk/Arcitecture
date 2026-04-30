@@ -29,6 +29,9 @@ public sealed class GameplayStageIntroDirector : MonoBehaviour
     private const float BackpackFadeInDelay = 0.16f * IntroDurationScale;
     private const float BlackoutFallbackFadeDuration = 0.14f * IntroDurationScale;
     private const float TitleRevealStartDuringFade = 0.38f;
+    private const float PlayerStartAnimationFallbackDuration = 1.35f;
+    private const string PlayerStartAnimationStateName = "StartAni";
+    private const string PlayerIdleAnimationStateName = "Idle";
 
     private const float PortalSideOffset = 1.42f;
     private const float PortalVerticalOffset = -0.08f;
@@ -61,6 +64,10 @@ public sealed class GameplayStageIntroDirector : MonoBehaviour
     private static readonly Vector2 RevealLeadFeatherScale = new Vector2(0.16f, 0.09f);
     private static readonly Vector2 RevealFinishClearScale = new Vector2(0.68f, 0.42f);
     private static readonly Vector2 RevealFinishFeatherScale = new Vector2(0.30f, 0.18f);
+    private static readonly int PlayerStartAnimationStateHash = Animator.StringToHash("Base Layer.StartAni");
+    private static readonly int PlayerStartAnimationShortHash = Animator.StringToHash(PlayerStartAnimationStateName);
+    private static readonly int PlayerIdleAnimationStateHash = Animator.StringToHash("Base Layer.Idle");
+    private static readonly int PlayerIdleAnimationShortHash = Animator.StringToHash(PlayerIdleAnimationStateName);
 
     public static bool IsIntroActive { get; private set; }
     public static bool HasOverlayCoverage { get; private set; }
@@ -72,6 +79,7 @@ public sealed class GameplayStageIntroDirector : MonoBehaviour
     private PlayerMove playerMove;
     private PlayerAttack playerAttack;
     private PlayerInteraction playerInteraction;
+    private SpriteCompanionFollowController spriteCompanion;
 
     private RunStageDirector runStageDirector;
     private GameCountDownManager countdownManager;
@@ -102,6 +110,9 @@ public sealed class GameplayStageIntroDirector : MonoBehaviour
     private Vector3 playerLandingPosition;
     private bool playerLandingCaptured;
     private bool stateRestored;
+    private bool playerStartAnimationPlayed;
+    private float playerStartAnimationStartedAt = -1f;
+    private float playerStartAnimationLength;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void Bootstrap()
@@ -153,6 +164,7 @@ public sealed class GameplayStageIntroDirector : MonoBehaviour
     private void OnDestroy()
     {
         CleanupPortalFx();
+        SetCompanionIntroPaused(false);
 
         if (!stateRestored)
         {
@@ -204,6 +216,7 @@ public sealed class GameplayStageIntroDirector : MonoBehaviour
         yield return HoldOverviewShot(overviewPose);
         yield return PlayCameraTravel(overviewPose, landingPose, portalSideSign);
         yield return PlayPortalEject(landingPose, portalSideSign);
+        yield return WaitForPlayerStartAnimationCompletion();
         RestoreGameplayUiState(false);
         yield return PlayGameplayUiFadeIn();
 
@@ -410,6 +423,7 @@ public sealed class GameplayStageIntroDirector : MonoBehaviour
             + Vector3.right * (portalSideSign * 0.22f);
         SetPlayerPosition(playerStartPosition);
         ShowPlayerRenderers(portalFx.clipMask);
+        PlayPlayerStartAnimation();
 
         elapsed = 0f;
         bool releasedMask = false;
@@ -500,6 +514,7 @@ public sealed class GameplayStageIntroDirector : MonoBehaviour
             playerBody.velocity = Vector2.zero;
         }
 
+        SetCompanionIntroPaused(true);
         runStageDirector?.SuspendRuntime();
         countdownManager?.SetInBaseState(true);
 
@@ -584,6 +599,8 @@ public sealed class GameplayStageIntroDirector : MonoBehaviour
             RestoreMainCamera();
         }
 
+        ReleasePlayerStartAnimation();
+        SetCompanionIntroPaused(false);
         countdownManager?.SetInBaseState(false);
         runStageDirector?.ResumeRuntime();
     }
@@ -643,6 +660,11 @@ public sealed class GameplayStageIntroDirector : MonoBehaviour
             }
         }
 
+        if (spriteCompanion == null)
+        {
+            spriteCompanion = FindObjectOfType<SpriteCompanionFollowController>(true);
+        }
+
         if (runStageDirector == null)
         {
             runStageDirector = FindObjectOfType<RunStageDirector>();
@@ -675,6 +697,106 @@ public sealed class GameplayStageIntroDirector : MonoBehaviour
         }
 
         return playerTransform != null && mainCamera != null;
+    }
+
+    private void PlayPlayerStartAnimation()
+    {
+        Animator animator = ResolvePlayerAnimator();
+        if (!CanPlayAnimatorState(animator) || !HasAnimatorState(animator, PlayerStartAnimationStateHash, PlayerStartAnimationShortHash))
+        {
+            return;
+        }
+
+        AnimatorParameterUtility.SetBoolIfPresent(animator, "IsMoving", false);
+        animator.Play(PlayerStartAnimationStateName, 0, 0f);
+        animator.Update(0f);
+
+        AnimatorStateInfo stateInfo = animator.GetCurrentAnimatorStateInfo(0);
+        playerStartAnimationPlayed = true;
+        playerStartAnimationStartedAt = Time.unscaledTime;
+        playerStartAnimationLength = stateInfo.length > 0.01f
+            ? stateInfo.length
+            : PlayerStartAnimationFallbackDuration;
+    }
+
+    private void ReleasePlayerStartAnimation()
+    {
+        Animator animator = ResolvePlayerAnimator();
+        if (!CanPlayAnimatorState(animator) || !HasAnimatorState(animator, PlayerIdleAnimationStateHash, PlayerIdleAnimationShortHash))
+        {
+            return;
+        }
+
+        AnimatorStateInfo stateInfo = animator.GetCurrentAnimatorStateInfo(0);
+        if (stateInfo.shortNameHash == PlayerStartAnimationShortHash)
+        {
+            animator.Play(PlayerIdleAnimationStateName, 0, 0f);
+            animator.Update(0f);
+        }
+
+        playerStartAnimationPlayed = false;
+        playerStartAnimationStartedAt = -1f;
+        playerStartAnimationLength = 0f;
+    }
+
+    private IEnumerator WaitForPlayerStartAnimationCompletion()
+    {
+        if (!playerStartAnimationPlayed)
+        {
+            yield break;
+        }
+
+        float elapsedSinceStarted = Time.unscaledTime - playerStartAnimationStartedAt;
+        float remainingDuration = ResolvePlayerStartAnimationRemainingDuration(playerStartAnimationLength, elapsedSinceStarted);
+        while (remainingDuration > 0f)
+        {
+            ApplyRuntimeUiSuppression();
+            yield return null;
+            elapsedSinceStarted = Time.unscaledTime - playerStartAnimationStartedAt;
+            remainingDuration = ResolvePlayerStartAnimationRemainingDuration(playerStartAnimationLength, elapsedSinceStarted);
+        }
+    }
+
+    public static float ResolvePlayerStartAnimationRemainingDuration(float clipLength, float elapsedSinceStarted)
+    {
+        return Mathf.Max(0f, clipLength - Mathf.Max(0f, elapsedSinceStarted));
+    }
+
+    private Animator ResolvePlayerAnimator()
+    {
+        if (playerMove != null && playerMove.animator != null)
+        {
+            return playerMove.animator;
+        }
+
+        return playerObject != null ? playerObject.GetComponent<Animator>() : null;
+    }
+
+    private static bool CanPlayAnimatorState(Animator animator)
+    {
+        return animator != null
+            && animator.isActiveAndEnabled
+            && animator.gameObject.activeInHierarchy
+            && animator.runtimeAnimatorController != null;
+    }
+
+    private static bool HasAnimatorState(Animator animator, int fullPathHash, int shortNameHash)
+    {
+        return animator != null
+            && (animator.HasState(0, fullPathHash) || animator.HasState(0, shortNameHash));
+    }
+
+    private void SetCompanionIntroPaused(bool paused)
+    {
+        if (spriteCompanion == null)
+        {
+            spriteCompanion = FindObjectOfType<SpriteCompanionFollowController>(true);
+        }
+
+        if (spriteCompanion != null)
+        {
+            spriteCompanion.SetIntroPaused(paused);
+        }
     }
 
     private void ResolveStageDefinition()

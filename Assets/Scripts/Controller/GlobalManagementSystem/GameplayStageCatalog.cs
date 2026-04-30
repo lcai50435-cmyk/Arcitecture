@@ -9,9 +9,11 @@ public class GameplayStageDefinition
     public string mapTitle;
     public string displayName;
     public string sceneName;
+    public string[] sceneAliases;
     public CatalogueBuildingId stageBuildingId;
     public CatalogueBuildingId gatingBuildingId;
     public string lockedHint;
+    public bool isPlaceholder;
 }
 
 public static class GameplayStageCatalog
@@ -24,7 +26,8 @@ public static class GameplayStageCatalog
             stageLabel = "第一关",
             mapTitle = "福建土楼",
             displayName = "第一关 · 福建土楼",
-            sceneName = "GameScene",
+            sceneName = "FirstPass_1",
+            sceneAliases = new[] { "GameScene" },
             stageBuildingId = CatalogueBuildingId.Building1,
             gatingBuildingId = CatalogueBuildingId.Building1,
             lockedHint = "默认开放"
@@ -33,23 +36,47 @@ public static class GameplayStageCatalog
         {
             stageId = "stage_02",
             stageLabel = "第二关",
-            mapTitle = "赵州桥",
-            displayName = "第二关 · 赵州桥",
-            sceneName = "GameScene_02",
-            stageBuildingId = CatalogueBuildingId.Building2,
+            mapTitle = "安徽水乡民居",
+            displayName = "第二关 · 安徽水乡民居",
+            sceneName = "GameScene_03",
+            stageBuildingId = CatalogueBuildingId.Building3,
             gatingBuildingId = CatalogueBuildingId.Building1,
-            lockedHint = "修复福建土楼后开放"
+            lockedHint = "解锁福建土楼图鉴后开放"
         },
         new GameplayStageDefinition
         {
             stageId = "stage_03",
             stageLabel = "第三关",
-            mapTitle = "安徽水乡民居",
-            displayName = "第三关 · 安徽水乡民居",
-            sceneName = "GameScene_03",
+            mapTitle = "赵州桥",
+            displayName = "第三关 · 赵州桥",
+            sceneName = "GameScene_02",
+            stageBuildingId = CatalogueBuildingId.Building2,
+            gatingBuildingId = CatalogueBuildingId.Building3,
+            lockedHint = "解锁安徽水乡民居图鉴后开放"
+        },
+        new GameplayStageDefinition
+        {
+            stageId = "stage_04",
+            stageLabel = "第四关",
+            mapTitle = "未开放",
+            displayName = "第四关 · 未开放",
+            sceneName = string.Empty,
             stageBuildingId = CatalogueBuildingId.Building3,
-            gatingBuildingId = CatalogueBuildingId.Building2,
-            lockedHint = "修复赵州桥后开放"
+            gatingBuildingId = CatalogueBuildingId.Building3,
+            lockedHint = "后续版本开放",
+            isPlaceholder = true
+        },
+        new GameplayStageDefinition
+        {
+            stageId = "stage_05",
+            stageLabel = "第五关",
+            mapTitle = "未开放",
+            displayName = "第五关 · 未开放",
+            sceneName = string.Empty,
+            stageBuildingId = CatalogueBuildingId.Building3,
+            gatingBuildingId = CatalogueBuildingId.Building3,
+            lockedHint = "后续版本开放",
+            isPlaceholder = true
         }
     };
 
@@ -92,13 +119,42 @@ public static class GameplayStageCatalog
         for (int i = 0; i < StageDefinitions.Length; i++)
         {
             GameplayStageDefinition definition = StageDefinitions[i];
-            if (definition.sceneName == sceneName)
+            if (!definition.isPlaceholder && MatchesSceneName(definition, sceneName))
             {
                 return definition;
             }
         }
 
         return null;
+    }
+
+    private static bool MatchesSceneName(GameplayStageDefinition definition, string sceneName)
+    {
+        if (definition == null)
+        {
+            return false;
+        }
+
+        if (string.Equals(definition.sceneName, sceneName, StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        string[] aliases = definition.sceneAliases;
+        if (aliases == null)
+        {
+            return false;
+        }
+
+        for (int i = 0; i < aliases.Length; i++)
+        {
+            if (string.Equals(aliases[i], sceneName, StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public static bool IsGameplayScene(string sceneName)
@@ -121,7 +177,7 @@ public static class GameplayStageCatalog
 
     public static bool IsStageUnlocked(GameplayStageDefinition definition, RuntimeProgressState runtimeState = null)
     {
-        if (definition == null)
+        if (definition == null || definition.isPlaceholder)
         {
             return false;
         }
@@ -133,7 +189,7 @@ public static class GameplayStageCatalog
         }
 
         runtimeState = runtimeState ?? RuntimeProgressState.Instance ?? RuntimeProgressState.EnsureInstance();
-        return runtimeState.IsBuildingRepaired(definition.gatingBuildingId);
+        return runtimeState.IsBuildingUnlocked(definition.gatingBuildingId);
     }
 
     public static GameplayStageDefinition GetFirstUnlockedStage(RuntimeProgressState runtimeState = null)

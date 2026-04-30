@@ -40,6 +40,7 @@ public class UniversalCollectionProgress : MonoBehaviour
         slider.minValue = 0;
         slider.maxValue = maxValuePerBar;
         slider.interactable = false;
+        SliderFillGeometryUtility.ApplyExactFill(slider, true);
     }
 
     public void RefreshUI()
@@ -54,16 +55,19 @@ public class UniversalCollectionProgress : MonoBehaviour
         if (progressSlider1 != null)
         {
             progressSlider1.value = bar1;
+            SliderFillGeometryUtility.ApplyExactFill(progressSlider1, true);
         }
 
         if (progressSlider2 != null)
         {
             progressSlider2.value = bar2;
+            SliderFillGeometryUtility.ApplyExactFill(progressSlider2, true);
         }
 
         if (progressSlider3 != null)
         {
             progressSlider3.value = bar3;
+            SliderFillGeometryUtility.ApplyExactFill(progressSlider3, true);
         }
 
     }

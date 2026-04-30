@@ -50,6 +50,10 @@ public sealed class MainMenuController : MonoBehaviour
         public int slotId;
         public Button selectButton;
         public Image backgroundImage;
+        public Image previewImage;
+        public string previewImagePath;
+        public Sprite previewSprite;
+        public Texture2D previewTexture;
         public Text titleText;
         public Text detailText;
         public Text stateText;
@@ -57,23 +61,37 @@ public sealed class MainMenuController : MonoBehaviour
         public Text deleteButtonText;
     }
 
+    private readonly struct MainMenuButtonLayout
+    {
+        public MainMenuButtonLayout(Vector2 size, Vector2 anchoredPosition, int labelFontSize)
+        {
+            Size = size;
+            AnchoredPosition = anchoredPosition;
+            LabelFontSize = labelFontSize;
+        }
+
+        public Vector2 Size { get; }
+        public Vector2 AnchoredPosition { get; }
+        public int LabelFontSize { get; }
+    }
+
     private const string MainSceneName = "MainScene";
     private const int UiLayer = 5;
     private const string RuntimeCanvasName = "MainMenuRuntimeCanvas";
 
-    private static readonly Color MenuButtonColor = new Color(0.12f, 0.09f, 0.06f, 0.92f);
-    private static readonly Color MenuButtonHighlightColor = new Color(0.19f, 0.15f, 0.1f, 0.96f);
-    private static readonly Color MenuButtonPressedColor = new Color(0.09f, 0.07f, 0.05f, 0.98f);
-    private static readonly Color MenuButtonDisabledColor = new Color(0.13f, 0.13f, 0.13f, 0.55f);
-    private static readonly Color AccentColor = new Color(0.84f, 0.71f, 0.47f, 0.96f);
-    private static readonly Color PanelColor = new Color(0.08f, 0.08f, 0.09f, 0.95f);
-    private static readonly Color CardColor = new Color(0.15f, 0.15f, 0.17f, 0.95f);
-    private static readonly Color CardSelectedColor = new Color(0.3f, 0.22f, 0.11f, 0.98f);
-    private static readonly Color CardDisabledColor = new Color(0.11f, 0.11f, 0.12f, 0.72f);
-    private static readonly Color DeleteButtonColor = new Color(0.41f, 0.12f, 0.11f, 0.96f);
-    private static readonly Color DeleteButtonArmedColor = new Color(0.74f, 0.18f, 0.13f, 1f);
+    private static readonly Color MenuButtonHitHighlightColor = new Color(1f, 0.92f, 0.68f, 0.18f);
+    private static readonly Color MenuButtonHitPressedColor = new Color(1f, 0.76f, 0.38f, 0.28f);
+    private static readonly Color MenuButtonArtDisabledColor = new Color(1f, 1f, 1f, 0.36f);
     private static readonly Color TextPrimaryColor = new Color(0.98f, 0.95f, 0.88f, 1f);
-    private static readonly Color TextSecondaryColor = new Color(0.84f, 0.83f, 0.78f, 1f);
+    private static readonly Color SaveBackdropColor = new Color(0.04f, 0.035f, 0.03f, 0.54f);
+    private static readonly Color SavePanelFallbackColor = new Color(0.84f, 0.64f, 0.37f, 0.98f);
+    private static readonly Color SaveCardColor = new Color(0.86f, 0.68f, 0.40f, 0.58f);
+    private static readonly Color SaveCardSelectedColor = new Color(0.97f, 0.78f, 0.46f, 0.78f);
+    private static readonly Color SaveButtonFallbackColor = new Color(0.78f, 0.56f, 0.28f, 0.98f);
+    private static readonly Color SavePreviewColor = new Color(1f, 0.98f, 0.91f, 0.92f);
+    private static readonly Color SaveTextPrimaryColor = new Color(0.07f, 0.045f, 0.02f, 1f);
+    private static readonly Color SaveTextMutedColor = new Color(0.43f, 0.29f, 0.14f, 1f);
+    private static readonly Color SaveDangerTextColor = new Color(0.36f, 0.08f, 0.04f, 1f);
 
     private static MainMenuController current;
 
@@ -89,8 +107,11 @@ public sealed class MainMenuController : MonoBehaviour
     private Text panelTitleText;
     private Text panelHintText;
     private Text panelSelectionText;
-    private Text primaryButtonText;
-    private Button primaryButton;
+    private GameObject confirmDialogObject;
+    private Text confirmTitleText;
+    private Text confirmMessageText;
+    private Text confirmPrimaryButtonText;
+    private Action pendingConfirmAction;
     private MainMenuSlotPanelMode currentPanelMode;
     private int selectedSlotId;
     private int armedDeleteSlotId;
@@ -187,6 +208,8 @@ public sealed class MainMenuController : MonoBehaviour
 
     private void OnDestroy()
     {
+        ReleaseSlotPreviewSprites();
+
         if (current == this)
         {
             current = null;
@@ -277,21 +300,8 @@ public sealed class MainMenuController : MonoBehaviour
         menuRootRect.anchorMin = new Vector2(0.5f, 0.5f);
         menuRootRect.anchorMax = new Vector2(0.5f, 0.5f);
         menuRootRect.pivot = new Vector2(0.5f, 0.5f);
-        menuRootRect.sizeDelta = new Vector2(560f, 760f);
-        menuRootRect.anchoredPosition = new Vector2(0f, -90f);
-
-        VerticalLayoutGroup layoutGroup = menuRoot.AddComponent<VerticalLayoutGroup>();
-        layoutGroup.spacing = 28f;
-        layoutGroup.padding = new RectOffset(0, 0, 0, 0);
-        layoutGroup.childAlignment = TextAnchor.MiddleCenter;
-        layoutGroup.childControlWidth = true;
-        layoutGroup.childControlHeight = false;
-        layoutGroup.childForceExpandWidth = true;
-        layoutGroup.childForceExpandHeight = false;
-
-        ContentSizeFitter sizeFitter = menuRoot.AddComponent<ContentSizeFitter>();
-        sizeFitter.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
-        sizeFitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+        menuRootRect.sizeDelta = new Vector2(860f, 920f);
+        menuRootRect.anchoredPosition = new Vector2(0f, -30f);
 
         CreateMenuButton(menuRootRect, "NewGameButton", "新游戏", OpenNewGamePanel);
         continueButton = CreateMenuButton(menuRootRect, "ContinueButton", "继续游戏", OpenContinuePanel);
@@ -312,72 +322,73 @@ public sealed class MainMenuController : MonoBehaviour
         overlayRect.offsetMax = Vector2.zero;
 
         Image overlayImage = slotOverlayObject.AddComponent<Image>();
-        overlayImage.color = new Color(0.02f, 0.02f, 0.03f, 0.78f);
+        overlayImage.color = SaveBackdropColor;
 
         Button backdropButton = slotOverlayObject.AddComponent<Button>();
         backdropButton.targetGraphic = overlayImage;
         backdropButton.onClick.AddListener(CloseSlotPanel);
 
-        GameObject panelObject = CreateUiObject("SaveSlotPanel", slotOverlayObject.transform);
+        GameObject panelObject = CreateUiObject("SaveBackGround_1", slotOverlayObject.transform);
         RectTransform panelRect = panelObject.GetComponent<RectTransform>();
         panelRect.anchorMin = new Vector2(0.5f, 0.5f);
         panelRect.anchorMax = new Vector2(0.5f, 0.5f);
         panelRect.pivot = new Vector2(0.5f, 0.5f);
-        panelRect.sizeDelta = new Vector2(960f, 660f);
-        panelRect.anchoredPosition = Vector2.zero;
+        panelRect.sizeDelta = new Vector2(1000f, 820f);
+        panelRect.anchoredPosition = new Vector2(40f, 0f);
 
         Image panelImage = panelObject.AddComponent<Image>();
-        RuntimeUiSpriteFactory.ApplyRoundedSprite(panelImage, PanelColor, 24, 18, 1.2f);
+        RuntimeUiSpriteFactory.ApplySaveBackgroundSprite(panelImage, SavePanelFallbackColor);
 
-        GameObject headerAccent = CreateUiObject("HeaderAccent", panelObject.transform);
-        RectTransform headerAccentRect = headerAccent.GetComponent<RectTransform>();
-        headerAccentRect.anchorMin = new Vector2(0.5f, 1f);
-        headerAccentRect.anchorMax = new Vector2(0.5f, 1f);
-        headerAccentRect.pivot = new Vector2(0.5f, 1f);
-        headerAccentRect.sizeDelta = new Vector2(320f, 6f);
-        headerAccentRect.anchoredPosition = new Vector2(0f, -30f);
-        Image headerAccentImage = headerAccent.AddComponent<Image>();
-        RuntimeUiSpriteFactory.ApplyRoundedSprite(headerAccentImage, AccentColor, 6, 4, 1f);
-
-        panelTitleText = CreateText(panelObject.transform, "Title", string.Empty, 44, TextPrimaryColor, TextAnchor.MiddleCenter, FontStyle.Bold);
-        ConfigureRect(panelTitleText.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(720f, 60f), new Vector2(0f, -72f));
+        panelTitleText = CreateText(panelObject.transform, "SavePrompt", "存档管理", 36, SaveTextPrimaryColor, TextAnchor.MiddleCenter, FontStyle.Bold);
+        ConfigureRect(panelTitleText.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(220f, 50f), new Vector2(28f, -61f));
         AddTextOutline(panelTitleText);
 
-        panelHintText = CreateText(panelObject.transform, "Hint", string.Empty, 24, TextSecondaryColor, TextAnchor.MiddleCenter);
-        ConfigureRect(panelHintText.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(820f, 70f), new Vector2(0f, -126f));
+        Button closeIconButton = CreateIconButton(panelObject.transform, "CloseButton", string.Empty, new Vector2(50f, 50f), CloseSlotPanel);
+        ConfigureRect((RectTransform)closeIconButton.transform, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(50f, 50f), new Vector2(-65.5f, -69f));
+        Image closeIconImage = closeIconButton.GetComponent<Image>();
+        Sprite closeIconSprite = RuntimeUiSpriteFactory.GetSaveCloseIconSprite();
+        if (closeIconImage != null && closeIconSprite != null)
+        {
+            closeIconImage.sprite = closeIconSprite;
+            closeIconImage.type = Image.Type.Simple;
+            closeIconImage.preserveAspect = true;
+            closeIconImage.color = Color.white;
+            Text closeIconLabel = closeIconButton.GetComponentInChildren<Text>(true);
+            if (closeIconLabel != null)
+            {
+                closeIconLabel.text = string.Empty;
+            }
+        }
 
-        GameObject cardsRoot = CreateUiObject("CardsRoot", panelObject.transform);
-        RectTransform cardsRootRect = cardsRoot.GetComponent<RectTransform>();
-        cardsRootRect.anchorMin = new Vector2(0.5f, 0.5f);
-        cardsRootRect.anchorMax = new Vector2(0.5f, 0.5f);
-        cardsRootRect.pivot = new Vector2(0.5f, 0.5f);
-        cardsRootRect.sizeDelta = new Vector2(840f, 370f);
-        cardsRootRect.anchoredPosition = new Vector2(0f, -18f);
+        GameObject dividerObject = CreateUiObject("Dec", panelObject.transform);
+        RectTransform dividerRect = dividerObject.GetComponent<RectTransform>();
+        dividerRect.anchorMin = new Vector2(0.5f, 0.5f);
+        dividerRect.anchorMax = new Vector2(0.5f, 0.5f);
+        dividerRect.pivot = new Vector2(0.5f, 0.5f);
+        dividerRect.sizeDelta = new Vector2(956.1309f, 35.5788f);
+        dividerRect.anchoredPosition = new Vector2(39.091812f, 311.7556f);
+        Image dividerImage = dividerObject.AddComponent<Image>();
+        Sprite dividerSprite = RuntimeUiSpriteFactory.GetSaveDividerSprite();
+        if (dividerSprite != null)
+        {
+            dividerImage.sprite = dividerSprite;
+            dividerImage.type = Image.Type.Simple;
+            dividerImage.preserveAspect = false;
+        }
+        dividerImage.color = Color.white;
 
-        VerticalLayoutGroup cardsLayout = cardsRoot.AddComponent<VerticalLayoutGroup>();
-        cardsLayout.spacing = 18f;
-        cardsLayout.padding = new RectOffset(0, 0, 0, 0);
-        cardsLayout.childAlignment = TextAnchor.UpperCenter;
-        cardsLayout.childControlWidth = true;
-        cardsLayout.childControlHeight = false;
-        cardsLayout.childForceExpandWidth = true;
-        cardsLayout.childForceExpandHeight = false;
+        panelHintText = CreateText(panelObject.transform, "Hint", string.Empty, 1, Color.clear, TextAnchor.MiddleCenter);
+        ConfigureRect(panelHintText.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), Vector2.zero, Vector2.zero);
 
         for (int slotId = 1; slotId <= GameProgressPersistence.SlotCount; slotId++)
         {
-            slotCardViews.Add(CreateSlotCard(cardsRoot.transform, slotId));
+            slotCardViews.Add(CreateSlotCard(panelObject.transform, slotId));
         }
 
-        panelSelectionText = CreateText(panelObject.transform, "SelectionHint", string.Empty, 24, TextSecondaryColor, TextAnchor.MiddleCenter);
-        ConfigureRect(panelSelectionText.rectTransform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(820f, 80f), new Vector2(0f, 102f));
+        panelSelectionText = CreateText(panelObject.transform, "SelectionHint", string.Empty, 1, Color.clear, TextAnchor.MiddleCenter);
+        ConfigureRect(panelSelectionText.rectTransform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), Vector2.zero, Vector2.zero);
 
-        Button closeButton = CreateActionButton(panelObject.transform, "CloseButton", "返回", new Vector2(220f, 78f), CloseSlotPanel, MenuButtonColor);
-        ConfigureRect((RectTransform)closeButton.transform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(220f, 78f), new Vector2(-160f, 32f));
-
-        primaryButton = CreateActionButton(panelObject.transform, "PrimaryButton", "继续游戏", new Vector2(340f, 84f), HandlePrimaryAction, AccentColor);
-        ConfigureRect((RectTransform)primaryButton.transform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(340f, 84f), new Vector2(170f, 28f));
-        primaryButtonText = primaryButton.GetComponentInChildren<Text>(true);
-
+        BuildConfirmDialog(slotOverlayObject.transform);
         slotOverlayObject.transform.SetAsLastSibling();
         slotOverlayObject.SetActive(false);
     }
@@ -386,87 +397,204 @@ public sealed class MainMenuController : MonoBehaviour
     {
         GameObject cardObject = CreateUiObject($"SlotCard_{slotId}", parent);
         RectTransform cardRect = cardObject.GetComponent<RectTransform>();
-        cardRect.sizeDelta = new Vector2(840f, 110f);
+        cardRect.anchorMin = new Vector2(0.5f, 0.5f);
+        cardRect.anchorMax = new Vector2(0.5f, 0.5f);
+        cardRect.pivot = new Vector2(0.5f, 0.5f);
+        cardRect.anchoredPosition = new Vector2(0f, -210f * (slotId - 1));
+        cardRect.sizeDelta = new Vector2(100f, 100f);
 
         LayoutElement layoutElement = cardObject.AddComponent<LayoutElement>();
-        layoutElement.preferredHeight = 110f;
+        layoutElement.preferredHeight = 190f;
 
-        Image backgroundImage = cardObject.AddComponent<Image>();
-        RuntimeUiSpriteFactory.ApplyRoundedSprite(backgroundImage, CardColor, 18, 14, 1.1f);
+        GameObject panelObject = CreateUiObject("Save_1Panel", cardObject.transform);
+        RectTransform panelRect = panelObject.GetComponent<RectTransform>();
+        panelRect.anchorMin = new Vector2(0.5f, 1f);
+        panelRect.anchorMax = new Vector2(0.5f, 1f);
+        panelRect.pivot = new Vector2(0.5f, 1f);
+        panelRect.anchoredPosition = new Vector2(0f, 247f);
+        panelRect.sizeDelta = new Vector2(840f, 190f);
 
-        Button selectButton = cardObject.AddComponent<Button>();
+        Image backgroundImage = panelObject.AddComponent<Image>();
+        RuntimeUiSpriteFactory.ApplySavePanelFrameSprite(backgroundImage, SaveCardColor);
+
+        Button selectButton = panelObject.AddComponent<Button>();
         selectButton.targetGraphic = backgroundImage;
-        ApplyButtonStyle(selectButton, backgroundImage, CardColor, CardSelectedColor, CardSelectedColor, CardDisabledColor);
+        ApplyButtonStyle(
+            selectButton,
+            backgroundImage,
+            Color.white,
+            Color.Lerp(Color.white, SaveCardSelectedColor, 0.18f),
+            Color.Lerp(Color.white, SaveCardSelectedColor, 0.32f),
+            new Color(1f, 1f, 1f, 0.55f));
         int capturedSlotId = slotId;
         selectButton.onClick.AddListener(() => HandleSlotSelected(capturedSlotId));
 
-        GameObject contentObject = CreateUiObject("Content", cardObject.transform);
+        GameObject contentObject = CreateUiObject("Content", panelObject.transform);
         RectTransform contentRect = contentObject.GetComponent<RectTransform>();
         contentRect.anchorMin = Vector2.zero;
         contentRect.anchorMax = Vector2.one;
-        contentRect.offsetMin = new Vector2(22f, 16f);
-        contentRect.offsetMax = new Vector2(-22f, -16f);
+        contentRect.offsetMin = Vector2.zero;
+        contentRect.offsetMax = Vector2.zero;
 
-        HorizontalLayoutGroup contentLayout = contentObject.AddComponent<HorizontalLayoutGroup>();
-        contentLayout.spacing = 20f;
-        contentLayout.padding = new RectOffset(0, 0, 0, 0);
-        contentLayout.childAlignment = TextAnchor.MiddleLeft;
-        contentLayout.childControlWidth = true;
-        contentLayout.childControlHeight = true;
-        contentLayout.childForceExpandWidth = false;
-        contentLayout.childForceExpandHeight = true;
+        GameObject previewObject = CreateUiObject("Preview", contentObject.transform);
+        RectTransform previewRect = previewObject.GetComponent<RectTransform>();
+        previewRect.anchorMin = new Vector2(0f, 0.5f);
+        previewRect.anchorMax = new Vector2(0f, 0.5f);
+        previewRect.pivot = new Vector2(0.5f, 0.5f);
+        previewRect.anchoredPosition = new Vector2(126.770355f, -0.35780334f);
+        previewRect.sizeDelta = new Vector2(232.3407f, 170.6831f);
+
+        Image previewImage = previewObject.AddComponent<Image>();
+        RuntimeUiSpriteFactory.ApplySavePreviewFrameSprite(previewImage, SavePreviewColor);
+        previewImage.raycastTarget = false;
+
+        GameObject previewInnerObject = CreateUiObject("Image", previewObject.transform);
+        RectTransform previewInnerRect = previewInnerObject.GetComponent<RectTransform>();
+        previewInnerRect.anchorMin = new Vector2(0.5f, 0.5f);
+        previewInnerRect.anchorMax = new Vector2(0.5f, 0.5f);
+        previewInnerRect.pivot = new Vector2(0.5f, 0.5f);
+        previewInnerRect.anchoredPosition = Vector2.zero;
+        previewInnerRect.sizeDelta = new Vector2(200f, 125f);
+        Image previewInnerImage = previewInnerObject.AddComponent<Image>();
+        previewInnerImage.color = Color.clear;
+        previewInnerImage.enabled = false;
+        previewInnerImage.preserveAspect = true;
+        previewInnerImage.raycastTarget = false;
 
         GameObject leftObject = CreateUiObject("Left", contentObject.transform);
-        LayoutElement leftLayout = leftObject.AddComponent<LayoutElement>();
-        leftLayout.flexibleWidth = 1f;
-
+        RectTransform leftRect = leftObject.GetComponent<RectTransform>();
+        leftRect.anchorMin = new Vector2(0.5f, 0.5f);
+        leftRect.anchorMax = new Vector2(0.5f, 0.5f);
+        leftRect.pivot = new Vector2(0.5f, 0.5f);
+        leftRect.anchoredPosition = new Vector2(132f, -2f);
+        leftRect.sizeDelta = new Vector2(438f, 150f);
         VerticalLayoutGroup leftGroup = leftObject.AddComponent<VerticalLayoutGroup>();
-        leftGroup.spacing = 10f;
-        leftGroup.childAlignment = TextAnchor.MiddleLeft;
+        leftGroup.spacing = 2f;
+        leftGroup.childAlignment = TextAnchor.UpperLeft;
         leftGroup.childControlWidth = true;
-        leftGroup.childControlHeight = false;
+        leftGroup.childControlHeight = true;
         leftGroup.childForceExpandWidth = true;
         leftGroup.childForceExpandHeight = false;
 
-        Text titleText = CreateText(leftObject.transform, "Title", string.Empty, 30, TextPrimaryColor, TextAnchor.MiddleLeft, FontStyle.Bold);
-        LayoutElement titleLayout = titleText.gameObject.AddComponent<LayoutElement>();
-        titleLayout.preferredHeight = 34f;
-
-        Text detailText = CreateText(leftObject.transform, "Detail", string.Empty, 21, TextSecondaryColor, TextAnchor.UpperLeft);
-        detailText.horizontalOverflow = HorizontalWrapMode.Wrap;
-        detailText.verticalOverflow = VerticalWrapMode.Overflow;
-        detailText.lineSpacing = 0.92f;
-
-        GameObject rightObject = CreateUiObject("Right", contentObject.transform);
-        LayoutElement rightLayout = rightObject.AddComponent<LayoutElement>();
-        rightLayout.preferredWidth = 190f;
-
-        VerticalLayoutGroup rightGroup = rightObject.AddComponent<VerticalLayoutGroup>();
-        rightGroup.spacing = 12f;
-        rightGroup.childAlignment = TextAnchor.MiddleCenter;
-        rightGroup.childControlWidth = true;
-        rightGroup.childControlHeight = false;
-        rightGroup.childForceExpandWidth = true;
-        rightGroup.childForceExpandHeight = false;
-
-        Text stateText = CreateText(rightObject.transform, "State", string.Empty, 22, AccentColor, TextAnchor.MiddleCenter, FontStyle.Bold);
+        Text stateText = CreateText(leftObject.transform, "State", string.Empty, 18, SaveTextMutedColor, TextAnchor.UpperLeft, FontStyle.Bold);
+        ConfigureBestFit(stateText, 13, 18);
         LayoutElement stateLayout = stateText.gameObject.AddComponent<LayoutElement>();
-        stateLayout.preferredHeight = 28f;
+        stateLayout.preferredHeight = 24f;
 
-        Button deleteButton = CreateActionButton(rightObject.transform, "DeleteButton", "删除存档", new Vector2(180f, 48f), () => HandleDeleteAction(capturedSlotId), DeleteButtonColor);
-        Text deleteButtonText = deleteButton.GetComponentInChildren<Text>(true);
+        Text titleText = CreateText(leftObject.transform, "Title", string.Empty, 32, SaveTextPrimaryColor, TextAnchor.MiddleLeft, FontStyle.Bold);
+        ConfigureBestFit(titleText, 24, 32);
+        LayoutElement titleLayout = titleText.gameObject.AddComponent<LayoutElement>();
+        titleLayout.preferredHeight = 40f;
+
+        Text detailText = CreateText(leftObject.transform, "Detail", string.Empty, 17, SaveTextPrimaryColor, TextAnchor.UpperLeft, FontStyle.Bold);
+        detailText.horizontalOverflow = HorizontalWrapMode.Wrap;
+        detailText.verticalOverflow = VerticalWrapMode.Truncate;
+        detailText.lineSpacing = 0.86f;
+        ConfigureBestFit(detailText, 13, 17);
+        LayoutElement detailLayout = detailText.gameObject.AddComponent<LayoutElement>();
+        detailLayout.preferredHeight = 80f;
+
+        Button deleteButton = CreateIconButton(cardObject.transform, "Dele", string.Empty, new Vector2(50f, 50f), () => HandleDeleteAction(capturedSlotId));
+        RectTransform deleteRect = (RectTransform)deleteButton.transform;
+        deleteRect.anchorMin = new Vector2(0.5f, 0.5f);
+        deleteRect.anchorMax = new Vector2(0.5f, 0.5f);
+        deleteRect.pivot = new Vector2(0.5f, 0.5f);
+        deleteRect.anchoredPosition = new Vector2(380.2f, 143.3f);
+        Image deleteImage = deleteButton.GetComponent<Image>();
+        Sprite deleteSprite = RuntimeUiSpriteFactory.GetSaveDeleteIconSprite();
+        if (deleteImage != null && deleteSprite != null)
+        {
+            deleteImage.sprite = deleteSprite;
+            deleteImage.type = Image.Type.Simple;
+            deleteImage.preserveAspect = true;
+            deleteImage.color = Color.white;
+        }
 
         return new SlotCardView
         {
             slotId = slotId,
             selectButton = selectButton,
             backgroundImage = backgroundImage,
+            previewImage = previewInnerImage,
             titleText = titleText,
             detailText = detailText,
             stateText = stateText,
             deleteButton = deleteButton,
-            deleteButtonText = deleteButtonText
+            deleteButtonText = null
         };
+    }
+
+    private void BuildConfirmDialog(Transform parent)
+    {
+        confirmDialogObject = CreateUiObject("SaveSlotConfirmDialog", parent);
+        RectTransform overlayRect = confirmDialogObject.GetComponent<RectTransform>();
+        overlayRect.anchorMin = Vector2.zero;
+        overlayRect.anchorMax = Vector2.one;
+        overlayRect.offsetMin = Vector2.zero;
+        overlayRect.offsetMax = Vector2.zero;
+
+        Image overlayImage = confirmDialogObject.AddComponent<Image>();
+        overlayImage.color = new Color(0.04f, 0.03f, 0.02f, 0.28f);
+
+        Button overlayButton = confirmDialogObject.AddComponent<Button>();
+        overlayButton.targetGraphic = overlayImage;
+        overlayButton.onClick.AddListener(CloseConfirmDialog);
+
+        GameObject panelObject = CreateUiObject("Pop-upPrompt", confirmDialogObject.transform);
+        RectTransform panelRect = panelObject.GetComponent<RectTransform>();
+        panelRect.anchorMin = new Vector2(0.5f, 0.5f);
+        panelRect.anchorMax = new Vector2(0.5f, 0.5f);
+        panelRect.pivot = new Vector2(0.5f, 0.5f);
+        panelRect.sizeDelta = new Vector2(550f, 350f);
+        panelRect.anchoredPosition = Vector2.zero;
+
+        Image panelImage = panelObject.AddComponent<Image>();
+        RuntimeUiSpriteFactory.ApplySavePanelFrameSprite(panelImage, SavePanelFallbackColor);
+
+        confirmTitleText = CreateText(panelObject.transform, "Information", "Prompt", 36, SaveTextPrimaryColor, TextAnchor.MiddleCenter, FontStyle.Bold);
+        ConfigureRect(confirmTitleText.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(200f, 50f), new Vector2(0f, 130f));
+        AddTextOutline(confirmTitleText);
+
+        GameObject dividerObject = CreateUiObject("Image", panelObject.transform);
+        RectTransform dividerRect = dividerObject.GetComponent<RectTransform>();
+        dividerRect.anchorMin = new Vector2(0.5f, 0.5f);
+        dividerRect.anchorMax = new Vector2(0.5f, 0.5f);
+        dividerRect.pivot = new Vector2(0.5f, 0.5f);
+        dividerRect.sizeDelta = new Vector2(471.4f, 21.4296f);
+        dividerRect.anchoredPosition = new Vector2(6.8781f, 105.667114f);
+        Image dividerImage = dividerObject.AddComponent<Image>();
+        Sprite lineSprite = RuntimeUiSpriteFactory.GetSavePromptLineSprite();
+        if (lineSprite != null)
+        {
+            dividerImage.sprite = lineSprite;
+            dividerImage.type = Image.Type.Simple;
+            dividerImage.preserveAspect = false;
+        }
+        dividerImage.color = Color.white;
+
+        GameObject detailObject = CreateUiObject("DetailInformation", panelObject.transform);
+        RectTransform detailRect = detailObject.GetComponent<RectTransform>();
+        detailRect.anchorMin = new Vector2(0.5f, 0.5f);
+        detailRect.anchorMax = new Vector2(0.5f, 0.5f);
+        detailRect.pivot = new Vector2(0.5f, 0.5f);
+        detailRect.sizeDelta = new Vector2(471.3979f, 216.9215f);
+        detailRect.anchoredPosition = new Vector2(6.8777f, -27.511002f);
+        Image detailImage = detailObject.AddComponent<Image>();
+        RuntimeUiSpriteFactory.ApplySavePanelFrameSprite(detailImage, SavePanelFallbackColor);
+
+        confirmMessageText = CreateText(detailObject.transform, "Text", string.Empty, 24, SaveTextPrimaryColor, TextAnchor.MiddleCenter, FontStyle.Bold);
+        confirmMessageText.horizontalOverflow = HorizontalWrapMode.Wrap;
+        confirmMessageText.verticalOverflow = VerticalWrapMode.Truncate;
+        ConfigureRect(confirmMessageText.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(404.3094f, 91.9097f), new Vector2(6.8103027f, 22.191f));
+
+        Button cancelButton = CreateActionButton(detailObject.transform, "CancelButton", "取消", new Vector2(160f, 40f), CloseConfirmDialog, SaveButtonFallbackColor);
+        ConfigureRect((RectTransform)cancelButton.transform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(160f, 40f), new Vector2(-114.9f, -53.9f));
+
+        Button confirmButton = CreateActionButton(detailObject.transform, "NotarizeButton", "确认", new Vector2(160f, 40f), ConfirmPendingAction, SaveButtonFallbackColor);
+        ConfigureRect((RectTransform)confirmButton.transform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(160f, 40f), new Vector2(130.2f, -54.4f));
+        confirmPrimaryButtonText = confirmButton.GetComponentInChildren<Text>(true);
+
+        confirmDialogObject.SetActive(false);
     }
 
     private void RefreshMenuState()
@@ -554,6 +682,7 @@ public sealed class MainMenuController : MonoBehaviour
         selectedSlotId = 0;
         armedDeleteSlotId = 0;
         armedOverwriteSlotId = 0;
+        CloseConfirmDialog();
 
         if (slotOverlayObject != null)
         {
@@ -573,6 +702,7 @@ public sealed class MainMenuController : MonoBehaviour
         armedDeleteSlotId = 0;
         armedOverwriteSlotId = 0;
         RefreshSlotOverlay();
+        HandlePrimaryAction();
     }
 
     private void HandleDeleteAction(int slotId)
@@ -594,14 +724,20 @@ public sealed class MainMenuController : MonoBehaviour
             armedDeleteSlotId = slotId;
             armedOverwriteSlotId = 0;
             RefreshSlotOverlay();
-            return;
         }
 
-        GameProgressPersistence.DeleteSlot(slotId);
-        armedDeleteSlotId = 0;
-        armedOverwriteSlotId = 0;
-        selectedSlotId = ResolveInitialSelection(currentPanelMode);
-        RefreshMenuState();
+        OpenConfirmDialog(
+            "删除存档",
+            $"确认删除存档 {slotId - 1:00}？\n永久进度会被清空，照片相册会保留。",
+            "确认",
+            () =>
+            {
+                GameProgressPersistence.DeleteSlot(slotId);
+                armedDeleteSlotId = 0;
+                armedOverwriteSlotId = 0;
+                selectedSlotId = ResolveInitialSelection(currentPanelMode);
+                RefreshMenuState();
+            });
     }
 
     private void HandlePrimaryAction()
@@ -614,11 +750,21 @@ public sealed class MainMenuController : MonoBehaviour
 
         if (currentPanelMode == MainMenuSlotPanelMode.NewGame)
         {
-            if (summary.hasSave && armedOverwriteSlotId != selectedSlotId)
+            if (summary.hasSave)
             {
                 armedOverwriteSlotId = selectedSlotId;
                 armedDeleteSlotId = 0;
                 RefreshSlotOverlay();
+                OpenConfirmDialog(
+                    "覆盖存档",
+                    $"确认覆盖存档 {selectedSlotId - 1:00}？\n原有永久进度会被清空，并从基地重新开始。",
+                    "确认",
+                    () =>
+                    {
+                        GameProgressPersistence.StartNewGame(selectedSlotId);
+                        CloseSlotPanel();
+                        EnterBaseScene();
+                    });
                 return;
             }
 
@@ -649,10 +795,8 @@ public sealed class MainMenuController : MonoBehaviour
             selectedSlotId = ResolveInitialSelection(currentPanelMode, summaries);
         }
 
-        panelTitleText.text = currentPanelMode == MainMenuSlotPanelMode.NewGame ? "新游戏" : "继续游戏";
-        panelHintText.text = currentPanelMode == MainMenuSlotPanelMode.NewGame
-            ? "请选择要创建新档的槽位。已有进度的槽位需要再次确认才会覆盖。"
-            : "请选择要继续的存档。删除存档需要二次确认，照片相册会继续保留。";
+        panelTitleText.text = "存档管理";
+        panelHintText.text = string.Empty;
 
         for (int i = 0; i < slotCardViews.Count; i++)
         {
@@ -676,22 +820,17 @@ public sealed class MainMenuController : MonoBehaviour
         bool canSelect = CanSelectSlot(summary);
         bool deleteVisible = currentPanelMode == MainMenuSlotPanelMode.Continue && hasSave;
 
-        view.titleText.text = $"槽位 {view.slotId}";
+        view.titleText.text = $"存档 {view.slotId - 1:00}";
         view.detailText.text = BuildSlotDetail(summary);
         view.stateText.text = BuildSlotState(summary, isSelected);
         view.selectButton.interactable = canSelect;
 
-        Color cardColor = CardColor;
-        if (!canSelect)
+        if (view.backgroundImage != null)
         {
-            cardColor = CardDisabledColor;
-        }
-        else if (isSelected)
-        {
-            cardColor = CardSelectedColor;
+            view.backgroundImage.color = Color.white;
         }
 
-        RuntimeUiSpriteFactory.ApplyRoundedSprite(view.backgroundImage, cardColor, 18, 14, 1.1f);
+        RefreshSlotPreview(view, summary);
 
         if (view.deleteButton != null)
         {
@@ -700,9 +839,15 @@ public sealed class MainMenuController : MonoBehaviour
             {
                 bool isDeleteArmed = armedDeleteSlotId == view.slotId;
                 Image deleteButtonImage = view.deleteButton.GetComponent<Image>();
-                Color deleteColor = isDeleteArmed ? DeleteButtonArmedColor : DeleteButtonColor;
-                RuntimeUiSpriteFactory.ApplyRoundedSprite(deleteButtonImage, deleteColor, 12, 10, 1f);
-                view.deleteButtonText.text = isDeleteArmed ? "确认删除" : "删除存档";
+                if (deleteButtonImage != null)
+                {
+                    deleteButtonImage.color = Color.white;
+                }
+                if (view.deleteButtonText != null)
+                {
+                    view.deleteButtonText.text = isDeleteArmed ? "确认" : "删除";
+                    view.deleteButtonText.color = SaveDangerTextColor;
+                }
             }
         }
     }
@@ -711,25 +856,11 @@ public sealed class MainMenuController : MonoBehaviour
     {
         SaveSlotSummary summary = GetSlotSummary(selectedSlotId, summaries);
         bool canSelect = CanSelectSlot(summary);
-        bool canPerformPrimaryAction = false;
 
-        if (currentPanelMode == MainMenuSlotPanelMode.NewGame)
+        if (panelSelectionText != null)
         {
-            primaryButtonText.text = summary != null && summary.hasSave && armedOverwriteSlotId == selectedSlotId
-                ? "确认覆盖并开始"
-                : summary != null && summary.hasSave
-                    ? "覆盖并开始"
-                    : "开始新游戏";
-            canPerformPrimaryAction = summary != null;
+            panelSelectionText.text = BuildSelectionHint(summary, canSelect);
         }
-        else
-        {
-            primaryButtonText.text = "继续游戏";
-            canPerformPrimaryAction = canSelect;
-        }
-
-        primaryButton.interactable = canPerformPrimaryAction;
-        panelSelectionText.text = BuildSelectionHint(summary, canSelect);
     }
 
     private string BuildSelectionHint(SaveSlotSummary summary, bool canSelect)
@@ -750,10 +881,10 @@ public sealed class MainMenuController : MonoBehaviour
 
             if (armedOverwriteSlotId == summary.slotId)
             {
-                return $"再次点击右下角按钮后，会清空槽位 {summary.slotId} 的永久进度并开始新游戏。";
+                return $"请在确认弹窗中决定是否覆盖存档 {summary.slotId - 1:00}。";
             }
 
-            return $"槽位 {summary.slotId} 已有存档。首次点击右下角按钮只会进入覆盖确认，不会立即清空。";
+            return $"存档 {summary.slotId - 1:00} 已有进度。点击右下角按钮会打开覆盖确认，不会立即清空。";
         }
 
         if (!canSelect)
@@ -761,20 +892,25 @@ public sealed class MainMenuController : MonoBehaviour
             return "请选择一个已有存档的槽位继续游戏。";
         }
 
-        return $"将读取槽位 {summary.slotId} 的永久进度并进入基地场景，不会恢复战斗中途现场。";
+        if (armedDeleteSlotId == summary.slotId)
+        {
+            return $"请在确认弹窗中决定是否删除存档 {summary.slotId - 1:00}。照片相册保留。";
+        }
+
+        return $"将读取存档 {summary.slotId - 1:00} 的永久进度并进入基地场景，不会恢复战斗中途现场。";
     }
 
     private string BuildSlotDetail(SaveSlotSummary summary)
     {
         if (summary == null || !summary.hasSave)
         {
-            return "状态：空槽位\n最后保存：暂无\n当前关卡：未开始    总进度：0%    当前武器：直墨";
+            return "最后保存：暂无\n关卡：未开始    进度：0%\n武器：直墨";
         }
 
         string stageName = ResolveStageName(summary.selectedStageId);
         string weaponName = InkTypeCatalog.GetDisplayName(summary.currentWeaponType);
         int progressValue = Mathf.RoundToInt(summary.progressPercent);
-        return $"状态：已占用\n最后保存：{FormatUtcTimestamp(summary.savedAtUtc)}\n当前关卡：{stageName}    总进度：{progressValue}%    当前武器：{weaponName}";
+        return $"最后保存：{FormatUtcTimestamp(summary.savedAtUtc)}\n关卡：{stageName}    进度：{progressValue}%\n武器：{weaponName}";
     }
 
     private string BuildSlotState(SaveSlotSummary summary, bool isSelected)
@@ -810,6 +946,127 @@ public sealed class MainMenuController : MonoBehaviour
         }
 
         return isSelected ? "已选择" : "可继续";
+    }
+
+    private static void RefreshSlotPreview(SlotCardView view, SaveSlotSummary summary)
+    {
+        if (view == null || view.previewImage == null)
+        {
+            return;
+        }
+
+        string nextPreviewPath = summary != null && summary.hasSave
+            ? summary.previewImagePath ?? string.Empty
+            : string.Empty;
+
+        if (!string.Equals(view.previewImagePath, nextPreviewPath, StringComparison.Ordinal))
+        {
+            ReleaseSlotPreview(view);
+            view.previewImagePath = nextPreviewPath;
+
+            Texture2D previewTexture = GameProgressPersistence.LoadSlotPreviewTexture(summary);
+            if (previewTexture != null)
+            {
+                view.previewTexture = previewTexture;
+                view.previewSprite = Sprite.Create(
+                    previewTexture,
+                    new Rect(0f, 0f, previewTexture.width, previewTexture.height),
+                    new Vector2(0.5f, 0.5f),
+                    100f,
+                    0u,
+                    SpriteMeshType.FullRect);
+                view.previewSprite.name = $"SaveSlotPreviewSprite_{view.slotId:00}";
+            }
+        }
+
+        bool hasPreview = view.previewSprite != null;
+        view.previewImage.sprite = hasPreview ? view.previewSprite : null;
+        view.previewImage.color = hasPreview ? Color.white : Color.clear;
+        view.previewImage.enabled = hasPreview;
+        view.previewImage.preserveAspect = true;
+        view.previewImage.raycastTarget = false;
+    }
+
+    private void ReleaseSlotPreviewSprites()
+    {
+        for (int i = 0; i < slotCardViews.Count; i++)
+        {
+            ReleaseSlotPreview(slotCardViews[i]);
+        }
+    }
+
+    private static void ReleaseSlotPreview(SlotCardView view)
+    {
+        if (view == null)
+        {
+            return;
+        }
+
+        DestroyUnityObject(view.previewSprite);
+        DestroyUnityObject(view.previewTexture);
+        view.previewSprite = null;
+        view.previewTexture = null;
+        view.previewImagePath = string.Empty;
+    }
+
+    private void OpenConfirmDialog(string title, string message, string confirmLabel, Action confirmAction)
+    {
+        pendingConfirmAction = confirmAction;
+
+        if (confirmDialogObject == null)
+        {
+            return;
+        }
+
+        if (confirmTitleText != null)
+        {
+            confirmTitleText.text = string.IsNullOrWhiteSpace(title) ? "Prompt" : title;
+        }
+
+        if (confirmMessageText != null)
+        {
+            confirmMessageText.text = message ?? string.Empty;
+        }
+
+        if (confirmPrimaryButtonText != null)
+        {
+            confirmPrimaryButtonText.text = string.IsNullOrWhiteSpace(confirmLabel) ? "确认" : confirmLabel;
+            confirmPrimaryButtonText.color = SaveTextPrimaryColor;
+        }
+
+        confirmDialogObject.SetActive(true);
+        confirmDialogObject.transform.SetAsLastSibling();
+    }
+
+    private void CloseConfirmDialog()
+    {
+        pendingConfirmAction = null;
+        bool wasOpen = confirmDialogObject != null && confirmDialogObject.activeSelf;
+
+        if (confirmDialogObject != null)
+        {
+            confirmDialogObject.SetActive(false);
+        }
+
+        if (wasOpen && currentPanelMode != MainMenuSlotPanelMode.None)
+        {
+            armedDeleteSlotId = 0;
+            armedOverwriteSlotId = 0;
+            RefreshSlotOverlay();
+        }
+    }
+
+    private void ConfirmPendingAction()
+    {
+        Action action = pendingConfirmAction;
+        pendingConfirmAction = null;
+
+        if (confirmDialogObject != null)
+        {
+            confirmDialogObject.SetActive(false);
+        }
+
+        action?.Invoke();
     }
 
     private int ResolveInitialSelection(MainMenuSlotPanelMode mode)
@@ -916,37 +1173,59 @@ public sealed class MainMenuController : MonoBehaviour
 
     private static Button CreateMenuButton(Transform parent, string objectName, string label, UnityEngine.Events.UnityAction onClick)
     {
+        MainMenuButtonLayout buttonLayout = ResolveMenuButtonLayout(objectName);
+
         GameObject buttonObject = CreateUiObject(objectName, parent);
         RectTransform rectTransform = buttonObject.GetComponent<RectTransform>();
-        rectTransform.sizeDelta = new Vector2(500f, 114f);
+        rectTransform.anchorMin = new Vector2(0.5f, 0.5f);
+        rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
+        rectTransform.pivot = new Vector2(0.5f, 0.5f);
+        rectTransform.sizeDelta = buttonLayout.Size;
+        rectTransform.anchoredPosition = buttonLayout.AnchoredPosition;
 
         LayoutElement layoutElement = buttonObject.AddComponent<LayoutElement>();
-        layoutElement.preferredWidth = 500f;
-        layoutElement.preferredHeight = 114f;
+        layoutElement.preferredWidth = buttonLayout.Size.x;
+        layoutElement.preferredHeight = buttonLayout.Size.y;
 
         Image image = buttonObject.AddComponent<Image>();
-        RuntimeUiSpriteFactory.ApplyRoundedSprite(image, MenuButtonColor, 20, 14, 1.1f);
+        RuntimeUiSpriteFactory.ApplySavePanelFrameSprite(image, Color.white);
 
         Button button = buttonObject.AddComponent<Button>();
         button.targetGraphic = image;
-        ApplyButtonStyle(button, image, MenuButtonColor, MenuButtonHighlightColor, MenuButtonPressedColor, MenuButtonDisabledColor);
+        Color normal = image.color;
+        ApplyButtonStyle(
+            button,
+            image,
+            normal,
+            Color.Lerp(normal, MenuButtonHitHighlightColor, 0.24f),
+            Color.Lerp(normal, MenuButtonHitPressedColor, 0.32f),
+            MenuButtonArtDisabledColor);
         button.onClick.AddListener(onClick);
 
-        GameObject accentObject = CreateUiObject("Accent", buttonObject.transform);
-        RectTransform accentRect = accentObject.GetComponent<RectTransform>();
-        accentRect.anchorMin = new Vector2(0.5f, 1f);
-        accentRect.anchorMax = new Vector2(0.5f, 1f);
-        accentRect.pivot = new Vector2(0.5f, 1f);
-        accentRect.sizeDelta = new Vector2(270f, 6f);
-        accentRect.anchoredPosition = new Vector2(0f, -18f);
-        Image accentImage = accentObject.AddComponent<Image>();
-        RuntimeUiSpriteFactory.ApplyRoundedSprite(accentImage, AccentColor, 6, 4, 1f);
-
-        Text labelText = CreateText(buttonObject.transform, "Label", label, 42, TextPrimaryColor, TextAnchor.MiddleCenter, FontStyle.Bold);
-        ConfigureRect(labelText.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(420f, 60f), new Vector2(0f, -4f));
+        Text labelText = CreateText(buttonObject.transform, "Label", label, buttonLayout.LabelFontSize, TextPrimaryColor, TextAnchor.MiddleCenter, FontStyle.Bold);
+        ConfigureRect(labelText.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), buttonLayout.Size - new Vector2(60f, 34f), new Vector2(0f, -4f));
         AddTextOutline(labelText);
 
         return button;
+    }
+
+    private static MainMenuButtonLayout ResolveMenuButtonLayout(string objectName)
+    {
+        switch (objectName)
+        {
+            case "NewGameButton":
+                return new MainMenuButtonLayout(new Vector2(500f, 250f), new Vector2(0f, 310f), 42);
+            case "ContinueButton":
+                return new MainMenuButtonLayout(new Vector2(760f, 140f), new Vector2(0f, 115f), 48);
+            case "HandbookButton":
+                return new MainMenuButtonLayout(new Vector2(760f, 140f), new Vector2(0f, -80f), 48);
+            case "SettingsButton":
+                return new MainMenuButtonLayout(new Vector2(420f, 180f), new Vector2(0f, -275f), 42);
+            case "ExitButton":
+                return new MainMenuButtonLayout(new Vector2(80f, 80f), new Vector2(0f, -405f), 32);
+            default:
+                return new MainMenuButtonLayout(new Vector2(500f, 114f), Vector2.zero, 42);
+        }
     }
 
     private static Button CreateActionButton(
@@ -962,21 +1241,46 @@ public sealed class MainMenuController : MonoBehaviour
         rectTransform.sizeDelta = size;
 
         Image image = buttonObject.AddComponent<Image>();
-        RuntimeUiSpriteFactory.ApplyRoundedSprite(image, buttonColor, 14, 10, 1f);
+        RuntimeUiSpriteFactory.ApplySaveButtonFrameSprite(image, buttonColor);
 
         Button button = buttonObject.AddComponent<Button>();
         button.targetGraphic = image;
 
-        Color highlighted = Color.Lerp(buttonColor, Color.white, 0.08f);
-        Color pressed = Color.Lerp(buttonColor, Color.black, 0.12f);
-        Color disabled = new Color(buttonColor.r, buttonColor.g, buttonColor.b, 0.4f);
-        ApplyButtonStyle(button, image, buttonColor, highlighted, pressed, disabled);
+        Color normal = image.color;
+        Color highlighted = Color.Lerp(normal, Color.white, 0.10f);
+        Color pressed = Color.Lerp(normal, new Color(0.65f, 0.42f, 0.18f, 1f), 0.16f);
+        Color disabled = new Color(normal.r, normal.g, normal.b, 0.42f);
+        ApplyButtonStyle(button, image, normal, highlighted, pressed, disabled);
         button.onClick.AddListener(onClick);
 
-        Text labelText = CreateText(buttonObject.transform, "Label", label, 28, TextPrimaryColor, TextAnchor.MiddleCenter, FontStyle.Bold);
+        int labelFontSize = size.y <= 54f ? 24 : 28;
+        Text labelText = CreateText(buttonObject.transform, "Label", label, labelFontSize, SaveTextPrimaryColor, TextAnchor.MiddleCenter, FontStyle.Bold);
         ConfigureRect(labelText.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), size - new Vector2(20f, 14f), Vector2.zero);
-        AddTextOutline(labelText);
 
+        return button;
+    }
+
+    private static Button CreateIconButton(
+        Transform parent,
+        string objectName,
+        string label,
+        Vector2 size,
+        UnityEngine.Events.UnityAction onClick)
+    {
+        GameObject buttonObject = CreateUiObject(objectName, parent);
+        RectTransform rectTransform = buttonObject.GetComponent<RectTransform>();
+        rectTransform.sizeDelta = size;
+
+        Image image = buttonObject.AddComponent<Image>();
+        image.color = Color.clear;
+
+        Button button = buttonObject.AddComponent<Button>();
+        button.targetGraphic = image;
+        button.transition = Selectable.Transition.None;
+        button.onClick.AddListener(onClick);
+
+        Text labelText = CreateText(buttonObject.transform, "Label", label, 38, SaveTextMutedColor, TextAnchor.MiddleCenter, FontStyle.Bold);
+        ConfigureRect(labelText.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), size, Vector2.zero);
         return button;
     }
 
@@ -1030,9 +1334,22 @@ public sealed class MainMenuController : MonoBehaviour
         text.color = color;
         text.horizontalOverflow = HorizontalWrapMode.Overflow;
         text.verticalOverflow = VerticalWrapMode.Overflow;
+        text.raycastTarget = false;
         text.supportRichText = false;
         RuntimeTextFontRepair.RepairLegacyText(text);
         return text;
+    }
+
+    private static void ConfigureBestFit(Text text, int minSize, int maxSize)
+    {
+        if (text == null)
+        {
+            return;
+        }
+
+        text.resizeTextForBestFit = true;
+        text.resizeTextMinSize = Mathf.Max(1, minSize);
+        text.resizeTextMaxSize = Mathf.Max(text.resizeTextMinSize, maxSize);
     }
 
     private static void ConfigureRect(
@@ -1069,6 +1386,23 @@ public sealed class MainMenuController : MonoBehaviour
 
         outline.effectColor = new Color(0f, 0f, 0f, 0.35f);
         outline.effectDistance = new Vector2(1.2f, -1.2f);
+    }
+
+    private static void DestroyUnityObject(UnityEngine.Object target)
+    {
+        if (target == null)
+        {
+            return;
+        }
+
+        if (Application.isPlaying)
+        {
+            Destroy(target);
+        }
+        else
+        {
+            DestroyImmediate(target);
+        }
     }
 
     private static string ResolveStageName(string stageId)

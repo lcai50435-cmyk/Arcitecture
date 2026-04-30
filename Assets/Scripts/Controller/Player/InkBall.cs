@@ -12,6 +12,7 @@ public class InkBall : MonoBehaviour
     public CharacterCore character;
 
     private float damage;
+    private float damageMultiplier = 1f;
     private Animator anim;
     private Rigidbody2D rb;
     private SpriteRenderer spriteRenderer;
@@ -62,6 +63,7 @@ public class InkBall : MonoBehaviour
     {
         inkType = config.inkType;
         displayColor = config.displayColor;
+        damageMultiplier = Mathf.Max(0.01f, config.damageMultiplier);
         maxHitCount = Mathf.Max(1, config.maxHitCount);
         debuffConfig = config.debuff;
         explodeOnHit = config.explodeOnHit;
@@ -100,7 +102,7 @@ public class InkBall : MonoBehaviour
     {
         if (character != null)
         {
-            damage = character.stats.attackDamage;
+            damage = character.stats.attackDamage * damageMultiplier;
         }
 
         if (isHit || rb == null)
@@ -119,8 +121,13 @@ public class InkBall : MonoBehaviour
             return;
         }
 
+        if (IsOwnerCollider(other))
+        {
+            return;
+        }
+
         bool hitEnemy = false;
-        CharacterCore enemyCore = other.GetComponent<CharacterCore>();
+        CharacterCore enemyCore = other.GetComponentInParent<CharacterCore>();
         if (enemyCore != null && enemyCore != character && character != null)
         {
             if (hitTargets.Contains(enemyCore))
@@ -145,6 +152,19 @@ public class InkBall : MonoBehaviour
         }
 
         FinishHit(hitEnemy);
+    }
+
+    private bool IsOwnerCollider(Collider2D other)
+    {
+        if (other == null || character == null)
+        {
+            return false;
+        }
+
+        CharacterCore ownerCore = other.GetComponentInParent<CharacterCore>();
+        return ownerCore == character ||
+               other.transform == character.transform ||
+               other.transform.IsChildOf(character.transform);
     }
 
     private void ApplyExplosion()

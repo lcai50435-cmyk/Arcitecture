@@ -6,6 +6,8 @@ using UnityEngine;
 /// </summary>
 public class PlayerTakeDamage : MonoBehaviour
 {
+    private const float HurtMoveLockDuration = 0.12f;
+
     [Header("组件引用")]
     public Animator playerAnim;
     public PlayerMove playerMovement; // 拖拽赋值移动脚本
@@ -15,6 +17,8 @@ public class PlayerTakeDamage : MonoBehaviour
     public ValueTrans healthTrans; 
 
     private CharacterCore characterCore;
+    private float hurtRecoveryTimer;
+    private bool movementLockedByHurt;
 
     private void Awake()
     {
@@ -42,6 +46,11 @@ public class PlayerTakeDamage : MonoBehaviour
         RefreshHealthUi();
     }
 
+    private void Update()
+    {
+        TickHurtRecovery(Time.deltaTime);
+    }
+
     /// <summary>
     /// 播放受击动画并禁用移动
     /// </summary>
@@ -53,8 +62,11 @@ public class PlayerTakeDamage : MonoBehaviour
         {
             if (playerMovement != null)
             {
+                bool shouldRestoreMovement = movementLockedByHurt || playerMovement.canMove;
                 // 受击时禁止移动
                 playerMovement.canMove = false;
+                movementLockedByHurt = shouldRestoreMovement;
+                hurtRecoveryTimer = shouldRestoreMovement ? HurtMoveLockDuration : 0f;
                 // 清空刚体速度，立即停止位移
                 if (playerMovement.rb != null)
                 {
@@ -72,9 +84,35 @@ public class PlayerTakeDamage : MonoBehaviour
     /// </summary>
     public void OnHurtAnimationEnd()
     {
+        ReleaseHurtMovementLock();
+    }
+
+    private void TickHurtRecovery(float deltaTime)
+    {
+        if (hurtRecoveryTimer <= 0f || playerMovement == null)
+        {
+            return;
+        }
+
+        hurtRecoveryTimer -= Mathf.Max(0f, deltaTime);
+        if (hurtRecoveryTimer <= 0f)
+        {
+            ReleaseHurtMovementLock();
+        }
+    }
+
+    private void ReleaseHurtMovementLock()
+    {
+        hurtRecoveryTimer = 0f;
+        if (!movementLockedByHurt)
+        {
+            return;
+        }
+
+        movementLockedByHurt = false;
         if (playerMovement != null)
         {
-            playerMovement.canMove = true; // 只关移动
+            playerMovement.canMove = true; // 只恢复受击锁定
         }
     }
 

@@ -36,8 +36,12 @@ public readonly struct WeaponAttackProfile
         config.baseProjectileLifetime = definition.projectileSpeed > 0.01f
             ? definition.attackRange / definition.projectileSpeed
             : definition.attackRange;
-        config.attackInterval = definition.attackInterval;
-        config.inkCost = definition.inkCost;
+        float attackIntervalMultiplier = config.attackIntervalMultiplier > 0f ? config.attackIntervalMultiplier : 1f;
+        float inkCostMultiplier = config.inkCostMultiplier > 0f ? config.inkCostMultiplier : 1f;
+        config.attackInterval = Mathf.Max(
+            InkAttackRuntimeConfig.MinimumAttackInterval,
+            definition.attackInterval * attackIntervalMultiplier);
+        config.inkCost = Mathf.Max(1, Mathf.RoundToInt(definition.inkCost * inkCostMultiplier));
         config.explodeOnHit = definition.explodeOnHit;
         config.explosionRadius = definition.explosionRadius;
         config.explosionDamageMultiplier = definition.explosionDamageMultiplier;

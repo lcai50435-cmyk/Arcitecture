@@ -25,6 +25,7 @@ public class BaseHubAlbumPanel : MonoBehaviour
     [SerializeField] private Button closeButton;
     [SerializeField] private Button previousPageButton;
     [SerializeField] private Button nextPageButton;
+    [SerializeField] private Button deleteSelectedButton;
     [SerializeField] private TextMeshProUGUI pageIndicatorText;
     [SerializeField] private TextMeshProUGUI previewTitleText;
     [SerializeField] private TextMeshProUGUI previewMetaText;
@@ -46,6 +47,7 @@ public class BaseHubAlbumPanel : MonoBehaviour
         Button close,
         Button previousPage,
         Button nextPage,
+        Button deleteSelected,
         TextMeshProUGUI pageIndicator,
         TextMeshProUGUI previewTitle,
         TextMeshProUGUI previewMeta,
@@ -57,6 +59,7 @@ public class BaseHubAlbumPanel : MonoBehaviour
         closeButton = close;
         previousPageButton = previousPage;
         nextPageButton = nextPage;
+        deleteSelectedButton = deleteSelected;
         pageIndicatorText = pageIndicator;
         previewTitleText = previewTitle;
         previewMetaText = previewMeta;
@@ -72,6 +75,9 @@ public class BaseHubAlbumPanel : MonoBehaviour
 
         nextPageButton?.onClick.RemoveAllListeners();
         nextPageButton?.onClick.AddListener(SelectNextPage);
+
+        deleteSelectedButton?.onClick.RemoveAllListeners();
+        deleteSelectedButton?.onClick.AddListener(DeleteSelectedEntry);
     }
 
     public void RegisterSlot(BaseHubAlbumSlotView slotView)
@@ -164,6 +170,35 @@ public class BaseHubAlbumPanel : MonoBehaviour
         selectedEntryIndex = globalIndex;
         RefreshSelectionState();
         RefreshPreview();
+    }
+
+    private void DeleteSelectedEntry()
+    {
+        if (selectedEntryIndex < 0 || selectedEntryIndex >= entries.Count)
+        {
+            return;
+        }
+
+        int deletedIndex = selectedEntryIndex;
+        if (!PhotoAlbumRepository.DeleteEntry(entries[selectedEntryIndex]))
+        {
+            return;
+        }
+
+        entries.Clear();
+        entries.AddRange(PhotoAlbumRepository.LoadEntries());
+        if (entries.Count == 0)
+        {
+            selectedEntryIndex = -1;
+            currentPageIndex = 0;
+        }
+        else
+        {
+            selectedEntryIndex = Mathf.Clamp(deletedIndex, 0, entries.Count - 1);
+            currentPageIndex = Mathf.Clamp(selectedEntryIndex / EntriesPerPage, 0, Mathf.Max(0, GetPageCount() - 1));
+        }
+
+        RefreshView();
     }
 
     private void RefreshView()
@@ -279,7 +314,7 @@ public class BaseHubAlbumPanel : MonoBehaviour
 
             if (previewMetaText != null)
             {
-                previewMetaText.text = "回到战斗里按下拍照键，新的留念会自动保存在这里。";
+                previewMetaText.text = "在基地或关卡里按下拍照键，新的留念会自动保存在这里。";
             }
 
             return;
@@ -326,6 +361,11 @@ public class BaseHubAlbumPanel : MonoBehaviour
         if (nextPageButton != null)
         {
             nextPageButton.interactable = currentPageIndex < pageCount - 1;
+        }
+
+        if (deleteSelectedButton != null)
+        {
+            deleteSelectedButton.interactable = selectedEntryIndex >= 0 && selectedEntryIndex < entries.Count;
         }
     }
 
@@ -422,10 +462,7 @@ public class BaseHubAlbumPanel : MonoBehaviour
             return "留念";
         }
 
-        GameplayStageDefinition stageDefinition = GameplayStageCatalog.GetStageById(entry.stageId);
-        string stageLabel = stageDefinition != null
-            ? stageDefinition.displayName
-            : (string.IsNullOrWhiteSpace(entry.stageId) ? entry.sceneName : entry.stageId);
+        string stageLabel = ResolveEntryLocationLabel(entry);
         if (string.IsNullOrWhiteSpace(stageLabel))
         {
             stageLabel = $"留念 {globalIndex + 1}";
@@ -442,16 +479,38 @@ public class BaseHubAlbumPanel : MonoBehaviour
         }
 
         string savedTime = FormatSavedTime(entry.savedAtUtc, "yyyy-MM-dd HH:mm:ss");
-        GameplayStageDefinition stageDefinition = GameplayStageCatalog.GetStageById(entry.stageId);
-        string stageText = stageDefinition != null
-            ? stageDefinition.displayName
-            : (string.IsNullOrWhiteSpace(entry.stageId) ? "未记录" : entry.stageId);
+        string stageText = ResolveEntryLocationLabel(entry);
+        if (string.IsNullOrWhiteSpace(stageText))
+        {
+            stageText = "未记录";
+        }
         string sceneText = string.IsNullOrWhiteSpace(entry.sceneName) ? "未记录" : entry.sceneName;
         string resolutionText = entry.width > 0 && entry.height > 0
             ? $"{entry.width} x {entry.height}"
             : "未知";
         string statusText = hasTexture ? "文件状态：正常" : "文件状态：读取失败";
         return $"保存时间：{savedTime}\n场景：{sceneText}\n关卡：{stageText}\n分辨率：{resolutionText}\n{statusText}";
+    }
+
+    private static string ResolveEntryLocationLabel(PhotoAlbumEntry entry)
+    {
+        if (entry == null)
+        {
+            return string.Empty;
+        }
+
+        GameplayStageDefinition stageDefinition = GameplayStageCatalog.GetStageById(entry.stageId);
+        if (stageDefinition != null)
+        {
+            return stageDefinition.displayName;
+        }
+
+        if (string.Equals(entry.sceneName, "NewBase", StringComparison.Ordinal))
+        {
+            return "基地";
+        }
+
+        return string.IsNullOrWhiteSpace(entry.stageId) ? entry.sceneName : entry.stageId;
     }
 
     private static string FormatSavedTime(string savedAtUtc, string format)

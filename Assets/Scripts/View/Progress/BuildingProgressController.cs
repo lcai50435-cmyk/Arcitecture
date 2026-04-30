@@ -72,6 +72,7 @@ public class BuildingProgressController : MonoBehaviour
         progressSlider.minValue = 0f;
         progressSlider.maxValue = maxProgress;
         progressSlider.value = RuntimeProgressState.EnsureInstance().GetBuildingProgress(buildingId);
+        SliderFillGeometryUtility.ApplyExactFill(progressSlider, true);
 
         if (buildingUnlockState != null)
         {

@@ -20,7 +20,8 @@ public sealed class RuntimePauseMenu : MonoBehaviour
     }
 
     private const string CanvasName = "RuntimePauseMenuCanvas";
-    private const int SortingOrder = 940;
+    // 暂停面板必须高于所有运行时弹窗，避免旧 UI 遮罩吞掉 Esc 打开的面板点击。
+    private const int SortingOrder = Dialog.TopmostRuntimeDialogSortingOrder + 50;
     private const string PauseReason = "RuntimePauseMenu";
     private const float PanelWidth = 1120f;
     private const float PanelHeight = 720f;
@@ -31,15 +32,16 @@ public sealed class RuntimePauseMenu : MonoBehaviour
     private const float MenuButtonRevealOffsetY = -42f;
     private const float MenuButtonRevealCurveX = 18f;
     private const float MenuButtonRevealStartScale = 0.965f;
+    private const float MenuButtonInteractionRevealProgress = 0f;
 
-    private static readonly Color PrimaryButtonColor = new Color(0.84f, 0.67f, 0.36f, 0.66f);
-    private static readonly Color PrimaryButtonTextColor = new Color(0.16f, 0.11f, 0.07f, 1f);
-    private static readonly Color SecondaryButtonColor = new Color(0.20f, 0.28f, 0.38f, 0.48f);
-    private static readonly Color SecondaryButtonTextColor = new Color(0.92f, 0.96f, 1f, 1f);
-    private static readonly Color DangerButtonColor = new Color(0.58f, 0.22f, 0.20f, 0.54f);
-    private static readonly Color DangerButtonTextColor = new Color(0.99f, 0.94f, 0.90f, 1f);
-    private static readonly Color TitleColor = new Color(0.97f, 0.98f, 1f, 1f);
-    private static readonly Color DescriptionColor = new Color(0.70f, 0.78f, 0.88f, 1f);
+    private static readonly Color PrimaryButtonColor = Color.white;
+    private static readonly Color PrimaryButtonTextColor = new Color(0.14f, 0.11f, 0.08f, 1f);
+    private static readonly Color SecondaryButtonColor = new Color(0.90f, 0.77f, 0.55f, 0.92f);
+    private static readonly Color SecondaryButtonTextColor = new Color(0.18f, 0.15f, 0.11f, 0.98f);
+    private static readonly Color DangerButtonColor = new Color(0.93f, 0.62f, 0.48f, 0.94f);
+    private static readonly Color DangerButtonTextColor = new Color(0.24f, 0.08f, 0.06f, 1f);
+    private static readonly Color TitleColor = new Color(0.97f, 0.94f, 0.86f, 1f);
+    private static readonly Color DescriptionColor = new Color(0.84f, 0.79f, 0.70f, 1f);
 
     private sealed class MenuButtonRevealItem
     {
@@ -59,8 +61,6 @@ public sealed class RuntimePauseMenu : MonoBehaviour
 
     public static RuntimePauseMenu Instance { get; private set; }
     public static bool IsPauseOpen => Instance != null && Instance.isOpen;
-
-    private static int suppressOpenUntilFrame = -1;
 
     private RuntimeModalShell modalShell;
     private RuntimeSettingsPanel settingsPanel;
@@ -87,23 +87,21 @@ public sealed class RuntimePauseMenu : MonoBehaviour
     {
         SceneManager.sceneLoaded -= HandleSceneLoaded;
         SceneManager.sceneLoaded += HandleSceneLoaded;
-        suppressOpenUntilFrame = -1;
         EnsureInstance();
     }
 
     private static void HandleSceneLoaded(Scene scene, LoadSceneMode mode)
     {
-        suppressOpenUntilFrame = -1;
         EnsureInstance();
         if (Instance != null)
         {
-            Instance.SetVisible(GameplayStageCatalog.IsGameplayScene(scene.name));
+            Instance.SetVisible(IsSupportedScene(scene.name));
         }
     }
 
     public static void ConsumeOpenHotkey()
     {
-        suppressOpenUntilFrame = Time.frameCount + 1;
+        // 保留给旧调用方；Esc 现在始终优先打开暂停页。
     }
 
     public static void CloseForSceneTransition()
@@ -114,12 +112,37 @@ public sealed class RuntimePauseMenu : MonoBehaviour
         }
     }
 
+    public static bool TryOpenFromExternal()
+    {
+        RuntimePauseMenu menu = EnsureInstance();
+        if (menu == null || !menu.CanOpenFromExternal())
+        {
+            return false;
+        }
+
+        menu.PauseGame();
+        return true;
+    }
+
+    public static bool TryOpenFromPauseKey()
+    {
+        RuntimePauseMenu menu = EnsureInstance();
+        if (menu == null || !menu.CanOpenFromPauseKey())
+        {
+            return false;
+        }
+
+        menu.PauseGame();
+        return true;
+    }
+
     public static RuntimePauseMenu EnsureInstance()
     {
-        bool supportedScene = GameplayStageCatalog.IsGameplayScene(SceneManager.GetActiveScene().name);
+        bool supportedScene = IsSupportedScene(SceneManager.GetActiveScene().name);
 
         if (Instance != null)
         {
+            Instance.EnsureUi();
             Instance.SetVisible(supportedScene);
             return Instance;
         }
@@ -128,12 +151,14 @@ public sealed class RuntimePauseMenu : MonoBehaviour
         if (existing != null)
         {
             Instance = existing;
+            Instance.EnsureUi();
             Instance.SetVisible(supportedScene);
             return existing;
         }
 
         GameObject runtimeObject = new GameObject("RuntimePauseMenu");
         Instance = runtimeObject.AddComponent<RuntimePauseMenu>();
+        Instance.EnsureUi();
         Instance.SetVisible(supportedScene);
         return Instance;
     }
@@ -149,7 +174,7 @@ public sealed class RuntimePauseMenu : MonoBehaviour
         Instance = this;
         DontDestroyOnLoad(gameObject);
         EnsureUi();
-        SetVisible(GameplayStageCatalog.IsGameplayScene(SceneManager.GetActiveScene().name));
+        SetVisible(IsSupportedScene(SceneManager.GetActiveScene().name));
         HideImmediate();
     }
 
@@ -176,13 +201,13 @@ public sealed class RuntimePauseMenu : MonoBehaviour
             return;
         }
 
-        KeyCode pauseKey = GameSettingsStore.GetKeyBinding(GameInputAction.Pause);
-        if (pauseKey == KeyCode.None || !Input.GetKeyDown(pauseKey))
+        if (isOpen || showingSettings)
         {
-            return;
+            RuntimeUiEventSystemBootstrapper.Ensure();
         }
 
-        if (RuntimeMiniMapHud.Instance != null && RuntimeMiniMapHud.Instance.IsExpandedViewVisible)
+        KeyCode pauseKey = GameSettingsStore.GetKeyBinding(GameInputAction.Pause);
+        if (pauseKey == KeyCode.None || !Input.GetKeyDown(pauseKey))
         {
             return;
         }
@@ -195,11 +220,6 @@ public sealed class RuntimePauseMenu : MonoBehaviour
             }
 
             settingsPanel?.RequestContinueGame();
-            return;
-        }
-
-        if (!isOpen && Time.frameCount <= suppressOpenUntilFrame)
-        {
             return;
         }
 
@@ -218,12 +238,7 @@ public sealed class RuntimePauseMenu : MonoBehaviour
             return;
         }
 
-        if (RuntimeUiInputGuard.IsBlockingGameplayUiOpen())
-        {
-            return;
-        }
-
-        PauseGame();
+        TryOpenFromPauseKey();
     }
 
     private void OnDestroy()
@@ -253,12 +268,7 @@ public sealed class RuntimePauseMenu : MonoBehaviour
 
     private bool CanOpenForFocusLoss()
     {
-        if (!visible || isOpen || showingSettings)
-        {
-            return false;
-        }
-
-        if (!GameplayStageCatalog.IsGameplayScene(SceneManager.GetActiveScene().name))
+        if (!CanOpenFromExternal())
         {
             return false;
         }
@@ -274,6 +284,25 @@ public sealed class RuntimePauseMenu : MonoBehaviour
         }
 
         return !RuntimeUiInputGuard.IsBlockingGameplayUiOpen();
+    }
+
+    private bool CanOpenFromExternal()
+    {
+        return visible &&
+               !isOpen &&
+               !showingSettings &&
+               IsSupportedScene(SceneManager.GetActiveScene().name) &&
+               (settingsPanel == null || (!settingsPanel.IsShown && !settingsPanel.IsCapturingBinding)) &&
+               !RuntimeUiInputGuard.IsBlockingGameplayUiOpen();
+    }
+
+    private bool CanOpenFromPauseKey()
+    {
+        return visible &&
+               !isOpen &&
+               !showingSettings &&
+               IsSupportedScene(SceneManager.GetActiveScene().name) &&
+               (settingsPanel == null || (!settingsPanel.IsShown && !settingsPanel.IsCapturingBinding));
     }
 
     private void PauseGame()
@@ -304,7 +333,8 @@ public sealed class RuntimePauseMenu : MonoBehaviour
         showingSettings = false;
         StopMenuReveal(false);
         RuntimeCameraController.EnsureInstance().SetPauseFocusActive(false);
-        HideShell(false, () => RuntimeGameplayPauseController.ReleasePause(PauseReason));
+        RuntimeGameplayPauseController.ReleasePause(PauseReason);
+        HideShell(false, null);
 
         if (settingsPanel != null && settingsPanel.IsShown)
         {
@@ -330,6 +360,11 @@ public sealed class RuntimePauseMenu : MonoBehaviour
     private void SetVisible(bool shouldShow)
     {
         visible = shouldShow;
+        if (shouldShow)
+        {
+            RuntimeUiEventSystemBootstrapper.Ensure();
+        }
+
         if (settingsPanel != null)
         {
             settingsPanel.SetVisible(shouldShow);
@@ -413,8 +448,12 @@ public sealed class RuntimePauseMenu : MonoBehaviour
     private void ShowShell()
     {
         EnsureUi();
+        RuntimeUiEventSystemBootstrapper.Ensure();
         if (canvas != null)
         {
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            canvas.overrideSorting = true;
+            canvas.sortingOrder = SortingOrder;
             canvas.gameObject.SetActive(true);
         }
 
@@ -609,9 +648,10 @@ public sealed class RuntimePauseMenu : MonoBehaviour
         float motionProgress = EaseOutBack(progress);
         if (item.CanvasGroup != null)
         {
+            bool canInteract = progress >= MenuButtonInteractionRevealProgress;
             item.CanvasGroup.alpha = easedProgress;
-            item.CanvasGroup.interactable = progress >= 0.98f;
-            item.CanvasGroup.blocksRaycasts = progress >= 0.98f;
+            item.CanvasGroup.interactable = canInteract;
+            item.CanvasGroup.blocksRaycasts = canInteract;
         }
 
         if (item.RectTransform != null)
@@ -659,6 +699,8 @@ public sealed class RuntimePauseMenu : MonoBehaviour
 
     private void EnsureUi()
     {
+        RuntimeUiEventSystemBootstrapper.Ensure();
+
         if (canvas != null)
         {
             return;
@@ -848,7 +890,7 @@ public sealed class RuntimePauseMenu : MonoBehaviour
         buttonObject.transform.SetParent(parent, false);
 
         Image buttonImage = buttonObject.GetComponent<Image>();
-        RuntimeUiSpriteFactory.ApplyRoundedSprite(buttonImage, backgroundColor, 14, 14);
+        RuntimeUiSpriteFactory.ApplySettingButtonFrameSprite(buttonImage, backgroundColor);
 
         RectTransform rect = buttonObject.GetComponent<RectTransform>();
         rect.anchorMin = new Vector2(0.5f, 0.5f);
@@ -870,6 +912,7 @@ public sealed class RuntimePauseMenu : MonoBehaviour
         text.fontSize = 26f;
         text.color = textColor;
         text.alignment = TextAlignmentOptions.Center;
+        text.raycastTarget = false;
 
         StretchRect(text.rectTransform);
         return button;
@@ -892,6 +935,7 @@ public sealed class RuntimePauseMenu : MonoBehaviour
         text.fontSize = fontSize;
         text.color = color;
         text.alignment = alignment;
+        text.raycastTarget = false;
 
         RectTransform rect = text.rectTransform;
         rect.anchorMin = new Vector2(0.5f, 0.5f);
@@ -928,6 +972,11 @@ public sealed class RuntimePauseMenu : MonoBehaviour
         rectTransform.offsetMin = Vector2.zero;
         rectTransform.offsetMax = Vector2.zero;
         rectTransform.localScale = Vector3.one;
+    }
+
+    private static bool IsSupportedScene(string sceneName)
+    {
+        return RuntimeGameplayPauseController.IsRuntimePausableScene(sceneName);
     }
 }
 

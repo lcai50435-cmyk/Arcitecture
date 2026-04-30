@@ -16,6 +16,12 @@ public class UnlockedBuildingImageButton : MonoBehaviour
     [Header("详细信息界面")]
     public GameObject detailedInformationPanel;
 
+    [Header("详细信息控制器")]
+    public DetailedInformationUI detailedInformationUI;
+
+    [Header("建筑详情数据")]
+    public BuildingDetailData buildingDetailData;
+
     [Header("是否解锁后才允许点击")]
     public bool onlyClickableWhenUnlocked = true;
 
@@ -51,6 +57,7 @@ public class UnlockedBuildingImageButton : MonoBehaviour
 
     private void RefreshClickableState()
     {
+        ResolveReferences();
         if (button == null)
         {
             return;
@@ -68,14 +75,15 @@ public class UnlockedBuildingImageButton : MonoBehaviour
             return;
         }
 
-        button.interactable = buildingUnlockState.isBuildingUnlocked;
+        button.interactable = IsBuildingUnlocked();
     }
 
     private void OnClickImage()
     {
+        ResolveReferences();
         if (onlyClickableWhenUnlocked)
         {
-            if (buildingUnlockState == null || !buildingUnlockState.isBuildingUnlocked)
+            if (buildingUnlockState == null || !IsBuildingUnlocked())
             {
                 return;
             }
@@ -92,5 +100,57 @@ public class UnlockedBuildingImageButton : MonoBehaviour
         {
             detailedInformationPanel.SetActive(true);
         }
+
+        if (detailedInformationUI != null && buildingDetailData != null)
+        {
+            detailedInformationUI.ShowDetail(buildingDetailData);
+        }
+    }
+
+    private void ResolveReferences()
+    {
+        if (buildingUnlockState == null)
+        {
+            buildingUnlockState = GetComponentInParent<CatalogueBuildingUnlockState>(true);
+        }
+
+        if (buildingDetailData == null)
+        {
+            buildingDetailData = GetComponent<BuildingDetailData>();
+        }
+
+        if (buildingDetailData == null && buildingUnlockState != null)
+        {
+            buildingDetailData = buildingUnlockState.GetComponent<BuildingDetailData>() ??
+                                 buildingUnlockState.GetComponentInChildren<BuildingDetailData>(true);
+        }
+
+        if (detailedInformationUI == null)
+        {
+            detailedInformationUI = GetComponentInParent<DetailedInformationUI>(true);
+        }
+
+        if (detailedInformationUI == null)
+        {
+            detailedInformationUI = FindObjectOfType<DetailedInformationUI>(true);
+        }
+
+        if (detailedInformationPanel == null && detailedInformationUI != null)
+        {
+            detailedInformationPanel = detailedInformationUI.detailedInformationPanel;
+        }
+    }
+
+    private bool IsBuildingUnlocked()
+    {
+        if (buildingUnlockState == null)
+        {
+            return false;
+        }
+
+        RuntimeProgressState runtimeState = RuntimeProgressState.Instance;
+        return runtimeState != null
+            ? runtimeState.IsBuildingUnlocked(buildingUnlockState.BuildingId)
+            : buildingUnlockState.isBuildingUnlocked;
     }
 }
