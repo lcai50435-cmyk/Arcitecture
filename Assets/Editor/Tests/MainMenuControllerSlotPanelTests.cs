@@ -260,7 +260,7 @@ public sealed class MainMenuControllerSlotPanelTests
                 (UnityEngine.Events.UnityAction)(() => { })
             });
 
-        AssertSettingSceneMenuButton(button, new Vector2(640f, 118f), new Vector2(0f, 240f));
+        AssertSettingSceneMenuButton(button, new Vector2(520f, 96f), new Vector2(0f, 220f));
     }
 
     [Test]
@@ -283,11 +283,11 @@ public sealed class MainMenuControllerSlotPanelTests
                 (UnityEngine.Events.UnityAction)(() => { })
             });
 
-        AssertSettingSceneMenuButton(button, new Vector2(640f, 118f), new Vector2(0f, 80f));
+        AssertSettingSceneMenuButton(button, new Vector2(520f, 96f), new Vector2(0f, 96f));
     }
 
     [Test]
-    public void UtilityMainMenuButtonsUseSettingSceneFrameSpriteAndOriginalGeometry()
+    public void UtilityMainMenuButtonsUseSettingSceneFrameSpriteAndCompactUnifiedGeometry()
     {
         _ = CreateController();
 
@@ -305,7 +305,7 @@ public sealed class MainMenuControllerSlotPanelTests
                 "图鉴/手册",
                 (UnityEngine.Events.UnityAction)(() => { })
             });
-        AssertSettingSceneMenuButton(handbookButton, new Vector2(640f, 118f), new Vector2(0f, -80f));
+        AssertSettingSceneMenuButton(handbookButton, new Vector2(520f, 96f), new Vector2(0f, -28f));
 
         Button settingsButton = (Button)createMenuButton.Invoke(
             null,
@@ -316,7 +316,7 @@ public sealed class MainMenuControllerSlotPanelTests
                 "设置",
                 (UnityEngine.Events.UnityAction)(() => { })
             });
-        AssertSettingSceneMenuButton(settingsButton, new Vector2(640f, 118f), new Vector2(0f, -240f));
+        AssertSettingSceneMenuButton(settingsButton, new Vector2(520f, 96f), new Vector2(0f, -152f));
 
         Button exitButton = (Button)createMenuButton.Invoke(
             null,
@@ -327,7 +327,7 @@ public sealed class MainMenuControllerSlotPanelTests
                 "退出",
                 (UnityEngine.Events.UnityAction)(() => { })
             });
-        AssertSettingSceneMenuButton(exitButton, new Vector2(80f, 80f), new Vector2(0f, -380f));
+        AssertSettingSceneMenuButton(exitButton, new Vector2(520f, 96f), new Vector2(0f, -276f));
     }
 
     private MainMenuController CreateController()

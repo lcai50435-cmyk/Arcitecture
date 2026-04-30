@@ -120,6 +120,7 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
     private const string LegacyHandbookLeftPanelName = "LeftPanel";
     private const string SceneAuthoredRightIntroductionName = "RightIntroduction";
     private const string SceneAuthoredBuildingImageName = "BuildingImage";
+    private const string SceneAuthoredBuildingDetailButtonName = "GotoButton";
     private const string SceneAuthoredProprietaryMaterialName = "ProprietaryMaterial";
     private const string SceneAuthoredGeneralMaterialName = "MaterialForGeneralPurpose";
     private const string SceneHandbookBackpackTrayName = "HandbookBackpackTray";
@@ -1485,7 +1486,18 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
             buildingImage.sprite = previewSprite;
             buildingImage.enabled = previewSprite != null;
             buildingImage.preserveAspect = true;
-            BindSceneAuthoredBuildingDetailButton(buildingImage, binding, definition);
+            BindSceneAuthoredBuildingDetailButton(buildingImage.gameObject, buildingImage, binding, definition, previewSprite);
+        }
+
+        Transform detailButtonRoot = FindTransformByName(rightRoot, SceneAuthoredBuildingDetailButtonName);
+        if (detailButtonRoot != null)
+        {
+            BindSceneAuthoredBuildingDetailButton(
+                detailButtonRoot.gameObject,
+                detailButtonRoot.GetComponent<Graphic>(),
+                binding,
+                definition,
+                previewSprite);
         }
 
         TMP_Text introductionText = buildingImageRoot != null
@@ -1575,34 +1587,43 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
     }
 
     private void BindSceneAuthoredBuildingDetailButton(
-        Image buildingImage,
+        GameObject targetObject,
+        Graphic targetGraphic,
         SceneAuthoredHandbookCardBinding binding,
-        BuildingDefinition definition)
+        BuildingDefinition definition,
+        Sprite previewSprite)
     {
-        if (buildingImage == null || binding == null || definition == null)
+        if (targetObject == null || binding == null || definition == null)
         {
             return;
         }
 
-        buildingImage.raycastTarget = true;
-
-        Button button = buildingImage.GetComponent<Button>();
-        if (button == null)
+        if (targetGraphic != null)
         {
-            button = buildingImage.gameObject.AddComponent<Button>();
+            targetGraphic.raycastTarget = true;
         }
 
-        button.targetGraphic = buildingImage;
+        Button button = targetObject.GetComponent<Button>();
+        if (button == null)
+        {
+            button = targetObject.AddComponent<Button>();
+        }
+
+        if (button.targetGraphic == null && targetGraphic != null)
+        {
+            button.targetGraphic = targetGraphic;
+        }
+
         button.interactable = RuntimeProgressState.EnsureInstance().IsBuildingUnlocked(binding.buildingId);
 
         SceneHandbookBuildingDetailButtonHandler handler =
-            buildingImage.GetComponent<SceneHandbookBuildingDetailButtonHandler>();
+            targetObject.GetComponent<SceneHandbookBuildingDetailButtonHandler>();
         if (handler == null)
         {
-            handler = buildingImage.gameObject.AddComponent<SceneHandbookBuildingDetailButtonHandler>();
+            handler = targetObject.AddComponent<SceneHandbookBuildingDetailButtonHandler>();
         }
 
-        handler.Bind(binding.buildingId, binding.detailData, definition, buildingImage.sprite);
+        handler.Bind(binding.buildingId, binding.detailData, definition, previewSprite);
     }
 
     private void RefreshSceneAuthoredRightProgress(
@@ -1665,29 +1686,102 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
             return slotRoots;
         }
 
-        for (int i = 0; i < proprietaryRoot.childCount; i++)
+        CollectNamedSceneHandbookProprietarySlotRoots(proprietaryRoot, slotRoots, false);
+        if (slotRoots.Count == 0)
         {
-            Transform child = proprietaryRoot.GetChild(i);
-            if (IsSceneHandbookProprietarySlotRoot(child))
-            {
-                slotRoots.Add(child);
-            }
+            CollectNamedSceneHandbookProprietarySlotRoots(proprietaryRoot, slotRoots, true);
         }
 
         if (slotRoots.Count == 0)
         {
+            for (int i = 0; i < proprietaryRoot.childCount; i++)
+            {
+                Transform child = proprietaryRoot.GetChild(i);
+                if (IsSceneHandbookProprietarySlotRoot(child))
+                {
+                    AddSceneHandbookSlotRoot(slotRoots, child);
+                }
+            }
+
             Button[] slotButtons = proprietaryRoot.GetComponentsInChildren<Button>(true);
             for (int i = 0; i < slotButtons.Length; i++)
             {
                 if (slotButtons[i] != null)
                 {
-                    slotRoots.Add(slotButtons[i].transform);
+                    AddSceneHandbookSlotRoot(slotRoots, slotButtons[i].transform);
                 }
             }
         }
 
         slotRoots.Sort(CompareSceneHandbookSlotTransforms);
         return slotRoots;
+    }
+
+    private static void CollectNamedSceneHandbookProprietarySlotRoots(
+        Transform root,
+        List<Transform> slotRoots,
+        bool includeButtonNames)
+    {
+        if (root == null || slotRoots == null)
+        {
+            return;
+        }
+
+        for (int i = 0; i < root.childCount; i++)
+        {
+            Transform child = root.GetChild(i);
+            if (IsNamedSceneHandbookProprietarySlotRoot(child, includeButtonNames))
+            {
+                AddSceneHandbookSlotRoot(slotRoots, child);
+            }
+
+            CollectNamedSceneHandbookProprietarySlotRoots(child, slotRoots, includeButtonNames);
+        }
+    }
+
+    private static void AddSceneHandbookSlotRoot(List<Transform> slotRoots, Transform candidate)
+    {
+        if (slotRoots == null || candidate == null)
+        {
+            return;
+        }
+
+        if (!TryGetSceneHandbookSlotOrder(candidate, out int candidateOrder))
+        {
+            candidateOrder = int.MinValue;
+        }
+
+        for (int i = slotRoots.Count - 1; i >= 0; i--)
+        {
+            Transform existing = slotRoots[i];
+            if (existing == null)
+            {
+                slotRoots.RemoveAt(i);
+                continue;
+            }
+
+            if (!TryGetSceneHandbookSlotOrder(existing, out int existingOrder))
+            {
+                existingOrder = int.MinValue;
+            }
+
+            if (existing == candidate)
+            {
+                return;
+            }
+
+            if (candidateOrder == existingOrder && IsAncestorOf(existing, candidate))
+            {
+                return;
+            }
+
+            if (candidateOrder == existingOrder && IsAncestorOf(candidate, existing))
+            {
+                slotRoots.RemoveAt(i);
+            }
+        }
+
+        slotRoots.Add(candidate);
     }
 
     private static bool IsSceneHandbookProprietarySlotRoot(Transform candidate)
@@ -1713,8 +1807,29 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         return candidate.GetComponentInChildren<Button>(true) != null;
     }
 
+    private static bool IsNamedSceneHandbookProprietarySlotRoot(Transform candidate, bool includeButtonNames)
+    {
+        if (candidate == null || string.IsNullOrEmpty(candidate.name))
+        {
+            return false;
+        }
+
+        string candidateName = candidate.name;
+        return candidateName.StartsWith("Material_", StringComparison.OrdinalIgnoreCase) ||
+               candidateName.StartsWith("ProprietarySlot_", StringComparison.OrdinalIgnoreCase) ||
+               candidateName.StartsWith("Slot_", StringComparison.OrdinalIgnoreCase) ||
+               (includeButtonNames && candidateName.StartsWith("Button_", StringComparison.OrdinalIgnoreCase));
+    }
+
     private static int CompareSceneHandbookSlotTransforms(Transform left, Transform right)
     {
+        bool hasLeftOrder = TryGetSceneHandbookSlotOrder(left, out int leftOrder);
+        bool hasRightOrder = TryGetSceneHandbookSlotOrder(right, out int rightOrder);
+        if (hasLeftOrder && hasRightOrder && leftOrder != rightOrder)
+        {
+            return leftOrder.CompareTo(rightOrder);
+        }
+
         RectTransform leftRect = left as RectTransform;
         RectTransform rightRect = right as RectTransform;
         if (leftRect != null && rightRect != null)
@@ -1737,6 +1852,54 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         return siblingCompare != 0
             ? siblingCompare
             : string.CompareOrdinal(left != null ? left.name : string.Empty, right != null ? right.name : string.Empty);
+    }
+
+    private static bool TryGetSceneHandbookSlotOrder(Transform target, out int order)
+    {
+        order = 0;
+        if (target == null)
+        {
+            return false;
+        }
+
+        string targetName = target.name;
+        if (string.IsNullOrWhiteSpace(targetName))
+        {
+            return false;
+        }
+
+        int underscoreIndex = targetName.LastIndexOf('_');
+        if (underscoreIndex < 0 || underscoreIndex >= targetName.Length - 1)
+        {
+            return false;
+        }
+
+        return int.TryParse(
+            targetName.Substring(underscoreIndex + 1),
+            NumberStyles.Integer,
+            CultureInfo.InvariantCulture,
+            out order);
+    }
+
+    private static bool IsAncestorOf(Transform ancestor, Transform descendant)
+    {
+        if (ancestor == null || descendant == null)
+        {
+            return false;
+        }
+
+        Transform current = descendant.parent;
+        while (current != null)
+        {
+            if (current == ancestor)
+            {
+                return true;
+            }
+
+            current = current.parent;
+        }
+
+        return false;
     }
 
     private static void ApplySceneHandbookProprietarySlotContent(

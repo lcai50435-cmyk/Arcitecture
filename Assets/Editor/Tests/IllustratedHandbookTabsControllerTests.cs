@@ -665,6 +665,46 @@ public sealed class IllustratedHandbookTabsControllerTests
     }
 
     [Test]
+    public void SceneAuthoredGotoButtonOpensSelectedUnlockedBuildingDetail()
+    {
+        RuntimeProgressState progressState = RuntimeProgressState.EnsureInstance();
+        progressState.ResetProgress(false);
+
+        rootObject = CreateSceneAuthoredRoot();
+        GameObject handbookPage = rootObject.transform.Find("IllustratedHandbookCanvas").gameObject;
+        CreateSceneAuthoredHandbookSurface(handbookPage);
+
+        GameObject detailPanel = new GameObject("DetailedInformationCanvas", typeof(RectTransform));
+        detailPanel.transform.SetParent(rootObject.transform, false);
+        Text detailTitle = CreateChild<Text>(detailPanel.transform, "Title");
+        DetailedInformationUI detailUi = detailPanel.AddComponent<DetailedInformationUI>();
+        detailUi.detailedInformationPanel = detailPanel;
+        detailUi.page1NameText = detailTitle;
+        detailPanel.SetActive(false);
+
+        UIManager manager = rootObject.AddComponent<UIManager>();
+        manager.illustratedHandbook = rootObject;
+        IllustratedHandbookTabsController controller = IllustratedHandbookTabsController.EnsureInstalled(manager);
+        controller.SwitchToPage(IllustratedHandbookPage.IllustratedHandbook);
+
+        GameObject secondCard = FindDescendant(handbookPage.transform, "ArcitectureImage_2").gameObject;
+        controller.SelectSceneAuthoredHandbookCard(secondCard);
+
+        Button gotoButton = FindDescendant(handbookPage.transform, "GotoButton").GetComponent<Button>();
+        Assert.IsNotNull(gotoButton);
+        Assert.IsFalse(gotoButton.interactable);
+
+        CompleteBuildingUnlock(progressState, CatalogueBuildingId.Building2);
+        controller.SelectSceneAuthoredHandbookCard(secondCard);
+
+        Assert.IsTrue(gotoButton.interactable);
+        gotoButton.onClick.Invoke();
+
+        Assert.IsTrue(detailPanel.activeSelf);
+        Assert.AreEqual("赵州桥", detailTitle.text);
+    }
+
+    [Test]
     public void DroppingRuntimeBackpackSlotOntoProprietarySlotConsumesBackpackItem()
     {
         RuntimeProgressState progressState = RuntimeProgressState.EnsureInstance();
@@ -852,6 +892,51 @@ public sealed class IllustratedHandbookTabsControllerTests
         Assert.IsTrue(progressState.IsSlotUnlocked(CatalogueBuildingId.Building1, 0));
         Assert.IsFalse(backpack.GetItem(0).HasValue);
         Assert.AreEqual(0, backpack.GetSpecialStructureMaterialCount());
+    }
+
+    [Test]
+    public void ClickingFirstSlotNamedProprietaryButtonUnlocksFirstSlotForEveryBuilding()
+    {
+        RuntimeProgressState progressState = RuntimeProgressState.EnsureInstance();
+        progressState.ResetProgress(false);
+
+        BackpackMananger backpack = CreateRuntimeBackpack();
+
+        rootObject = CreateSceneAuthoredRoot();
+        GameObject handbookPage = rootObject.transform.Find("IllustratedHandbookCanvas").gameObject;
+        CreateSceneAuthoredHandbookSurfaceWithSlotNamedProprietarySlots(handbookPage);
+
+        UIManager manager = rootObject.AddComponent<UIManager>();
+        manager.illustratedHandbook = rootObject;
+        IllustratedHandbookTabsController controller = IllustratedHandbookTabsController.EnsureInstalled(manager);
+        controller.SwitchToPage(IllustratedHandbookPage.IllustratedHandbook);
+
+        CatalogueBuildingId[] buildingIds =
+        {
+            CatalogueBuildingId.Building1,
+            CatalogueBuildingId.Building2,
+            CatalogueBuildingId.Building3
+        };
+
+        for (int i = 0; i < buildingIds.Length; i++)
+        {
+            CatalogueBuildingId buildingId = buildingIds[i];
+            GameObject card = FindDescendant(handbookPage.transform, $"ArcitectureImage_{i + 1}").gameObject;
+            controller.SelectSceneAuthoredHandbookCard(card);
+
+            Assert.IsTrue(backpack.PickItem(ArchitecturalCrystalFactory.CreateSpecialStructureMaterial()));
+            Button firstSlotButton = FindDescendant(handbookPage.transform, "Button_1").GetComponent<Button>();
+            AssertHasClickHandler(firstSlotButton.transform);
+
+            EventSystem eventSystem = EventSystem.current ?? new GameObject("EventSystem", typeof(EventSystem)).GetComponent<EventSystem>();
+            ExecuteEvents.ExecuteHierarchy(
+                firstSlotButton.gameObject,
+                new PointerEventData(eventSystem) { button = PointerEventData.InputButton.Left },
+                ExecuteEvents.pointerClickHandler);
+
+            Assert.IsTrue(progressState.IsSlotUnlocked(buildingId, 0), buildingId.ToString());
+            Assert.AreEqual(0, backpack.GetSpecialStructureMaterialCount(), buildingId.ToString());
+        }
     }
 
     [Test]
@@ -1067,6 +1152,9 @@ public sealed class IllustratedHandbookTabsControllerTests
         GameObject buildingImage = new GameObject("BuildingImage", typeof(RectTransform), typeof(Image));
         buildingImage.transform.SetParent(rightIntroduction.transform, false);
         CreateTmpText("Introduction", buildingImage.transform, string.Empty);
+        GameObject gotoButton = new GameObject("GotoButton", typeof(RectTransform), typeof(Image), typeof(Button));
+        gotoButton.transform.SetParent(rightIntroduction.transform, false);
+        CreateTmpText("Label", gotoButton.transform, "查看详情");
 
         GameObject proprietary = new GameObject("ProprietaryMaterial", typeof(RectTransform));
         proprietary.transform.SetParent(rightIntroduction.transform, false);
@@ -1086,6 +1174,30 @@ public sealed class IllustratedHandbookTabsControllerTests
         CreateTmpText("Label", button.transform, "提交通用材料");
     }
 
+    private static void CreateSceneAuthoredHandbookSurfaceWithSlotNamedProprietarySlots(GameObject handbookPage)
+    {
+        CreateSceneAuthoredHandbookSurface(handbookPage);
+
+        Transform rightIntroduction = FindDescendant(handbookPage.transform, "RightIntroduction");
+        Transform oldProprietary = FindDescendant(rightIntroduction, "ProprietaryMaterial");
+        Object.DestroyImmediate(oldProprietary.gameObject);
+
+        GameObject proprietary = new GameObject("ProprietaryMaterial", typeof(RectTransform));
+        proprietary.transform.SetParent(rightIntroduction, false);
+        CreateTmpText("Label", proprietary.transform, "专用进度（0/3）");
+
+        GameObject distractor = new GameObject("HelpButton", typeof(RectTransform), typeof(Image), typeof(Button));
+        distractor.transform.SetParent(proprietary.transform, false);
+
+        for (int i = 0; i < 3; i++)
+        {
+            Transform slotRoot = CreateNestedProprietarySlot(proprietary.transform, i + 1, "Slot");
+            RectTransform slotRect = slotRoot as RectTransform;
+            slotRect.anchoredPosition = new Vector2(i * 64f, 0f);
+            slotRect.sizeDelta = new Vector2(35f, 35f);
+        }
+    }
+
     private static void CreateSceneAuthoredHandbookSurfaceWithNestedProprietarySlots(GameObject handbookPage)
     {
         CreateSceneAuthoredHandbookSurface(handbookPage);
@@ -1100,16 +1212,16 @@ public sealed class IllustratedHandbookTabsControllerTests
 
         for (int i = 0; i < 3; i++)
         {
-            Transform slotRoot = CreateNestedProprietarySlot(proprietary.transform, i + 1);
+            Transform slotRoot = CreateNestedProprietarySlot(proprietary.transform, i + 1, "Material");
             RectTransform slotRect = slotRoot as RectTransform;
             slotRect.anchoredPosition = new Vector2(i * 64f, 0f);
             slotRect.sizeDelta = new Vector2(35f, 35f);
         }
     }
 
-    private static Transform CreateNestedProprietarySlot(Transform parent, int slotNumber)
+    private static Transform CreateNestedProprietarySlot(Transform parent, int slotNumber, string slotNamePrefix)
     {
-        GameObject slotObject = new GameObject($"Material_{slotNumber}", typeof(RectTransform), typeof(Image));
+        GameObject slotObject = new GameObject($"{slotNamePrefix}_{slotNumber}", typeof(RectTransform), typeof(Image));
         slotObject.transform.SetParent(parent, false);
         Image slotImage = slotObject.GetComponent<Image>();
         slotImage.raycastTarget = slotNumber != 1;
