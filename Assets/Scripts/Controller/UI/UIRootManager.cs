@@ -265,6 +265,7 @@ public class UIRootManager : MonoBehaviour
         string activeSceneName = SceneManager.GetActiveScene().name;
         bool isGameplayScene = GameplayStageCatalog.IsGameplayScene(activeSceneName);
         bool isBaseScene = string.Equals(activeSceneName, "NewBase", StringComparison.Ordinal);
+        bool supportsBookDetailScene = isGameplayScene || isBaseScene;
 
         if (!IllustratedUISceneLoader.TryGetUIManager(out handbookManager))
         {
@@ -274,7 +275,7 @@ public class UIRootManager : MonoBehaviour
         dialogController = isGameplayScene
             ? Dialog.EnsureGameplayRuntimeInstance()
             : Dialog.FindUsableInstance() ?? FindObjectOfType<Dialog>(true);
-        detailedInformationController = isGameplayScene ? FindObjectOfType<DetailedInformationUI>(true) : null;
+        detailedInformationController = supportsBookDetailScene ? FindObjectOfType<DetailedInformationUI>(true) : null;
         submitPanelControllers = isGameplayScene ? FindObjectsOfType<SubmitSelectionPanelUI>(true) : Array.Empty<SubmitSelectionPanelUI>();
 
         if (handbookManager != null && handbookManager.illustratedHandbook != null)
@@ -296,7 +297,7 @@ public class UIRootManager : MonoBehaviour
             detailUIPage1 = detailRoot;
             detailUIPage2 = detailRoot;
         }
-        else if (!isGameplayScene)
+        else if (!supportsBookDetailScene)
         {
             detailUIPage1 = null;
             detailUIPage2 = null;
@@ -741,17 +742,23 @@ public class UIRootManager : MonoBehaviour
         string activeSceneName = SceneManager.GetActiveScene().name;
         bool isGameplayScene = GameplayStageCatalog.IsGameplayScene(activeSceneName);
         bool isBaseScene = string.Equals(activeSceneName, "NewBase", StringComparison.Ordinal);
+        bool supportsBookDetailScene = isGameplayScene || isBaseScene;
 
         if (handbookManager == null || handbookUI == null || dialogController == null || dialogUI == null)
         {
             return true;
         }
 
-        if (isGameplayScene &&
+        if (supportsBookDetailScene &&
             (detailedInformationController == null ||
              detailUIPage1 == null ||
-             detailUIPage2 == null ||
-             submitPanelControllers == null ||
+             detailUIPage2 == null))
+        {
+            return true;
+        }
+
+        if (isGameplayScene &&
+            (submitPanelControllers == null ||
              submitPanelControllers.Length == 0 ||
              submitSelectionUI1 == null ||
              submitSelectionUI2 == null ||

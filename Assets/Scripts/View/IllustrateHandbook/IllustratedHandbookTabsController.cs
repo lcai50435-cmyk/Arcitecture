@@ -211,6 +211,7 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
     private bool initialized;
     private bool usesSceneAuthoredPages;
     private bool personalInformationPageAvailable = true;
+    private RuntimeProgressState subscribedRuntimeProgressState;
 
     public static IllustratedHandbookTabsController EnsureInstalled(UIManager manager)
     {
@@ -337,6 +338,11 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         UpdateSceneAuthoredSelectionPointerAnimation(Time.unscaledDeltaTime);
     }
 
+    private void OnEnable()
+    {
+        EnsureRuntimeProgressStateSubscription(false);
+    }
+
     private void OnDisable()
     {
         foreach (KeyValuePair<Button, Coroutine> entry in buttonMoveAnimations)
@@ -362,6 +368,7 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         sceneSettingsToggleBinder?.Release();
         hasHoveredPersonalInkWeapon = false;
         UnsubscribeBackpackInventoryEvents();
+        UnsubscribeRuntimeProgressState();
     }
 
     private void OnDestroy()
@@ -369,10 +376,13 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         scenePhotoAlbumBinder?.Release();
         sceneSettingsToggleBinder?.Release();
         UnsubscribeBackpackInventoryEvents();
+        UnsubscribeRuntimeProgressState();
     }
 
     private void EnsureInitialized()
     {
+        EnsureRuntimeProgressStateSubscription();
+
         if (TryUseSceneAuthoredPages())
         {
             if (initialized)
@@ -411,6 +421,58 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         RefreshGeneratedPageContent();
         initialized = true;
         ResetToDefaultPage();
+    }
+
+    private void EnsureRuntimeProgressStateSubscription(bool createIfMissing = true)
+    {
+        RuntimeProgressState progressState = RuntimeProgressState.Instance;
+        if (progressState == null && createIfMissing)
+        {
+            progressState = RuntimeProgressState.EnsureInstance();
+        }
+
+        if (ReferenceEquals(subscribedRuntimeProgressState, progressState))
+        {
+            return;
+        }
+
+        UnsubscribeRuntimeProgressState();
+        if (progressState == null)
+        {
+            return;
+        }
+
+        subscribedRuntimeProgressState = progressState;
+        subscribedRuntimeProgressState.OnStateChanged += HandleRuntimeProgressStateChanged;
+    }
+
+    private void UnsubscribeRuntimeProgressState()
+    {
+        if (subscribedRuntimeProgressState == null)
+        {
+            return;
+        }
+
+        subscribedRuntimeProgressState.OnStateChanged -= HandleRuntimeProgressStateChanged;
+        subscribedRuntimeProgressState = null;
+    }
+
+    private void HandleRuntimeProgressStateChanged()
+    {
+        if (!initialized)
+        {
+            return;
+        }
+
+        if (usesSceneAuthoredPages)
+        {
+            RefreshSceneAuthoredHandbookSelection();
+            RefreshSceneAuthoredRightIntroduction();
+            RefreshSceneAuthoredBackpackSurfaces();
+            return;
+        }
+
+        RefreshGeneratedPageContent();
     }
 
     private bool TryUseSceneAuthoredPages()
