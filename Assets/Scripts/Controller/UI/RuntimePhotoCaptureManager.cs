@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using TMPro;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
@@ -740,6 +741,7 @@ public sealed class RuntimePhotoCaptureManager : MonoBehaviour
             new Vector2(220f, 58f));
         saveButton.GetComponent<RectTransform>().anchoredPosition = new Vector2(132f, -312f);
         saveButton.onClick.AddListener(ConfirmSave);
+        RuntimePhotoConfirmationButtonHandler.Bind(saveButton.gameObject, this, true);
 
         cancelButton = CreateButton(
             "CancelButton",
@@ -750,6 +752,7 @@ public sealed class RuntimePhotoCaptureManager : MonoBehaviour
             new Vector2(180f, 58f));
         cancelButton.GetComponent<RectTransform>().anchoredPosition = new Vector2(-120f, -312f);
         cancelButton.onClick.AddListener(CancelSave);
+        RuntimePhotoConfirmationButtonHandler.Bind(cancelButton.gameObject, this, false);
 
         GameObject toastRoot = new GameObject("Toast", typeof(RectTransform), typeof(Image), typeof(CanvasGroup), typeof(Outline));
         toastRoot.transform.SetParent(canvasObject.transform, false);
@@ -929,6 +932,60 @@ public sealed class RuntimePhotoCaptureManager : MonoBehaviour
     private void CancelSave()
     {
         pendingConfirmDecision = false;
+    }
+
+    private sealed class RuntimePhotoConfirmationButtonHandler : MonoBehaviour, IPointerClickHandler, ISubmitHandler
+    {
+        private RuntimePhotoCaptureManager owner;
+        private bool confirmsSave;
+
+        public static void Bind(
+            GameObject targetObject,
+            RuntimePhotoCaptureManager targetOwner,
+            bool targetConfirmsSave)
+        {
+            if (targetObject == null)
+            {
+                return;
+            }
+
+            RuntimePhotoConfirmationButtonHandler handler =
+                targetObject.GetComponent<RuntimePhotoConfirmationButtonHandler>();
+            if (handler == null)
+            {
+                handler = targetObject.AddComponent<RuntimePhotoConfirmationButtonHandler>();
+            }
+
+            handler.owner = targetOwner;
+            handler.confirmsSave = targetConfirmsSave;
+        }
+
+        public void OnPointerClick(PointerEventData eventData)
+        {
+            InvokeDecision();
+        }
+
+        public void OnSubmit(BaseEventData eventData)
+        {
+            InvokeDecision();
+        }
+
+        private void InvokeDecision()
+        {
+            if (owner == null)
+            {
+                return;
+            }
+
+            if (confirmsSave)
+            {
+                owner.ConfirmSave();
+            }
+            else
+            {
+                owner.CancelSave();
+            }
+        }
     }
 
     private string BuildConfirmationMeta(Texture2D screenshot)

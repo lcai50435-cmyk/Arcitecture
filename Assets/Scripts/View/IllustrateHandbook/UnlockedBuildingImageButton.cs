@@ -96,49 +96,31 @@ public class UnlockedBuildingImageButton : MonoBehaviour
             illustratedHandbookPanel.SetActive(false);
         }
 
+        if (detailedInformationUI != null && buildingDetailData != null)
+        {
+            BuildingDetailRuntimeResolver.HideOtherSceneAuthoredDetailCanvases(buildingUnlockState);
+            detailedInformationUI.ShowDetail(buildingDetailData);
+            return;
+        }
+
         if (detailedInformationPanel != null)
         {
             detailedInformationPanel.SetActive(true);
-        }
-
-        if (detailedInformationUI != null && buildingDetailData != null)
-        {
-            detailedInformationUI.ShowDetail(buildingDetailData);
         }
     }
 
     private void ResolveReferences()
     {
-        if (buildingUnlockState == null)
-        {
-            buildingUnlockState = GetComponentInParent<CatalogueBuildingUnlockState>(true);
-        }
-
-        if (buildingDetailData == null)
-        {
-            buildingDetailData = GetComponent<BuildingDetailData>();
-        }
-
-        if (buildingDetailData == null && buildingUnlockState != null)
-        {
-            buildingDetailData = buildingUnlockState.GetComponent<BuildingDetailData>() ??
-                                 buildingUnlockState.GetComponentInChildren<BuildingDetailData>(true);
-        }
-
-        if (detailedInformationUI == null)
-        {
-            detailedInformationUI = GetComponentInParent<DetailedInformationUI>(true);
-        }
-
-        if (detailedInformationUI == null)
-        {
-            detailedInformationUI = FindObjectOfType<DetailedInformationUI>(true);
-        }
-
-        if (detailedInformationPanel == null && detailedInformationUI != null)
-        {
-            detailedInformationPanel = detailedInformationUI.detailedInformationPanel;
-        }
+        buildingUnlockState = BuildingDetailRuntimeResolver.ResolveUnlockState(this, buildingUnlockState);
+        buildingDetailData = BuildingDetailRuntimeResolver.ResolveDetailData(this, buildingUnlockState, buildingDetailData);
+        detailedInformationUI = BuildingDetailRuntimeResolver.ResolveDetailUi(
+            this,
+            buildingUnlockState,
+            detailedInformationUI,
+            detailedInformationPanel);
+        detailedInformationPanel = BuildingDetailRuntimeResolver.ResolveDetailPanel(
+            detailedInformationUI,
+            detailedInformationPanel);
     }
 
     private bool IsBuildingUnlocked()

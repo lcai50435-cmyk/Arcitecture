@@ -1491,7 +1491,17 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
             BindSceneAuthoredBuildingDetailButton(buildingImage.gameObject, buildingImage, binding, definition, previewSprite);
         }
 
-        Transform detailButtonRoot = FindTransformByName(rightRoot, SceneAuthoredBuildingDetailButtonName);
+        Button detailButton = FindSceneAuthoredDetailButton(
+            rightRoot,
+            false,
+            SceneAuthoredBuildingDetailButtonName,
+            "Detail",
+            "详细",
+            "详情",
+            "查看");
+        Transform detailButtonRoot = detailButton != null
+            ? detailButton.transform
+            : FindTransformByName(rightRoot, SceneAuthoredBuildingDetailButtonName);
         if (detailButtonRoot != null)
         {
             BindSceneAuthoredBuildingDetailButton(
@@ -4987,6 +4997,14 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
 
     private static Button FindSceneAuthoredDetailButton(Transform root, params string[] nameFragments)
     {
+        return FindSceneAuthoredDetailButton(root, true, nameFragments);
+    }
+
+    private static Button FindSceneAuthoredDetailButton(
+        Transform root,
+        bool allowFallback,
+        params string[] nameFragments)
+    {
         if (root == null)
         {
             return null;
@@ -5010,18 +5028,22 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
                 }
 
                 Text label = button.GetComponentInChildren<Text>(true);
+                TMP_Text tmpLabel = button.GetComponentInChildren<TMP_Text>(true);
                 bool matchesName = button.name.IndexOf(fragment, StringComparison.OrdinalIgnoreCase) >= 0;
                 bool matchesLabel = label != null &&
                                     label.text != null &&
                                     label.text.IndexOf(fragment, StringComparison.OrdinalIgnoreCase) >= 0;
-                if (matchesName || matchesLabel)
+                bool matchesTmpLabel = tmpLabel != null &&
+                                       tmpLabel.text != null &&
+                                       tmpLabel.text.IndexOf(fragment, StringComparison.OrdinalIgnoreCase) >= 0;
+                if (matchesName || matchesLabel || matchesTmpLabel)
                 {
                     return button;
                 }
             }
         }
 
-        return buttons.Length > 0 ? buttons[0] : null;
+        return allowFallback && buttons.Length > 0 ? buttons[0] : null;
     }
 
     private sealed class SceneHandbookCommonSubmitButtonHandler : MonoBehaviour
