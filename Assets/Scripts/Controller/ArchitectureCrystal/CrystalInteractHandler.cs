@@ -63,9 +63,12 @@ public class CrystalInteractHandler : MonoBehaviour, IInteractable
 
     public void OnInteract()
     {
+        Debug.Log($"[CrystalInteract] OnInteract 被调用，type={type}, textDescription={textDescription}");
+        
         PlayerGetArchitectural player = FindObjectOfType<PlayerGetArchitectural>();
         if (player == null)
         {
+            Debug.LogWarning("[CrystalInteract] 未找到 PlayerGetArchitectural");
             return;
         }
 
@@ -77,6 +80,7 @@ public class CrystalInteractHandler : MonoBehaviour, IInteractable
         }
 
         ArchitecturalCrystal data = BuildRuntimeCrystalData();
+        Debug.Log($"[CrystalInteract] BuildRuntimeCrystalData 返回: type={data.type}, DisplayName={data.DisplayName}, IsCommonStructure={data.IsCommonStructure}");
 
         if (startClosedAsLootBag &&
             RuntimeBackpackPickupAnimator.TryAnimateLootBagPickup(
