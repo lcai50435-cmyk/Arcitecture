@@ -15,12 +15,12 @@ public class PropInteractiveManager : MonoBehaviour
 
     private static readonly Dictionary<string, string> typeDescriptions = new Dictionary<string, string>
     {
-        { "MortiseAndTenonJoint", "这是榫卯结构，通过凹凸咬合连接木材，无需钉子。它让建筑既稳固又灵活，是中国古建筑最重要的技艺之一。" },
-        { "Brackets", "斗拱位于柱与屋顶之间，用来承托重量并分散压力。这种结构还能缓冲震动，使建筑更加稳固。" },
-        { "BeamFrame", "梁架是建筑的骨架，由梁与柱共同构成，支撑起整个屋顶结构。" },
-        { "GroundMass", "石基位于建筑底部，可以防潮、防腐，让建筑更加耐久。" },
-        { "RammedEarth", "夯土是将土层反复压实形成地基的方法，简单却非常坚固，广泛用于古代建筑。" },
-        { "Tile", "瓦片覆盖在屋顶上，用来防水和保护内部结构，是最常见的屋面材料。" }
+        { "MortiseAndTenonJoint", "这是榫卯结构，通过凹凸咬合连接木材，无需钉子。它让建筑既稳固又灵活。你握住它时，能感觉到力量的传递变得更加顺畅，出手也更灵活了一些。" },
+        { "Brackets", "斗拱位于柱与屋顶之间，用来承托重量并分散压力。这种结构还能缓冲震动，使建筑更加稳固。这种稳固感，似乎也在保护你，让你更能承受冲击。" },
+        { "BeamFrame", "梁架是建筑的骨架，由梁与柱共同构成，支撑起整个屋顶结构。它让整体运转更加高效，就像你的动作与攻击，也变得更加流畅有力。" },
+        { "GroundMass", "石基位于建筑底部，可以防潮、防腐，让建筑更加耐久。但也正因为它厚重稳固，你会感觉行动略微沉了一些，不过更不容易被动摇。" },
+        { "RammedEarth", "夯土是将土层反复压实形成地基的方法，简单却非常坚固。这种稳定与延展，让你的攻击能够传得更远，也更加迅速。" },
+        { "Tile", "瓦片覆盖在屋顶上，用来防水和保护内部结构，是最常见的屋面材料。它轻巧而实用，让你的消耗变得更少，只是力量也显得更加分散。" }
     };
 
     public static PropInteractiveManager Instance { get; private set; }
