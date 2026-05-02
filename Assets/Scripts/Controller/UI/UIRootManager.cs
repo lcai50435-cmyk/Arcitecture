@@ -1202,6 +1202,8 @@ public class UIRootManager : MonoBehaviour
         {
             canvas = target.AddComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            // 隐藏白色线框
+            canvas.hideFlags = HideFlags.HideInHierarchy | HideFlags.NotEditable;
             canvas.worldCamera = null;
             canvas.planeDistance = 100f;
         }
