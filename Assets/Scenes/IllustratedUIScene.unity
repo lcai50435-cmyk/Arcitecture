@@ -44608,6 +44608,7 @@ GameObject:
   - component: {fileID: 1990909050}
   - component: {fileID: 1990909049}
   - component: {fileID: 1990909048}
+  - component: {fileID: 1990909051}
   m_Layer: 0
   m_Name: DetailInformationFuJianCanvas
   m_TagString: Untagged
@@ -44699,6 +44700,32 @@ Canvas:
   m_SortingLayerID: 0
   m_SortingOrder: 0
   m_TargetDisplay: 0
+--- !u!114 &1990909051
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1990909046}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b6dd0f61215efc64c91223047103dc17, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  illustratedHandbookPanel: {fileID: 0}
+  detailedInformationPanel: {fileID: 0}
+  backGround1: {fileID: 0}
+  page1Image: {fileID: 0}
+  page1NameText: {fileID: 0}
+  page1IntroductionText: {fileID: 0}
+  nextPageButton: {fileID: 0}
+  closeButton1: {fileID: 0}
+  backGround2: {fileID: 0}
+  page2Image: {fileID: 0}
+  page2IntroductionText: {fileID: 0}
+  page2FinallyIntroductionText: {fileID: 0}
+  previousPageButton: {fileID: 0}
+  closeButton2: {fileID: 0}
 --- !u!1 &1993602210
 GameObject:
   m_ObjectHideFlags: 0
