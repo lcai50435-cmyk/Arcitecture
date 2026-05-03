@@ -53,7 +53,7 @@ public sealed class RuntimeFireflyAmbientEffectTests
     }
 
     [Test]
-    public void LaterStageGameplayProfileKeepsVisibleParticleScale()
+    public void SecondStageGameplayProfileUsesReducedParticleScale()
     {
         Type effectType = ResolveEffectType();
         MethodInfo resolveProfile = effectType.GetMethod("ResolveProfile", BindingFlags.Static | BindingFlags.NonPublic);
@@ -62,6 +62,22 @@ public sealed class RuntimeFireflyAmbientEffectTests
 
         Assert.IsNotNull(profile);
         Assert.AreSame(profile, legacyProfile);
+        Assert.LessOrEqual(ReadFloat(profile, "minSize"), 0.07f);
+        Assert.LessOrEqual(ReadFloat(profile, "maxSize"), 0.18f);
+        Assert.LessOrEqual(ReadFloat(profile, "emissionRate"), 9f);
+        Assert.LessOrEqual(ReadInt(profile, "maxParticles"), 72);
+        Assert.LessOrEqual(ReadColor(profile, "warmColor").a, 0.62f);
+        Assert.LessOrEqual(ReadColor(profile, "coolColor").a, 0.46f);
+    }
+
+    [Test]
+    public void LaterNonSecondStageGameplayProfileKeepsVisibleParticleScale()
+    {
+        Type effectType = ResolveEffectType();
+        MethodInfo resolveProfile = effectType.GetMethod("ResolveProfile", BindingFlags.Static | BindingFlags.NonPublic);
+        object profile = resolveProfile.Invoke(null, new object[] { "GameScene_02" });
+
+        Assert.IsNotNull(profile);
         Assert.GreaterOrEqual(ReadFloat(profile, "minSize"), 0.12f);
         Assert.GreaterOrEqual(ReadFloat(profile, "maxSize"), 0.28f);
         Assert.GreaterOrEqual(ReadFloat(profile, "emissionRate"), 32f);
