@@ -433,7 +433,10 @@ public class UIRootManager : MonoBehaviour
         RuntimeModalBinding activeBinding = GetBinding(activeModalType);
         if (activeBinding != null && activeBinding != binding)
         {
-            HideModalImmediate(activeBinding);
+            if (!IsAncestorBinding(activeBinding, binding))
+            {
+                HideModalImmediate(activeBinding);
+            }
         }
 
         activeModalType = type;
@@ -834,6 +837,40 @@ public class UIRootManager : MonoBehaviour
 
         modalBindings.TryGetValue(type, out RuntimeModalBinding binding);
         return binding;
+    }
+
+    private static bool IsAncestorBinding(RuntimeModalBinding possibleAncestor, RuntimeModalBinding possibleChild)
+    {
+        if (possibleAncestor == null ||
+            possibleChild == null ||
+            possibleAncestor == possibleChild)
+        {
+            return false;
+        }
+
+        return IsAncestorCanvasGroup(possibleAncestor.CanvasGroup, possibleChild.CanvasGroup);
+    }
+
+    private static bool IsAncestorCanvasGroup(CanvasGroup possibleAncestor, CanvasGroup possibleChild)
+    {
+        if (possibleAncestor == null || possibleChild == null || possibleAncestor == possibleChild)
+        {
+            return false;
+        }
+
+        Transform ancestorTransform = possibleAncestor.transform;
+        Transform current = possibleChild.transform.parent;
+        while (current != null)
+        {
+            if (current == ancestorTransform)
+            {
+                return true;
+            }
+
+            current = current.parent;
+        }
+
+        return false;
     }
 
     private void PrepareModalForDisplay(RuntimeModalBinding binding)
