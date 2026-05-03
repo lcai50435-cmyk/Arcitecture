@@ -65,6 +65,42 @@ public sealed class UIRootManagerTests
     }
 
     [Test]
+    public void GameplayStageBootstrapperCreatesReturnInteractableWithoutPortalVisual()
+    {
+        Scene activeScene = SceneManager.GetActiveScene();
+        GameObject existingAnchor = GameObject.Find("RuntimeReturnToBaseInteractable");
+        if (existingAnchor != null)
+        {
+            Object.DestroyImmediate(existingAnchor);
+        }
+
+        MethodInfo ensureReturnInteractable = typeof(GameplayStageRuntimeBootstrapper).GetMethod(
+            "EnsureReturnToBaseInteractable",
+            BindingFlags.Static | BindingFlags.NonPublic);
+        Assert.IsNotNull(ensureReturnInteractable);
+
+        ensureReturnInteractable.Invoke(null, new object[] { activeScene });
+
+        GameObject anchor = GameObject.Find("RuntimeReturnToBaseInteractable");
+        try
+        {
+            Assert.IsNotNull(anchor);
+            Assert.AreEqual(activeScene, anchor.scene);
+            Assert.IsNotNull(anchor.GetComponent<BookInteract>());
+            Assert.IsNotNull(anchor.GetComponent<CircleCollider2D>());
+            Assert.IsNull(anchor.transform.Find("ReturnPortalVisual"));
+            Assert.IsNull(GameObject.Find("ReturnPortalVisual"));
+        }
+        finally
+        {
+            if (anchor != null)
+            {
+                Object.DestroyImmediate(anchor);
+            }
+        }
+    }
+
+    [Test]
     public void RefreshRuntimeBindingsKeepsGameplaySpiritPanel()
     {
         createdScene = SceneManager.CreateScene("FirstPass_1");
