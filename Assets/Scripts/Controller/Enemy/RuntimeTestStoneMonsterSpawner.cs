@@ -1,83 +1,10 @@
-using System.Collections;
 using UnityEngine;
-using UnityEngine.SceneManagement;
-
-#if UNITY_EDITOR
-using UnityEditor;
-#endif
 
 public sealed class RuntimeTestStoneMonsterSpawner : MonoBehaviour
 {
     public const float TestHealth = 9999f;
 
     private const string SpawnedObjectName = "RuntimeTestStoneMonster";
-    private const string BootstrapperObjectName = "RuntimeTestStoneMonsterSpawner";
-    private const string StoneMonsterPrefabPath = "Assets/File/Prefab/EnemyPrefab/StoneMonster.prefab";
-    private const float PlayerWaitSeconds = 2f;
-    private static readonly Vector3 PlayerSpawnOffset = new Vector3(0.6f, 1.8f, 0f);
-    private static readonly Vector3 FallbackPosition = new Vector3(0f, 1.8f, 0f);
-
-    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
-    private static void Bootstrap()
-    {
-        SceneManager.sceneLoaded -= HandleSceneLoaded;
-        SceneManager.sceneLoaded += HandleSceneLoaded;
-        TryCreate(SceneManager.GetActiveScene());
-    }
-
-    private static void HandleSceneLoaded(Scene scene, LoadSceneMode mode)
-    {
-        TryCreate(scene);
-    }
-
-    private static void TryCreate(Scene scene)
-    {
-        if (!GameplayStageCatalog.IsGameplayScene(scene.name) || FindExistingSpawnedMonster() != null)
-        {
-            return;
-        }
-
-        if (FindObjectOfType<RuntimeTestStoneMonsterSpawner>() != null)
-        {
-            return;
-        }
-
-        GameObject bootstrapper = new GameObject(BootstrapperObjectName);
-        bootstrapper.AddComponent<RuntimeTestStoneMonsterSpawner>();
-    }
-
-    private void Start()
-    {
-        StartCoroutine(SpawnWhenReady());
-    }
-
-    private IEnumerator SpawnWhenReady()
-    {
-        float deadline = Time.realtimeSinceStartup + PlayerWaitSeconds;
-        GameObject playerObject = null;
-
-        while (Time.realtimeSinceStartup < deadline)
-        {
-            playerObject = ResolvePlayerObject();
-            if (playerObject != null)
-            {
-                break;
-            }
-
-            yield return null;
-        }
-
-        if (FindExistingSpawnedMonster() == null)
-        {
-            GameObject template = ResolveStoneMonsterTemplate();
-            if (template != null)
-            {
-                CreateStoneMonsterFromTemplate(template, ResolveSpawnPosition(playerObject));
-            }
-        }
-
-        Destroy(gameObject);
-    }
 
     public static GameObject CreateStoneMonsterFromTemplate(GameObject template, Vector3 position)
     {
@@ -134,50 +61,6 @@ public sealed class RuntimeTestStoneMonsterSpawner : MonoBehaviour
         return true;
     }
 
-    private static GameObject ResolveStoneMonsterTemplate()
-    {
-        GameObject prefab = LoadStoneMonsterPrefab();
-        if (prefab != null)
-        {
-            return prefab;
-        }
-
-        StoneMonsterDeath[] stoneDeaths = FindObjectsOfType<StoneMonsterDeath>(true);
-        for (int i = 0; i < stoneDeaths.Length; i++)
-        {
-            if (stoneDeaths[i] != null && stoneDeaths[i].gameObject.name != SpawnedObjectName)
-            {
-                return stoneDeaths[i].gameObject;
-            }
-        }
-
-        EnemyStatsManager[] enemies = FindObjectsOfType<EnemyStatsManager>(true);
-        for (int i = 0; i < enemies.Length; i++)
-        {
-            GameObject enemy = enemies[i] != null ? enemies[i].gameObject : null;
-            if (enemy == null || enemy.name == SpawnedObjectName)
-            {
-                continue;
-            }
-
-            if (enemy.CompareTag("StoneEnemy") || enemy.name.IndexOf("StoneMonster", System.StringComparison.OrdinalIgnoreCase) >= 0)
-            {
-                return enemy;
-            }
-        }
-
-        return null;
-    }
-
-    private static GameObject LoadStoneMonsterPrefab()
-    {
-#if UNITY_EDITOR
-        return AssetDatabase.LoadAssetAtPath<GameObject>(StoneMonsterPrefabPath);
-#else
-        return null;
-#endif
-    }
-
     private static void ConfigureRunStageBinding(GameObject monster)
     {
         RunStageDirector director = FindObjectOfType<RunStageDirector>();
@@ -193,37 +76,6 @@ public sealed class RuntimeTestStoneMonsterSpawner : MonoBehaviour
         }
 
         binding.Configure(director);
-    }
-
-    private static Vector3 ResolveSpawnPosition(GameObject playerObject)
-    {
-        return playerObject != null
-            ? playerObject.transform.position + PlayerSpawnOffset
-            : FallbackPosition;
-    }
-
-    private static GameObject ResolvePlayerObject()
-    {
-        GameObject player = GameObject.FindGameObjectWithTag("Player");
-        if (player != null)
-        {
-            return player;
-        }
-
-        PlayerAttack playerAttack = FindObjectOfType<PlayerAttack>();
-        return playerAttack != null ? playerAttack.gameObject : null;
-    }
-
-    private static GameObject FindExistingSpawnedMonster()
-    {
-        GameObject existing = GameObject.Find(SpawnedObjectName);
-        if (existing != null)
-        {
-            return existing;
-        }
-
-        RuntimeTestStoneMonsterHealthOverride marker = FindObjectOfType<RuntimeTestStoneMonsterHealthOverride>();
-        return marker != null ? marker.gameObject : null;
     }
 }
 
