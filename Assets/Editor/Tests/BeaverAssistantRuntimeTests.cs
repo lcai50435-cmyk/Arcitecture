@@ -384,6 +384,41 @@ public sealed class BeaverAssistantRuntimeTests
     }
 
     [Test]
+    public void PanelAskButtonRebindsAndPointerClickSubmitsAfterListenerWasCleared()
+    {
+        Scene baseScene = GetOrCreateScene("NewBase");
+        Assert.IsTrue(baseScene.IsValid() && baseScene.isLoaded);
+
+        BeaverAssistantPanel panel = BeaverAssistantPanel.EnsureInstance();
+        panel.Show();
+
+        TMP_InputField input = panel.transform.Find("BeaverAssistantPanelCanvas/Panel/Input")?.GetComponent<TMP_InputField>();
+        Button ask = panel.transform.Find("BeaverAssistantPanelCanvas/Panel/AskButton")?.GetComponent<Button>();
+        ScrollRect scrollRect = panel.transform.Find("BeaverAssistantPanelCanvas/Panel/HistoryScroll")?.GetComponent<ScrollRect>();
+        Assert.IsNotNull(input);
+        Assert.IsNotNull(ask);
+        Assert.IsNotNull(scrollRect);
+
+        ask.onClick.RemoveAllListeners();
+        BeaverAssistantPanel.EnsureInstance();
+        input.text = "赵州桥";
+
+        PointerEventData eventData = new PointerEventData(GetEventSystem())
+        {
+            button = PointerEventData.InputButton.Left,
+            position = RectTransformUtility.WorldToScreenPoint(null, ask.transform.position)
+        };
+
+        ExecuteEvents.Execute(ask.gameObject, eventData, ExecuteEvents.pointerClickHandler);
+
+        string renderedText = GetCombinedHistoryText(scrollRect.content);
+        Assert.That(renderedText, Does.Contain("赵州桥"));
+        Assert.That(input.text, Is.Empty);
+
+        panel.Hide();
+    }
+
+    [Test]
     public void PanelHistoryUsesScrollableViewport()
     {
         Scene baseScene = GetOrCreateScene("NewBase");

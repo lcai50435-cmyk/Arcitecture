@@ -2029,19 +2029,7 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
             Vector3.one,
             animationProgress);
 
-        if (panelCanvasGroup != null)
-        {
-            bool panelInteractive = canvasGroup != null &&
-                                    canvasGroup.interactable &&
-                                    animationProgress > 0.01f;
-            panelCanvasGroup.interactable = panelInteractive;
-            panelCanvasGroup.blocksRaycasts = panelInteractive;
-        }
-
-        if (animationProgress >= 0.99f)
-        {
-            RestorePanelInputState();
-        }
+        RestorePanelInputState();
 
         if (panelOutline != null)
         {

@@ -1,5 +1,5 @@
 fileFormatVersion: 2
-guid: 7910889e0b2a7bd438cf87696d2f21a7
+guid: 7378478906183684eab4449e6c225c0c
 TextureImporter:
   internalIDToNameTable: []
   externalObjects: {}
@@ -53,7 +53,7 @@ TextureImporter:
   spriteGenerateFallbackPhysicsShape: 1
   alphaUsage: 1
   alphaIsTransparency: 1
-  spriteTessellationDetail: -1
+  spriteTessellationDetail: 0
   textureType: 8
   textureShape: 1
   singleChannelComponent: 0
@@ -110,10 +110,60 @@ TextureImporter:
     serializedVersion: 2
     sprites: []
     outline: []
-    physicsShape: []
+    physicsShape:
+    - - {x: 336, y: -160.5}
+      - {x: 153, y: -258.5}
+      - {x: 97, y: -238.5}
+      - {x: 47, y: -263.5}
+      - {x: 5, y: -260.5}
+      - {x: -42, y: -279.5}
+      - {x: -63, y: -275.5}
+      - {x: -78, y: -283.5}
+      - {x: -115, y: -297.5}
+      - {x: -204, y: -253.5}
+      - {x: -377, y: -184.5}
+      - {x: -429, y: -170.5}
+      - {x: -431, y: -93.5}
+      - {x: -379, y: -61.5}
+      - {x: -363, y: -47.5}
+      - {x: -355, y: -46.5}
+      - {x: -356, y: -19.5}
+      - {x: -355, y: 69.5}
+      - {x: -373, y: 86.5}
+      - {x: -377, y: 106.5}
+      - {x: -344, y: 105.5}
+      - {x: -323, y: 115.5}
+      - {x: -320, y: 151.5}
+      - {x: -288, y: 142.5}
+      - {x: -113, y: 222.5}
+      - {x: -52, y: 209.5}
+      - {x: -40, y: 264.5}
+      - {x: -3, y: 250.5}
+      - {x: 34, y: 297.5}
+      - {x: 53, y: 270.5}
+      - {x: 95, y: 256.5}
+      - {x: 195, y: 210.5}
+      - {x: 279, y: 183.5}
+      - {x: 295, y: 198.5}
+      - {x: 329, y: 175.5}
+      - {x: 363, y: 197.5}
+      - {x: 369, y: 176.5}
+      - {x: 355, y: 157.5}
+      - {x: 362, y: 146.5}
+      - {x: 385, y: 146.5}
+      - {x: 400, y: 151.5}
+      - {x: 397, y: 126.5}
+      - {x: 382, y: 121.5}
+      - {x: 382, y: 77.5}
+      - {x: 383, y: -9.5}
+      - {x: 407, y: -14.5}
+      - {x: 427, y: -22.5}
+      - {x: 424, y: -34.5}
+      - {x: 435, y: -56.5}
+      - {x: 435, y: -96.5}
     bones: []
     spriteID: 5e97eb03825dee720800000000000000
-    internalID: 0
+    internalID: 1537655665
     vertices: []
     indices: 
     edges: []

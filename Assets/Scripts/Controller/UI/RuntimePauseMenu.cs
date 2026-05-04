@@ -321,6 +321,7 @@ public sealed class RuntimePauseMenu : MonoBehaviour
         RuntimeCameraController.EnsureInstance().SetPauseFocusActive(true);
         ShowMenuPage(true);
         ShowShell();
+        EnsureVisiblePageButtonsInputReady();
         StartMenuRevealSequence();
     }
 

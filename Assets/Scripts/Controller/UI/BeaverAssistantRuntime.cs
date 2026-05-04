@@ -858,6 +858,9 @@ public sealed class BeaverAssistantPanel : MonoBehaviour
     private ScrollRect historyScrollRect;
     private RectTransform historyContentRect;
     private TMP_InputField inputField;
+    private Button closeButton;
+    private Button askButton;
+    private int lastSubmitFrame = -1;
     private readonly List<HistoryEntry> historyEntries = new List<HistoryEntry>();
     private readonly List<GameObject> historyRowObjects = new List<GameObject>();
 
@@ -967,6 +970,7 @@ public sealed class BeaverAssistantPanel : MonoBehaviour
         if (canvas != null && historyScrollRect != null && historyContentRect != null && inputField != null)
         {
             EnsureCanvasSurface();
+            EnsurePanelControlBindings();
             return;
         }
 
@@ -1001,6 +1005,7 @@ public sealed class BeaverAssistantPanel : MonoBehaviour
         inputField = CreateInput(panel.transform);
         CreateAskButton(panel.transform);
         CreateTopicButtons(panel.transform);
+        EnsurePanelControlBindings();
     }
 
     private void EnsureCanvasSurface()
@@ -1047,12 +1052,24 @@ public sealed class BeaverAssistantPanel : MonoBehaviour
         TextMeshProUGUI title = CreateText(parent, "Title", "河狸 · 建筑知识", 34f, new Color(0.94f, 0.82f, 0.56f, 1f), TextAlignmentOptions.MidlineLeft);
         SetRect(title.rectTransform, new Vector2(32f, -26f), new Vector2(520f, 54f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f));
 
-        Button close = CreateButton(parent, "CloseButton", "×", new Vector2(-34f, -30f), new Vector2(52f, 42f), new Vector2(1f, 1f));
-        close.onClick.AddListener(Hide);
-        BeaverAssistantPanelCloseButtonFallback fallback = close.gameObject.GetComponent<BeaverAssistantPanelCloseButtonFallback>();
+        closeButton = CreateButton(parent, "CloseButton", "×", new Vector2(-34f, -30f), new Vector2(52f, 42f), new Vector2(1f, 1f));
+        BindCloseButton(closeButton);
+    }
+
+    private void BindCloseButton(Button button)
+    {
+        if (button == null)
+        {
+            return;
+        }
+
+        EnsureButtonInteractive(button);
+        button.onClick.RemoveListener(Hide);
+        button.onClick.AddListener(Hide);
+        BeaverAssistantPanelCloseButtonFallback fallback = button.gameObject.GetComponent<BeaverAssistantPanelCloseButtonFallback>();
         if (fallback == null)
         {
-            fallback = close.gameObject.AddComponent<BeaverAssistantPanelCloseButtonFallback>();
+            fallback = button.gameObject.AddComponent<BeaverAssistantPanelCloseButtonFallback>();
         }
 
         fallback.Configure(this);
@@ -1172,8 +1189,27 @@ public sealed class BeaverAssistantPanel : MonoBehaviour
 
     private void CreateAskButton(Transform parent)
     {
-        Button ask = CreateButton(parent, "AskButton", "询问", new Vector2(-32f, 90f), new Vector2(158f, 58f), new Vector2(1f, 0f));
-        ask.onClick.AddListener(SubmitQuestion);
+        askButton = CreateButton(parent, "AskButton", "询问", new Vector2(-32f, 90f), new Vector2(158f, 58f), new Vector2(1f, 0f));
+        BindAskButton(askButton);
+    }
+
+    private void BindAskButton(Button button)
+    {
+        if (button == null)
+        {
+            return;
+        }
+
+        EnsureButtonInteractive(button);
+        button.onClick.RemoveListener(SubmitQuestion);
+        button.onClick.AddListener(SubmitQuestion);
+        BeaverAssistantPanelAskButtonFallback fallback = button.gameObject.GetComponent<BeaverAssistantPanelAskButtonFallback>();
+        if (fallback == null)
+        {
+            fallback = button.gameObject.AddComponent<BeaverAssistantPanelAskButtonFallback>();
+        }
+
+        fallback.Configure(this);
     }
 
     private void CreateTopicButtons(Transform parent)
@@ -1195,6 +1231,12 @@ public sealed class BeaverAssistantPanel : MonoBehaviour
 
     private void SubmitQuestion()
     {
+        if (lastSubmitFrame == Time.frameCount)
+        {
+            return;
+        }
+
+        lastSubmitFrame = Time.frameCount;
         string question = inputField != null ? inputField.text.Trim() : string.Empty;
         string answer = BuildingKnowledgeLibrary.Answer(
             question,
@@ -1208,6 +1250,11 @@ public sealed class BeaverAssistantPanel : MonoBehaviour
             inputField.text = string.Empty;
             inputField.ActivateInputField();
         }
+    }
+
+    internal void SubmitQuestionFromControl()
+    {
+        SubmitQuestion();
     }
 
     private void SeedHistoryIfNeeded()
@@ -1390,8 +1437,36 @@ public sealed class BeaverAssistantPanel : MonoBehaviour
 
         Button button = buttonObject.GetComponent<Button>();
         button.targetGraphic = image;
-        button.interactable = true;
+        EnsureButtonInteractive(button);
         return button;
+    }
+
+    private void EnsurePanelControlBindings()
+    {
+        if (closeButton == null)
+        {
+            closeButton = transform.Find("BeaverAssistantPanelCanvas/Panel/CloseButton")?.GetComponent<Button>();
+        }
+
+        if (askButton == null)
+        {
+            askButton = transform.Find("BeaverAssistantPanelCanvas/Panel/AskButton")?.GetComponent<Button>();
+        }
+
+        BindCloseButton(closeButton);
+        BindAskButton(askButton);
+
+        if (inputField != null)
+        {
+            EnsureInputFieldInteractive(inputField);
+            BeaverAssistantPanelInputFocusProxy focusProxy = inputField.GetComponent<BeaverAssistantPanelInputFocusProxy>();
+            if (focusProxy == null)
+            {
+                focusProxy = inputField.gameObject.AddComponent<BeaverAssistantPanelInputFocusProxy>();
+            }
+
+            focusProxy.Configure(inputField);
+        }
     }
 
     private void FocusInputField()
@@ -1477,6 +1552,32 @@ public sealed class BeaverAssistantPanel : MonoBehaviour
         }
     }
 
+    internal static void EnsureButtonInteractive(Button button)
+    {
+        if (button == null)
+        {
+            return;
+        }
+
+        Graphic targetGraphic = button.targetGraphic ?? button.GetComponent<Graphic>();
+        if (targetGraphic != null)
+        {
+            targetGraphic.raycastTarget = true;
+            button.targetGraphic = targetGraphic;
+        }
+
+        button.interactable = true;
+
+        TextMeshProUGUI[] labels = button.GetComponentsInChildren<TextMeshProUGUI>(true);
+        for (int i = 0; i < labels.Length; i++)
+        {
+            if (labels[i] != null)
+            {
+                labels[i].raycastTarget = false;
+            }
+        }
+    }
+
     private static TextMeshProUGUI CreateText(Transform parent, string name, string value, float size, Color color, TextAlignmentOptions alignment)
     {
         GameObject textObject = new GameObject(name, typeof(RectTransform), typeof(TextMeshProUGUI));
@@ -1555,6 +1656,42 @@ public sealed class BeaverAssistantPanelCloseButtonFallback : MonoBehaviour, IPo
         }
 
         owner?.Hide();
+    }
+}
+
+[DisallowMultipleComponent]
+public sealed class BeaverAssistantPanelAskButtonFallback : MonoBehaviour, IPointerClickHandler, ISubmitHandler
+{
+    private BeaverAssistantPanel owner;
+
+    public void Configure(BeaverAssistantPanel panel)
+    {
+        owner = panel;
+    }
+
+    public void OnPointerClick(PointerEventData eventData)
+    {
+        if (eventData != null && eventData.button != PointerEventData.InputButton.Left)
+        {
+            return;
+        }
+
+        Submit();
+    }
+
+    public void OnSubmit(BaseEventData eventData)
+    {
+        Submit();
+    }
+
+    private void Submit()
+    {
+        if (owner == null)
+        {
+            owner = GetComponentInParent<BeaverAssistantPanel>();
+        }
+
+        owner?.SubmitQuestionFromControl();
     }
 }
 
