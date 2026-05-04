@@ -120,6 +120,10 @@ public sealed class NightLightingController : MonoBehaviour
             CreateReadableSceneProfile("GameScene_03", true, 0f, 0.16f, 0.58f, 0.82f, 1.02f)
         },
         {
+            "SecondPassSence",
+            CreateReadableSceneProfile("SecondPassSence", true, 0f, 0.16f, 0.58f, 0.82f, 1.02f)
+        },
+        {
             DeadSceneName,
             new SceneNightProfile(
                 DeadSceneName,

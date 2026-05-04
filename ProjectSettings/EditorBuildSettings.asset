@@ -21,6 +21,9 @@ EditorBuildSettings:
     path: Assets/Scenes/FirstPass_1.unity
     guid: 8c6430c665ee81d4f9a1a325a3da86bc
   - enabled: 1
+    path: Assets/Scenes/SecondPassSence.unity
+    guid: 6cd18b09e03348d4187ff09abb70ecda
+  - enabled: 1
     path: Assets/Scenes/GameScene_02.unity
     guid: ac3b3fb1a4cd494697f5b10924013fcf
   - enabled: 1

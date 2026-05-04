@@ -120,8 +120,11 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
     private const string LegacyHandbookLeftPanelName = "LeftPanel";
     private const string SceneAuthoredRightIntroductionName = "RightIntroduction";
     private const string SceneAuthoredBuildingImageName = "BuildingImage";
+    private const string SceneAuthoredBuildingDetailButtonName = "GotoButton";
     private const string SceneAuthoredProprietaryMaterialName = "ProprietaryMaterial";
     private const string SceneAuthoredGeneralMaterialName = "MaterialForGeneralPurpose";
+    private const string SceneAuthoredFujianDetailCanvasName = "DetailInformationFuJianCanvas";
+    private const string SceneAuthoredShuiXiangDetailCanvasName = "DetailInformationShuiXiangCanvas";
     private const string SceneHandbookBackpackTrayName = "HandbookBackpackTray";
     private const string SceneHandbookBackpackSlotNamePrefix = "HandbookBackpackSlot_";
     private const string SceneHandbookSpecialStackName = "SpecialMaterialStack";
@@ -211,6 +214,7 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
     private bool initialized;
     private bool usesSceneAuthoredPages;
     private bool personalInformationPageAvailable = true;
+    private RuntimeProgressState subscribedRuntimeProgressState;
 
     public static IllustratedHandbookTabsController EnsureInstalled(UIManager manager)
     {
@@ -337,6 +341,11 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         UpdateSceneAuthoredSelectionPointerAnimation(Time.unscaledDeltaTime);
     }
 
+    private void OnEnable()
+    {
+        EnsureRuntimeProgressStateSubscription(false);
+    }
+
     private void OnDisable()
     {
         foreach (KeyValuePair<Button, Coroutine> entry in buttonMoveAnimations)
@@ -362,6 +371,7 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         sceneSettingsToggleBinder?.Release();
         hasHoveredPersonalInkWeapon = false;
         UnsubscribeBackpackInventoryEvents();
+        UnsubscribeRuntimeProgressState();
     }
 
     private void OnDestroy()
@@ -369,10 +379,13 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         scenePhotoAlbumBinder?.Release();
         sceneSettingsToggleBinder?.Release();
         UnsubscribeBackpackInventoryEvents();
+        UnsubscribeRuntimeProgressState();
     }
 
     private void EnsureInitialized()
     {
+        EnsureRuntimeProgressStateSubscription();
+
         if (TryUseSceneAuthoredPages())
         {
             if (initialized)
@@ -411,6 +424,58 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         RefreshGeneratedPageContent();
         initialized = true;
         ResetToDefaultPage();
+    }
+
+    private void EnsureRuntimeProgressStateSubscription(bool createIfMissing = true)
+    {
+        RuntimeProgressState progressState = RuntimeProgressState.Instance;
+        if (progressState == null && createIfMissing)
+        {
+            progressState = RuntimeProgressState.EnsureInstance();
+        }
+
+        if (ReferenceEquals(subscribedRuntimeProgressState, progressState))
+        {
+            return;
+        }
+
+        UnsubscribeRuntimeProgressState();
+        if (progressState == null)
+        {
+            return;
+        }
+
+        subscribedRuntimeProgressState = progressState;
+        subscribedRuntimeProgressState.OnStateChanged += HandleRuntimeProgressStateChanged;
+    }
+
+    private void UnsubscribeRuntimeProgressState()
+    {
+        if (subscribedRuntimeProgressState == null)
+        {
+            return;
+        }
+
+        subscribedRuntimeProgressState.OnStateChanged -= HandleRuntimeProgressStateChanged;
+        subscribedRuntimeProgressState = null;
+    }
+
+    private void HandleRuntimeProgressStateChanged()
+    {
+        if (!initialized)
+        {
+            return;
+        }
+
+        if (usesSceneAuthoredPages)
+        {
+            RefreshSceneAuthoredHandbookSelection();
+            RefreshSceneAuthoredRightIntroduction();
+            RefreshSceneAuthoredBackpackSurfaces();
+            return;
+        }
+
+        RefreshGeneratedPageContent();
     }
 
     private bool TryUseSceneAuthoredPages()
@@ -1423,7 +1488,28 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
             buildingImage.sprite = previewSprite;
             buildingImage.enabled = previewSprite != null;
             buildingImage.preserveAspect = true;
-            BindSceneAuthoredBuildingDetailButton(buildingImage, binding, definition);
+            BindSceneAuthoredBuildingDetailButton(buildingImage.gameObject, buildingImage, binding, definition, previewSprite);
+        }
+
+        Button detailButton = FindSceneAuthoredDetailButton(
+            rightRoot,
+            false,
+            SceneAuthoredBuildingDetailButtonName,
+            "Detail",
+            "详细",
+            "详情",
+            "查看");
+        Transform detailButtonRoot = detailButton != null
+            ? detailButton.transform
+            : FindTransformByName(rightRoot, SceneAuthoredBuildingDetailButtonName);
+        if (detailButtonRoot != null)
+        {
+            BindSceneAuthoredBuildingDetailButton(
+                detailButtonRoot.gameObject,
+                detailButtonRoot.GetComponent<Graphic>(),
+                binding,
+                definition,
+                previewSprite);
         }
 
         TMP_Text introductionText = buildingImageRoot != null
@@ -1513,34 +1599,43 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
     }
 
     private void BindSceneAuthoredBuildingDetailButton(
-        Image buildingImage,
+        GameObject targetObject,
+        Graphic targetGraphic,
         SceneAuthoredHandbookCardBinding binding,
-        BuildingDefinition definition)
+        BuildingDefinition definition,
+        Sprite previewSprite)
     {
-        if (buildingImage == null || binding == null || definition == null)
+        if (targetObject == null || binding == null || definition == null)
         {
             return;
         }
 
-        buildingImage.raycastTarget = true;
-
-        Button button = buildingImage.GetComponent<Button>();
-        if (button == null)
+        if (targetGraphic != null)
         {
-            button = buildingImage.gameObject.AddComponent<Button>();
+            targetGraphic.raycastTarget = true;
         }
 
-        button.targetGraphic = buildingImage;
+        Button button = targetObject.GetComponent<Button>();
+        if (button == null)
+        {
+            button = targetObject.AddComponent<Button>();
+        }
+
+        if (button.targetGraphic == null && targetGraphic != null)
+        {
+            button.targetGraphic = targetGraphic;
+        }
+
         button.interactable = RuntimeProgressState.EnsureInstance().IsBuildingUnlocked(binding.buildingId);
 
         SceneHandbookBuildingDetailButtonHandler handler =
-            buildingImage.GetComponent<SceneHandbookBuildingDetailButtonHandler>();
+            targetObject.GetComponent<SceneHandbookBuildingDetailButtonHandler>();
         if (handler == null)
         {
-            handler = buildingImage.gameObject.AddComponent<SceneHandbookBuildingDetailButtonHandler>();
+            handler = targetObject.AddComponent<SceneHandbookBuildingDetailButtonHandler>();
         }
 
-        handler.Bind(binding.buildingId, binding.detailData, definition, buildingImage.sprite);
+        handler.Bind(this, binding.buildingId, binding.detailData, definition, previewSprite);
     }
 
     private void RefreshSceneAuthoredRightProgress(
@@ -1578,6 +1673,8 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         }
 
         Transform generalRoot = FindTransformByName(rightRoot, SceneAuthoredGeneralMaterialName);
+        SanitizeSceneHandbookGeneralMaterialRaycasts(generalRoot);
+        EnsureSceneHandbookProprietaryRootAboveGeneral(proprietaryRoot, generalRoot);
         BindSceneHandbookSubmitCommonButton(generalRoot, buildingId);
         Slider generalSlider = generalRoot != null ? generalRoot.GetComponentInChildren<Slider>(true) : null;
         if (generalSlider == null)
@@ -1595,6 +1692,61 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         RefreshSceneAuthoredHandbookBackpack(rightRoot);
     }
 
+    private static void SanitizeSceneHandbookGeneralMaterialRaycasts(Transform generalRoot)
+    {
+        if (generalRoot == null)
+        {
+            return;
+        }
+
+        Graphic[] graphics = generalRoot.GetComponentsInChildren<Graphic>(true);
+        for (int i = 0; i < graphics.Length; i++)
+        {
+            Graphic graphic = graphics[i];
+            if (graphic == null)
+            {
+                continue;
+            }
+
+            if (ShouldKeepSceneHandbookGeneralGraphicInteractive(graphic))
+            {
+                graphic.raycastTarget = true;
+                continue;
+            }
+
+            graphic.raycastTarget = false;
+        }
+    }
+
+    private static bool ShouldKeepSceneHandbookGeneralGraphicInteractive(Graphic graphic)
+    {
+        if (graphic == null ||
+            graphic is TMP_Text ||
+            graphic is TMP_SubMeshUI)
+        {
+            return false;
+        }
+
+        Button button = graphic.GetComponentInParent<Button>(true);
+        return button != null && button.targetGraphic == graphic;
+    }
+
+    private static void EnsureSceneHandbookProprietaryRootAboveGeneral(
+        Transform proprietaryRoot,
+        Transform generalRoot)
+    {
+        if (proprietaryRoot == null ||
+            generalRoot == null ||
+            proprietaryRoot.parent == null ||
+            proprietaryRoot.parent != generalRoot.parent ||
+            proprietaryRoot.GetSiblingIndex() > generalRoot.GetSiblingIndex())
+        {
+            return;
+        }
+
+        proprietaryRoot.SetSiblingIndex(generalRoot.GetSiblingIndex());
+    }
+
     private static List<Transform> CollectSceneHandbookProprietarySlotRoots(Transform proprietaryRoot)
     {
         List<Transform> slotRoots = new List<Transform>();
@@ -1603,29 +1755,102 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
             return slotRoots;
         }
 
-        for (int i = 0; i < proprietaryRoot.childCount; i++)
+        CollectNamedSceneHandbookProprietarySlotRoots(proprietaryRoot, slotRoots, false);
+        if (slotRoots.Count == 0)
         {
-            Transform child = proprietaryRoot.GetChild(i);
-            if (IsSceneHandbookProprietarySlotRoot(child))
-            {
-                slotRoots.Add(child);
-            }
+            CollectNamedSceneHandbookProprietarySlotRoots(proprietaryRoot, slotRoots, true);
         }
 
         if (slotRoots.Count == 0)
         {
+            for (int i = 0; i < proprietaryRoot.childCount; i++)
+            {
+                Transform child = proprietaryRoot.GetChild(i);
+                if (IsSceneHandbookProprietarySlotRoot(child))
+                {
+                    AddSceneHandbookSlotRoot(slotRoots, child);
+                }
+            }
+
             Button[] slotButtons = proprietaryRoot.GetComponentsInChildren<Button>(true);
             for (int i = 0; i < slotButtons.Length; i++)
             {
                 if (slotButtons[i] != null)
                 {
-                    slotRoots.Add(slotButtons[i].transform);
+                    AddSceneHandbookSlotRoot(slotRoots, slotButtons[i].transform);
                 }
             }
         }
 
         slotRoots.Sort(CompareSceneHandbookSlotTransforms);
         return slotRoots;
+    }
+
+    private static void CollectNamedSceneHandbookProprietarySlotRoots(
+        Transform root,
+        List<Transform> slotRoots,
+        bool includeButtonNames)
+    {
+        if (root == null || slotRoots == null)
+        {
+            return;
+        }
+
+        for (int i = 0; i < root.childCount; i++)
+        {
+            Transform child = root.GetChild(i);
+            if (IsNamedSceneHandbookProprietarySlotRoot(child, includeButtonNames))
+            {
+                AddSceneHandbookSlotRoot(slotRoots, child);
+            }
+
+            CollectNamedSceneHandbookProprietarySlotRoots(child, slotRoots, includeButtonNames);
+        }
+    }
+
+    private static void AddSceneHandbookSlotRoot(List<Transform> slotRoots, Transform candidate)
+    {
+        if (slotRoots == null || candidate == null)
+        {
+            return;
+        }
+
+        if (!TryGetSceneHandbookSlotOrder(candidate, out int candidateOrder))
+        {
+            candidateOrder = int.MinValue;
+        }
+
+        for (int i = slotRoots.Count - 1; i >= 0; i--)
+        {
+            Transform existing = slotRoots[i];
+            if (existing == null)
+            {
+                slotRoots.RemoveAt(i);
+                continue;
+            }
+
+            if (!TryGetSceneHandbookSlotOrder(existing, out int existingOrder))
+            {
+                existingOrder = int.MinValue;
+            }
+
+            if (existing == candidate)
+            {
+                return;
+            }
+
+            if (candidateOrder == existingOrder && IsAncestorOf(existing, candidate))
+            {
+                return;
+            }
+
+            if (candidateOrder == existingOrder && IsAncestorOf(candidate, existing))
+            {
+                slotRoots.RemoveAt(i);
+            }
+        }
+
+        slotRoots.Add(candidate);
     }
 
     private static bool IsSceneHandbookProprietarySlotRoot(Transform candidate)
@@ -1651,8 +1876,29 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         return candidate.GetComponentInChildren<Button>(true) != null;
     }
 
+    private static bool IsNamedSceneHandbookProprietarySlotRoot(Transform candidate, bool includeButtonNames)
+    {
+        if (candidate == null || string.IsNullOrEmpty(candidate.name))
+        {
+            return false;
+        }
+
+        string candidateName = candidate.name;
+        return candidateName.StartsWith("Material_", StringComparison.OrdinalIgnoreCase) ||
+               candidateName.StartsWith("ProprietarySlot_", StringComparison.OrdinalIgnoreCase) ||
+               candidateName.StartsWith("Slot_", StringComparison.OrdinalIgnoreCase) ||
+               (includeButtonNames && candidateName.StartsWith("Button_", StringComparison.OrdinalIgnoreCase));
+    }
+
     private static int CompareSceneHandbookSlotTransforms(Transform left, Transform right)
     {
+        bool hasLeftOrder = TryGetSceneHandbookSlotOrder(left, out int leftOrder);
+        bool hasRightOrder = TryGetSceneHandbookSlotOrder(right, out int rightOrder);
+        if (hasLeftOrder && hasRightOrder && leftOrder != rightOrder)
+        {
+            return leftOrder.CompareTo(rightOrder);
+        }
+
         RectTransform leftRect = left as RectTransform;
         RectTransform rightRect = right as RectTransform;
         if (leftRect != null && rightRect != null)
@@ -1675,6 +1921,54 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         return siblingCompare != 0
             ? siblingCompare
             : string.CompareOrdinal(left != null ? left.name : string.Empty, right != null ? right.name : string.Empty);
+    }
+
+    private static bool TryGetSceneHandbookSlotOrder(Transform target, out int order)
+    {
+        order = 0;
+        if (target == null)
+        {
+            return false;
+        }
+
+        string targetName = target.name;
+        if (string.IsNullOrWhiteSpace(targetName))
+        {
+            return false;
+        }
+
+        int underscoreIndex = targetName.LastIndexOf('_');
+        if (underscoreIndex < 0 || underscoreIndex >= targetName.Length - 1)
+        {
+            return false;
+        }
+
+        return int.TryParse(
+            targetName.Substring(underscoreIndex + 1),
+            NumberStyles.Integer,
+            CultureInfo.InvariantCulture,
+            out order);
+    }
+
+    private static bool IsAncestorOf(Transform ancestor, Transform descendant)
+    {
+        if (ancestor == null || descendant == null)
+        {
+            return false;
+        }
+
+        Transform current = descendant.parent;
+        while (current != null)
+        {
+            if (current == ancestor)
+            {
+                return true;
+            }
+
+            current = current.parent;
+        }
+
+        return false;
     }
 
     private static void ApplySceneHandbookProprietarySlotContent(
@@ -2076,6 +2370,33 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         RuntimeSubtitleFeedHud.PushMessage(rewardText);
         MusicManager.PlaySfx(SfxCueId.ButtonClick);
         return true;
+    }
+
+    private bool TryClickProprietarySlot(CatalogueBuildingId buildingId, int slotIndex)
+    {
+        RuntimeProgressState runtimeState = RuntimeProgressState.EnsureInstance();
+        if (runtimeState.IsSlotUnlocked(buildingId, slotIndex))
+        {
+            return false;
+        }
+
+        BackpackMananger backpack = ResolveRuntimeBackpackManager();
+        if (backpack != null)
+        {
+            for (int i = 0; i < SceneHandbookBackpackSlotCount; i++)
+            {
+                ArchitecturalCrystal? item = backpack.GetItem(i);
+                if (item.HasValue && item.Value.IsSpecialStructure)
+                {
+                    return TryDropSpecialMaterialOnProprietarySlot(buildingId, slotIndex, i);
+                }
+            }
+        }
+
+        RefreshSceneAuthoredRightIntroduction();
+        RefreshSceneAuthoredBackpackSurfaces();
+        RuntimeSubtitleFeedHud.PushMessage("需要从背包拖动专用结构，才能点亮槽位。");
+        return false;
     }
 
     public bool SubmitCommonMaterialsToBuilding(CatalogueBuildingId buildingId)
@@ -4512,6 +4833,219 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         return false;
     }
 
+    private DetailedInformationUI ResolveSceneAuthoredDetailUi(CatalogueBuildingId buildingId)
+    {
+        DetailedInformationUI sceneDetailUi = EnsureSceneAuthoredDetailUi(ResolveSceneAuthoredDetailCanvas(buildingId));
+        if (sceneDetailUi != null)
+        {
+            return sceneDetailUi;
+        }
+
+        return FindObjectOfType<DetailedInformationUI>(true);
+    }
+
+    private Transform ResolveSceneAuthoredDetailCanvas(CatalogueBuildingId buildingId)
+    {
+        string canvasName = ResolveSceneAuthoredDetailCanvasName(buildingId);
+        if (string.IsNullOrEmpty(canvasName))
+        {
+            return null;
+        }
+
+        Transform ownerRoot = owner != null ? owner.transform : null;
+        Transform detailCanvas = FindTransformByName(ownerRoot, canvasName);
+        if (detailCanvas != null)
+        {
+            return detailCanvas;
+        }
+
+        GameObject sceneRoot = owner != null ? ResolveSceneAuthoredRoot(owner.illustratedHandbook) : null;
+        if (sceneRoot != null)
+        {
+            detailCanvas = FindTransformByName(sceneRoot.transform, canvasName);
+            if (detailCanvas != null)
+            {
+                return detailCanvas;
+            }
+        }
+
+        return FindTransformByName(transform.root, canvasName);
+    }
+
+    private static string ResolveSceneAuthoredDetailCanvasName(CatalogueBuildingId buildingId)
+    {
+        switch (buildingId)
+        {
+            case CatalogueBuildingId.Building1:
+                return SceneAuthoredFujianDetailCanvasName;
+            case CatalogueBuildingId.Building3:
+                return SceneAuthoredShuiXiangDetailCanvasName;
+            default:
+                return null;
+        }
+    }
+
+    private DetailedInformationUI EnsureSceneAuthoredDetailUi(Transform detailCanvas)
+    {
+        if (detailCanvas == null)
+        {
+            return null;
+        }
+
+        DetailedInformationUI detailUi = detailCanvas.GetComponent<DetailedInformationUI>();
+        if (detailUi == null)
+        {
+            detailUi = detailCanvas.gameObject.AddComponent<DetailedInformationUI>();
+        }
+
+        if (detailUi.illustratedHandbookPanel == null)
+        {
+            detailUi.illustratedHandbookPanel = illustratedHandbookCanvas != null
+                ? illustratedHandbookCanvas
+                : owner != null
+                    ? owner.illustratedHandbook
+                    : null;
+        }
+
+        detailUi.detailedInformationPanel = detailCanvas.gameObject;
+        BindSceneAuthoredDetailFields(detailUi, detailCanvas);
+
+        if (owner != null)
+        {
+            owner.detailedInformation = detailCanvas.gameObject;
+        }
+
+        UIRootManager.Instance?.RefreshRuntimeBindings();
+        return detailUi;
+    }
+
+    private static void BindSceneAuthoredDetailFields(DetailedInformationUI detailUi, Transform detailCanvas)
+    {
+        if (detailUi == null || detailCanvas == null)
+        {
+            return;
+        }
+
+        Transform firstBackground = FindTransformByName(detailCanvas, "BackGround");
+        if (detailUi.backGround1 == null && firstBackground != null)
+        {
+            detailUi.backGround1 = firstBackground.gameObject;
+        }
+
+        if (detailUi.page1NameText == null)
+        {
+            detailUi.page1NameText = FindSceneAuthoredDetailText(detailCanvas, "Name", "Title") ??
+                                     FindFirstSceneAuthoredDetailText(detailCanvas);
+        }
+
+        if (detailUi.page1IntroductionText == null)
+        {
+            detailUi.page1IntroductionText = FindSceneAuthoredDetailText(detailCanvas, "Introduction", "Content", "Body");
+        }
+
+        if (detailUi.page2FinallyIntroductionText == null)
+        {
+            detailUi.page2FinallyIntroductionText = FindSceneAuthoredDetailText(detailCanvas, "Finally", "Final");
+        }
+
+        if (detailUi.closeButton1 == null)
+        {
+            detailUi.closeButton1 = FindSceneAuthoredDetailButton(detailCanvas, "Close", "Setting", "关闭");
+        }
+    }
+
+    private static Text FindSceneAuthoredDetailText(Transform root, params string[] nameFragments)
+    {
+        if (root == null)
+        {
+            return null;
+        }
+
+        Text[] texts = root.GetComponentsInChildren<Text>(true);
+        for (int fragmentIndex = 0; fragmentIndex < nameFragments.Length; fragmentIndex++)
+        {
+            string fragment = nameFragments[fragmentIndex];
+            if (string.IsNullOrEmpty(fragment))
+            {
+                continue;
+            }
+
+            for (int i = 0; i < texts.Length; i++)
+            {
+                Text text = texts[i];
+                if (text != null &&
+                    text.name.IndexOf(fragment, StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    return text;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private static Text FindFirstSceneAuthoredDetailText(Transform root)
+    {
+        if (root == null)
+        {
+            return null;
+        }
+
+        Text[] texts = root.GetComponentsInChildren<Text>(true);
+        return texts.Length > 0 ? texts[0] : null;
+    }
+
+    private static Button FindSceneAuthoredDetailButton(Transform root, params string[] nameFragments)
+    {
+        return FindSceneAuthoredDetailButton(root, true, nameFragments);
+    }
+
+    private static Button FindSceneAuthoredDetailButton(
+        Transform root,
+        bool allowFallback,
+        params string[] nameFragments)
+    {
+        if (root == null)
+        {
+            return null;
+        }
+
+        Button[] buttons = root.GetComponentsInChildren<Button>(true);
+        for (int fragmentIndex = 0; fragmentIndex < nameFragments.Length; fragmentIndex++)
+        {
+            string fragment = nameFragments[fragmentIndex];
+            if (string.IsNullOrEmpty(fragment))
+            {
+                continue;
+            }
+
+            for (int i = 0; i < buttons.Length; i++)
+            {
+                Button button = buttons[i];
+                if (button == null)
+                {
+                    continue;
+                }
+
+                Text label = button.GetComponentInChildren<Text>(true);
+                TMP_Text tmpLabel = button.GetComponentInChildren<TMP_Text>(true);
+                bool matchesName = button.name.IndexOf(fragment, StringComparison.OrdinalIgnoreCase) >= 0;
+                bool matchesLabel = label != null &&
+                                    label.text != null &&
+                                    label.text.IndexOf(fragment, StringComparison.OrdinalIgnoreCase) >= 0;
+                bool matchesTmpLabel = tmpLabel != null &&
+                                       tmpLabel.text != null &&
+                                       tmpLabel.text.IndexOf(fragment, StringComparison.OrdinalIgnoreCase) >= 0;
+                if (matchesName || matchesLabel || matchesTmpLabel)
+                {
+                    return button;
+                }
+            }
+        }
+
+        return allowFallback && buttons.Length > 0 ? buttons[0] : null;
+    }
+
     private sealed class SceneHandbookCommonSubmitButtonHandler : MonoBehaviour
     {
         private IllustratedHandbookTabsController owner;
@@ -4551,7 +5085,7 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         }
     }
 
-    private sealed class SceneHandbookProprietarySlotDropHandler : MonoBehaviour, IDropHandler
+    private sealed class SceneHandbookProprietarySlotDropHandler : MonoBehaviour, IDropHandler, IPointerClickHandler
     {
         private IllustratedHandbookTabsController owner;
         private CatalogueBuildingId buildingId;
@@ -4575,10 +5109,16 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
 
             owner?.TryDropSpecialMaterialOnProprietarySlot(buildingId, slotIndex, sourceSlotIndex);
         }
+
+        public void OnPointerClick(PointerEventData eventData)
+        {
+            owner?.TryClickProprietarySlot(buildingId, slotIndex);
+        }
     }
 
     private sealed class SceneHandbookBuildingDetailButtonHandler : MonoBehaviour
     {
+        private IllustratedHandbookTabsController owner;
         private Button button;
         private CatalogueBuildingId buildingId;
         private BuildingDetailData detailData;
@@ -4586,11 +5126,13 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         private Sprite previewSprite;
 
         public void Bind(
+            IllustratedHandbookTabsController controller,
             CatalogueBuildingId targetBuildingId,
             BuildingDetailData targetDetailData,
             BuildingDefinition targetDefinition,
             Sprite targetPreviewSprite)
         {
+            owner = controller;
             if (button == null)
             {
                 button = GetComponent<Button>();
@@ -4624,7 +5166,9 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
                 return;
             }
 
-            DetailedInformationUI detailUi = FindObjectOfType<DetailedInformationUI>(true);
+            DetailedInformationUI detailUi = owner != null
+                ? owner.ResolveSceneAuthoredDetailUi(buildingId)
+                : FindObjectOfType<DetailedInformationUI>(true);
             if (detailUi == null)
             {
                 RuntimeSubtitleFeedHud.PushMessage("详情界面暂未接入。");

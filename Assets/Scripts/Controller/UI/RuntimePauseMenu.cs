@@ -537,6 +537,7 @@ public sealed class RuntimePauseMenu : MonoBehaviour
         {
             confirmPrimaryButton.onClick.RemoveAllListeners();
             confirmPrimaryButton.onClick.AddListener(page == PausePage.ReturnConfirm ? ConfirmReturnToMenu : ConfirmQuitGame);
+            EnsureButtonInputReady(confirmPrimaryButton);
         }
 
         if (confirmPrimaryImage != null)
@@ -681,6 +682,7 @@ public sealed class RuntimePauseMenu : MonoBehaviour
         SetRootVisible(menuRoot, page == PausePage.Menu);
         SetRootVisible(aboutRoot, page == PausePage.About);
         SetRootVisible(confirmRoot, page == PausePage.ReturnConfirm || page == PausePage.QuitConfirm);
+        EnsureVisiblePageButtonsInputReady();
     }
 
     private void EnsureSettingsPanel()
@@ -844,6 +846,7 @@ public sealed class RuntimePauseMenu : MonoBehaviour
         cancelRect.pivot = new Vector2(0.5f, 0.5f);
         cancelRect.anchoredPosition = new Vector2(-110f, -96f);
         cancelButton.onClick.AddListener(ShowMenuPage);
+        EnsureButtonInputReady(cancelButton);
     }
 
     private void CreateMenuButton(
@@ -862,6 +865,7 @@ public sealed class RuntimePauseMenu : MonoBehaviour
         rect.pivot = new Vector2(0.5f, 0.5f);
         rect.anchoredPosition = new Vector2(0f, y);
         button.onClick.AddListener(onClick);
+        EnsureButtonInputReady(button);
 
         if (revealWithMenu)
         {
@@ -900,6 +904,8 @@ public sealed class RuntimePauseMenu : MonoBehaviour
 
         Button button = buttonObject.GetComponent<Button>();
         button.targetGraphic = buttonImage;
+        buttonImage.raycastTarget = true;
+        button.interactable = true;
 
         PauseMenuButtonFlowEffect flowEffect = buttonObject.AddComponent<PauseMenuButtonFlowEffect>();
         flowEffect.SetAccentFromBackground(backgroundColor);
@@ -915,7 +921,72 @@ public sealed class RuntimePauseMenu : MonoBehaviour
         text.raycastTarget = false;
 
         StretchRect(text.rectTransform);
+        EnsureButtonInputReady(button);
         return button;
+    }
+
+    private void EnsureVisiblePageButtonsInputReady()
+    {
+        switch (currentPage)
+        {
+            case PausePage.Menu:
+                EnsureButtonsInputReady(menuRoot);
+                break;
+            case PausePage.About:
+                EnsureButtonsInputReady(aboutRoot);
+                break;
+            case PausePage.ReturnConfirm:
+            case PausePage.QuitConfirm:
+                EnsureButtonsInputReady(confirmRoot);
+                break;
+        }
+    }
+
+    private static void EnsureButtonsInputReady(Transform root)
+    {
+        if (root == null)
+        {
+            return;
+        }
+
+        Button[] buttons = root.GetComponentsInChildren<Button>(true);
+        for (int i = 0; i < buttons.Length; i++)
+        {
+            EnsureButtonInputReady(buttons[i]);
+        }
+    }
+
+    private static void EnsureButtonInputReady(Button button)
+    {
+        if (button == null)
+        {
+            return;
+        }
+
+        Graphic targetGraphic = button.targetGraphic ?? button.GetComponent<Graphic>();
+        if (targetGraphic != null)
+        {
+            targetGraphic.raycastTarget = true;
+            button.targetGraphic = targetGraphic;
+        }
+
+        button.interactable = true;
+
+        CanvasGroup canvasGroup = button.GetComponent<CanvasGroup>();
+        if (canvasGroup != null)
+        {
+            canvasGroup.interactable = true;
+            canvasGroup.blocksRaycasts = true;
+        }
+
+        TextMeshProUGUI[] labels = button.GetComponentsInChildren<TextMeshProUGUI>(true);
+        for (int i = 0; i < labels.Length; i++)
+        {
+            if (labels[i] != null)
+            {
+                labels[i].raycastTarget = false;
+            }
+        }
     }
 
     private static TextMeshProUGUI CreateText(

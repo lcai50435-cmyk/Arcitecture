@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using TMPro;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
@@ -11,7 +12,7 @@ public sealed class RuntimePhotoCaptureManager : MonoBehaviour
     private const string PauseReason = "RuntimePhotoCapture";
     private const string BaseSceneName = "NewBase";
     private const string BaseSceneDisplayName = "基地";
-    private const int SortingOrder = 290;
+    private const int SortingOrder = Dialog.TopmostRuntimeDialogSortingOrder + 80;
     private const float ShutterDuration = 0.18f;
     private const float ShutterMaxHeight = 132f;
     private const float FlashPeakAlpha = 0.92f;
@@ -115,6 +116,7 @@ public sealed class RuntimePhotoCaptureManager : MonoBehaviour
     {
         if (Instance != null)
         {
+            Instance.EnsureUi();
             return Instance;
         }
 
@@ -122,11 +124,13 @@ public sealed class RuntimePhotoCaptureManager : MonoBehaviour
         if (existing != null)
         {
             Instance = existing;
+            Instance.EnsureUi();
             return existing;
         }
 
         GameObject runtimeObject = new GameObject("RuntimePhotoCaptureManager");
         Instance = runtimeObject.AddComponent<RuntimePhotoCaptureManager>();
+        Instance.EnsureUi();
         return Instance;
     }
 
@@ -223,6 +227,7 @@ public sealed class RuntimePhotoCaptureManager : MonoBehaviour
     private IEnumerator CaptureRoutine()
     {
         captureInProgress = true;
+        string captureSceneName = SceneManager.GetActiveScene().name;
         Texture2D screenshot = null;
         bool pauseApplied = false;
         bool overlaysHidden = false;
@@ -259,7 +264,7 @@ public sealed class RuntimePhotoCaptureManager : MonoBehaviour
                 yield break;
             }
 
-            PhotoAlbumEntry savedEntry = SaveScreenshot(screenshot);
+            PhotoAlbumEntry savedEntry = SaveScreenshot(screenshot, captureSceneName);
             if (savedEntry != null)
             {
                 yield return PlayToastRoutine("留念已保存到本地相册", ToastSuccessTextColor, ToastSuccessBorderColor);
@@ -299,6 +304,11 @@ public sealed class RuntimePhotoCaptureManager : MonoBehaviour
 
     private PhotoAlbumEntry SaveScreenshot(Texture2D screenshot)
     {
+        return SaveScreenshot(screenshot, SceneManager.GetActiveScene().name);
+    }
+
+    private PhotoAlbumEntry SaveScreenshot(Texture2D screenshot, string sceneName)
+    {
         if (screenshot == null)
         {
             return null;
@@ -320,7 +330,6 @@ public sealed class RuntimePhotoCaptureManager : MonoBehaviour
             return null;
         }
 
-        string sceneName = SceneManager.GetActiveScene().name;
         return PhotoAlbumRepository.SaveCapture(
             pngBytes,
             screenshot.width,
@@ -601,6 +610,7 @@ public sealed class RuntimePhotoCaptureManager : MonoBehaviour
 
         if (canvas != null)
         {
+            EnsurePhotoCanvasOnTop();
             return;
         }
 
@@ -731,6 +741,7 @@ public sealed class RuntimePhotoCaptureManager : MonoBehaviour
             new Vector2(220f, 58f));
         saveButton.GetComponent<RectTransform>().anchoredPosition = new Vector2(132f, -312f);
         saveButton.onClick.AddListener(ConfirmSave);
+        RuntimePhotoConfirmationButtonHandler.Bind(saveButton.gameObject, this, true);
 
         cancelButton = CreateButton(
             "CancelButton",
@@ -741,6 +752,7 @@ public sealed class RuntimePhotoCaptureManager : MonoBehaviour
             new Vector2(180f, 58f));
         cancelButton.GetComponent<RectTransform>().anchoredPosition = new Vector2(-120f, -312f);
         cancelButton.onClick.AddListener(CancelSave);
+        RuntimePhotoConfirmationButtonHandler.Bind(cancelButton.gameObject, this, false);
 
         GameObject toastRoot = new GameObject("Toast", typeof(RectTransform), typeof(Image), typeof(CanvasGroup), typeof(Outline));
         toastRoot.transform.SetParent(canvasObject.transform, false);
@@ -773,6 +785,18 @@ public sealed class RuntimePhotoCaptureManager : MonoBehaviour
 
         ResetOverlayState();
         HideConfirmationImmediate();
+    }
+
+    private void EnsurePhotoCanvasOnTop()
+    {
+        if (canvas == null)
+        {
+            return;
+        }
+
+        canvas.overrideSorting = true;
+        canvas.sortingOrder = SortingOrder;
+        canvas.transform.SetAsLastSibling();
     }
 
     private void ApplyVisibilityState()
@@ -835,9 +859,44 @@ public sealed class RuntimePhotoCaptureManager : MonoBehaviour
         if (shouldShow)
         {
             RuntimeUiEventSystemBootstrapper.Ensure();
+            EnsurePhotoCanvasOnTop();
+            RestoreConfirmationButtons();
         }
 
         confirmCanvasGroup.gameObject.SetActive(shouldShow);
+    }
+
+    private void RestoreConfirmationButtons()
+    {
+        RestoreConfirmationButton(saveButton);
+        RestoreConfirmationButton(cancelButton);
+    }
+
+    private static void RestoreConfirmationButton(Button button)
+    {
+        if (button == null)
+        {
+            return;
+        }
+
+        button.interactable = true;
+        Graphic targetGraphic = button.targetGraphic != null
+            ? button.targetGraphic
+            : button.GetComponent<Graphic>();
+        if (targetGraphic != null)
+        {
+            targetGraphic.raycastTarget = true;
+            button.targetGraphic = targetGraphic;
+        }
+
+        TMP_Text[] labels = button.GetComponentsInChildren<TMP_Text>(true);
+        for (int i = 0; i < labels.Length; i++)
+        {
+            if (labels[i] != null)
+            {
+                labels[i].raycastTarget = false;
+            }
+        }
     }
 
     private void SetShutterAmount(float amount)
@@ -873,6 +932,60 @@ public sealed class RuntimePhotoCaptureManager : MonoBehaviour
     private void CancelSave()
     {
         pendingConfirmDecision = false;
+    }
+
+    private sealed class RuntimePhotoConfirmationButtonHandler : MonoBehaviour, IPointerClickHandler, ISubmitHandler
+    {
+        private RuntimePhotoCaptureManager owner;
+        private bool confirmsSave;
+
+        public static void Bind(
+            GameObject targetObject,
+            RuntimePhotoCaptureManager targetOwner,
+            bool targetConfirmsSave)
+        {
+            if (targetObject == null)
+            {
+                return;
+            }
+
+            RuntimePhotoConfirmationButtonHandler handler =
+                targetObject.GetComponent<RuntimePhotoConfirmationButtonHandler>();
+            if (handler == null)
+            {
+                handler = targetObject.AddComponent<RuntimePhotoConfirmationButtonHandler>();
+            }
+
+            handler.owner = targetOwner;
+            handler.confirmsSave = targetConfirmsSave;
+        }
+
+        public void OnPointerClick(PointerEventData eventData)
+        {
+            InvokeDecision();
+        }
+
+        public void OnSubmit(BaseEventData eventData)
+        {
+            InvokeDecision();
+        }
+
+        private void InvokeDecision()
+        {
+            if (owner == null)
+            {
+                return;
+            }
+
+            if (confirmsSave)
+            {
+                owner.ConfirmSave();
+            }
+            else
+            {
+                owner.CancelSave();
+            }
+        }
     }
 
     private string BuildConfirmationMeta(Texture2D screenshot)

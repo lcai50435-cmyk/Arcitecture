@@ -624,6 +624,157 @@ public sealed class IllustratedHandbookTabsControllerTests
     }
 
     [Test]
+    public void SceneAuthoredBuildingImageBecomesDetailEntryAfterRuntimeUnlock()
+    {
+        RuntimeProgressState progressState = RuntimeProgressState.EnsureInstance();
+        progressState.ResetProgress(false);
+
+        rootObject = CreateSceneAuthoredRoot();
+        GameObject handbookPage = rootObject.transform.Find("IllustratedHandbookCanvas").gameObject;
+        CreateSceneAuthoredHandbookSurface(handbookPage);
+
+        GameObject firstCard = FindDescendant(handbookPage.transform, "ArcitectureImage_1").gameObject;
+        BuildingDetailData detailData = firstCard.AddComponent<BuildingDetailData>();
+        detailData.buildingName = "福建土楼详情";
+        detailData.introduction1 = "解锁后展示完整建筑详情。";
+
+        GameObject detailPanel = new GameObject("DetailedInformationCanvas", typeof(RectTransform));
+        detailPanel.transform.SetParent(rootObject.transform, false);
+        Text detailTitle = CreateChild<Text>(detailPanel.transform, "Title");
+        DetailedInformationUI detailUi = detailPanel.AddComponent<DetailedInformationUI>();
+        detailUi.detailedInformationPanel = detailPanel;
+        detailUi.page1NameText = detailTitle;
+        detailPanel.SetActive(false);
+
+        UIManager manager = rootObject.AddComponent<UIManager>();
+        manager.illustratedHandbook = rootObject;
+        IllustratedHandbookTabsController controller = IllustratedHandbookTabsController.EnsureInstalled(manager);
+        controller.SwitchToPage(IllustratedHandbookPage.IllustratedHandbook);
+
+        Button detailButton = FindDescendant(handbookPage.transform, "BuildingImage").GetComponent<Button>();
+        Assert.IsNotNull(detailButton);
+        Assert.IsFalse(detailButton.interactable);
+
+        CompleteBuildingUnlock(progressState, CatalogueBuildingId.Building1);
+
+        Assert.IsTrue(detailButton.interactable);
+        detailButton.onClick.Invoke();
+
+        Assert.IsTrue(detailPanel.activeSelf);
+        Assert.AreEqual("福建土楼详情", detailTitle.text);
+    }
+
+    [Test]
+    public void SceneAuthoredGotoButtonOpensSelectedUnlockedBuildingDetail()
+    {
+        RuntimeProgressState progressState = RuntimeProgressState.EnsureInstance();
+        progressState.ResetProgress(false);
+
+        rootObject = CreateSceneAuthoredRoot();
+        GameObject handbookPage = rootObject.transform.Find("IllustratedHandbookCanvas").gameObject;
+        CreateSceneAuthoredHandbookSurface(handbookPage);
+
+        GameObject detailPanel = new GameObject("DetailedInformationCanvas", typeof(RectTransform));
+        detailPanel.transform.SetParent(rootObject.transform, false);
+        Text detailTitle = CreateChild<Text>(detailPanel.transform, "Title");
+        DetailedInformationUI detailUi = detailPanel.AddComponent<DetailedInformationUI>();
+        detailUi.detailedInformationPanel = detailPanel;
+        detailUi.page1NameText = detailTitle;
+        detailPanel.SetActive(false);
+
+        UIManager manager = rootObject.AddComponent<UIManager>();
+        manager.illustratedHandbook = rootObject;
+        IllustratedHandbookTabsController controller = IllustratedHandbookTabsController.EnsureInstalled(manager);
+        controller.SwitchToPage(IllustratedHandbookPage.IllustratedHandbook);
+
+        GameObject secondCard = FindDescendant(handbookPage.transform, "ArcitectureImage_2").gameObject;
+        controller.SelectSceneAuthoredHandbookCard(secondCard);
+
+        Button gotoButton = FindDescendant(handbookPage.transform, "GotoButton").GetComponent<Button>();
+        Assert.IsNotNull(gotoButton);
+        Assert.IsFalse(gotoButton.interactable);
+
+        CompleteBuildingUnlock(progressState, CatalogueBuildingId.Building2);
+        controller.SelectSceneAuthoredHandbookCard(secondCard);
+
+        Assert.IsTrue(gotoButton.interactable);
+        gotoButton.onClick.Invoke();
+
+        Assert.IsTrue(detailPanel.activeSelf);
+        Assert.AreEqual("赵州桥", detailTitle.text);
+    }
+
+    [Test]
+    public void SceneAuthoredGotoButtonBindsAndOpensFujianDetailCanvas()
+    {
+        RuntimeProgressState progressState = RuntimeProgressState.EnsureInstance();
+        progressState.ResetProgress(false);
+
+        rootObject = CreateSceneAuthoredRoot();
+        GameObject handbookPage = rootObject.transform.Find("IllustratedHandbookCanvas").gameObject;
+        CreateSceneAuthoredHandbookSurface(handbookPage);
+        Text detailTitle = CreateSceneAuthoredDetailCanvas(rootObject.transform, "DetailInformationFuJianCanvas");
+
+        UIManager manager = rootObject.AddComponent<UIManager>();
+        manager.illustratedHandbook = rootObject;
+        IllustratedHandbookTabsController controller = IllustratedHandbookTabsController.EnsureInstalled(manager);
+        controller.SwitchToPage(IllustratedHandbookPage.IllustratedHandbook);
+
+        CompleteBuildingUnlock(progressState, CatalogueBuildingId.Building1);
+        controller.SwitchToPage(IllustratedHandbookPage.IllustratedHandbook);
+
+        Button gotoButton = FindDescendant(handbookPage.transform, "GotoButton").GetComponent<Button>();
+        Assert.IsTrue(gotoButton.interactable);
+        gotoButton.onClick.Invoke();
+
+        GameObject detailCanvas = detailTitle.transform.parent.gameObject;
+        CanvasGroup canvasGroup = detailCanvas.GetComponent<CanvasGroup>();
+        Assert.IsTrue(detailCanvas.activeSelf);
+        Assert.AreEqual(Vector3.one, detailCanvas.transform.localScale);
+        Assert.IsTrue(canvasGroup.interactable);
+        Assert.IsTrue(canvasGroup.blocksRaycasts);
+        Assert.AreEqual("福建土楼", detailTitle.text);
+        Assert.AreSame(detailCanvas, manager.detailedInformation);
+        Assert.IsNotNull(detailCanvas.GetComponent<DetailedInformationUI>());
+    }
+
+    [Test]
+    public void SceneAuthoredGotoButtonBindsAndOpensShuiXiangDetailCanvas()
+    {
+        RuntimeProgressState progressState = RuntimeProgressState.EnsureInstance();
+        progressState.ResetProgress(false);
+
+        rootObject = CreateSceneAuthoredRoot();
+        GameObject handbookPage = rootObject.transform.Find("IllustratedHandbookCanvas").gameObject;
+        CreateSceneAuthoredHandbookSurface(handbookPage);
+        CreateSceneAuthoredDetailCanvas(rootObject.transform, "DetailInformationFuJianCanvas");
+        Text shuiXiangTitle = CreateSceneAuthoredDetailCanvas(rootObject.transform, "DetailInformationShuiXiangCanvas");
+
+        UIManager manager = rootObject.AddComponent<UIManager>();
+        manager.illustratedHandbook = rootObject;
+        IllustratedHandbookTabsController controller = IllustratedHandbookTabsController.EnsureInstalled(manager);
+        controller.SwitchToPage(IllustratedHandbookPage.IllustratedHandbook);
+
+        GameObject thirdCard = FindDescendant(handbookPage.transform, "ArcitectureImage_3").gameObject;
+        CompleteBuildingUnlock(progressState, CatalogueBuildingId.Building3);
+        controller.SelectSceneAuthoredHandbookCard(thirdCard);
+
+        Button gotoButton = FindDescendant(handbookPage.transform, "GotoButton").GetComponent<Button>();
+        Assert.IsTrue(gotoButton.interactable);
+        gotoButton.onClick.Invoke();
+
+        GameObject shuiXiangCanvas = shuiXiangTitle.transform.parent.gameObject;
+        CanvasGroup canvasGroup = shuiXiangCanvas.GetComponent<CanvasGroup>();
+        Assert.IsTrue(shuiXiangCanvas.activeSelf);
+        Assert.AreEqual(Vector3.one, shuiXiangCanvas.transform.localScale);
+        Assert.IsTrue(canvasGroup.interactable);
+        Assert.IsTrue(canvasGroup.blocksRaycasts);
+        Assert.AreEqual("安徽水乡民居", shuiXiangTitle.text);
+        Assert.AreSame(shuiXiangCanvas, manager.detailedInformation);
+        Assert.IsNotNull(shuiXiangCanvas.GetComponent<DetailedInformationUI>());
+    }
+
+    [Test]
     public void DroppingRuntimeBackpackSlotOntoProprietarySlotConsumesBackpackItem()
     {
         RuntimeProgressState progressState = RuntimeProgressState.EnsureInstance();
@@ -781,6 +932,154 @@ public sealed class IllustratedHandbookTabsControllerTests
     }
 
     [Test]
+    public void SceneAuthoredGeneralMaterialDecorationsDoNotBlockFirstProprietarySlot()
+    {
+        RuntimeProgressState.EnsureInstance().ResetProgress(false);
+
+        rootObject = CreateSceneAuthoredRoot();
+        GameObject handbookPage = rootObject.transform.Find("IllustratedHandbookCanvas").gameObject;
+        CreateSceneAuthoredHandbookSurface(handbookPage);
+
+        Transform generalRoot = FindDescendant(handbookPage.transform, "MaterialForGeneralPurpose");
+        Image decorativeImage = CreateChild<Image>(generalRoot, "Image");
+        decorativeImage.raycastTarget = true;
+        TMP_Text decorativeText = CreateTmpText("TMP Blocker", generalRoot, "遮挡文本");
+        decorativeText.raycastTarget = true;
+        TMP_SubMeshUI decorativeSubMesh = CreateChild<TMP_SubMeshUI>(
+            generalRoot,
+            "TMP SubMeshUI [NotoSansSC-Black Atlas Material + NotoSansSC-Black Atlas 1]");
+        decorativeSubMesh.raycastTarget = true;
+
+        UIManager manager = rootObject.AddComponent<UIManager>();
+        manager.illustratedHandbook = rootObject;
+        IllustratedHandbookTabsController controller = IllustratedHandbookTabsController.EnsureInstalled(manager);
+        controller.SwitchToPage(IllustratedHandbookPage.IllustratedHandbook);
+
+        Transform proprietaryRoot = FindDescendant(handbookPage.transform, "ProprietaryMaterial");
+        Button firstSlotButton = FindDescendant(handbookPage.transform, "ProprietarySlot_1").GetComponent<Button>();
+        Button submitButton = FindDescendant(generalRoot, "SubmitCommonMaterialButton").GetComponent<Button>();
+
+        Assert.Greater(proprietaryRoot.GetSiblingIndex(), generalRoot.GetSiblingIndex());
+        Assert.IsFalse(decorativeImage.raycastTarget);
+        Assert.IsFalse(decorativeText.raycastTarget);
+        Assert.IsFalse(decorativeSubMesh.raycastTarget);
+        Assert.IsTrue(firstSlotButton.targetGraphic.raycastTarget);
+        Assert.IsTrue(submitButton.targetGraphic.raycastTarget);
+    }
+
+    [Test]
+    public void ClickingFirstProprietaryButtonConsumesFirstSpecialBackpackItem()
+    {
+        RuntimeProgressState progressState = RuntimeProgressState.EnsureInstance();
+        progressState.ResetProgress(false);
+
+        BackpackMananger backpack = CreateRuntimeBackpack();
+        Assert.IsTrue(backpack.PickItem(ArchitecturalCrystalFactory.CreateSpecialStructureMaterial()));
+
+        rootObject = CreateSceneAuthoredRoot();
+        GameObject handbookPage = rootObject.transform.Find("IllustratedHandbookCanvas").gameObject;
+        CreateSceneAuthoredHandbookSurfaceWithNestedProprietarySlots(handbookPage);
+
+        UIManager manager = rootObject.AddComponent<UIManager>();
+        manager.illustratedHandbook = rootObject;
+        IllustratedHandbookTabsController controller = IllustratedHandbookTabsController.EnsureInstalled(manager);
+        controller.SwitchToPage(IllustratedHandbookPage.IllustratedHandbook);
+
+        Transform firstSlotRoot = FindDescendant(handbookPage.transform, "Material_1");
+        Button firstSlotButton = FindDescendant(firstSlotRoot, "Button_1").GetComponent<Button>();
+        AssertHasClickHandler(firstSlotButton.transform);
+
+        EventSystem eventSystem = EventSystem.current ?? new GameObject("EventSystem", typeof(EventSystem)).GetComponent<EventSystem>();
+        ExecuteEvents.ExecuteHierarchy(
+            firstSlotButton.gameObject,
+            new PointerEventData(eventSystem) { button = PointerEventData.InputButton.Left },
+            ExecuteEvents.pointerClickHandler);
+
+        Assert.IsTrue(progressState.IsSlotUnlocked(CatalogueBuildingId.Building1, 0));
+        Assert.IsFalse(backpack.GetItem(0).HasValue);
+        Assert.AreEqual(0, backpack.GetSpecialStructureMaterialCount());
+    }
+
+    [Test]
+    public void ClickingFirstSlotNamedProprietaryButtonUnlocksFirstSlotForEveryBuilding()
+    {
+        RuntimeProgressState progressState = RuntimeProgressState.EnsureInstance();
+        progressState.ResetProgress(false);
+
+        BackpackMananger backpack = CreateRuntimeBackpack();
+
+        rootObject = CreateSceneAuthoredRoot();
+        GameObject handbookPage = rootObject.transform.Find("IllustratedHandbookCanvas").gameObject;
+        CreateSceneAuthoredHandbookSurfaceWithSlotNamedProprietarySlots(handbookPage);
+
+        UIManager manager = rootObject.AddComponent<UIManager>();
+        manager.illustratedHandbook = rootObject;
+        IllustratedHandbookTabsController controller = IllustratedHandbookTabsController.EnsureInstalled(manager);
+        controller.SwitchToPage(IllustratedHandbookPage.IllustratedHandbook);
+
+        CatalogueBuildingId[] buildingIds =
+        {
+            CatalogueBuildingId.Building1,
+            CatalogueBuildingId.Building2,
+            CatalogueBuildingId.Building3
+        };
+
+        for (int i = 0; i < buildingIds.Length; i++)
+        {
+            CatalogueBuildingId buildingId = buildingIds[i];
+            GameObject card = FindDescendant(handbookPage.transform, $"ArcitectureImage_{i + 1}").gameObject;
+            controller.SelectSceneAuthoredHandbookCard(card);
+
+            Assert.IsTrue(backpack.PickItem(ArchitecturalCrystalFactory.CreateSpecialStructureMaterial()));
+            Button firstSlotButton = FindDescendant(handbookPage.transform, "Button_1").GetComponent<Button>();
+            AssertHasClickHandler(firstSlotButton.transform);
+
+            EventSystem eventSystem = EventSystem.current ?? new GameObject("EventSystem", typeof(EventSystem)).GetComponent<EventSystem>();
+            ExecuteEvents.ExecuteHierarchy(
+                firstSlotButton.gameObject,
+                new PointerEventData(eventSystem) { button = PointerEventData.InputButton.Left },
+                ExecuteEvents.pointerClickHandler);
+
+            Assert.IsTrue(progressState.IsSlotUnlocked(buildingId, 0), buildingId.ToString());
+            Assert.AreEqual(0, backpack.GetSpecialStructureMaterialCount(), buildingId.ToString());
+        }
+    }
+
+    [Test]
+    public void ClickingUnlockedProprietaryButtonDoesNotConsumeSpecialBackpackItem()
+    {
+        RuntimeProgressState progressState = RuntimeProgressState.EnsureInstance();
+        progressState.ResetProgress(false);
+        Assert.IsTrue(progressState.TryUnlockSlot(CatalogueBuildingId.Building1, 0, out _, out _));
+
+        BackpackMananger backpack = CreateRuntimeBackpack();
+        Assert.IsTrue(backpack.PickItem(ArchitecturalCrystalFactory.CreateSpecialStructureMaterial()));
+
+        rootObject = CreateSceneAuthoredRoot();
+        GameObject handbookPage = rootObject.transform.Find("IllustratedHandbookCanvas").gameObject;
+        CreateSceneAuthoredHandbookSurfaceWithNestedProprietarySlots(handbookPage);
+
+        UIManager manager = rootObject.AddComponent<UIManager>();
+        manager.illustratedHandbook = rootObject;
+        IllustratedHandbookTabsController controller = IllustratedHandbookTabsController.EnsureInstalled(manager);
+        controller.SwitchToPage(IllustratedHandbookPage.IllustratedHandbook);
+
+        Transform firstSlotRoot = FindDescendant(handbookPage.transform, "Material_1");
+        Button firstSlotButton = FindDescendant(firstSlotRoot, "Button_1").GetComponent<Button>();
+        AssertHasClickHandler(firstSlotButton.transform);
+
+        EventSystem eventSystem = EventSystem.current ?? new GameObject("EventSystem", typeof(EventSystem)).GetComponent<EventSystem>();
+        ExecuteEvents.ExecuteHierarchy(
+            firstSlotButton.gameObject,
+            new PointerEventData(eventSystem) { button = PointerEventData.InputButton.Left },
+            ExecuteEvents.pointerClickHandler);
+
+        Assert.IsTrue(progressState.IsSlotUnlocked(CatalogueBuildingId.Building1, 0));
+        Assert.IsTrue(backpack.GetItem(0).HasValue);
+        Assert.AreEqual(1, backpack.GetSpecialStructureMaterialCount());
+    }
+
+    [Test]
     public void DroppingRuntimeBackpackIconOntoFirstProprietaryButtonConsumesItem()
     {
         RuntimeProgressState progressState = RuntimeProgressState.EnsureInstance();
@@ -920,6 +1219,22 @@ public sealed class IllustratedHandbookTabsControllerTests
         return backpackObject.AddComponent<BackpackMananger>();
     }
 
+    private static void CompleteBuildingUnlock(RuntimeProgressState progressState, CatalogueBuildingId buildingId)
+    {
+        BuildingDefinition definition = BuildingDefinitionLibrary.Get(buildingId);
+        Assert.IsTrue(progressState.AddBuildingProgress(buildingId, definition.requiredProgress, out _));
+        int slotCount = definition.slotDefinitions != null ? definition.slotDefinitions.Length : 0;
+        for (int i = 0; i < slotCount; i++)
+        {
+            if (!progressState.IsSlotUnlocked(buildingId, i))
+            {
+                Assert.IsTrue(progressState.TryUnlockSlot(buildingId, i, out _, out _));
+            }
+        }
+
+        Assert.IsTrue(progressState.TryUnlockBuilding(buildingId, out _));
+    }
+
     private static void CreateSceneAuthoredHandbookSurface(GameObject handbookPage)
     {
         GameObject leftPanel = new GameObject("LeftPanel", typeof(RectTransform));
@@ -943,6 +1258,9 @@ public sealed class IllustratedHandbookTabsControllerTests
         GameObject buildingImage = new GameObject("BuildingImage", typeof(RectTransform), typeof(Image));
         buildingImage.transform.SetParent(rightIntroduction.transform, false);
         CreateTmpText("Introduction", buildingImage.transform, string.Empty);
+        GameObject gotoButton = new GameObject("GotoButton", typeof(RectTransform), typeof(Image), typeof(Button));
+        gotoButton.transform.SetParent(rightIntroduction.transform, false);
+        CreateTmpText("Label", gotoButton.transform, "查看详情");
 
         GameObject proprietary = new GameObject("ProprietaryMaterial", typeof(RectTransform));
         proprietary.transform.SetParent(rightIntroduction.transform, false);
@@ -962,6 +1280,52 @@ public sealed class IllustratedHandbookTabsControllerTests
         CreateTmpText("Label", button.transform, "提交通用材料");
     }
 
+    private static Text CreateSceneAuthoredDetailCanvas(Transform parent, string canvasName)
+    {
+        GameObject detailCanvas = new GameObject(
+            canvasName,
+            typeof(RectTransform),
+            typeof(Canvas),
+            typeof(CanvasScaler),
+            typeof(GraphicRaycaster),
+            typeof(CanvasGroup));
+        detailCanvas.transform.SetParent(parent, false);
+        detailCanvas.transform.localScale = Vector3.zero;
+
+        CanvasGroup canvasGroup = detailCanvas.GetComponent<CanvasGroup>();
+        canvasGroup.alpha = 0f;
+        canvasGroup.interactable = false;
+        canvasGroup.blocksRaycasts = false;
+
+        Text title = CreateChild<Text>(detailCanvas.transform, "Name");
+        CreateChild<Text>(detailCanvas.transform, "Introduction");
+        return title;
+    }
+
+    private static void CreateSceneAuthoredHandbookSurfaceWithSlotNamedProprietarySlots(GameObject handbookPage)
+    {
+        CreateSceneAuthoredHandbookSurface(handbookPage);
+
+        Transform rightIntroduction = FindDescendant(handbookPage.transform, "RightIntroduction");
+        Transform oldProprietary = FindDescendant(rightIntroduction, "ProprietaryMaterial");
+        Object.DestroyImmediate(oldProprietary.gameObject);
+
+        GameObject proprietary = new GameObject("ProprietaryMaterial", typeof(RectTransform));
+        proprietary.transform.SetParent(rightIntroduction, false);
+        CreateTmpText("Label", proprietary.transform, "专用进度（0/3）");
+
+        GameObject distractor = new GameObject("HelpButton", typeof(RectTransform), typeof(Image), typeof(Button));
+        distractor.transform.SetParent(proprietary.transform, false);
+
+        for (int i = 0; i < 3; i++)
+        {
+            Transform slotRoot = CreateNestedProprietarySlot(proprietary.transform, i + 1, "Slot");
+            RectTransform slotRect = slotRoot as RectTransform;
+            slotRect.anchoredPosition = new Vector2(i * 64f, 0f);
+            slotRect.sizeDelta = new Vector2(35f, 35f);
+        }
+    }
+
     private static void CreateSceneAuthoredHandbookSurfaceWithNestedProprietarySlots(GameObject handbookPage)
     {
         CreateSceneAuthoredHandbookSurface(handbookPage);
@@ -976,16 +1340,16 @@ public sealed class IllustratedHandbookTabsControllerTests
 
         for (int i = 0; i < 3; i++)
         {
-            Transform slotRoot = CreateNestedProprietarySlot(proprietary.transform, i + 1);
+            Transform slotRoot = CreateNestedProprietarySlot(proprietary.transform, i + 1, "Material");
             RectTransform slotRect = slotRoot as RectTransform;
             slotRect.anchoredPosition = new Vector2(i * 64f, 0f);
             slotRect.sizeDelta = new Vector2(35f, 35f);
         }
     }
 
-    private static Transform CreateNestedProprietarySlot(Transform parent, int slotNumber)
+    private static Transform CreateNestedProprietarySlot(Transform parent, int slotNumber, string slotNamePrefix)
     {
-        GameObject slotObject = new GameObject($"Material_{slotNumber}", typeof(RectTransform), typeof(Image));
+        GameObject slotObject = new GameObject($"{slotNamePrefix}_{slotNumber}", typeof(RectTransform), typeof(Image));
         slotObject.transform.SetParent(parent, false);
         Image slotImage = slotObject.GetComponent<Image>();
         slotImage.raycastTarget = slotNumber != 1;
@@ -1131,10 +1495,22 @@ public sealed class IllustratedHandbookTabsControllerTests
         Assert.IsNotNull(ResolveDropHandler(target), target != null ? target.name : "null");
     }
 
+    private static void AssertHasClickHandler(Transform target)
+    {
+        Assert.IsNotNull(ResolveClickHandler(target), target != null ? target.name : "null");
+    }
+
     private static IDropHandler ResolveDropHandler(Transform target)
     {
         return target != null
             ? target.GetComponents<MonoBehaviour>().OfType<IDropHandler>().FirstOrDefault()
+            : null;
+    }
+
+    private static IPointerClickHandler ResolveClickHandler(Transform target)
+    {
+        return target != null
+            ? target.GetComponents<MonoBehaviour>().OfType<IPointerClickHandler>().FirstOrDefault(handler => !(handler is Button))
             : null;
     }
 

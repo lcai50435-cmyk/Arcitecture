@@ -235,7 +235,7 @@ public static class ArchitecturalCrystalFactory
                     0f,
                     AttributeBonusType.None,
                     0f,
-                    "榫卯会让墨迹按扇形发射，最多形成 6 发齐射。")
+                    "这是榫卯结构，通过凹凸咬合连接木材，无需钉子。它让建筑既稳固又灵活。你握住它时，能感觉到力量的传递变得更加顺畅，出手也更灵活了一些。")
             },
             {
                 ArchitecturalType.GroundMass,
@@ -244,7 +244,7 @@ public static class ArchitecturalCrystalFactory
                     0f,
                     AttributeBonusType.None,
                     0f,
-                    "石基会同步提升墨迹体积与伤害。")
+                    "石基位于建筑底部，可以防潮、防腐，让建筑更加耐久。但也正因为它厚重稳固，你会感觉行动略微沉了一些，不过更不容易被动摇。")
             },
             {
                 ArchitecturalType.BeamFrame,
@@ -253,7 +253,7 @@ public static class ArchitecturalCrystalFactory
                     0f,
                     AttributeBonusType.None,
                     0f,
-                    "梁架会提升攻击速度，最低攻击间隔为 0.4 秒。")
+                    "梁架是建筑的骨架，由梁与柱共同构成，支撑起整个屋顶结构。它让整体运转更加高效，就像你的动作与攻击，也变得更加流畅有力。")
             },
             {
                 ArchitecturalType.TampedEarth,
@@ -262,7 +262,7 @@ public static class ArchitecturalCrystalFactory
                     0f,
                     AttributeBonusType.None,
                     0f,
-                    "夯土会同步提升墨迹射程与飞行速度。")
+                    "夯土是将土层反复压实形成地基的方法，简单却非常坚固。这种稳定与延展，让你的攻击能够传得更远，也更加迅速。")
             },
             {
                 ArchitecturalType.Tile,
@@ -271,7 +271,7 @@ public static class ArchitecturalCrystalFactory
                     0f,
                     AttributeBonusType.None,
                     0f,
-                    "瓦片会增大墨迹体积，并降低攻击墨水消耗。")
+                    "瓦片覆盖在屋顶上，用来防水和保护内部结构，是最常见的屋面材料。它轻巧而实用，让你的消耗变得更少，只是力量也显得更加分散。")
             },
             {
                 ArchitecturalType.Brackets,
@@ -280,7 +280,7 @@ public static class ArchitecturalCrystalFactory
                     0f,
                     AttributeBonusType.None,
                     0f,
-                    "斗拱会追加攻击波次，最多连续发出 3 波。")
+                    "斗拱位于柱与屋顶之间，用来承托重量并分散压力。这种结构还能缓冲震动，使建筑更加稳固。这种稳固感，似乎也在保护你，让你更能承受冲击。")
             }
         };
 

@@ -22,6 +22,19 @@ public sealed class RuntimeTestStoneMonsterSpawnerTests
     }
 
     [Test]
+    public void SpawnerDoesNotAutoBootstrapIntoGameplayScenes()
+    {
+        MethodInfo[] methods = typeof(RuntimeTestStoneMonsterSpawner).GetMethods(
+            BindingFlags.Static | BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+
+        for (int i = 0; i < methods.Length; i++)
+        {
+            object[] attributes = methods[i].GetCustomAttributes(typeof(RuntimeInitializeOnLoadMethodAttribute), false);
+            Assert.IsEmpty(attributes, methods[i].Name + " must not auto-create test monsters when entering gameplay scenes.");
+        }
+    }
+
+    [Test]
     public void CreateStoneMonsterFromTemplateSpawnsRealEnemyWithTestHealth()
     {
         templateObject = CreateStoneMonsterTemplate();

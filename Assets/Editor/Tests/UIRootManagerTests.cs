@@ -3,6 +3,7 @@ using NUnit.Framework;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using UnityEngine.UI;
 
 public sealed class UIRootManagerTests
 {
@@ -64,6 +65,42 @@ public sealed class UIRootManagerTests
     }
 
     [Test]
+    public void GameplayStageBootstrapperCreatesReturnInteractableWithoutPortalVisual()
+    {
+        Scene activeScene = SceneManager.GetActiveScene();
+        GameObject existingAnchor = GameObject.Find("RuntimeReturnToBaseInteractable");
+        if (existingAnchor != null)
+        {
+            Object.DestroyImmediate(existingAnchor);
+        }
+
+        MethodInfo ensureReturnInteractable = typeof(GameplayStageRuntimeBootstrapper).GetMethod(
+            "EnsureReturnToBaseInteractable",
+            BindingFlags.Static | BindingFlags.NonPublic);
+        Assert.IsNotNull(ensureReturnInteractable);
+
+        ensureReturnInteractable.Invoke(null, new object[] { activeScene });
+
+        GameObject anchor = GameObject.Find("RuntimeReturnToBaseInteractable");
+        try
+        {
+            Assert.IsNotNull(anchor);
+            Assert.AreEqual(activeScene, anchor.scene);
+            Assert.IsNotNull(anchor.GetComponent<BookInteract>());
+            Assert.IsNotNull(anchor.GetComponent<CircleCollider2D>());
+            Assert.IsNull(anchor.transform.Find("ReturnPortalVisual"));
+            Assert.IsNull(GameObject.Find("ReturnPortalVisual"));
+        }
+        finally
+        {
+            if (anchor != null)
+            {
+                Object.DestroyImmediate(anchor);
+            }
+        }
+    }
+
+    [Test]
     public void RefreshRuntimeBindingsKeepsGameplaySpiritPanel()
     {
         createdScene = SceneManager.CreateScene("FirstPass_1");
@@ -81,6 +118,86 @@ public sealed class UIRootManagerTests
 
         Assert.IsNotNull(rootManager.spiritPanelUI);
         Assert.AreSame(panelObject, rootManager.spiritPanelUI.gameObject);
+    }
+
+    [Test]
+    public void AncestorCanvasGroupIsKeptWhenRetargetingToChildDetail()
+    {
+        GameObject parentObject = new GameObject("IllustratedHandbookCanvasUI", typeof(RectTransform), typeof(CanvasGroup));
+        GameObject detailObject = new GameObject("DetailInformationFuJianCanvas", typeof(RectTransform), typeof(CanvasGroup));
+        try
+        {
+            detailObject.transform.SetParent(parentObject.transform, false);
+
+            MethodInfo method = typeof(UIRootManager).GetMethod(
+                "IsAncestorCanvasGroup",
+                BindingFlags.Static | BindingFlags.NonPublic);
+            Assert.IsNotNull(method);
+
+            bool isAncestor = (bool)method.Invoke(
+                null,
+                new object[]
+                {
+                    parentObject.GetComponent<CanvasGroup>(),
+                    detailObject.GetComponent<CanvasGroup>()
+                });
+
+            Assert.IsTrue(isAncestor);
+        }
+        finally
+        {
+            Object.DestroyImmediate(detailObject);
+            Object.DestroyImmediate(parentObject);
+        }
+    }
+
+    [Test]
+    public void DetailUiRestoresHiddenScaledCanvasAndBindsCloseButton()
+    {
+        GameObject parentObject = new GameObject(
+            IllustratedHandbookTabsController.RootObjectName,
+            typeof(RectTransform),
+            typeof(CanvasGroup));
+        GameObject detailObject = new GameObject(
+            "DetailInformationFuJianCanvas",
+            typeof(RectTransform),
+            typeof(Canvas),
+            typeof(CanvasGroup),
+            typeof(GraphicRaycaster));
+        GameObject buttonObject = new GameObject("CloseButton", typeof(RectTransform), typeof(Image), typeof(Button));
+        GameObject dataObject = new GameObject("DetailData");
+        try
+        {
+            detailObject.transform.SetParent(parentObject.transform, false);
+            buttonObject.transform.SetParent(detailObject.transform, false);
+            detailObject.transform.localScale = Vector3.zero;
+            parentObject.SetActive(false);
+
+            DetailedInformationUI detailUi = detailObject.AddComponent<DetailedInformationUI>();
+            BuildingDetailData detailData = dataObject.AddComponent<BuildingDetailData>();
+            detailData.buildingName = "福建土楼";
+            detailData.introduction1 = "建筑介绍";
+
+            detailUi.ShowDetail(detailData);
+
+            Assert.IsTrue(parentObject.activeSelf);
+            Assert.IsTrue(detailObject.activeSelf);
+            Assert.AreEqual(Vector3.one, detailObject.transform.localScale);
+            Assert.AreSame(parentObject, detailUi.illustratedHandbookPanel);
+            Assert.IsNotNull(detailUi.closeButton1);
+
+            detailUi.closeButton1.onClick.Invoke();
+
+            Assert.IsFalse(detailObject.activeSelf);
+            Assert.IsTrue(parentObject.activeSelf);
+        }
+        finally
+        {
+            Object.DestroyImmediate(dataObject);
+            Object.DestroyImmediate(buttonObject);
+            Object.DestroyImmediate(detailObject);
+            Object.DestroyImmediate(parentObject);
+        }
     }
 
     private static IllustratedHandbookPage ResolveHandbookHotkeyPage(bool hasPhotoEntries)

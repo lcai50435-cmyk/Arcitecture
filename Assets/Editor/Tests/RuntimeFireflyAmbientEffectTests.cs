@@ -26,7 +26,9 @@ public sealed class RuntimeFireflyAmbientEffectTests
         Assert.IsNotNull(resolveProfile.Invoke(null, new object[] { "BaseScene" }));
         Assert.IsNotNull(resolveProfile.Invoke(null, new object[] { "GameScene" }));
         Assert.IsNotNull(resolveProfile.Invoke(null, new object[] { "GameScene_02" }));
+        Assert.IsNotNull(resolveProfile.Invoke(null, new object[] { "SecondPassSence" }));
         Assert.IsNotNull(resolveProfile.Invoke(null, new object[] { "GameScene_03" }));
+        Assert.IsNotNull(resolveProfile.Invoke(null, new object[] { "SecondPass" }));
         Assert.IsNull(resolveProfile.Invoke(null, new object[] { "MainScene" }));
         Assert.IsNull(resolveProfile.Invoke(null, new object[] { "DeadScene" }));
         Assert.IsNull(resolveProfile.Invoke(null, new object[] { "IllustratedUIScene" }));
@@ -51,7 +53,25 @@ public sealed class RuntimeFireflyAmbientEffectTests
     }
 
     [Test]
-    public void LaterStageGameplayProfileKeepsVisibleParticleScale()
+    public void SecondStageGameplayProfileUsesReducedParticleScale()
+    {
+        Type effectType = ResolveEffectType();
+        MethodInfo resolveProfile = effectType.GetMethod("ResolveProfile", BindingFlags.Static | BindingFlags.NonPublic);
+        object profile = resolveProfile.Invoke(null, new object[] { "SecondPassSence" });
+        object legacyProfile = resolveProfile.Invoke(null, new object[] { "GameScene_03" });
+
+        Assert.IsNotNull(profile);
+        Assert.AreSame(profile, legacyProfile);
+        Assert.LessOrEqual(ReadFloat(profile, "minSize"), 0.07f);
+        Assert.LessOrEqual(ReadFloat(profile, "maxSize"), 0.18f);
+        Assert.LessOrEqual(ReadFloat(profile, "emissionRate"), 9f);
+        Assert.LessOrEqual(ReadInt(profile, "maxParticles"), 72);
+        Assert.LessOrEqual(ReadColor(profile, "warmColor").a, 0.62f);
+        Assert.LessOrEqual(ReadColor(profile, "coolColor").a, 0.46f);
+    }
+
+    [Test]
+    public void LaterNonSecondStageGameplayProfileKeepsVisibleParticleScale()
     {
         Type effectType = ResolveEffectType();
         MethodInfo resolveProfile = effectType.GetMethod("ResolveProfile", BindingFlags.Static | BindingFlags.NonPublic);

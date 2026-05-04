@@ -15,6 +15,8 @@ public sealed class GameplayStageIntroStartupTests
     private const string BaseScenePath = "Assets/Scenes/NewBase.unity";
     private const string OriginalFirstPassScenePath = "Assets/Scenes/FirstPass.unity";
     private const string FirstPassScenePath = "Assets/Scenes/FirstPass_1.unity";
+    private const string SecondPassSceneName = "SecondPassSence";
+    private const string SecondPassScenePath = "Assets/Scenes/SecondPassSence.unity";
     private const string LevelSelectionScenePath = "Assets/Scenes/LevelSelection.unity";
     private const string PlayerAttackProjectilePrefabPath = "Assets/File/Prefab/WeaponPrefab/MagicBall.prefab";
     private const string StartAniPath = "Assets/Animation/PlayerAni/Start/StartAni.anim";
@@ -56,11 +58,13 @@ public sealed class GameplayStageIntroStartupTests
         Assert.AreEqual("第二关", secondStage.stageLabel);
         Assert.AreEqual("安徽水乡民居", secondStage.mapTitle);
         Assert.AreEqual("第二关 · 安徽水乡民居", secondStage.displayName);
-        Assert.AreEqual("GameScene_03", secondStage.sceneName);
+        Assert.AreEqual(SecondPassSceneName, secondStage.sceneName);
         Assert.AreEqual(CatalogueBuildingId.Building3, secondStage.stageBuildingId);
         Assert.AreEqual(CatalogueBuildingId.Building1, secondStage.gatingBuildingId);
         Assert.AreEqual("解锁福建土楼图鉴后开放", secondStage.lockedHint);
+        Assert.AreSame(secondStage, GameplayStageCatalog.GetStageByScene(SecondPassSceneName));
         Assert.AreSame(secondStage, GameplayStageCatalog.GetStageByScene("GameScene_03"));
+        Assert.AreSame(secondStage, GameplayStageCatalog.GetStageByScene("SecondPass"));
 
         GameplayStageDefinition thirdStage = stages[2];
         Assert.AreEqual("stage_03", thirdStage.stageId);
@@ -143,6 +147,15 @@ public sealed class GameplayStageIntroStartupTests
             scene.enabled && scene.path == FirstPassScenePath);
 
         Assert.IsTrue(enabled, "FirstPass_1 must be enabled so the first stage can load in builds.");
+    }
+
+    [Test]
+    public void SecondPassSceneIsEnabledInBuildSettings()
+    {
+        bool enabled = EditorBuildSettings.scenes.Any(scene =>
+            scene.enabled && scene.path == SecondPassScenePath);
+
+        Assert.IsTrue(enabled, "SecondPassSence must be enabled so the second stage can load in builds.");
     }
 
     [Test]
@@ -265,10 +278,12 @@ public sealed class GameplayStageIntroStartupTests
             BindingFlags.Static | BindingFlags.NonPublic);
         Assert.IsNotNull(resolveScale);
 
-        float secondStageScale = (float)resolveScale.Invoke(null, new object[] { "GameScene_03" });
+        float secondStageScale = (float)resolveScale.Invoke(null, new object[] { SecondPassSceneName });
+        float legacySecondStageScale = (float)resolveScale.Invoke(null, new object[] { "GameScene_03" });
         float thirdStageScale = (float)resolveScale.Invoke(null, new object[] { "GameScene_02" });
 
         Assert.That(secondStageScale, Is.EqualTo(ExpectedGameplayCompanionScale).Within(0.0001f));
+        Assert.That(legacySecondStageScale, Is.EqualTo(ExpectedGameplayCompanionScale).Within(0.0001f));
         Assert.That(thirdStageScale, Is.EqualTo(ExpectedGameplayCompanionScale).Within(0.0001f));
     }
 
@@ -368,6 +383,20 @@ public sealed class GameplayStageIntroStartupTests
         Assert.IsNotNull(profile);
         Assert.IsTrue(profile.useCountdownProgress);
         Assert.Greater(profile.EvaluateOverlayAlpha(0.1f), profile.EvaluateOverlayAlpha(0f));
+    }
+
+    [Test]
+    public void SecondPassNightProfileUsesGameplayCountdown()
+    {
+        MethodInfo resolveProfile = typeof(NightLightingController).GetMethod(
+            "ResolveProfile",
+            BindingFlags.Static | BindingFlags.NonPublic);
+        Assert.IsNotNull(resolveProfile);
+
+        SceneNightProfile profile = resolveProfile.Invoke(null, new object[] { SecondPassSceneName }) as SceneNightProfile;
+
+        Assert.IsNotNull(profile);
+        Assert.IsTrue(profile.useCountdownProgress);
     }
 
     [Test]

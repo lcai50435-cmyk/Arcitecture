@@ -30,7 +30,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 129.85, y: 12, z: 0.14215522}
-  m_LocalScale: {x: 0.3, y: 0.3, z: 0.3}
+  m_LocalScale: {x: 0.07, y: 0.07, z: 0.07}
   m_ConstrainProportionsScale: 1
   m_Children: []
   m_Father: {fileID: 0}
@@ -75,7 +75,7 @@ SpriteRenderer:
   m_LightmapParameters: {fileID: 0}
   m_SortingLayerID: 0
   m_SortingLayer: 0
-  m_SortingOrder: 0
+  m_SortingOrder: 3
   m_Sprite: {fileID: 21300000, guid: 864b2f008fb12c846a67e5a05e0d22de, type: 3}
   m_Color: {r: 1, g: 0.6906943, b: 0, a: 1}
   m_FlipX: 0
@@ -172,12 +172,20 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   isUnlockMaterial: 0
+  resourceCategory: 0
+  repairBuildingId: 0
   type: 5
   expValue: 30
+  buildProgressPercent: 0
   icon: {fileID: 21300000, guid: 864b2f008fb12c846a67e5a05e0d22de, type: 3}
-  backIcon: {fileID: 21300000, guid: 65e8bfee471d12b42a1ce599b60c8c57, type: 3}
+  backIcon: {fileID: 21300000, guid: dbfcbf1f7e1e1ba4481f1231c7e3b7e9, type: 3}
   bonusType: 3
   bonusValue: 5
   subBonusType: 0
   subBonusValue: 10
+  inkRestoreValue: 0
   textDescription: "\u6597\u62F1\u4F4D\u4E8E\u67F1\u4E0E\u5C4B\u9876\u4E4B\u95F4\uFF0C\u7528\u6765\u627F\u6258\u91CD\u91CF\u5E76\u5206\u6563\u538B\u529B\u3002\u8FD9\u79CD\u7ED3\u6784\u8FD8\u80FD\u7F13\u51B2\u9707\u52A8\uFF0C\u4F7F\u5EFA\u7B51\u66F4\u52A0\u7A33\u56FA\uFF0C\u82E5\u5F97\u6B64\u7269\u53EF\u51DD\u94F8\u62A4\u8EAB\u58C1\u5792\u4E0E\u5145\u76C8\u81EA\u8EAB\u6C14\u8840"
+  persistCollectedAcrossSceneLoads: 1
+  startClosedAsLootBag: 0
+  closedLootBagSprite: {fileID: 0}
+  revealedLootSprite: {fileID: 0}

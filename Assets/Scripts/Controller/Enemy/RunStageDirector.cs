@@ -331,13 +331,40 @@ public class RunStageDirector : MonoBehaviour
             }
 
             AddSpawnTemplate(enemy.gameObject, enemy.transform.position, enemy.transform.rotation);
-            PrepareEnemyInstance(enemy.gameObject);
+            PrepareEnemyInstanceForTemplate(enemy.gameObject);
         }
 
         if (spawnTemplates.Count == 0)
         {
             CaptureFallbackEnemyPrefabsAsTemplates();
         }
+    }
+
+    private void PrepareEnemyInstanceForTemplate(GameObject enemyObject)
+    {
+        if (enemyObject == null)
+        {
+            return;
+        }
+
+        ResolvedStageState stageState = currentStageState ?? ResolveStageState(GetElapsedTime());
+        ApplyStageToEnemy(enemyObject, stageState);
+
+        RunStageEnemyBinding binding = enemyObject.GetComponent<RunStageEnemyBinding>();
+        if (binding == null)
+        {
+            binding = enemyObject.AddComponent<RunStageEnemyBinding>();
+        }
+
+        binding.Configure(this);
+
+        if (enemyObject.GetComponent<EnemyCombatFeedback>() == null)
+        {
+            enemyObject.AddComponent<EnemyCombatFeedback>();
+        }
+
+        NightLightingController.EnsureProjectedShadow(enemyObject);
+        NightLightingController.EnsureGameplayEnemyLight(enemyObject);
     }
 
     private void CaptureFallbackEnemyPrefabsAsTemplates()

@@ -265,6 +265,7 @@ public class UIRootManager : MonoBehaviour
         string activeSceneName = SceneManager.GetActiveScene().name;
         bool isGameplayScene = GameplayStageCatalog.IsGameplayScene(activeSceneName);
         bool isBaseScene = string.Equals(activeSceneName, "NewBase", StringComparison.Ordinal);
+        bool supportsBookDetailScene = isGameplayScene || isBaseScene;
 
         if (!IllustratedUISceneLoader.TryGetUIManager(out handbookManager))
         {
@@ -274,7 +275,9 @@ public class UIRootManager : MonoBehaviour
         dialogController = isGameplayScene
             ? Dialog.EnsureGameplayRuntimeInstance()
             : Dialog.FindUsableInstance() ?? FindObjectOfType<Dialog>(true);
-        detailedInformationController = isGameplayScene ? FindObjectOfType<DetailedInformationUI>(true) : null;
+        detailedInformationController = supportsBookDetailScene
+            ? ResolveDetailedInformationController(handbookManager)
+            : null;
         submitPanelControllers = isGameplayScene ? FindObjectsOfType<SubmitSelectionPanelUI>(true) : Array.Empty<SubmitSelectionPanelUI>();
 
         if (handbookManager != null && handbookManager.illustratedHandbook != null)
@@ -296,7 +299,7 @@ public class UIRootManager : MonoBehaviour
             detailUIPage1 = detailRoot;
             detailUIPage2 = detailRoot;
         }
-        else if (!isGameplayScene)
+        else if (!supportsBookDetailScene)
         {
             detailUIPage1 = null;
             detailUIPage2 = null;
@@ -430,7 +433,10 @@ public class UIRootManager : MonoBehaviour
         RuntimeModalBinding activeBinding = GetBinding(activeModalType);
         if (activeBinding != null && activeBinding != binding)
         {
-            HideModalImmediate(activeBinding);
+            if (!IsAncestorBinding(activeBinding, binding))
+            {
+                HideModalImmediate(activeBinding);
+            }
         }
 
         activeModalType = type;
@@ -741,17 +747,23 @@ public class UIRootManager : MonoBehaviour
         string activeSceneName = SceneManager.GetActiveScene().name;
         bool isGameplayScene = GameplayStageCatalog.IsGameplayScene(activeSceneName);
         bool isBaseScene = string.Equals(activeSceneName, "NewBase", StringComparison.Ordinal);
+        bool supportsBookDetailScene = isGameplayScene || isBaseScene;
 
         if (handbookManager == null || handbookUI == null || dialogController == null || dialogUI == null)
         {
             return true;
         }
 
-        if (isGameplayScene &&
+        if (supportsBookDetailScene &&
             (detailedInformationController == null ||
              detailUIPage1 == null ||
-             detailUIPage2 == null ||
-             submitPanelControllers == null ||
+             detailUIPage2 == null))
+        {
+            return true;
+        }
+
+        if (isGameplayScene &&
+            (submitPanelControllers == null ||
              submitPanelControllers.Length == 0 ||
              submitSelectionUI1 == null ||
              submitSelectionUI2 == null ||
@@ -783,6 +795,27 @@ public class UIRootManager : MonoBehaviour
         RegisterModal(RuntimeModalType.Album, albumPanelUI);
     }
 
+    private static DetailedInformationUI ResolveDetailedInformationController(UIManager manager)
+    {
+        if (manager != null && manager.detailedInformation != null)
+        {
+            DetailedInformationUI boundController =
+                manager.detailedInformation.GetComponent<DetailedInformationUI>();
+            if (boundController != null)
+            {
+                return boundController;
+            }
+
+            boundController = manager.detailedInformation.GetComponentInChildren<DetailedInformationUI>(true);
+            if (boundController != null)
+            {
+                return boundController;
+            }
+        }
+
+        return FindObjectOfType<DetailedInformationUI>(true);
+    }
+
     private void RegisterModal(RuntimeModalType type, CanvasGroup canvasGroup)
     {
         if (canvasGroup == null)
@@ -804,6 +837,40 @@ public class UIRootManager : MonoBehaviour
 
         modalBindings.TryGetValue(type, out RuntimeModalBinding binding);
         return binding;
+    }
+
+    private static bool IsAncestorBinding(RuntimeModalBinding possibleAncestor, RuntimeModalBinding possibleChild)
+    {
+        if (possibleAncestor == null ||
+            possibleChild == null ||
+            possibleAncestor == possibleChild)
+        {
+            return false;
+        }
+
+        return IsAncestorCanvasGroup(possibleAncestor.CanvasGroup, possibleChild.CanvasGroup);
+    }
+
+    private static bool IsAncestorCanvasGroup(CanvasGroup possibleAncestor, CanvasGroup possibleChild)
+    {
+        if (possibleAncestor == null || possibleChild == null || possibleAncestor == possibleChild)
+        {
+            return false;
+        }
+
+        Transform ancestorTransform = possibleAncestor.transform;
+        Transform current = possibleChild.transform.parent;
+        while (current != null)
+        {
+            if (current == ancestorTransform)
+            {
+                return true;
+            }
+
+            current = current.parent;
+        }
+
+        return false;
     }
 
     private void PrepareModalForDisplay(RuntimeModalBinding binding)
@@ -1172,6 +1239,8 @@ public class UIRootManager : MonoBehaviour
         {
             canvas = target.AddComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            // 隐藏白色线框
+            canvas.hideFlags = HideFlags.HideInHierarchy | HideFlags.NotEditable;
             canvas.worldCamera = null;
             canvas.planeDistance = 100f;
         }

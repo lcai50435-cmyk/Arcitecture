@@ -447,36 +447,36 @@ public sealed class RuntimeWaterReflectionSceneController : MonoBehaviour
 
     private static void EnsureWaterShimmer(Renderer waterRenderer, Bounds bounds)
     {
-        Transform existing = waterRenderer.transform.Find(ShimmerObjectName);
-        GameObject shimmerObject = existing != null
-            ? existing.gameObject
-            : new GameObject(ShimmerObjectName);
-        shimmerObject.hideFlags = HideFlags.DontSaveInEditor | HideFlags.DontSaveInBuild;
-        shimmerObject.transform.SetParent(waterRenderer.transform, true);
-        shimmerObject.transform.position = bounds.center + new Vector3(0f, 0f, -0.02f);
-        shimmerObject.transform.rotation = Quaternion.identity;
-        shimmerObject.transform.localScale = Vector3.one;
+        //Transform existing = waterRenderer.transform.Find(ShimmerObjectName);
+        //GameObject shimmerObject = existing != null
+        //    ? existing.gameObject
+        //    : new GameObject(ShimmerObjectName);
+        //shimmerObject.hideFlags = HideFlags.DontSaveInEditor | HideFlags.DontSaveInBuild;
+        //shimmerObject.transform.SetParent(waterRenderer.transform, true);
+        //shimmerObject.transform.position = bounds.center + new Vector3(0f, 0f, -0.02f);
+        //shimmerObject.transform.rotation = Quaternion.identity;
+        //shimmerObject.transform.localScale = Vector3.one;
 
-        SpriteRenderer shimmerRenderer = shimmerObject.GetComponent<SpriteRenderer>();
-        if (shimmerRenderer == null)
-        {
-            shimmerRenderer = shimmerObject.AddComponent<SpriteRenderer>();
-        }
+        //SpriteRenderer shimmerRenderer = shimmerObject.GetComponent<SpriteRenderer>();
+        //if (shimmerRenderer == null)
+        //{
+        //    shimmerRenderer = shimmerObject.AddComponent<SpriteRenderer>();
+        //}
 
-        shimmerRenderer.sprite = GetOrCreateShimmerSprite();
-        shimmerRenderer.drawMode = SpriteDrawMode.Tiled;
-        shimmerRenderer.size = new Vector2(Mathf.Max(0.4f, bounds.size.x), Mathf.Max(0.25f, bounds.size.y));
-        shimmerRenderer.sortingLayerID = waterRenderer.sortingLayerID;
-        shimmerRenderer.sortingOrder = waterRenderer.sortingOrder + 1;
-        shimmerRenderer.color = new Color(0.66f, 0.88f, 1f, 0.12f);
+        //shimmerRenderer.sprite = GetOrCreateShimmerSprite();
+        //shimmerRenderer.drawMode = SpriteDrawMode.Tiled;
+        //shimmerRenderer.size = new Vector2(Mathf.Max(0.4f, bounds.size.x), Mathf.Max(0.25f, bounds.size.y));
+        //shimmerRenderer.sortingLayerID = waterRenderer.sortingLayerID;
+        //shimmerRenderer.sortingOrder = waterRenderer.sortingOrder + 1;
+        //shimmerRenderer.color = new Color(0.66f, 0.88f, 1f, 0.12f);
 
-        RuntimeWaterShimmerOverlay overlay = shimmerObject.GetComponent<RuntimeWaterShimmerOverlay>();
-        if (overlay == null)
-        {
-            overlay = shimmerObject.AddComponent<RuntimeWaterShimmerOverlay>();
-        }
+        //RuntimeWaterShimmerOverlay overlay = shimmerObject.GetComponent<RuntimeWaterShimmerOverlay>();
+        //if (overlay == null)
+        //{
+        //    overlay = shimmerObject.AddComponent<RuntimeWaterShimmerOverlay>();
+        //}
 
-        overlay.Configure(shimmerRenderer, bounds.center);
+        //overlay.Configure(shimmerRenderer, bounds.center);
     }
 
     private static Sprite GetOrCreateShimmerSprite()

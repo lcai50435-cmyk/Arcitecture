@@ -69,6 +69,7 @@ public class BuildingDetailOpenButton : MonoBehaviour
             return;
         }
 
+        BuildingDetailRuntimeResolver.HideOtherSceneAuthoredDetailCanvases(buildingUnlockState);
         detailedInformationUI.ShowDetail(buildingDetailData);
     }
 
@@ -102,36 +103,13 @@ public class BuildingDetailOpenButton : MonoBehaviour
 
     private void ResolveReferences()
     {
-        if (buildingUnlockState == null)
-        {
-            buildingUnlockState = GetComponentInParent<CatalogueBuildingUnlockState>(true);
-        }
-
-        if (buildingDetailData == null)
-        {
-            buildingDetailData = GetComponent<BuildingDetailData>();
-        }
-
-        if (buildingDetailData == null && buildingUnlockState != null)
-        {
-            buildingDetailData = buildingUnlockState.GetComponent<BuildingDetailData>() ??
-                                 buildingUnlockState.GetComponentInChildren<BuildingDetailData>(true);
-        }
-
-        if (detailedInformationUI == null)
-        {
-            detailedInformationUI = GetComponent<DetailedInformationUI>();
-        }
-
-        if (detailedInformationUI == null)
-        {
-            detailedInformationUI = GetComponentInParent<DetailedInformationUI>(true);
-        }
-
-        if (detailedInformationUI == null)
-        {
-            detailedInformationUI = FindObjectOfType<DetailedInformationUI>(true);
-        }
+        buildingUnlockState = BuildingDetailRuntimeResolver.ResolveUnlockState(this, buildingUnlockState);
+        buildingDetailData = BuildingDetailRuntimeResolver.ResolveDetailData(this, buildingUnlockState, buildingDetailData);
+        detailedInformationUI = BuildingDetailRuntimeResolver.ResolveDetailUi(
+            this,
+            buildingUnlockState,
+            detailedInformationUI,
+            null);
     }
 
     private bool IsBuildingUnlocked()

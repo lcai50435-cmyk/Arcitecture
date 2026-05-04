@@ -1,8 +1,6 @@
-using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.SceneManagement;
-using UnityEngine.Tilemaps;
 using UnityEngine.UI;
 
 public class GameSceneBaseReturnBootstrapper : MonoBehaviour
@@ -556,16 +554,10 @@ public sealed class GameplayStageRuntimeBootstrapper : MonoBehaviour
     private const string RuntimeCountdownManagerName = "RuntimeGameCountDownManager";
     private const string RuntimeUiRootName = "UIRootManager";
     private const string RuntimeReturnAnchorName = "RuntimeReturnToBaseInteractable";
-    private const string ReturnPortalTileResourcePath = "FirstPassReturnPortal";
     private const string DeadSceneName = "DeadScene";
     private const float ReturnAnchorRadius = 0.64f;
-    private const float ReturnPortalVisualScale = 2.08f;
-    private const float DefaultReturnPortalFrameRate = 8f;
 
     private static bool sceneHookRegistered;
-    private static Sprite returnAnchorSprite;
-    private static AnimatedTile returnPortalTile;
-    private static readonly List<ReturnPortalAnimationState> returnPortalAnimations = new List<ReturnPortalAnimationState>();
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     private static void ResetStatics()
@@ -575,15 +567,6 @@ public sealed class GameplayStageRuntimeBootstrapper : MonoBehaviour
             SceneManager.sceneLoaded -= HandleSceneLoaded;
             sceneHookRegistered = false;
         }
-
-        returnAnchorSprite = null;
-        returnPortalTile = null;
-        returnPortalAnimations.Clear();
-    }
-
-    private void Update()
-    {
-        UpdateReturnPortalAnimations();
     }
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
@@ -801,107 +784,7 @@ public sealed class GameplayStageRuntimeBootstrapper : MonoBehaviour
         trigger.isTrigger = true;
         trigger.radius = ReturnAnchorRadius;
 
-        CreateReturnPortalVisual(anchor.transform);
-
         anchor.AddComponent<BookInteract>();
-    }
-
-    private static void CreateReturnPortalVisual(Transform parent)
-    {
-        GameObject visual = new GameObject("ReturnPortalVisual");
-        visual.transform.SetParent(parent, false);
-
-        SpriteRenderer renderer = visual.AddComponent<SpriteRenderer>();
-        renderer.sortingOrder = 6;
-
-        Sprite[] portalSprites = GetReturnPortalSprites();
-        if (portalSprites.Length > 0)
-        {
-            visual.transform.localScale = Vector3.one * ReturnPortalVisualScale;
-            renderer.sprite = portalSprites[0];
-            CenterVisualOnSprite(visual.transform, portalSprites[0]);
-            RegisterReturnPortalAnimation(renderer, portalSprites, GetReturnPortalFrameRate());
-            return;
-        }
-
-        renderer.sprite = GetReturnAnchorSprite();
-    }
-
-    private static Sprite[] GetReturnPortalSprites()
-    {
-        AnimatedTile portalTile = GetReturnPortalTile();
-        return portalTile != null && portalTile.m_AnimatedSprites != null
-            ? portalTile.m_AnimatedSprites
-            : new Sprite[0];
-    }
-
-    private static AnimatedTile GetReturnPortalTile()
-    {
-        if (returnPortalTile == null)
-        {
-            returnPortalTile = Resources.Load<AnimatedTile>(ReturnPortalTileResourcePath);
-        }
-
-        return returnPortalTile;
-    }
-
-    private static float GetReturnPortalFrameRate()
-    {
-        AnimatedTile portalTile = GetReturnPortalTile();
-        if (portalTile == null)
-        {
-            return DefaultReturnPortalFrameRate;
-        }
-
-        float minSpeed = Mathf.Max(0f, portalTile.m_MinSpeed);
-        float maxSpeed = Mathf.Max(minSpeed, portalTile.m_MaxSpeed);
-        float averageSpeed = (minSpeed + maxSpeed) * 0.5f;
-        return averageSpeed > 0f ? averageSpeed : DefaultReturnPortalFrameRate;
-    }
-
-    private static void CenterVisualOnSprite(Transform visual, Sprite sprite)
-    {
-        if (visual == null || sprite == null)
-        {
-            return;
-        }
-
-        Vector3 scale = visual.localScale;
-        Vector3 centerOffset = sprite.bounds.center;
-        visual.localPosition = new Vector3(
-            -centerOffset.x * scale.x,
-            -centerOffset.y * scale.y,
-            0f);
-    }
-
-    private static void RegisterReturnPortalAnimation(SpriteRenderer renderer, Sprite[] frames, float frameRate)
-    {
-        if (renderer == null || frames == null || frames.Length == 0)
-        {
-            return;
-        }
-
-        returnPortalAnimations.Add(new ReturnPortalAnimationState(renderer, frames, Mathf.Max(1f, frameRate)));
-    }
-
-    private static void UpdateReturnPortalAnimations()
-    {
-        for (int i = returnPortalAnimations.Count - 1; i >= 0; i--)
-        {
-            ReturnPortalAnimationState state = returnPortalAnimations[i];
-            if (state.Renderer == null || state.Frames == null || state.Frames.Length == 0)
-            {
-                returnPortalAnimations.RemoveAt(i);
-                continue;
-            }
-
-            int frameIndex = Mathf.FloorToInt(Time.time * state.FrameRate) % state.Frames.Length;
-            Sprite frame = state.Frames[frameIndex];
-            if (frame != null)
-            {
-                state.Renderer.sprite = frame;
-            }
-        }
     }
 
     private static GameObject ResolveScenePlayer(Scene scene)
@@ -971,65 +854,4 @@ public sealed class GameplayStageRuntimeBootstrapper : MonoBehaviour
         return null;
     }
 
-    private static Sprite GetReturnAnchorSprite()
-    {
-        if (returnAnchorSprite != null)
-        {
-            return returnAnchorSprite;
-        }
-
-        Texture2D texture = new Texture2D(32, 24, TextureFormat.RGBA32, false)
-        {
-            filterMode = FilterMode.Point,
-            wrapMode = TextureWrapMode.Clamp
-        };
-
-        Color clear = Color.clear;
-        Color page = new Color(0.78f, 0.58f, 0.34f, 1f);
-        Color pageLight = new Color(0.96f, 0.82f, 0.54f, 1f);
-        Color spine = new Color(0.34f, 0.18f, 0.08f, 1f);
-        Color outline = new Color(0.12f, 0.07f, 0.03f, 1f);
-
-        for (int y = 0; y < texture.height; y++)
-        {
-            for (int x = 0; x < texture.width; x++)
-            {
-                texture.SetPixel(x, y, clear);
-            }
-        }
-
-        for (int y = 4; y < 21; y++)
-        {
-            for (int x = 3; x < 29; x++)
-            {
-                bool border = x == 3 || x == 28 || y == 4 || y == 20 || x == 15 || x == 16;
-                texture.SetPixel(x, y, border ? outline : (x < 16 ? pageLight : page));
-            }
-        }
-
-        for (int y = 5; y < 20; y++)
-        {
-            texture.SetPixel(15, y, spine);
-            texture.SetPixel(16, y, spine);
-        }
-
-        texture.Apply();
-        returnAnchorSprite = Sprite.Create(texture, new Rect(0f, 0f, 32f, 24f), new Vector2(0.5f, 0.5f), 24f);
-        returnAnchorSprite.name = "RuntimeReturnToBaseBook";
-        return returnAnchorSprite;
-    }
-
-    private sealed class ReturnPortalAnimationState
-    {
-        public ReturnPortalAnimationState(SpriteRenderer renderer, Sprite[] frames, float frameRate)
-        {
-            Renderer = renderer;
-            Frames = frames;
-            FrameRate = frameRate;
-        }
-
-        public SpriteRenderer Renderer { get; }
-        public Sprite[] Frames { get; }
-        public float FrameRate { get; }
-    }
 }

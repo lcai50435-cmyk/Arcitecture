@@ -9,6 +9,7 @@ public sealed class RuntimeFireflyAmbientEffect : MonoBehaviour
     private const string BaseSceneName = "NewBase";
     private const string LegacyBaseSceneName = "BaseScene";
     private const string FirstStageId = "stage_01";
+    private const string SecondStageId = "stage_02";
     private const int FireflySortingOrder = 28150;
     private const float ShapeWidthMultiplier = 1.15f;
     private const float ShapeHeightMultiplier = 1.05f;
@@ -60,6 +61,22 @@ public sealed class RuntimeFireflyAmbientEffect : MonoBehaviour
         0.26f,
         new Color(1f, 0.84f, 0.34f, 1f),
         new Color(0.64f, 0.96f, 1f, 0.82f));
+
+    private static readonly FireflyAmbientProfile SecondStageGameplayProfile = new FireflyAmbientProfile(
+        72,
+        9f,
+        5.2f,
+        8.0f,
+        0.065f,
+        0.17f,
+        0.06f,
+        0.18f,
+        0.04f,
+        0.14f,
+        0.28f,
+        0.18f,
+        new Color(1f, 0.86f, 0.42f, 0.62f),
+        new Color(0.70f, 0.96f, 1f, 0.46f));
 
     private static RuntimeFireflyAmbientEffect instance;
     private static bool sceneHookRegistered;
@@ -240,8 +257,13 @@ public sealed class RuntimeFireflyAmbientEffect : MonoBehaviour
             return null;
         }
 
-        return string.Equals(stage.stageId, FirstStageId, StringComparison.Ordinal)
-            ? FirstStageGameplayProfile
+        if (string.Equals(stage.stageId, FirstStageId, StringComparison.Ordinal))
+        {
+            return FirstStageGameplayProfile;
+        }
+
+        return string.Equals(stage.stageId, SecondStageId, StringComparison.Ordinal)
+            ? SecondStageGameplayProfile
             : GameplayProfile;
     }
 

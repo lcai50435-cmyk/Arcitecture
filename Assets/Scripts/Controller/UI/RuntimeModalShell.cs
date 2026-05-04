@@ -541,6 +541,7 @@ public sealed class RuntimeModalShell : MonoBehaviour
             typeof(GraphicRaycaster),
             typeof(CanvasGroup));
         canvasObject.transform.SetParent(transform, false);
+        canvasObject.hideFlags = HideFlags.HideInHierarchy | HideFlags.NotEditable;
 
         canvas = canvasObject.GetComponent<Canvas>();
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;
