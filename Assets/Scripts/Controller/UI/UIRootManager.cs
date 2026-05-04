@@ -544,6 +544,18 @@ public class UIRootManager : MonoBehaviour
         CloseModalFlowInternal(null, true);
     }
 
+    public static void HideAllRuntimeUiForSceneTransition()
+    {
+        UIRootManager[] managers = FindObjectsOfType<UIRootManager>(true);
+        for (int i = 0; i < managers.Length; i++)
+        {
+            if (managers[i] != null)
+            {
+                managers[i].HideAllRuntimeUiImmediate();
+            }
+        }
+    }
+
     public bool ShouldSuppressInteractionInput()
     {
         return Time.frameCount <= suppressInteractUntilFrame;
@@ -1254,6 +1266,12 @@ public class UIRootManager : MonoBehaviour
             target.GetComponent<GraphicRaycaster>() == null)
         {
             target.AddComponent<GraphicRaycaster>();
+        }
+
+        GraphicRaycaster raycaster = target.GetComponent<GraphicRaycaster>();
+        if (raycaster != null)
+        {
+            raycaster.enabled = true;
         }
 
         return canvas;

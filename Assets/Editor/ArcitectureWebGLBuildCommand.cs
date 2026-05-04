@@ -18,12 +18,18 @@ public static class ArcitectureWebGLBuildCommand
         string previousVersion = PlayerSettings.bundleVersion;
         WebGLCompressionFormat previousCompression = PlayerSettings.WebGL.compressionFormat;
         bool previousDecompressionFallback = PlayerSettings.WebGL.decompressionFallback;
+        int previousInitialMemorySize = PlayerSettings.WebGL.initialMemorySize;
+        int previousMemorySize = PlayerSettings.WebGL.memorySize;
+        int previousMaximumMemorySize = PlayerSettings.WebGL.maximumMemorySize;
 
         try
         {
             PlayerSettings.bundleVersion = version;
             PlayerSettings.WebGL.compressionFormat = WebGLCompressionFormat.Disabled;
             PlayerSettings.WebGL.decompressionFallback = true;
+            PlayerSettings.WebGL.initialMemorySize = Math.Max(PlayerSettings.WebGL.initialMemorySize, 128);
+            PlayerSettings.WebGL.memorySize = Math.Max(PlayerSettings.WebGL.memorySize, 128);
+            PlayerSettings.WebGL.maximumMemorySize = Math.Max(PlayerSettings.WebGL.maximumMemorySize, 2048);
 
             RuntimeBuildInfoGenerator.RefreshSnapshot();
             BuildPlayer(projectRoot, outputPath);
@@ -33,6 +39,9 @@ public static class ArcitectureWebGLBuildCommand
             PlayerSettings.bundleVersion = previousVersion;
             PlayerSettings.WebGL.compressionFormat = previousCompression;
             PlayerSettings.WebGL.decompressionFallback = previousDecompressionFallback;
+            PlayerSettings.WebGL.initialMemorySize = previousInitialMemorySize;
+            PlayerSettings.WebGL.memorySize = previousMemorySize;
+            PlayerSettings.WebGL.maximumMemorySize = previousMaximumMemorySize;
         }
     }
 

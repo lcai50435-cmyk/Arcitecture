@@ -101,6 +101,7 @@ public class SceneLoader : MonoBehaviour
     private IEnumerator DoTransition(string sceneName, int fallbackIndex)
     {
         isBusy = true;
+        RuntimeSessionResetService.ResetRuntimeUiForSceneTransition();
         EnsureOverlay();
 
         yield return FadeOverlay(1f);

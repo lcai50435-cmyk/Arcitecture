@@ -84,7 +84,10 @@ public static class PhotoAlbumRepository
 
     public static IReadOnlyList<PhotoAlbumEntry> LoadEntries()
     {
-        EnsureAlbumDirectory();
+        if (!EnsureAlbumDirectory())
+        {
+            return Array.Empty<PhotoAlbumEntry>();
+        }
 
         PhotoAlbumSaveData saveData = ReadSaveData();
         List<PhotoAlbumEntry> entries = new List<PhotoAlbumEntry>();
@@ -150,7 +153,10 @@ public static class PhotoAlbumRepository
             return null;
         }
 
-        EnsureAlbumDirectory();
+        if (!EnsureAlbumDirectory())
+        {
+            return null;
+        }
 
         try
         {
@@ -320,9 +326,18 @@ public static class PhotoAlbumRepository
         File.Delete(photoPath);
     }
 
-    private static void EnsureAlbumDirectory()
+    private static bool EnsureAlbumDirectory()
     {
-        Directory.CreateDirectory(AlbumDirectoryPath);
+        try
+        {
+            Directory.CreateDirectory(AlbumDirectoryPath);
+            return true;
+        }
+        catch (Exception exception)
+        {
+            Debug.LogWarning($"PhotoAlbumRepository: failed to prepare album directory: {exception.Message}");
+            return false;
+        }
     }
 
     private static PhotoAlbumSaveData ReadSaveData()
@@ -353,7 +368,10 @@ public static class PhotoAlbumRepository
     {
         try
         {
-            EnsureAlbumDirectory();
+            if (!EnsureAlbumDirectory())
+            {
+                return;
+            }
             PhotoAlbumSaveData saveData = new PhotoAlbumSaveData
             {
                 version = CurrentVersion,

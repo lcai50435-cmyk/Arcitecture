@@ -494,6 +494,12 @@ public sealed class BeaverAssistantHud : MonoBehaviour
         {
             canvas.gameObject.AddComponent<GraphicRaycaster>();
         }
+
+        GraphicRaycaster raycaster = canvas.GetComponent<GraphicRaycaster>();
+        if (raycaster != null)
+        {
+            raycaster.enabled = true;
+        }
     }
 
     private Button CreateAvatarButton(Transform parent)
@@ -842,6 +848,14 @@ public sealed class BeaverAssistantPanel : MonoBehaviour
         return instance;
     }
 
+    public static void HideForSceneTransition()
+    {
+        if (instance != null)
+        {
+            instance.HideImmediateForSceneTransition();
+        }
+    }
+
     public void Toggle()
     {
         if (gameObject.activeInHierarchy)
@@ -872,6 +886,19 @@ public sealed class BeaverAssistantPanel : MonoBehaviour
     {
         RuntimeGameplayPauseController.ReleasePause(PauseReason);
         UIRootManager.Instance?.ShowBackpack();
+        gameObject.SetActive(false);
+    }
+
+    private void HideImmediateForSceneTransition()
+    {
+        RuntimeGameplayPauseController.ReleasePause(PauseReason);
+        if (rootGroup != null)
+        {
+            rootGroup.alpha = 0f;
+            rootGroup.interactable = false;
+            rootGroup.blocksRaycasts = false;
+        }
+
         gameObject.SetActive(false);
     }
 
@@ -959,6 +986,12 @@ public sealed class BeaverAssistantPanel : MonoBehaviour
         if (canvas.GetComponent<GraphicRaycaster>() == null)
         {
             canvas.gameObject.AddComponent<GraphicRaycaster>();
+        }
+
+        GraphicRaycaster raycaster = canvas.GetComponent<GraphicRaycaster>();
+        if (raycaster != null)
+        {
+            raycaster.enabled = true;
         }
     }
 
