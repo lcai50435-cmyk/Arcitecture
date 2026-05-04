@@ -446,6 +446,7 @@ public sealed class BeaverAssistantHud : MonoBehaviour
         if (canvas != null && avatarButton != null && bubbleText != null)
         {
             EnsureCanvasSurface();
+            EnsureAvatarButtonBinding(avatarButton);
             return;
         }
 
@@ -476,6 +477,7 @@ public sealed class BeaverAssistantHud : MonoBehaviour
 
         avatarButton = CreateAvatarButton(canvasRect);
         bubbleText = CreateBubble(canvasRect, out bubbleGroup);
+        EnsureAvatarButtonBinding(avatarButton);
         RefreshLegacyBeaverButtonBindings();
     }
 
@@ -520,7 +522,7 @@ public sealed class BeaverAssistantHud : MonoBehaviour
 
         Button button = buttonObject.GetComponent<Button>();
         button.targetGraphic = image;
-        button.onClick.AddListener(() => BeaverAssistantPanel.EnsureInstance().Toggle());
+        EnsureAvatarButtonBinding(button);
         return button;
     }
 
@@ -686,15 +688,38 @@ public sealed class BeaverAssistantHud : MonoBehaviour
         for (int i = 0; i < buttons.Length; i++)
         {
             Button button = buttons[i];
-            if (!IsLegacyBeaverButton(button) || button.GetComponent<BeaverAssistantLegacyButtonBinding>() != null)
+            if (!IsLegacyBeaverButton(button))
             {
                 continue;
             }
 
             EnsureLegacyBeaverButtonClickable(button);
+            button.onClick.RemoveListener(TogglePanelFromLegacyButton);
             button.onClick.AddListener(TogglePanelFromLegacyButton);
-            button.gameObject.AddComponent<BeaverAssistantLegacyButtonBinding>();
+            if (button.GetComponent<BeaverAssistantLegacyButtonBinding>() == null)
+            {
+                button.gameObject.AddComponent<BeaverAssistantLegacyButtonBinding>();
+            }
         }
+    }
+
+    private static void EnsureAvatarButtonBinding(Button button)
+    {
+        if (button == null)
+        {
+            return;
+        }
+
+        Graphic targetGraphic = button.targetGraphic ?? button.GetComponent<Graphic>();
+        if (targetGraphic != null)
+        {
+            targetGraphic.raycastTarget = true;
+            button.targetGraphic = targetGraphic;
+        }
+
+        button.interactable = true;
+        button.onClick.RemoveListener(TogglePanelFromRuntimeAvatar);
+        button.onClick.AddListener(TogglePanelFromRuntimeAvatar);
     }
 
     private static void EnsureLegacyBeaverButtonClickable(Button button)
@@ -716,6 +741,8 @@ public sealed class BeaverAssistantHud : MonoBehaviour
             targetGraphic.raycastTarget = true;
         }
 
+        button.interactable = true;
+
         Canvas parentCanvas = button.GetComponentInParent<Canvas>();
         if (parentCanvas != null)
         {
@@ -723,9 +750,15 @@ public sealed class BeaverAssistantHud : MonoBehaviour
             parentCanvas.sortingOrder = Mathf.Max(parentCanvas.sortingOrder, SortingOrder);
         }
 
-        if (button.GetComponentInParent<GraphicRaycaster>() == null && parentCanvas != null)
+        GraphicRaycaster raycaster = button.GetComponentInParent<GraphicRaycaster>();
+        if (raycaster == null && parentCanvas != null)
         {
-            parentCanvas.gameObject.AddComponent<GraphicRaycaster>();
+            raycaster = parentCanvas.gameObject.AddComponent<GraphicRaycaster>();
+        }
+
+        if (raycaster != null)
+        {
+            raycaster.enabled = true;
         }
     }
 
@@ -737,6 +770,11 @@ public sealed class BeaverAssistantHud : MonoBehaviour
     }
 
     private static void TogglePanelFromLegacyButton()
+    {
+        BeaverAssistantPanel.EnsureInstance().Toggle();
+    }
+
+    private static void TogglePanelFromRuntimeAvatar()
     {
         BeaverAssistantPanel.EnsureInstance().Toggle();
     }
@@ -879,27 +917,20 @@ public sealed class BeaverAssistantPanel : MonoBehaviour
         UIRootManager.Instance?.HideBackpack();
         RuntimeGameplayPauseController.RequestPause(PauseReason);
         SeedHistoryIfNeeded();
-        inputField?.ActivateInputField();
+        FocusInputField();
     }
 
     public void Hide()
     {
+        DeactivatePanelSurface();
         RuntimeGameplayPauseController.ReleasePause(PauseReason);
         UIRootManager.Instance?.ShowBackpack();
-        gameObject.SetActive(false);
     }
 
     private void HideImmediateForSceneTransition()
     {
+        DeactivatePanelSurface();
         RuntimeGameplayPauseController.ReleasePause(PauseReason);
-        if (rootGroup != null)
-        {
-            rootGroup.alpha = 0f;
-            rootGroup.interactable = false;
-            rootGroup.blocksRaycasts = false;
-        }
-
-        gameObject.SetActive(false);
     }
 
     private void Awake()
@@ -1018,6 +1049,13 @@ public sealed class BeaverAssistantPanel : MonoBehaviour
 
         Button close = CreateButton(parent, "CloseButton", "×", new Vector2(-34f, -30f), new Vector2(52f, 42f), new Vector2(1f, 1f));
         close.onClick.AddListener(Hide);
+        BeaverAssistantPanelCloseButtonFallback fallback = close.gameObject.GetComponent<BeaverAssistantPanelCloseButtonFallback>();
+        if (fallback == null)
+        {
+            fallback = close.gameObject.AddComponent<BeaverAssistantPanelCloseButtonFallback>();
+        }
+
+        fallback.Configure(this);
     }
 
     private RectTransform CreateHistory(Transform parent)
@@ -1120,7 +1158,15 @@ public sealed class BeaverAssistantPanel : MonoBehaviour
         field.textComponent = text;
         field.placeholder = placeholder;
         field.lineType = TMP_InputField.LineType.SingleLine;
+        EnsureInputFieldInteractive(field);
         field.onSubmit.AddListener(_ => SubmitQuestion());
+        BeaverAssistantPanelInputFocusProxy focusProxy = inputObject.GetComponent<BeaverAssistantPanelInputFocusProxy>();
+        if (focusProxy == null)
+        {
+            focusProxy = inputObject.AddComponent<BeaverAssistantPanelInputFocusProxy>();
+        }
+
+        focusProxy.Configure(field);
         return field;
     }
 
@@ -1344,7 +1390,91 @@ public sealed class BeaverAssistantPanel : MonoBehaviour
 
         Button button = buttonObject.GetComponent<Button>();
         button.targetGraphic = image;
+        button.interactable = true;
         return button;
+    }
+
+    private void FocusInputField()
+    {
+        if (inputField == null)
+        {
+            return;
+        }
+
+        EnsureInputFieldInteractive(inputField);
+        EventSystem eventSystem = EventSystem.current;
+        if (eventSystem != null)
+        {
+            eventSystem.SetSelectedGameObject(inputField.gameObject);
+        }
+
+        inputField.Select();
+        inputField.ActivateInputField();
+    }
+
+    private void DeactivatePanelSurface()
+    {
+        if (inputField != null)
+        {
+            inputField.DeactivateInputField();
+        }
+
+        ClearSelectedObjectIfOwnedByPanel();
+
+        if (rootGroup != null)
+        {
+            rootGroup.alpha = 0f;
+            rootGroup.interactable = false;
+            rootGroup.blocksRaycasts = false;
+        }
+
+        if (canvas != null)
+        {
+            GraphicRaycaster raycaster = canvas.GetComponent<GraphicRaycaster>();
+            if (raycaster != null)
+            {
+                raycaster.enabled = false;
+            }
+        }
+
+        if (gameObject.activeSelf)
+        {
+            gameObject.SetActive(false);
+        }
+    }
+
+    private void ClearSelectedObjectIfOwnedByPanel()
+    {
+        EventSystem eventSystem = EventSystem.current;
+        if (eventSystem == null || eventSystem.currentSelectedGameObject == null)
+        {
+            return;
+        }
+
+        Transform selectedTransform = eventSystem.currentSelectedGameObject.transform;
+        if (selectedTransform != null && selectedTransform.IsChildOf(transform))
+        {
+            eventSystem.SetSelectedGameObject(null);
+        }
+    }
+
+    internal static void EnsureInputFieldInteractive(TMP_InputField field)
+    {
+        if (field == null)
+        {
+            return;
+        }
+
+        field.enabled = true;
+        field.interactable = true;
+        field.readOnly = false;
+
+        Graphic targetGraphic = field.targetGraphic ?? field.GetComponent<Graphic>();
+        if (targetGraphic != null)
+        {
+            targetGraphic.raycastTarget = true;
+            field.targetGraphic = targetGraphic;
+        }
     }
 
     private static TextMeshProUGUI CreateText(Transform parent, string name, string value, float size, Color color, TextAlignmentOptions alignment)
@@ -1380,6 +1510,101 @@ public sealed class BeaverAssistantPanel : MonoBehaviour
         rect.offsetMax = new Vector2(-right, -top);
     }
 
+}
+
+[DisallowMultipleComponent]
+public sealed class BeaverAssistantPanelCloseButtonFallback : MonoBehaviour, IPointerUpHandler, IPointerClickHandler, ISubmitHandler
+{
+    private BeaverAssistantPanel owner;
+
+    public void Configure(BeaverAssistantPanel panel)
+    {
+        owner = panel;
+    }
+
+    public void OnPointerUp(PointerEventData eventData)
+    {
+        if (eventData != null && eventData.button != PointerEventData.InputButton.Left)
+        {
+            return;
+        }
+
+        Close();
+    }
+
+    public void OnPointerClick(PointerEventData eventData)
+    {
+        if (eventData != null && eventData.button != PointerEventData.InputButton.Left)
+        {
+            return;
+        }
+
+        Close();
+    }
+
+    public void OnSubmit(BaseEventData eventData)
+    {
+        Close();
+    }
+
+    private void Close()
+    {
+        if (owner == null)
+        {
+            owner = GetComponentInParent<BeaverAssistantPanel>();
+        }
+
+        owner?.Hide();
+    }
+}
+
+[DisallowMultipleComponent]
+public sealed class BeaverAssistantPanelInputFocusProxy : MonoBehaviour, IPointerDownHandler, IPointerClickHandler
+{
+    private TMP_InputField field;
+
+    public void Configure(TMP_InputField inputField)
+    {
+        field = inputField;
+    }
+
+    public void OnPointerDown(PointerEventData eventData)
+    {
+        Focus(eventData);
+    }
+
+    public void OnPointerClick(PointerEventData eventData)
+    {
+        Focus(eventData);
+    }
+
+    private void Focus(PointerEventData eventData)
+    {
+        if (eventData != null && eventData.button != PointerEventData.InputButton.Left)
+        {
+            return;
+        }
+
+        if (field == null)
+        {
+            field = GetComponent<TMP_InputField>();
+        }
+
+        if (field == null)
+        {
+            return;
+        }
+
+        BeaverAssistantPanel.EnsureInputFieldInteractive(field);
+        EventSystem eventSystem = EventSystem.current;
+        if (eventSystem != null)
+        {
+            eventSystem.SetSelectedGameObject(field.gameObject, eventData);
+        }
+
+        field.Select();
+        field.ActivateInputField();
+    }
 }
 
 internal static class RuntimeUiEventSystemBootstrapper

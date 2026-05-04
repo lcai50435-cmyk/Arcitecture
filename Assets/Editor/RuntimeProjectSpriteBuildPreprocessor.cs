@@ -45,7 +45,12 @@ public sealed class RuntimeProjectSpriteBuildPreprocessor : IPreprocessBuildWith
             if (!File.Exists(targetPath) || !FilesMatch(assetPath, targetPath))
             {
                 File.Copy(assetPath, targetPath, true);
+                CopyMetaFile(assetPath, targetPath);
                 copiedCount++;
+            }
+            else
+            {
+                CopyMetaFile(assetPath, targetPath);
             }
         }
 
@@ -95,5 +100,45 @@ public sealed class RuntimeProjectSpriteBuildPreprocessor : IPreprocessBuildWith
         }
 
         return File.GetLastWriteTimeUtc(leftPath) <= File.GetLastWriteTimeUtc(rightPath);
+    }
+
+    private static void CopyMetaFile(string sourceAssetPath, string targetAssetPath)
+    {
+        string sourceMetaPath = sourceAssetPath + ".meta";
+        if (!File.Exists(sourceMetaPath))
+        {
+            return;
+        }
+
+        string targetMetaPath = targetAssetPath + ".meta";
+        string targetDirectory = Path.GetDirectoryName(targetMetaPath);
+        if (!string.IsNullOrEmpty(targetDirectory))
+        {
+            Directory.CreateDirectory(targetDirectory);
+        }
+
+        string targetGuid = ResolveTargetMetaGuid(targetMetaPath);
+        string metaContent = File.ReadAllText(sourceMetaPath);
+        metaContent = Regex.Replace(
+            metaContent,
+            "^guid: [0-9a-fA-F]+$",
+            "guid: " + targetGuid,
+            RegexOptions.Multiline);
+        File.WriteAllText(targetMetaPath, metaContent);
+    }
+
+    private static string ResolveTargetMetaGuid(string targetMetaPath)
+    {
+        if (File.Exists(targetMetaPath))
+        {
+            string existingMeta = File.ReadAllText(targetMetaPath);
+            Match match = Regex.Match(existingMeta, "^guid: ([0-9a-fA-F]+)$", RegexOptions.Multiline);
+            if (match.Success)
+            {
+                return match.Groups[1].Value;
+            }
+        }
+
+        return GUID.Generate().ToString();
     }
 }

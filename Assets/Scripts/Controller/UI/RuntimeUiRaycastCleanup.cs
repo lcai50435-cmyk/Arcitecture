@@ -35,6 +35,12 @@ public static class RuntimeUiRaycastCleanup
                 continue;
             }
 
+            RuntimeSettingsPanel settingsPanel = group.GetComponentInParent<RuntimeSettingsPanel>(true);
+            if (settingsPanel != null && settingsPanel.ShouldPreserveCanvasGroup(group))
+            {
+                continue;
+            }
+
             if (!group.gameObject.activeInHierarchy || group.alpha <= 0.01f)
             {
                 group.interactable = false;

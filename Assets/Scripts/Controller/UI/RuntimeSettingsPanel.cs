@@ -298,6 +298,13 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
         StartShowSequence();
     }
 
+    public bool ShouldPreserveCanvasGroup(CanvasGroup group)
+    {
+        return group != null &&
+               IsPanelShown() &&
+               group.GetComponentInParent<RuntimeSettingsPanel>(true) == this;
+    }
+
     public void HideImmediate()
     {
         CompleteHideState(true, true);
@@ -1811,6 +1818,32 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
         canvasGroup.alpha = show ? 1f : 0f;
         canvasGroup.interactable = show;
         canvasGroup.blocksRaycasts = show;
+
+        if (panelCanvasGroup != null)
+        {
+            panelCanvasGroup.interactable = show;
+            panelCanvasGroup.blocksRaycasts = show;
+        }
+    }
+
+    private void RestorePanelInputState()
+    {
+        if (!IsPanelShown())
+        {
+            return;
+        }
+
+        if (canvasGroup != null)
+        {
+            canvasGroup.interactable = true;
+            canvasGroup.blocksRaycasts = true;
+        }
+
+        if (panelCanvasGroup != null)
+        {
+            panelCanvasGroup.interactable = true;
+            panelCanvasGroup.blocksRaycasts = true;
+        }
     }
 
     private void StartShowSequence()
@@ -1995,6 +2028,20 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
             panelVisibleAnchoredPosition,
             Vector3.one,
             animationProgress);
+
+        if (panelCanvasGroup != null)
+        {
+            bool panelInteractive = canvasGroup != null &&
+                                    canvasGroup.interactable &&
+                                    animationProgress > 0.01f;
+            panelCanvasGroup.interactable = panelInteractive;
+            panelCanvasGroup.blocksRaycasts = panelInteractive;
+        }
+
+        if (animationProgress >= 0.99f)
+        {
+            RestorePanelInputState();
+        }
 
         if (panelOutline != null)
         {
