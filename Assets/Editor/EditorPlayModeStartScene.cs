@@ -5,27 +5,36 @@ using UnityEngine;
 [InitializeOnLoad]
 public static class EditorPlayModeStartScene
 {
-    public const string BaseScenePath = "Assets/Scenes/NewBase.unity";
+    public const string MainScenePath = "Assets/Scenes/MainScene.unity";
+
+    [System.Obsolete("Use MainScenePath instead.")]
+    public const string BaseScenePath = MainScenePath;
 
     static EditorPlayModeStartScene()
     {
-        EnsureBaseStartScene();
+        EnsureMainStartScene();
     }
 
+    [System.Obsolete("Use EnsureMainStartScene instead.")]
     public static void EnsureBaseStartScene()
     {
-        SceneAsset baseScene = AssetDatabase.LoadAssetAtPath<SceneAsset>(BaseScenePath);
-        if (baseScene == null)
+        EnsureMainStartScene();
+    }
+
+    public static void EnsureMainStartScene()
+    {
+        SceneAsset mainScene = AssetDatabase.LoadAssetAtPath<SceneAsset>(MainScenePath);
+        if (mainScene == null)
         {
-            Debug.LogWarning($"编辑器 Play Mode 启动场景配置失败：未找到 {BaseScenePath}");
+            Debug.LogWarning($"Editor Play Mode start scene setup failed: missing {MainScenePath}");
             return;
         }
 
-        if (EditorSceneManager.playModeStartScene == baseScene)
+        if (EditorSceneManager.playModeStartScene == mainScene)
         {
             return;
         }
 
-        EditorSceneManager.playModeStartScene = baseScene;
+        EditorSceneManager.playModeStartScene = mainScene;
     }
 }

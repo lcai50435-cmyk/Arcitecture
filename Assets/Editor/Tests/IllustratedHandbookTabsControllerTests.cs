@@ -102,6 +102,35 @@ public sealed class IllustratedHandbookTabsControllerTests
     }
 
     [Test]
+    public void DetailSceneCloseBookmarkClosesIllustratedHandbook()
+    {
+        DestroyExistingRootManager();
+        rootObject = CreateSceneAuthoredRoot();
+        Text detailTitle = CreateSceneAuthoredDetailCanvas(rootObject.transform, "DetailInformationFuJianCanvas");
+        GameObject detailCanvas = detailTitle.transform.parent.gameObject;
+        detailCanvas.SetActive(true);
+        detailCanvas.transform.localScale = Vector3.one;
+
+        UIManager manager = rootObject.AddComponent<UIManager>();
+        manager.illustratedHandbook = rootObject;
+        IllustratedHandbookTabsController.EnsureInstalled(manager);
+
+        Button hitAreaButton = detailCanvas.transform
+            .Find("BookMark/Setting/SceneBookmarkHitArea")
+            .GetComponent<Button>();
+        Image blockerImage = detailCanvas.transform.Find("BookMark/Panel").GetComponent<Image>();
+
+        Assert.IsNotNull(hitAreaButton);
+        Assert.IsTrue(hitAreaButton.interactable);
+        Assert.IsTrue(hitAreaButton.targetGraphic.raycastTarget);
+        Assert.IsFalse(blockerImage.raycastTarget);
+
+        hitAreaButton.onClick.Invoke();
+
+        Assert.IsFalse(rootObject.activeSelf);
+    }
+
+    [Test]
     public void CloseIllustratedHandbookKeepsSceneAuthoredRootHiddenWithoutRootManager()
     {
         DestroyExistingRootManager();
@@ -1299,6 +1328,19 @@ public sealed class IllustratedHandbookTabsControllerTests
 
         Text title = CreateChild<Text>(detailCanvas.transform, "Name");
         CreateChild<Text>(detailCanvas.transform, "Introduction");
+        GameObject bookmarkRoot = new GameObject("BookMark", typeof(RectTransform));
+        bookmarkRoot.transform.SetParent(detailCanvas.transform, false);
+        CreateBookmark("HandBook", bookmarkRoot.transform);
+        CreateBookmark("PersonalInformation", bookmarkRoot.transform);
+        CreateBookmark("PhotoAlbum", bookmarkRoot.transform);
+        CreateBookmark("Mission", bookmarkRoot.transform);
+        CreateBookmark("Setting", bookmarkRoot.transform);
+
+        GameObject transparentPanel = new GameObject("Panel", typeof(RectTransform), typeof(Image));
+        transparentPanel.transform.SetParent(bookmarkRoot.transform, false);
+        Image panelImage = transparentPanel.GetComponent<Image>();
+        panelImage.color = Color.clear;
+        panelImage.raycastTarget = true;
         return title;
     }
 

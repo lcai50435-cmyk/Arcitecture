@@ -563,16 +563,25 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         List<GameObject> roots = new List<GameObject>();
         foreach (KeyValuePair<IllustratedHandbookPage, GameObject> entry in scenePageRoots)
         {
-            GameObject pageRoot = entry.Value;
-            if (pageRoot == null || roots.Contains(pageRoot))
-            {
-                continue;
-            }
-
-            roots.Add(pageRoot);
+            AddUniqueSceneBookmarkRoot(roots, entry.Value);
         }
 
+        AddUniqueSceneBookmarkRoot(roots, ResolveSceneAuthoredDetailCanvas(SceneAuthoredFujianDetailCanvasName)?.gameObject);
+        AddUniqueSceneBookmarkRoot(roots, ResolveSceneAuthoredDetailCanvas(SceneAuthoredShuiXiangDetailCanvasName)?.gameObject);
         return roots;
+    }
+
+    private static void AddUniqueSceneBookmarkRoot(List<GameObject> roots, GameObject pageRoot)
+    {
+        if (roots == null ||
+            pageRoot == null ||
+            roots.Contains(pageRoot) ||
+            !HasSceneAuthoredBookmarkTabs(pageRoot.transform))
+        {
+            return;
+        }
+
+        roots.Add(pageRoot);
     }
 
     private static GameObject ResolveSceneAuthoredRoot(GameObject handbookObject)
@@ -4847,6 +4856,16 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
     private Transform ResolveSceneAuthoredDetailCanvas(CatalogueBuildingId buildingId)
     {
         string canvasName = ResolveSceneAuthoredDetailCanvasName(buildingId);
+        if (string.IsNullOrEmpty(canvasName))
+        {
+            return null;
+        }
+
+        return ResolveSceneAuthoredDetailCanvas(canvasName);
+    }
+
+    private Transform ResolveSceneAuthoredDetailCanvas(string canvasName)
+    {
         if (string.IsNullOrEmpty(canvasName))
         {
             return null;
