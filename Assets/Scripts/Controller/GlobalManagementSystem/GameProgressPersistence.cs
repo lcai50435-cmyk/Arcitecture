@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
@@ -54,6 +55,8 @@ public static class GameProgressPersistence
     private static bool isReady;
     private static bool suppressSave;
     private static int? activeSlotId;
+    private static readonly HashSet<int> pendingPreviewCaptureSlotIds = new HashSet<int>();
+    private static GameProgressPersistencePreviewCaptureRunner previewCaptureRunner;
 
     public static bool IsReady => isReady;
     public static bool HasActiveSlot => activeSlotId.HasValue;
@@ -68,6 +71,8 @@ public static class GameProgressPersistence
         isReady = false;
         suppressSave = false;
         activeSlotId = null;
+        pendingPreviewCaptureSlotIds.Clear();
+        previewCaptureRunner = null;
     }
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
@@ -131,7 +136,7 @@ public static class GameProgressPersistence
         string createdAtUtc = ResolveCreatedAtUtc(existingData, GetSlotSavePath(slotId));
         if (SaveCurrentStateToSlot(slotId, createdAtUtc))
         {
-            TryCaptureSlotPreview(slotId);
+            QueueSlotPreviewCapture(slotId);
         }
     }
 
@@ -420,6 +425,60 @@ public static class GameProgressPersistence
 #endif
     }
 
+    private static void QueueSlotPreviewCapture(int slotId)
+    {
+#if UNITY_WEBGL && !UNITY_EDITOR
+        return;
+#else
+        if (!Application.isPlaying || !IsValidSlotId(slotId))
+        {
+            return;
+        }
+
+        if (!pendingPreviewCaptureSlotIds.Add(slotId))
+        {
+            return;
+        }
+
+        GameProgressPersistencePreviewCaptureRunner runner = EnsurePreviewCaptureRunner();
+        if (runner == null)
+        {
+            pendingPreviewCaptureSlotIds.Remove(slotId);
+            return;
+        }
+
+        runner.StartCoroutine(CaptureSlotPreviewAtEndOfFrame(slotId));
+#endif
+    }
+
+    private static IEnumerator CaptureSlotPreviewAtEndOfFrame(int slotId)
+    {
+        yield return new WaitForEndOfFrame();
+        pendingPreviewCaptureSlotIds.Remove(slotId);
+        TryCaptureSlotPreview(slotId);
+    }
+
+    private static GameProgressPersistencePreviewCaptureRunner EnsurePreviewCaptureRunner()
+    {
+        if (previewCaptureRunner != null)
+        {
+            return previewCaptureRunner;
+        }
+
+        GameProgressPersistencePreviewCaptureRunner existing =
+            UnityEngine.Object.FindObjectOfType<GameProgressPersistencePreviewCaptureRunner>(true);
+        if (existing != null)
+        {
+            previewCaptureRunner = existing;
+            return previewCaptureRunner;
+        }
+
+        GameObject runnerObject = new GameObject("GameProgressPersistencePreviewCaptureRunner");
+        previewCaptureRunner = runnerObject.AddComponent<GameProgressPersistencePreviewCaptureRunner>();
+        UnityEngine.Object.DontDestroyOnLoad(runnerObject);
+        return previewCaptureRunner;
+    }
+
     private static GameProgressSaveData ReadSaveDataFromSlot(int slotId)
     {
         if (!IsValidSlotId(slotId))
@@ -699,4 +758,8 @@ public static class GameSaveResetService
         RuntimeCollectedCrystalRegistry.Instance?.Clear();
         BackpackMananger.Instance?.ClearAllItems();
     }
+}
+
+internal sealed class GameProgressPersistencePreviewCaptureRunner : MonoBehaviour
+{
 }

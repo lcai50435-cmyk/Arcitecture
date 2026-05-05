@@ -106,7 +106,7 @@ MonoBehaviour:
   expValue: 0
   buildProgressPercent: 0
   icon: {fileID: 21300000, guid: bf025a52aaea52646acbef0c0059095a, type: 3}
-  backIcon: {fileID: 21300000, guid: 5b9ddc14c818ab3409171aafab8f8494, type: 3}
+  backIcon: {fileID: 2005195844, guid: e5e3fe861ab5bb047b4d6192669fa78d, type: 3}
   bonusType: 0
   bonusValue: 0
   subBonusType: 0

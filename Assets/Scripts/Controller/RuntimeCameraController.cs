@@ -385,6 +385,23 @@ public sealed class RuntimeCameraController : MonoBehaviour
         float baseSize = ResolveBaseOrthographicSize();
         float desiredSize = ResolveDesiredOrthographicSize(baseSize, false);
 
+        if (ShouldDisableCameraDamping())
+        {
+            smoothedFollowPosition = basePosition;
+            smoothedOrthographicSize = desiredSize;
+            followVelocity = Vector3.zero;
+            lookAheadVelocity = Vector3.zero;
+            orthographicSizeVelocity = 0f;
+            hasSmoothedFollowPose = true;
+            hasSmoothedSize = true;
+
+            controlledCamera.orthographicSize = desiredSize;
+            controlledCamera.transform.position = SnapCameraPosition(
+                basePosition + EvaluateTransientOffset(deltaTime),
+                desiredSize);
+            return;
+        }
+
         if (!hasSmoothedFollowPose)
         {
             smoothedFollowPosition = basePosition;
@@ -633,6 +650,13 @@ public sealed class RuntimeCameraController : MonoBehaviour
 
     private Vector3 ResolveLookAheadOffset(float deltaTime, bool instant)
     {
+        if (ShouldDisableCameraDamping())
+        {
+            lookAheadOffset = Vector3.zero;
+            lookAheadVelocity = Vector3.zero;
+            return Vector3.zero;
+        }
+
         Vector2 moveVector = followBody != null && followBody.simulated
             ? followBody.velocity
             : Vector2.zero;
@@ -736,6 +760,12 @@ public sealed class RuntimeCameraController : MonoBehaviour
         }
 
         return Mathf.Lerp(GameplayFollowSmoothBase, GameplayFollowSmoothHighRisk, currentDangerTension);
+    }
+
+    private bool ShouldDisableCameraDamping()
+    {
+        return string.Equals(activeSceneName, "FirstPass_1", System.StringComparison.Ordinal) ||
+               string.Equals(activeSceneName, "SecondPassSence", System.StringComparison.Ordinal);
     }
 
     private void CapturePauseFocusBaseSize()

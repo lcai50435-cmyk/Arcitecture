@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using UnityEngine.Tilemaps;
 
 /// <summary>
@@ -24,6 +25,7 @@ public class PlayerMove : MonoBehaviour
     // 记住最后一次的方向
     private float lastInputX;
     private float lastInputY;
+    private Vector2 pendingMoveInput;
 
     private float moveSpeed; // 速度
     private float externalMoveSpeedMultiplier = 1f;
@@ -46,7 +48,7 @@ public class PlayerMove : MonoBehaviour
 
         if (rb != null)
         {
-            rb.interpolation = RigidbodyInterpolation2D.Interpolate;
+            ConfigureMovementDamping(rb);
             rb.collisionDetectionMode = CollisionDetectionMode2D.Continuous;
         }
 
@@ -74,6 +76,7 @@ public class PlayerMove : MonoBehaviour
 
         if (UIRootManager.Instance != null && UIRootManager.Instance.IsAnyGameplayBlockingUIOpen())
         {
+            pendingMoveInput = Vector2.zero;
             if (rb != null)
             {
                 rb.velocity = Vector2.zero;
@@ -87,7 +90,11 @@ public class PlayerMove : MonoBehaviour
             return;
         }
 
-        if (!canMove) return;
+        if (!canMove)
+        {
+            pendingMoveInput = Vector2.zero;
+            return;
+        }
 
         float inputX = Input.GetAxisRaw("Horizontal"); 
         float inputY = Input.GetAxisRaw("Vertical");
@@ -123,15 +130,38 @@ public class PlayerMove : MonoBehaviour
         }
 
         // 移动
+        pendingMoveInput = new Vector2(inputX, inputY);
+    }
+
+    private void FixedUpdate()
+    {
+        if (core == null || core.stats == null) return;
+
+        moveSpeed = core.stats.moveSpeed * Mathf.Max(0f, externalMoveSpeedMultiplier);
+
         if (rb != null)
         {
-            rb.velocity = new Vector2(inputX, inputY) * moveSpeed;
+            rb.velocity = pendingMoveInput * moveSpeed;
         }
     }
 
     public void SetExternalMoveSpeedMultiplier(float multiplier)
     {
         externalMoveSpeedMultiplier = Mathf.Max(0f, multiplier);
+    }
+
+    private static void ConfigureMovementDamping(Rigidbody2D rigidbody)
+    {
+        string sceneName = SceneManager.GetActiveScene().name;
+        bool disableMovementDamping = sceneName == "FirstPass_1" || sceneName == "SecondPassSence";
+
+        rigidbody.interpolation = RigidbodyInterpolation2D.Interpolate;
+
+        if (disableMovementDamping)
+        {
+            rigidbody.drag = 0f;
+            rigidbody.angularDrag = 0f;
+        }
     }
 
     private Collider2D ResolveBodyCollider()

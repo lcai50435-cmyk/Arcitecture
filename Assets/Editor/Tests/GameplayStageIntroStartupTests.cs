@@ -13,6 +13,7 @@ public sealed class GameplayStageIntroStartupTests
     private const string LegacyGameSceneName = "GameScene";
     private const string BaseSceneName = "NewBase";
     private const string BaseScenePath = "Assets/Scenes/NewBase.unity";
+    private const string MainScenePath = "Assets/Scenes/MainScene.unity";
     private const string OriginalFirstPassScenePath = "Assets/Scenes/FirstPass.unity";
     private const string FirstPassScenePath = "Assets/Scenes/FirstPass_1.unity";
     private const string SecondPassSceneName = "SecondPassSence";
@@ -168,23 +169,23 @@ public sealed class GameplayStageIntroStartupTests
     }
 
     [Test]
-    public void BuildStartsInBaseScene()
+    public void BuildStartsInMainScene()
     {
         EditorBuildSettingsScene firstEnabledScene = EditorBuildSettings.scenes.FirstOrDefault(scene => scene.enabled);
 
         Assert.IsNotNull(firstEnabledScene, "Build Settings must contain at least one enabled scene.");
-        Assert.AreEqual(BaseScenePath, firstEnabledScene.path, "玩家开始游戏应直接进入基地场景。");
+        Assert.AreEqual(MainScenePath, firstEnabledScene.path, "玩家进入游戏以后应先进入 MainScene。");
     }
 
     [Test]
-    public void EditorPlayModeStartsInBaseScene()
+    public void EditorPlayModeStartsInMainScene()
     {
-        EditorPlayModeStartScene.EnsureBaseStartScene();
+        EditorPlayModeStartScene.EnsureMainStartScene();
 
         SceneAsset startupScene = EditorSceneManager.playModeStartScene;
 
-        Assert.IsNotNull(startupScene, "编辑器 Play Mode 必须固定从基地场景启动，避免直接从关卡场景出生。");
-        Assert.AreEqual(BaseScenePath, AssetDatabase.GetAssetPath(startupScene));
+        Assert.IsNotNull(startupScene, "编辑器 Play Mode 必须固定从 MainScene 启动。");
+        Assert.AreEqual(MainScenePath, AssetDatabase.GetAssetPath(startupScene));
     }
 
     [Test]
