@@ -225,6 +225,47 @@ public sealed class BeaverAssistantRuntimeTests
     }
 
     [Test]
+    public void LegacyAuthoredBeaverButtonRebindsWhenMarkerExistsButListenerWasCleared()
+    {
+        Scene gameplayScene = GetOrCreateScene("FirstPass_1");
+        Assert.IsTrue(gameplayScene.IsValid() && gameplayScene.isLoaded);
+        Button legacyButton = CreateLegacyBeaverButton();
+
+        BeaverAssistantHud hud = BeaverAssistantHud.EnsureInstance();
+        InvokeSceneChanged(hud, "FirstPass_1");
+        InvokePrivate(hud, "RefreshLegacyBeaverButtonBindings");
+
+        Assert.IsNotNull(legacyButton.GetComponent<BeaverAssistantLegacyButtonBinding>());
+
+        legacyButton.onClick.RemoveAllListeners();
+        InvokePrivate(hud, "RefreshLegacyBeaverButtonBindings");
+
+        legacyButton.onClick.Invoke();
+
+        Assert.IsTrue(BeaverAssistantPanel.IsOpen);
+    }
+
+    [Test]
+    public void RuntimeAvatarButtonRebindsAfterListenersCleared()
+    {
+        Scene gameplayScene = GetOrCreateScene("FirstPass_1");
+        Assert.IsTrue(gameplayScene.IsValid() && gameplayScene.isLoaded);
+
+        BeaverAssistantHud hud = BeaverAssistantHud.EnsureInstance();
+        InvokeSceneChanged(hud, "FirstPass_1");
+
+        Button avatarButton = hud.transform.Find("BeaverAssistantCanvas/BeaverAvatarButton")?.GetComponent<Button>();
+        Assert.IsNotNull(avatarButton);
+
+        avatarButton.onClick.RemoveAllListeners();
+        BeaverAssistantHud.EnsureInstance();
+
+        avatarButton.onClick.Invoke();
+
+        Assert.IsTrue(BeaverAssistantPanel.IsOpen);
+    }
+
+    [Test]
     public void SpriteCompanionClickProxyOpensPanelInFirstPass()
     {
         Scene gameplayScene = GetOrCreateScene("FirstPass_1");
@@ -287,6 +328,92 @@ public sealed class BeaverAssistantRuntimeTests
         Assert.IsNotNull(canvas);
         Assert.That(canvas.sortingOrder, Is.GreaterThan(SceneTransitionBlockerSortingOrder));
         Assert.That(canvas.sortingOrder, Is.LessThan(Dialog.TopmostRuntimeDialogSortingOrder));
+
+        panel.Hide();
+    }
+
+    [Test]
+    public void PanelShowFocusesInteractiveInputFieldForTyping()
+    {
+        Scene baseScene = GetOrCreateScene("NewBase");
+        Assert.IsTrue(baseScene.IsValid() && baseScene.isLoaded);
+
+        BeaverAssistantPanel panel = BeaverAssistantPanel.EnsureInstance();
+        panel.Show();
+
+        TMP_InputField input = panel.transform.Find("BeaverAssistantPanelCanvas/Panel/Input")?.GetComponent<TMP_InputField>();
+        Assert.IsNotNull(input);
+        Assert.IsTrue(input.enabled);
+        Assert.IsTrue(input.interactable);
+        Assert.IsFalse(input.readOnly);
+        Assert.IsNotNull(input.targetGraphic);
+        Assert.IsTrue(input.targetGraphic.raycastTarget);
+        Assert.AreSame(input.gameObject, GetEventSystem().currentSelectedGameObject);
+
+        panel.Hide();
+    }
+
+    [Test]
+    public void PanelCloseButtonPointerUpClosesAndDisablesRaycastSurface()
+    {
+        Scene baseScene = GetOrCreateScene("NewBase");
+        Assert.IsTrue(baseScene.IsValid() && baseScene.isLoaded);
+
+        BeaverAssistantPanel panel = BeaverAssistantPanel.EnsureInstance();
+        panel.Show();
+
+        Button close = panel.transform.Find("BeaverAssistantPanelCanvas/Panel/CloseButton")?.GetComponent<Button>();
+        Assert.IsNotNull(close);
+
+        GraphicRaycaster raycaster = panel.transform.Find("BeaverAssistantPanelCanvas")?.GetComponent<GraphicRaycaster>();
+        Assert.IsNotNull(raycaster);
+        Assert.IsTrue(raycaster.enabled);
+
+        PointerEventData eventData = new PointerEventData(GetEventSystem())
+        {
+            button = PointerEventData.InputButton.Left,
+            position = RectTransformUtility.WorldToScreenPoint(null, close.transform.position)
+        };
+
+        ExecuteEvents.Execute(close.gameObject, eventData, ExecuteEvents.pointerUpHandler);
+
+        Assert.IsFalse(panel.gameObject.activeSelf);
+        Assert.IsFalse(BeaverAssistantPanel.IsOpen);
+        Assert.IsFalse(raycaster.enabled);
+        Assert.IsNull(GetEventSystem().currentSelectedGameObject);
+    }
+
+    [Test]
+    public void PanelAskButtonRebindsAndPointerClickSubmitsAfterListenerWasCleared()
+    {
+        Scene baseScene = GetOrCreateScene("NewBase");
+        Assert.IsTrue(baseScene.IsValid() && baseScene.isLoaded);
+
+        BeaverAssistantPanel panel = BeaverAssistantPanel.EnsureInstance();
+        panel.Show();
+
+        TMP_InputField input = panel.transform.Find("BeaverAssistantPanelCanvas/Panel/Input")?.GetComponent<TMP_InputField>();
+        Button ask = panel.transform.Find("BeaverAssistantPanelCanvas/Panel/AskButton")?.GetComponent<Button>();
+        ScrollRect scrollRect = panel.transform.Find("BeaverAssistantPanelCanvas/Panel/HistoryScroll")?.GetComponent<ScrollRect>();
+        Assert.IsNotNull(input);
+        Assert.IsNotNull(ask);
+        Assert.IsNotNull(scrollRect);
+
+        ask.onClick.RemoveAllListeners();
+        BeaverAssistantPanel.EnsureInstance();
+        input.text = "赵州桥";
+
+        PointerEventData eventData = new PointerEventData(GetEventSystem())
+        {
+            button = PointerEventData.InputButton.Left,
+            position = RectTransformUtility.WorldToScreenPoint(null, ask.transform.position)
+        };
+
+        ExecuteEvents.Execute(ask.gameObject, eventData, ExecuteEvents.pointerClickHandler);
+
+        string renderedText = GetCombinedHistoryText(scrollRect.content);
+        Assert.That(renderedText, Does.Contain("赵州桥"));
+        Assert.That(input.text, Is.Empty);
 
         panel.Hide();
     }

@@ -76,6 +76,8 @@ public sealed class RuntimePauseMenu : MonoBehaviour
     private Image confirmPrimaryImage;
 
     private readonly List<MenuButtonRevealItem> menuButtonRevealItems = new List<MenuButtonRevealItem>();
+    private readonly Dictionary<Button, UnityEngine.Events.UnityAction> buttonActions =
+        new Dictionary<Button, UnityEngine.Events.UnityAction>();
     private Coroutine menuRevealCoroutine;
     private bool isOpen;
     private bool visible;
@@ -319,6 +321,7 @@ public sealed class RuntimePauseMenu : MonoBehaviour
         RuntimeCameraController.EnsureInstance().SetPauseFocusActive(true);
         ShowMenuPage(true);
         ShowShell();
+        EnsureVisiblePageButtonsInputReady();
         StartMenuRevealSequence();
     }
 
@@ -445,6 +448,20 @@ public sealed class RuntimePauseMenu : MonoBehaviour
 #endif
     }
 
+    private void HandleConfirmPrimaryClicked()
+    {
+        if (currentPage == PausePage.ReturnConfirm)
+        {
+            ConfirmReturnToMenu();
+            return;
+        }
+
+        if (currentPage == PausePage.QuitConfirm)
+        {
+            ConfirmQuitGame();
+        }
+    }
+
     private void ShowShell()
     {
         EnsureUi();
@@ -454,6 +471,13 @@ public sealed class RuntimePauseMenu : MonoBehaviour
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
             canvas.overrideSorting = true;
             canvas.sortingOrder = SortingOrder;
+            GraphicRaycaster raycaster = canvas.GetComponent<GraphicRaycaster>();
+            if (raycaster == null)
+            {
+                raycaster = canvas.gameObject.AddComponent<GraphicRaycaster>();
+            }
+
+            raycaster.enabled = true;
             canvas.gameObject.SetActive(true);
         }
 
@@ -461,6 +485,7 @@ public sealed class RuntimePauseMenu : MonoBehaviour
         panelCanvasGroup.alpha = 1f;
         panelCanvasGroup.interactable = true;
         panelCanvasGroup.blocksRaycasts = true;
+        EnsureVisiblePageButtonsInputReady();
         modalShell.Show(panelCanvasGroup);
     }
 
@@ -535,8 +560,7 @@ public sealed class RuntimePauseMenu : MonoBehaviour
 
         if (confirmPrimaryButton != null)
         {
-            confirmPrimaryButton.onClick.RemoveAllListeners();
-            confirmPrimaryButton.onClick.AddListener(page == PausePage.ReturnConfirm ? ConfirmReturnToMenu : ConfirmQuitGame);
+            BindButtonAction(confirmPrimaryButton, HandleConfirmPrimaryClicked);
             EnsureButtonInputReady(confirmPrimaryButton);
         }
 
@@ -705,6 +729,8 @@ public sealed class RuntimePauseMenu : MonoBehaviour
 
         if (canvas != null)
         {
+            EnsureCanvasSurface();
+            EnsureVisiblePageButtonsInputReady();
             return;
         }
 
@@ -750,6 +776,7 @@ public sealed class RuntimePauseMenu : MonoBehaviour
         BuildAboutPage(panelRect);
         BuildConfirmPage(panelRect);
         SetPage(PausePage.Menu);
+        EnsureCanvasSurface();
         canvas.gameObject.SetActive(false);
     }
 
@@ -845,7 +872,7 @@ public sealed class RuntimePauseMenu : MonoBehaviour
         cancelRect.anchorMax = new Vector2(0.5f, 0.5f);
         cancelRect.pivot = new Vector2(0.5f, 0.5f);
         cancelRect.anchoredPosition = new Vector2(-110f, -96f);
-        cancelButton.onClick.AddListener(ShowMenuPage);
+        BindButtonAction(cancelButton, ShowMenuPage);
         EnsureButtonInputReady(cancelButton);
     }
 
@@ -864,7 +891,7 @@ public sealed class RuntimePauseMenu : MonoBehaviour
         rect.anchorMax = new Vector2(0.5f, 0.5f);
         rect.pivot = new Vector2(0.5f, 0.5f);
         rect.anchoredPosition = new Vector2(0f, y);
-        button.onClick.AddListener(onClick);
+        BindButtonAction(button, onClick);
         EnsureButtonInputReady(button);
 
         if (revealWithMenu)
@@ -942,7 +969,7 @@ public sealed class RuntimePauseMenu : MonoBehaviour
         }
     }
 
-    private static void EnsureButtonsInputReady(Transform root)
+    private void EnsureButtonsInputReady(Transform root)
     {
         if (root == null)
         {
@@ -953,7 +980,53 @@ public sealed class RuntimePauseMenu : MonoBehaviour
         for (int i = 0; i < buttons.Length; i++)
         {
             EnsureButtonInputReady(buttons[i]);
+            RebindButtonAction(buttons[i]);
         }
+    }
+
+    private void BindButtonAction(Button button, UnityEngine.Events.UnityAction action)
+    {
+        if (button == null || action == null)
+        {
+            return;
+        }
+
+        buttonActions[button] = action;
+        RebindButtonAction(button);
+    }
+
+    private void RebindButtonAction(Button button)
+    {
+        if (button == null)
+        {
+            return;
+        }
+
+        if (buttonActions.TryGetValue(button, out UnityEngine.Events.UnityAction action) && action != null)
+        {
+            button.onClick.RemoveListener(action);
+            button.onClick.AddListener(action);
+        }
+    }
+
+    private void EnsureCanvasSurface()
+    {
+        RuntimeUiEventSystemBootstrapper.Ensure();
+        if (canvas == null)
+        {
+            return;
+        }
+
+        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        canvas.overrideSorting = true;
+        canvas.sortingOrder = SortingOrder;
+        GraphicRaycaster raycaster = canvas.GetComponent<GraphicRaycaster>();
+        if (raycaster == null)
+        {
+            raycaster = canvas.gameObject.AddComponent<GraphicRaycaster>();
+        }
+
+        raycaster.enabled = true;
     }
 
     private static void EnsureButtonInputReady(Button button)

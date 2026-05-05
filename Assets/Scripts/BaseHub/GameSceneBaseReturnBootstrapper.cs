@@ -515,7 +515,7 @@ public class GameSceneBaseReturnBootstrapper : MonoBehaviour
 
     public static void ReturnToBaseScene()
     {
-        Time.timeScale = 1f;
+        RuntimeSessionResetService.ResetRuntimeUiForSceneTransition();
 
         SceneLoader loader = SceneLoader.EnsureInstance();
         if (loader != null)

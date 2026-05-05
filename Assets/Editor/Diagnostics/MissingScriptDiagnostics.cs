@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.IO;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -8,17 +9,28 @@ public static class MissingScriptDiagnostics
     [MenuItem("Tools/Diagnostics/Scan Missing Scripts")]
     public static void ScanMissingScripts()
     {
-        List<string> issues = new List<string>();
-        ScanLoadedScenes(issues);
-        ScanAllPrefabs(issues);
+        List<string> issues = CollectMissingScriptIssues(true);
 
         if (issues.Count == 0)
         {
-            Debug.Log("MissingScriptDiagnostics: 未发现缺失脚本挂载。");
+            Debug.Log("MissingScriptDiagnostics: no missing script references found.");
             return;
         }
 
-        Debug.LogWarning($"MissingScriptDiagnostics: 发现 {issues.Count} 处缺失脚本挂载。\n" + string.Join("\n", issues));
+        Debug.LogWarning($"MissingScriptDiagnostics: found {issues.Count} missing script references.\n" + string.Join("\n", issues));
+    }
+
+    public static List<string> CollectMissingScriptIssues(bool includeLoadedScenes)
+    {
+        List<string> issues = new List<string>();
+        if (includeLoadedScenes)
+        {
+            ScanLoadedScenes(issues);
+        }
+
+        ScanBuildScenes(issues);
+        ScanAllPrefabs(issues);
+        return issues;
     }
 
     private static void ScanLoadedScenes(List<string> issues)
@@ -35,6 +47,48 @@ public static class MissingScriptDiagnostics
             for (int i = 0; i < roots.Length; i++)
             {
                 ScanHierarchy(roots[i], $"Scene:{scene.path}", issues);
+            }
+        }
+    }
+
+    private static void ScanBuildScenes(List<string> issues)
+    {
+        EditorBuildSettingsScene[] scenes = EditorBuildSettings.scenes;
+        for (int i = 0; i < scenes.Length; i++)
+        {
+            EditorBuildSettingsScene scene = scenes[i];
+            if (scene == null || !scene.enabled || string.IsNullOrWhiteSpace(scene.path))
+            {
+                continue;
+            }
+
+            ScanSerializedAssetForMissingScript(scene.path, issues);
+
+            string[] dependencies = AssetDatabase.GetDependencies(scene.path, true);
+            for (int dependencyIndex = 0; dependencyIndex < dependencies.Length; dependencyIndex++)
+            {
+                string dependency = dependencies[dependencyIndex];
+                if (dependency.EndsWith(".prefab"))
+                {
+                    ScanSerializedAssetForMissingScript(dependency, issues);
+                }
+            }
+        }
+    }
+
+    private static void ScanSerializedAssetForMissingScript(string assetPath, List<string> issues)
+    {
+        if (string.IsNullOrWhiteSpace(assetPath) || !File.Exists(assetPath))
+        {
+            return;
+        }
+
+        string[] lines = File.ReadAllLines(assetPath);
+        for (int i = 0; i < lines.Length; i++)
+        {
+            if (lines[i].Contains("m_Script: {fileID: 0}"))
+            {
+                issues.Add($"{assetPath}:{i + 1} missing script reference");
             }
         }
     }

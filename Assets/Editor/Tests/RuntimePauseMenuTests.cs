@@ -298,6 +298,65 @@ public sealed class RuntimePauseMenuTests
         AssertButtonClickable("取消");
     }
 
+    [Test]
+    public void PauseMenuRebindsButtonsAfterListenersClearedAndSceneTransition()
+    {
+        createdScene = OpenTestScene("FirstPass_1");
+        Assert.IsTrue(createdScene.IsValid() && createdScene.isLoaded);
+        Time.timeScale = 1f;
+
+        Assert.IsTrue(RuntimePauseMenu.TryOpenFromExternal());
+        RevealMenuButtonsImmediate();
+
+        Button aboutButton = FindButtonByLabel("关于我们");
+        Assert.IsNotNull(aboutButton);
+        aboutButton.onClick.RemoveAllListeners();
+
+        RuntimePauseMenu.CloseForSceneTransition();
+
+        Assert.IsFalse(RuntimePauseMenu.IsPauseOpen);
+        Assert.IsTrue(RuntimePauseMenu.TryOpenFromExternal());
+        RevealMenuButtonsImmediate();
+
+        aboutButton = FindButtonByLabel("关于我们");
+        Assert.IsNotNull(aboutButton);
+        aboutButton.onClick.Invoke();
+
+        Assert.AreEqual("About", GetCurrentPageName());
+
+        Button backButton = FindButtonByLabel("返回暂停页");
+        Assert.IsNotNull(backButton);
+        backButton.onClick.RemoveAllListeners();
+
+        InvokePrivate("ShowAboutPage");
+        backButton.onClick.Invoke();
+
+        Assert.AreEqual("Menu", GetCurrentPageName());
+    }
+
+    [Test]
+    public void PauseMenuConfirmPrimaryRebindsAfterListenersCleared()
+    {
+        createdScene = OpenTestScene("FirstPass_1");
+        Assert.IsTrue(createdScene.IsValid() && createdScene.isLoaded);
+        Time.timeScale = 1f;
+
+        Assert.IsTrue(RuntimePauseMenu.TryOpenFromExternal());
+        RevealMenuButtonsImmediate();
+
+        ClickButtonByLabel("退出游戏");
+        Assert.AreEqual("QuitConfirm", GetCurrentPageName());
+
+        Button confirmButton = FindButtonByLabel("确认退出");
+        Assert.IsNotNull(confirmButton);
+        confirmButton.onClick.RemoveAllListeners();
+
+        RuntimePauseMenu.EnsureInstance();
+        confirmButton.onClick.Invoke();
+
+        Assert.IsFalse(RuntimePauseMenu.IsPauseOpen);
+    }
+
     private static void DestroyPauseMenu()
     {
         if (RuntimePauseMenu.Instance != null)

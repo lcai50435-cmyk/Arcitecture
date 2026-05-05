@@ -133,6 +133,7 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
     private const int SceneHandbookBackpackSlotCount = 6;
     private const int SceneHandbookBackpackLaneCount = SceneHandbookBackpackSlotCount;
     private const float SceneHandbookProprietarySlotContentInset = 4f;
+    private const float SceneHandbookProprietarySlotSpacing = 61f;
 
     [SerializeField] private UIManager owner;
 
@@ -566,8 +567,8 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
             AddUniqueSceneBookmarkRoot(roots, entry.Value);
         }
 
-        AddUniqueSceneBookmarkRoot(roots, ResolveSceneAuthoredDetailCanvas(SceneAuthoredFujianDetailCanvasName)?.gameObject);
-        AddUniqueSceneBookmarkRoot(roots, ResolveSceneAuthoredDetailCanvas(SceneAuthoredShuiXiangDetailCanvasName)?.gameObject);
+        AddUniqueSceneCloseBookmarkRoot(roots, ResolveSceneAuthoredDetailCanvas(SceneAuthoredFujianDetailCanvasName)?.gameObject);
+        AddUniqueSceneCloseBookmarkRoot(roots, ResolveSceneAuthoredDetailCanvas(SceneAuthoredShuiXiangDetailCanvasName)?.gameObject);
         return roots;
     }
 
@@ -577,6 +578,19 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
             pageRoot == null ||
             roots.Contains(pageRoot) ||
             !HasSceneAuthoredBookmarkTabs(pageRoot.transform))
+        {
+            return;
+        }
+
+        roots.Add(pageRoot);
+    }
+
+    private static void AddUniqueSceneCloseBookmarkRoot(List<GameObject> roots, GameObject pageRoot)
+    {
+        if (roots == null ||
+            pageRoot == null ||
+            roots.Contains(pageRoot) ||
+            FindSceneBookmarkVisual(pageRoot.transform, SceneAuthoredCloseButtonName) == null)
         {
             return;
         }
@@ -1671,6 +1685,7 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         if (proprietaryRoot != null)
         {
             List<Transform> slotRoots = CollectSceneHandbookProprietarySlotRoots(proprietaryRoot);
+            ArrangeSceneHandbookProprietarySlots(slotRoots, slotCount);
             for (int i = 0; i < slotRoots.Count && i < slotCount; i++)
             {
                 BuildingSlotDefinition slotDefinition = definition.slotDefinitions[i];
@@ -1793,6 +1808,83 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
 
         slotRoots.Sort(CompareSceneHandbookSlotTransforms);
         return slotRoots;
+    }
+
+    private static void ArrangeSceneHandbookProprietarySlots(List<Transform> slotRoots, int slotCount)
+    {
+        if (slotRoots == null || slotRoots.Count == 0)
+        {
+            return;
+        }
+
+        int visibleCount = Mathf.Min(slotRoots.Count, Mathf.Max(0, slotCount));
+        if (visibleCount <= 0)
+        {
+            return;
+        }
+
+        float centerX = ResolveSceneHandbookProprietarySlotCenterX(slotRoots, visibleCount);
+        float startX = centerX - SceneHandbookProprietarySlotSpacing * (visibleCount - 1) * 0.5f;
+        for (int i = 0; i < slotRoots.Count; i++)
+        {
+            RectTransform slotRect = slotRoots[i] as RectTransform;
+            if (slotRect == null)
+            {
+                continue;
+            }
+
+            bool visible = i < visibleCount;
+            slotRect.gameObject.SetActive(visible);
+            if (!visible)
+            {
+                continue;
+            }
+
+            Vector2 slotSize = ResolveRectSize(slotRect);
+            if (slotSize.x <= 1f || slotSize.y <= 1f)
+            {
+                slotSize = new Vector2(35f, 35f);
+            }
+
+            ConfigureAnchoredRect(
+                slotRect,
+                new Vector2(0.5f, 0.5f),
+                new Vector2(0.5f, 0.5f),
+                slotSize,
+                new Vector2(startX + i * SceneHandbookProprietarySlotSpacing, slotRect.anchoredPosition.y),
+                new Vector2(0.5f, 0.5f));
+            slotRect.localScale = Vector3.one;
+            slotRect.localRotation = Quaternion.identity;
+        }
+    }
+
+    private static float ResolveSceneHandbookProprietarySlotCenterX(List<Transform> slotRoots, int visibleCount)
+    {
+        if (slotRoots == null || visibleCount <= 0)
+        {
+            return 0f;
+        }
+
+        float minX = float.PositiveInfinity;
+        float maxX = float.NegativeInfinity;
+        for (int i = 0; i < slotRoots.Count && i < visibleCount; i++)
+        {
+            RectTransform slotRect = slotRoots[i] as RectTransform;
+            if (slotRect == null)
+            {
+                continue;
+            }
+
+            minX = Mathf.Min(minX, slotRect.anchoredPosition.x);
+            maxX = Mathf.Max(maxX, slotRect.anchoredPosition.x);
+        }
+
+        if (float.IsInfinity(minX) || float.IsInfinity(maxX))
+        {
+            return 0f;
+        }
+
+        return (minX + maxX) * 0.5f;
     }
 
     private static void CollectNamedSceneHandbookProprietarySlotRoots(
@@ -1994,9 +2086,11 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         if (contentImage != null && slotSprite != null)
         {
             NormalizeSceneHandbookProprietarySlotSurface(slotRoot, contentImage);
+            DisableSceneHandbookExtraProprietaryContentImages(slotRoot, contentImage);
             contentImage.sprite = slotSprite;
             contentImage.enabled = true;
             contentImage.preserveAspect = true;
+            contentImage.color = Color.white;
             contentImage.raycastTarget = false;
             FitSceneHandbookProprietarySlotContent(contentImage.rectTransform, slotRoot as RectTransform);
         }
@@ -2029,12 +2123,6 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
             return namedImageComponent;
         }
 
-        Image directImage = slotRoot.GetComponent<Image>();
-        if (directImage != null)
-        {
-            return directImage;
-        }
-
         Image[] images = slotRoot.GetComponentsInChildren<Image>(true);
         for (int i = 0; i < images.Length; i++)
         {
@@ -2044,10 +2132,56 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
                 continue;
             }
 
-            return image;
+            if (image.transform != slotRoot && !IsSceneHandbookSlotHitAreaImage(slotRoot, image))
+            {
+                return image;
+            }
         }
 
-        return null;
+        return slotRoot.GetComponent<Image>();
+    }
+
+    private static void DisableSceneHandbookExtraProprietaryContentImages(Transform slotRoot, Image contentImage)
+    {
+        if (slotRoot == null || contentImage == null)
+        {
+            return;
+        }
+
+        Image[] images = slotRoot.GetComponentsInChildren<Image>(true);
+        for (int i = 0; i < images.Length; i++)
+        {
+            Image image = images[i];
+            if (image == null ||
+                image == contentImage ||
+                image.transform == slotRoot ||
+                IsSceneHandbookSlotHitAreaImage(slotRoot, image))
+            {
+                continue;
+            }
+
+            image.enabled = false;
+            image.raycastTarget = false;
+        }
+    }
+
+    private static bool IsSceneHandbookSlotHitAreaImage(Transform slotRoot, Image image)
+    {
+        if (slotRoot == null || image == null)
+        {
+            return false;
+        }
+
+        Button button = image.GetComponent<Button>();
+        if (button != null && button.targetGraphic == image)
+        {
+            return true;
+        }
+
+        Button parentButton = image.GetComponentInParent<Button>(true);
+        return parentButton != null &&
+               parentButton.transform == image.transform &&
+               IsAncestorOf(slotRoot, parentButton.transform);
     }
 
     private static void NormalizeSceneHandbookProprietarySlotSurface(Transform slotRoot, Image contentImage)
@@ -3061,6 +3195,10 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         }
 
         DisableSceneBookmarkTransparentBlockers(pageRoot.transform);
+
+        Transform bookmarkRoot = FindDirectChild(pageRoot.transform, SceneAuthoredBookmarkRootName) ??
+                                 FindTransformByName(pageRoot.transform, SceneAuthoredBookmarkRootName);
+        bookmarkRoot?.SetAsLastSibling();
 
         Transform closeVisualRoot = FindSceneBookmarkVisual(pageRoot.transform, SceneAuthoredCloseButtonName);
         if (closeVisualRoot != null)

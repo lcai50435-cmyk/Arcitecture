@@ -124,6 +124,7 @@ public sealed class IllustratedHandbookTabsControllerTests
         Assert.IsTrue(hitAreaButton.interactable);
         Assert.IsTrue(hitAreaButton.targetGraphic.raycastTarget);
         Assert.IsFalse(blockerImage.raycastTarget);
+        Assert.AreEqual(detailCanvas.transform.childCount - 1, detailCanvas.transform.Find("BookMark").GetSiblingIndex());
 
         hitAreaButton.onClick.Invoke();
 
@@ -210,7 +211,7 @@ public sealed class IllustratedHandbookTabsControllerTests
         GameObject personalPage = rootObject.transform.Find("PersonalInformationCanvas").gameObject;
         CreateSceneAuthoredPersonalAttributeSurface(personalPage);
 
-        Slider healthSlider = FindDescendant(personalPage.transform, "生命值").GetComponent<Slider>();
+        Slider healthSlider = FindDescendant(personalPage.transform, "Health").GetComponent<Slider>();
         TMP_Text valueText = CreateTmpText("ValueText", healthSlider.transform, "75/100");
 
         UIManager manager = rootObject.AddComponent<UIManager>();
@@ -396,6 +397,38 @@ public sealed class IllustratedHandbookTabsControllerTests
         Assert.AreEqual("SingleSpan", GetSlotSpriteName(handbookPage.transform, "ProprietarySlot_1"));
         Assert.AreEqual("SmallArch", GetSlotSpriteName(handbookPage.transform, "ProprietarySlot_2"));
         Assert.AreEqual("VoussoirConstruction", GetSlotSpriteName(handbookPage.transform, "ProprietarySlot_3"));
+    }
+
+    [Test]
+    public void SceneAuthoredButtonOnlyProprietaryIconsFollowSelectedBuildingAndStaySeparated()
+    {
+        RuntimeProgressState.EnsureInstance().ResetProgress(false);
+
+        rootObject = CreateSceneAuthoredRoot();
+        GameObject handbookPage = rootObject.transform.Find("IllustratedHandbookCanvas").gameObject;
+        CreateSceneAuthoredHandbookSurfaceWithButtonOnlyProprietarySlots(handbookPage);
+
+        UIManager manager = rootObject.AddComponent<UIManager>();
+        manager.illustratedHandbook = rootObject;
+        IllustratedHandbookTabsController controller = IllustratedHandbookTabsController.EnsureInstalled(manager);
+        controller.SwitchToPage(IllustratedHandbookPage.IllustratedHandbook);
+
+        Assert.AreEqual("RammedEarthUI", GetSlotSpriteName(handbookPage.transform, "Button_1"));
+        Assert.AreEqual("ThickWallUI", GetSlotSpriteName(handbookPage.transform, "Button_2"));
+        Assert.AreEqual("TimberworkUI", GetSlotSpriteName(handbookPage.transform, "Button_3"));
+
+        RectTransform firstButton = FindDescendant(handbookPage.transform, "Button_1") as RectTransform;
+        RectTransform secondButton = FindDescendant(handbookPage.transform, "Button_2") as RectTransform;
+        RectTransform thirdButton = FindDescendant(handbookPage.transform, "Button_3") as RectTransform;
+        Assert.That(Mathf.Abs(firstButton.anchoredPosition.x - secondButton.anchoredPosition.x), Is.GreaterThan(35f));
+        Assert.That(Mathf.Abs(secondButton.anchoredPosition.x - thirdButton.anchoredPosition.x), Is.GreaterThan(35f));
+
+        GameObject secondCard = FindDescendant(handbookPage.transform, "ArcitectureImage_2").gameObject;
+        controller.SelectSceneAuthoredHandbookCard(secondCard);
+
+        Assert.AreEqual("SingleSpan", GetSlotSpriteName(handbookPage.transform, "Button_1"));
+        Assert.AreEqual("SmallArch", GetSlotSpriteName(handbookPage.transform, "Button_2"));
+        Assert.AreEqual("VoussoirConstruction", GetSlotSpriteName(handbookPage.transform, "Button_3"));
     }
 
     [Test]
@@ -665,7 +698,7 @@ public sealed class IllustratedHandbookTabsControllerTests
         GameObject firstCard = FindDescendant(handbookPage.transform, "ArcitectureImage_1").gameObject;
         BuildingDetailData detailData = firstCard.AddComponent<BuildingDetailData>();
         detailData.buildingName = "福建土楼详情";
-        detailData.introduction1 = "解锁后展示完整建筑详情。";
+        detailData.introduction1 = "Unlocked building detail.";
 
         GameObject detailPanel = new GameObject("DetailedInformationCanvas", typeof(RectTransform));
         detailPanel.transform.SetParent(rootObject.transform, false);
@@ -730,7 +763,7 @@ public sealed class IllustratedHandbookTabsControllerTests
         gotoButton.onClick.Invoke();
 
         Assert.IsTrue(detailPanel.activeSelf);
-        Assert.AreEqual("赵州桥", detailTitle.text);
+        Assert.AreEqual("Zhaozhou Bridge", detailTitle.text);
     }
 
     [Test]
@@ -1293,7 +1326,7 @@ public sealed class IllustratedHandbookTabsControllerTests
 
         GameObject proprietary = new GameObject("ProprietaryMaterial", typeof(RectTransform));
         proprietary.transform.SetParent(rightIntroduction.transform, false);
-        CreateTmpText("Label", proprietary.transform, "专用进度（0/3）");
+        CreateTmpText("Label", proprietary.transform, "Special progress 0/3");
         for (int i = 0; i < 3; i++)
         {
             GameObject slot = new GameObject($"ProprietarySlot_{i + 1}", typeof(RectTransform), typeof(Image), typeof(Button));
@@ -1330,10 +1363,6 @@ public sealed class IllustratedHandbookTabsControllerTests
         CreateChild<Text>(detailCanvas.transform, "Introduction");
         GameObject bookmarkRoot = new GameObject("BookMark", typeof(RectTransform));
         bookmarkRoot.transform.SetParent(detailCanvas.transform, false);
-        CreateBookmark("HandBook", bookmarkRoot.transform);
-        CreateBookmark("PersonalInformation", bookmarkRoot.transform);
-        CreateBookmark("PhotoAlbum", bookmarkRoot.transform);
-        CreateBookmark("Mission", bookmarkRoot.transform);
         CreateBookmark("Setting", bookmarkRoot.transform);
 
         GameObject transparentPanel = new GameObject("Panel", typeof(RectTransform), typeof(Image));
@@ -1341,6 +1370,10 @@ public sealed class IllustratedHandbookTabsControllerTests
         Image panelImage = transparentPanel.GetComponent<Image>();
         panelImage.color = Color.clear;
         panelImage.raycastTarget = true;
+
+        GameObject lateBlockingContent = new GameObject("LateBlockingContent", typeof(RectTransform), typeof(Image));
+        lateBlockingContent.transform.SetParent(detailCanvas.transform, false);
+        lateBlockingContent.GetComponent<Image>().raycastTarget = true;
         return title;
     }
 
@@ -1354,7 +1387,7 @@ public sealed class IllustratedHandbookTabsControllerTests
 
         GameObject proprietary = new GameObject("ProprietaryMaterial", typeof(RectTransform));
         proprietary.transform.SetParent(rightIntroduction, false);
-        CreateTmpText("Label", proprietary.transform, "专用进度（0/3）");
+        CreateTmpText("Label", proprietary.transform, "Special progress 0/3");
 
         GameObject distractor = new GameObject("HelpButton", typeof(RectTransform), typeof(Image), typeof(Button));
         distractor.transform.SetParent(proprietary.transform, false);
@@ -1378,7 +1411,7 @@ public sealed class IllustratedHandbookTabsControllerTests
 
         GameObject proprietary = new GameObject("ProprietaryMaterial", typeof(RectTransform));
         proprietary.transform.SetParent(rightIntroduction, false);
-        CreateTmpText("Label", proprietary.transform, "专用进度（0/3）");
+        CreateTmpText("Label", proprietary.transform, "Special progress 0/3");
 
         for (int i = 0; i < 3; i++)
         {
@@ -1386,6 +1419,33 @@ public sealed class IllustratedHandbookTabsControllerTests
             RectTransform slotRect = slotRoot as RectTransform;
             slotRect.anchoredPosition = new Vector2(i * 64f, 0f);
             slotRect.sizeDelta = new Vector2(35f, 35f);
+        }
+    }
+
+    private static void CreateSceneAuthoredHandbookSurfaceWithButtonOnlyProprietarySlots(GameObject handbookPage)
+    {
+        CreateSceneAuthoredHandbookSurface(handbookPage);
+
+        Transform rightIntroduction = FindDescendant(handbookPage.transform, "RightIntroduction");
+        Transform oldProprietary = FindDescendant(rightIntroduction, "ProprietaryMaterial");
+        Object.DestroyImmediate(oldProprietary.gameObject);
+
+        GameObject proprietary = new GameObject("ProprietaryMaterial", typeof(RectTransform));
+        proprietary.transform.SetParent(rightIntroduction, false);
+        CreateTmpText("Image", proprietary.transform, "Special progress 0/3");
+
+        for (int i = 0; i < 3; i++)
+        {
+            GameObject buttonObject = new GameObject($"Button_{i + 1}", typeof(RectTransform), typeof(Image), typeof(Button));
+            buttonObject.transform.SetParent(proprietary.transform, false);
+            RectTransform buttonRect = buttonObject.transform as RectTransform;
+            buttonRect.anchoredPosition = Vector2.zero;
+            buttonRect.sizeDelta = new Vector2(35f, 35f);
+            buttonObject.GetComponent<Image>().color = new Color(1f, 1f, 1f, 0f);
+
+            CreateChild<Image>(buttonObject.transform, $"ShuiXiang_{i + 1}");
+            CreateChild<Image>(buttonObject.transform, $"ZhaoGouQiao_{i + 1}");
+            CreateChild<Image>(buttonObject.transform, $"FuJianTuLou_{i + 1}");
         }
     }
 
@@ -1414,13 +1474,13 @@ public sealed class IllustratedHandbookTabsControllerTests
 
     private static void CreateSceneAuthoredPersonalAttributeSurface(GameObject personalPage)
     {
-        GameObject attributesRoot = new GameObject("人物属性", typeof(RectTransform));
+        GameObject attributesRoot = new GameObject("Attributes", typeof(RectTransform));
         attributesRoot.transform.SetParent(personalPage.transform, false);
 
-        CreateInteractiveSlider(attributesRoot.transform, "生命值");
-        CreateInteractiveSlider(attributesRoot.transform, "攻击力");
-        CreateInteractiveSlider(attributesRoot.transform, "移速");
-        CreateInteractiveSlider(attributesRoot.transform, "防御");
+        CreateInteractiveSlider(attributesRoot.transform, "Health");
+        CreateInteractiveSlider(attributesRoot.transform, "Attack");
+        CreateInteractiveSlider(attributesRoot.transform, "MoveSpeed");
+        CreateInteractiveSlider(attributesRoot.transform, "Defense");
     }
 
     private static void CreateSceneAuthoredPersonalBackpackSurface(GameObject personalPage)
@@ -1529,7 +1589,24 @@ public sealed class IllustratedHandbookTabsControllerTests
     {
         Transform content = slot.Find("Image");
         Image contentImage = content != null ? content.GetComponent<Image>() : null;
-        return contentImage != null ? contentImage : slot.GetComponent<Image>();
+        if (contentImage != null)
+        {
+            return contentImage;
+        }
+
+        foreach (Image image in slot.GetComponentsInChildren<Image>(true))
+        {
+            if (image != null &&
+                image.transform != slot &&
+                image.enabled &&
+                image.sprite != null &&
+                image.color.a > 0.01f)
+            {
+                return image;
+            }
+        }
+
+        return slot.GetComponent<Image>();
     }
 
     private static void AssertHasDropHandler(Transform target)

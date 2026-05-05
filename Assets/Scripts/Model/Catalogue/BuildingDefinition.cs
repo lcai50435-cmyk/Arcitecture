@@ -129,19 +129,19 @@ public static class BuildingDefinitionLibrary
                             "anhui_water_town_slot_1",
                             "临水布局",
                             "依水而建的街巷与民居组织，让生活、运输与防洪形成稳定平衡。",
-                            "Assets/File/UIResources/ShuiXiang.png",
+                            "Assets/File/UIResources/ShuZhe_1.png",
                             CreateReward("anhui_water_town_small_1", "水乡小奖励", "防御提升 2。", AttributeBonusType.Defense, 2f)),
                         CreateSlot(
                             "anhui_water_town_slot_2",
                             "白墙黛瓦",
                             "屋面与墙体形成鲜明对比，同时兼顾排水、防潮与识别性。",
-                            "Assets/File/Prop/Prop/RoofTile.png",
+                            "Assets/File/UIResources/ShuZhe_2.png",
                             CreateReward("anhui_water_town_small_2", "水乡小奖励", "墨笔耐久上限提升 10。", AttributeBonusType.Durability, 10f)),
                         CreateSlot(
                             "anhui_water_town_slot_3",
                             "天井采光",
                             "通过天井组织通风、采光与雨水回收，是民居空间智慧的核心节点。",
-                            "Assets/File/TileMap/FirstPass/AnhuiWaterTowns_1.png",
+                            "Assets/File/UIResources/ShuZhe_3.png",
                             CreateReward("anhui_water_town_small_3", "水乡小奖励", "生命上限提升 10。", AttributeBonusType.MaxHealth, 10f))
                     },
                     completionReward = CreateWeaponUnlockReward(

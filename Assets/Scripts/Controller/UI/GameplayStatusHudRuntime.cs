@@ -1353,45 +1353,13 @@ public static class GameplayStatusHudRuntime
             return cachedSprite;
         }
 
-        Sprite sprite = LoadNamedSprite(assetPath, spriteName) ??
-                        RuntimeProjectSpriteLoader.LoadSprite(assetPath, true, SpriteMeshType.FullRect);
+        Sprite sprite = RuntimeProjectSpriteLoader.LoadSprite(assetPath, spriteName, true, SpriteMeshType.FullRect);
         if (sprite != null)
         {
             HudSpriteCache[cacheKey] = sprite;
         }
 
         return sprite;
-    }
-
-    private static Sprite LoadNamedSprite(string assetPath, string spriteName)
-    {
-        if (string.IsNullOrWhiteSpace(spriteName))
-        {
-            return null;
-        }
-
-#if UNITY_EDITOR
-        Object[] assets = AssetDatabase.LoadAllAssetsAtPath(assetPath);
-        foreach (Object asset in assets)
-        {
-            if (asset is Sprite sprite &&
-                string.Equals(sprite.name, spriteName, System.StringComparison.Ordinal))
-            {
-                return sprite;
-            }
-        }
-#endif
-
-        Sprite[] loadedSprites = Resources.FindObjectsOfTypeAll<Sprite>();
-        foreach (Sprite sprite in loadedSprites)
-        {
-            if (sprite != null && string.Equals(sprite.name, spriteName, System.StringComparison.Ordinal))
-            {
-                return sprite;
-            }
-        }
-
-        return null;
     }
 
     private static Sprite GetGaugeFillSprite()

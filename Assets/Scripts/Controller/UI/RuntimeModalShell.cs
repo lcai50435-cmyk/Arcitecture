@@ -547,6 +547,11 @@ public sealed class RuntimeModalShell : MonoBehaviour
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;
         canvas.overrideSorting = true;
         canvas.sortingOrder = RuntimeModalStyle.BackdropSortingOrder;
+        GraphicRaycaster raycaster = canvasObject.GetComponent<GraphicRaycaster>();
+        if (raycaster != null)
+        {
+            raycaster.enabled = true;
+        }
 
         CanvasScaler scaler = canvasObject.GetComponent<CanvasScaler>();
         scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;

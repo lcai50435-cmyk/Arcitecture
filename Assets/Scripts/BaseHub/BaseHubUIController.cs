@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.SceneManagement;
 
 public class BaseHubUIController : MonoBehaviour
@@ -237,17 +238,43 @@ public class BaseHubUIController : MonoBehaviour
 
     private void ClosePanelsOnly()
     {
-        if (illustratedHandbookPanel != null)
-            illustratedHandbookPanel.SetActive(false);
+        HidePanel(illustratedHandbookPanel);
 
         if (spiritPanel != null)
-            spiritPanel.gameObject.SetActive(false);
+            HidePanel(spiritPanel.gameObject);
 
         if (stageSelectionPanel != null)
-            stageSelectionPanel.gameObject.SetActive(false);
+            HidePanel(stageSelectionPanel.gameObject);
 
         if (albumPanel != null)
-            albumPanel.gameObject.SetActive(false);
+            HidePanel(albumPanel.gameObject);
+    }
+
+    private static void HidePanel(GameObject panel)
+    {
+        if (panel == null)
+        {
+            return;
+        }
+
+        CanvasGroup[] canvasGroups = panel.GetComponentsInChildren<CanvasGroup>(true);
+        for (int i = 0; i < canvasGroups.Length; i++)
+        {
+            CanvasGroup canvasGroup = canvasGroups[i];
+            if (canvasGroup == null)
+            {
+                continue;
+            }
+
+            canvasGroup.alpha = 0f;
+            canvasGroup.interactable = false;
+            canvasGroup.blocksRaycasts = false;
+        }
+
+        if (panel.activeSelf)
+        {
+            panel.SetActive(false);
+        }
     }
 
     private void LockPlayer()
@@ -338,7 +365,9 @@ public class BaseHubUIController : MonoBehaviour
 
     private void CompleteCloseAll()
     {
+        UIRootManager.Instance?.CloseModalFlowImmediate();
         ClosePanelsOnly();
+        RuntimeUiRaycastCleanup.CleanupAfterBaseModalClosed();
         SetInteractTipVisible(false);
         UnlockPlayer();
         RuntimeCameraController.EnsureInstance().ClearHubFocus();
