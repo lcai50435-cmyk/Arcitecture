@@ -6,6 +6,7 @@ on:
       - master
       - main
       - release/webgl
+      - release/webgl-*
     tags:
       - "v*.*.*"
   workflow_dispatch:
@@ -104,8 +105,8 @@ jobs:
             pages_path="${pages_path}/${BUILD_NAME}"
           fi
           if [[ ! -f "${pages_path}/index.html" ]]; then
-            echo "WebGL index.html not found under ${BUILD_PATH}/${BUILD_NAME}" >&2
-            find "${BUILD_PATH}" -maxdepth 3 -type f | sort >&2
+            echo "::error::Missing WebGL index.html under ${BUILD_PATH}/${BUILD_NAME}. GitHub Pages would deploy a 404."
+            find "${BUILD_PATH}" -maxdepth 3 -type f | sort
             exit 1
           fi
           touch "${pages_path}/.nojekyll"
@@ -177,11 +178,11 @@ jobs:
         shell: bash
         run: |
           cat > release-notes.md <<EOF
-          Arcitecture WebGL 试玩版本。
+          Arcitecture WebGL preview build.
 
-          试玩地址：${PAGE_URL}
-          版本：${VERSION}
-          提交：${GITHUB_SHA}
+          Preview URL: ${PAGE_URL}
+          Version: ${VERSION}
+          Commit: ${GITHUB_SHA}
           EOF
 
       - name: Publish release

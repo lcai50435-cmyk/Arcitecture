@@ -1,5 +1,14 @@
 # Architecture
 
+## WebGL GitHub Pages
+
+- Play URL: <https://lcai50435-cmyk.github.io/Arcitecture/>
+- CI/CD workflow: <https://github.com/lcai50435-cmyk/Arcitecture/actions/workflows/webgl-release.yml>
+- Deploy path: GitHub Actions builds Unity WebGL, verifies the generated `index.html`, then publishes that WebGL directory as the GitHub Pages root.
+- Download artifact: each run creates `arcitecture-webgl-${version}.zip`.
+
+If the URL returns 404, no successful Pages deployment has published `index.html` yet. Check the latest `WebGL Release` run and confirm the `Deploy GitHub Pages` job finished successfully.
+
 ## 项目定位
 
 本项目是一款 2D 平面、45 度俯视角的探索战斗游戏。核心体验是“搜、打、撤”：玩家在限定时间内进入被灾害侵蚀的建筑录世界，收集古建筑智慧结晶，躲避或击败灾害投影，并在风险升高前撤回基地，将收集物提交给建筑录以修复建筑、解锁介绍并获得成长。
