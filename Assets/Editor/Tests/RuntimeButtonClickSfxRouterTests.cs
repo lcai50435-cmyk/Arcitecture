@@ -428,6 +428,12 @@ public sealed class PlayerLoadoutRuntimeTests
 
 public sealed class PhotoAlbumRepositoryTests
 {
+    [SetUp]
+    public void SetUp()
+    {
+        WebGLPersistentFileSystemBridge.ResetSyncRequestCountForTests();
+    }
+
     [Test]
     public void DeleteEntryRemovesPhotoFileAndIndexEntry()
     {
@@ -463,6 +469,51 @@ public sealed class PhotoAlbumRepositoryTests
                 var entries = PhotoAlbumRepository.LoadEntries();
                 Assert.AreEqual(1, entries.Count);
                 Assert.AreEqual(second.id, entries[0].id);
+            }
+        }
+        finally
+        {
+            if (Directory.Exists(tempAlbumDirectory))
+            {
+                Directory.Delete(tempAlbumDirectory, true);
+            }
+        }
+    }
+
+    [Test]
+    public void AlbumMutationsRequestPersistentFileSystemSync()
+    {
+        string tempAlbumDirectory = Path.Combine(
+            Path.GetTempPath(),
+            "ArcitecturePhotoAlbumSyncTests",
+            System.Guid.NewGuid().ToString("N"));
+
+        try
+        {
+            using (PhotoAlbumRepository.UseAlbumDirectoryForTests(tempAlbumDirectory))
+            {
+                PhotoAlbumEntry entry = PhotoAlbumRepository.SaveCapture(
+                    new byte[] { 1, 2, 3 },
+                    160,
+                    90,
+                    "GameScene",
+                    "stage_01");
+                Assert.IsNotNull(entry);
+                Assert.AreEqual(1, WebGLPersistentFileSystemBridge.SyncRequestCountForTests);
+
+                Assert.IsTrue(PhotoAlbumRepository.DeleteEntry(entry));
+                Assert.AreEqual(2, WebGLPersistentFileSystemBridge.SyncRequestCountForTests);
+
+                PhotoAlbumRepository.SaveCapture(
+                    new byte[] { 4, 5, 6 },
+                    160,
+                    90,
+                    "GameScene",
+                    "stage_01");
+                Assert.AreEqual(3, WebGLPersistentFileSystemBridge.SyncRequestCountForTests);
+
+                PhotoAlbumRepository.ClearAll();
+                Assert.AreEqual(4, WebGLPersistentFileSystemBridge.SyncRequestCountForTests);
             }
         }
         finally

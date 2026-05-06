@@ -358,5 +358,42 @@ mergeInto(LibraryManager.library, {
 
     GLctx.viewport(0, 0, canvas.width, canvas.height);
     return 1;
+  },
+
+  ArcitectureSyncPersistentFileSystem: function () {
+    if (typeof FS === "undefined" || !FS || typeof FS.syncfs !== "function") {
+      return 0;
+    }
+
+    var state = Module.arcitecturePersistentFileSystemState || (Module.arcitecturePersistentFileSystemState = {});
+    if (state.syncInProgress) {
+      state.syncPending = true;
+      return 1;
+    }
+
+    var runSync = function () {
+      state.syncInProgress = true;
+      state.syncPending = false;
+      try {
+        FS.syncfs(false, function (error) {
+          state.syncInProgress = false;
+          if (error && typeof console !== "undefined" && console.warn) {
+            console.warn("Arcitecture persistent file system sync failed", error);
+          }
+
+          if (state.syncPending) {
+            runSync();
+          }
+        });
+      } catch (error) {
+        state.syncInProgress = false;
+        if (typeof console !== "undefined" && console.warn) {
+          console.warn("Arcitecture persistent file system sync failed", error);
+        }
+      }
+    };
+
+    runSync();
+    return 1;
   }
 });

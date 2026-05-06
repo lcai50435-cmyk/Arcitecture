@@ -3006,9 +3006,7 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         {
             CreateTabButton(rail, IllustratedHandbookPage.PersonalInformation, "角色");
         }
-#if !(UNITY_WEBGL && !UNITY_EDITOR)
         CreateTabButton(rail, IllustratedHandbookPage.PhotoAlbum, "相册");
-#endif
         CreateTabButton(rail, IllustratedHandbookPage.Setting, "设置");
 
         if (FindButtonByName(chromeRoot, "CloseButton") == null)
@@ -3935,9 +3933,6 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
             return;
         }
 
-#if UNITY_WEBGL && !UNITY_EDITOR
-        return;
-#else
         if (scenePhotoAlbumBinder == null)
         {
             scenePhotoAlbumBinder = new IllustratedPhotoAlbumPageBinder();
@@ -3945,7 +3940,6 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
 
         scenePhotoAlbumBinder.Bind(photoAlbumCanvas.transform as RectTransform);
         scenePhotoAlbumBinder.Refresh();
-#endif
     }
 
     private void RefreshSceneAuthoredSettings(IllustratedHandbookPage activePage)
@@ -5807,9 +5801,6 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
 
     private string BuildPhotoAlbumBody()
     {
-#if UNITY_WEBGL && !UNITY_EDITOR
-        return "网页试玩版暂不启用本地留念相册。";
-#else
         IReadOnlyList<PhotoAlbumEntry> entries = PhotoAlbumRepository.LoadEntries();
         List<string> lines = new List<string>
         {
@@ -5834,17 +5825,12 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         }
 
         return string.Join("\n", lines);
-#endif
     }
 
     private string BuildPhotoAlbumFooter()
     {
-#if UNITY_WEBGL && !UNITY_EDITOR
-        return "如需完整相册与截图保存体验，请使用桌面版本。";
-#else
         KeyCode captureKey = GameSettingsStore.GetKeyBinding(GameInputAction.PhotoCapture);
         return $"相册入口已统一走书本；基地或关卡内按 {captureKey} 可继续保存本地留念。";
-#endif
     }
 
     private static string ResolvePhotoAlbumEntrySceneLabel(string sceneName)

@@ -82,13 +82,9 @@ public sealed class RuntimePhotoCaptureManager : MonoBehaviour
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void Bootstrap()
     {
-#if UNITY_WEBGL && !UNITY_EDITOR
-        return;
-#else
         SceneManager.sceneLoaded -= HandleSceneLoaded;
         SceneManager.sceneLoaded += HandleSceneLoaded;
         EnsureInstance();
-#endif
     }
 
     private static void HandleSceneLoaded(Scene scene, LoadSceneMode mode)
@@ -190,9 +186,6 @@ public sealed class RuntimePhotoCaptureManager : MonoBehaviour
 
     private bool ShouldAllowCapture()
     {
-#if UNITY_WEBGL && !UNITY_EDITOR
-        return false;
-#else
         string activeSceneName = SceneManager.GetActiveScene().name;
         bool isGameplayScene = GameplayStageCatalog.IsGameplayScene(activeSceneName);
         if (!IsCaptureSupportedScene(activeSceneName))
@@ -221,7 +214,6 @@ public sealed class RuntimePhotoCaptureManager : MonoBehaviour
         }
 
         return true;
-#endif
     }
 
     private IEnumerator CaptureRoutine()
@@ -235,6 +227,7 @@ public sealed class RuntimePhotoCaptureManager : MonoBehaviour
 
         try
         {
+            WebGLCanvasResizeBridge.SyncCanvasSizeNow();
             LockPlayerControlsForCapture();
             controlsLocked = true;
 
@@ -245,7 +238,9 @@ public sealed class RuntimePhotoCaptureManager : MonoBehaviour
             overlaysHidden = true;
 
             yield return new WaitForEndOfFrame();
+            WebGLCanvasResizeBridge.SyncCanvasSizeNow();
             screenshot = ScreenCapture.CaptureScreenshotAsTexture();
+            WebGLCanvasResizeBridge.RestoreCanvasViewportNow();
 
             yield return PlayShutterRoutine();
 
@@ -276,6 +271,7 @@ public sealed class RuntimePhotoCaptureManager : MonoBehaviour
         }
         finally
         {
+            WebGLCanvasResizeBridge.RestoreCanvasViewportNow();
             HideConfirmationImmediate();
 
             if (screenshot != null)

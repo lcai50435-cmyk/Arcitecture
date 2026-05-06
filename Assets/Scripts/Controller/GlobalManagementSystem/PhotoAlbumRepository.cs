@@ -182,6 +182,7 @@ public static class PhotoAlbumRepository
             };
             SortEntries(entries);
             WriteSaveData(entries);
+            WebGLPersistentFileSystemBridge.RequestSync();
             return entry;
         }
         catch (Exception exception)
@@ -223,6 +224,7 @@ public static class PhotoAlbumRepository
             }
 
             WriteSaveData(existingEntries);
+            WebGLPersistentFileSystemBridge.RequestSync();
             return true;
         }
         catch (Exception exception)
@@ -289,6 +291,7 @@ public static class PhotoAlbumRepository
             }
 
             Directory.Delete(AlbumDirectoryPath, true);
+            WebGLPersistentFileSystemBridge.RequestSync();
         }
         catch (Exception exception)
         {

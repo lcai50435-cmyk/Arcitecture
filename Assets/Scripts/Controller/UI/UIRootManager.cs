@@ -1050,11 +1050,7 @@ public class UIRootManager : MonoBehaviour
 
     private static IllustratedHandbookPage ResolveHandbookHotkeyPage()
     {
-#if UNITY_WEBGL && !UNITY_EDITOR
-        return ResolveHandbookHotkeyPage(false);
-#else
         return ResolveHandbookHotkeyPage(PhotoAlbumRepository.HasEntries());
-#endif
     }
 
     private static IllustratedHandbookPage ResolveHandbookHotkeyPage(bool hasPhotoEntries)
