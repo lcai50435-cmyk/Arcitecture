@@ -351,6 +351,7 @@ public sealed class RuntimeModalShell : MonoBehaviour
     {
         EnsureUi();
         SetTarget(targetCanvasGroup);
+        WebGLCanvasResizeBridge.RequestCanvasSync();
         ApplyState(0f);
 
         canvas.gameObject.SetActive(true);
@@ -410,6 +411,7 @@ public sealed class RuntimeModalShell : MonoBehaviour
     {
         yield return new WaitForEndOfFrame();
 
+        WebGLCanvasResizeBridge.SyncCanvasSizeNow();
         RefreshRealtimeBackdrop();
 
         float elapsed = 0f;
@@ -487,6 +489,7 @@ public sealed class RuntimeModalShell : MonoBehaviour
         while (IsVisible)
         {
             yield return new WaitForEndOfFrame();
+            WebGLCanvasResizeBridge.SyncCanvasSizeNow();
             RefreshRealtimeBackdrop();
         }
 
@@ -500,6 +503,7 @@ public sealed class RuntimeModalShell : MonoBehaviour
             return;
         }
 
+        WebGLCanvasResizeBridge.SyncCanvasSizeNow();
         blurredBackdropTexture = RuntimeModalStyle.RefreshRealtimeBlurBackdrop(blurredBackdropTexture);
         if (blurBackdropImage.texture != blurredBackdropTexture)
         {

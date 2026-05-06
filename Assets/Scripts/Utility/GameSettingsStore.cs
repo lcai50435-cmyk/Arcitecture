@@ -378,6 +378,20 @@ public static class GameSettingsStore
         return !isWebGlPlayer;
     }
 
+    public static bool ShouldWaitForExplicitDisplayMatchForPlatform(bool isWebGlPlayer)
+    {
+        return ShouldApplyExplicitResolutionForPlatform(isWebGlPlayer);
+    }
+
+    public static bool ShouldWaitForExplicitDisplayMatchForCurrentPlatform()
+    {
+#if UNITY_WEBGL && !UNITY_EDITOR
+        return ShouldWaitForExplicitDisplayMatchForPlatform(true);
+#else
+        return ShouldWaitForExplicitDisplayMatchForPlatform(false);
+#endif
+    }
+
     private static bool ShouldApplyExplicitResolutionForCurrentPlatform()
     {
 #if UNITY_WEBGL && !UNITY_EDITOR

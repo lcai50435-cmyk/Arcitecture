@@ -13,4 +13,16 @@ public sealed class GameSettingsStoreTests
     {
         Assert.IsTrue(GameSettingsStore.ShouldApplyExplicitResolutionForPlatform(false));
     }
+
+    [Test]
+    public void WebGlPlayerDoesNotWaitForExplicitDisplayMatch()
+    {
+        Assert.IsFalse(GameSettingsStore.ShouldWaitForExplicitDisplayMatchForPlatform(true));
+    }
+
+    [Test]
+    public void StandaloneRuntimeWaitsForExplicitDisplayMatch()
+    {
+        Assert.IsTrue(GameSettingsStore.ShouldWaitForExplicitDisplayMatchForPlatform(false));
+    }
 }
