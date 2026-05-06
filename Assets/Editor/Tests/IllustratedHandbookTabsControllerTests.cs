@@ -102,18 +102,26 @@ public sealed class IllustratedHandbookTabsControllerTests
     }
 
     [Test]
-    public void DetailSceneCloseBookmarkClosesIllustratedHandbook()
+    public void DetailSceneCloseBookmarkReturnsToIllustratedHandbookPage()
     {
         DestroyExistingRootManager();
         rootObject = CreateSceneAuthoredRoot();
         Text detailTitle = CreateSceneAuthoredDetailCanvas(rootObject.transform, "DetailInformationFuJianCanvas");
         GameObject detailCanvas = detailTitle.transform.parent.gameObject;
+        DetailedInformationUI detailUi = detailCanvas.AddComponent<DetailedInformationUI>();
+        detailUi.detailedInformationPanel = detailCanvas;
+        detailUi.illustratedHandbookPanel = rootObject.transform.Find("IllustratedHandbookCanvas").gameObject;
         detailCanvas.SetActive(true);
         detailCanvas.transform.localScale = Vector3.one;
+        CanvasGroup canvasGroup = detailCanvas.GetComponent<CanvasGroup>();
+        canvasGroup.alpha = 1f;
+        canvasGroup.interactable = true;
+        canvasGroup.blocksRaycasts = true;
 
         UIManager manager = rootObject.AddComponent<UIManager>();
         manager.illustratedHandbook = rootObject;
         IllustratedHandbookTabsController.EnsureInstalled(manager);
+        Assert.IsNotNull(detailUi);
 
         Button hitAreaButton = detailCanvas.transform
             .Find("BookMark/Setting/SceneBookmarkHitArea")
@@ -127,6 +135,104 @@ public sealed class IllustratedHandbookTabsControllerTests
         Assert.AreEqual(detailCanvas.transform.childCount - 1, detailCanvas.transform.Find("BookMark").GetSiblingIndex());
 
         hitAreaButton.onClick.Invoke();
+
+        Assert.IsTrue(rootObject.activeSelf);
+        Assert.IsFalse(detailCanvas.activeSelf);
+        Assert.IsTrue(rootObject.transform.Find("IllustratedHandbookCanvas").gameObject.activeSelf);
+    }
+
+    [Test]
+    public void LegacyDetailCloseButtonReturnsToIllustratedHandbookPage()
+    {
+        rootObject = CreateSceneAuthoredRoot();
+        GameObject handbookPage = rootObject.transform.Find("IllustratedHandbookCanvas").gameObject;
+        Text detailTitle = CreateSceneAuthoredDetailCanvas(rootObject.transform, "DetailInformationFuJianCanvas");
+        GameObject detailCanvas = detailTitle.transform.parent.gameObject;
+        DetailedInformationUI detailUi = detailCanvas.AddComponent<DetailedInformationUI>();
+        detailUi.detailedInformationPanel = detailCanvas;
+        detailUi.illustratedHandbookPanel = handbookPage;
+        detailCanvas.SetActive(true);
+        detailCanvas.transform.localScale = Vector3.one;
+        CanvasGroup canvasGroup = detailCanvas.GetComponent<CanvasGroup>();
+        canvasGroup.alpha = 1f;
+        canvasGroup.interactable = true;
+        canvasGroup.blocksRaycasts = true;
+
+        Button authoredCloseButton = detailCanvas.transform
+            .Find("BookMark/Setting/Button")
+            .GetComponent<Button>();
+        IllustratedHandbookCloseButton closeHandler = authoredCloseButton.gameObject.AddComponent<IllustratedHandbookCloseButton>();
+        closeHandler.illustratedHandbookPanel = handbookPage;
+        closeHandler.detailedInformationPanel = detailCanvas;
+        authoredCloseButton.onClick.AddListener(closeHandler.CloseHandbook);
+
+        authoredCloseButton.onClick.Invoke();
+
+        Assert.IsTrue(rootObject.activeSelf);
+        Assert.IsTrue(handbookPage.activeSelf);
+        Assert.IsFalse(detailCanvas.activeSelf);
+    }
+
+    [Test]
+    public void HandbookCloseBookmarkIgnoresHiddenScaledDetailCanvas()
+    {
+        DestroyExistingRootManager();
+        rootObject = CreateSceneAuthoredRoot();
+        Text detailTitle = CreateSceneAuthoredDetailCanvas(rootObject.transform, "DetailInformationFuJianCanvas");
+        GameObject detailCanvas = detailTitle.transform.parent.gameObject;
+        DetailedInformationUI detailUi = detailCanvas.AddComponent<DetailedInformationUI>();
+        detailUi.detailedInformationPanel = detailCanvas;
+        detailUi.illustratedHandbookPanel = rootObject.transform.Find("IllustratedHandbookCanvas").gameObject;
+        detailCanvas.SetActive(true);
+        detailCanvas.transform.localScale = Vector3.zero;
+        CanvasGroup canvasGroup = detailCanvas.GetComponent<CanvasGroup>();
+        canvasGroup.alpha = 1f;
+        canvasGroup.interactable = true;
+        canvasGroup.blocksRaycasts = true;
+
+        UIManager manager = rootObject.AddComponent<UIManager>();
+        manager.illustratedHandbook = rootObject;
+        IllustratedHandbookTabsController.EnsureInstalled(manager);
+        manager.OpenIllustratedHandbook();
+
+        Button handbookCloseButton = rootObject.transform
+            .Find("IllustratedHandbookCanvas/BookMark/Setting/SceneBookmarkHitArea")
+            .GetComponent<Button>();
+        Assert.IsNotNull(handbookCloseButton);
+
+        handbookCloseButton.onClick.Invoke();
+
+        Assert.IsFalse(rootObject.activeSelf);
+    }
+
+    [Test]
+    public void HandbookCloseBookmarkClosesHandbookEvenWhenDetailCanvasIsVisible()
+    {
+        DestroyExistingRootManager();
+        rootObject = CreateSceneAuthoredRoot();
+        Text detailTitle = CreateSceneAuthoredDetailCanvas(rootObject.transform, "DetailInformationFuJianCanvas");
+        GameObject detailCanvas = detailTitle.transform.parent.gameObject;
+        DetailedInformationUI detailUi = detailCanvas.AddComponent<DetailedInformationUI>();
+        detailUi.detailedInformationPanel = detailCanvas;
+        detailUi.illustratedHandbookPanel = rootObject.transform.Find("IllustratedHandbookCanvas").gameObject;
+        detailCanvas.SetActive(true);
+        detailCanvas.transform.localScale = Vector3.one;
+        CanvasGroup canvasGroup = detailCanvas.GetComponent<CanvasGroup>();
+        canvasGroup.alpha = 1f;
+        canvasGroup.interactable = true;
+        canvasGroup.blocksRaycasts = true;
+
+        UIManager manager = rootObject.AddComponent<UIManager>();
+        manager.illustratedHandbook = rootObject;
+        IllustratedHandbookTabsController.EnsureInstalled(manager);
+        manager.OpenIllustratedHandbook();
+
+        Button handbookCloseButton = rootObject.transform
+            .Find("IllustratedHandbookCanvas/BookMark/Setting/SceneBookmarkHitArea")
+            .GetComponent<Button>();
+        Assert.IsNotNull(handbookCloseButton);
+
+        handbookCloseButton.onClick.Invoke();
 
         Assert.IsFalse(rootObject.activeSelf);
     }

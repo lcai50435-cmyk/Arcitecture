@@ -164,6 +164,34 @@ public class DetailedInformationUI : MonoBehaviour
         ShowPage1Only();
     }
 
+    public bool IsDetailVisible()
+    {
+        GameObject detailRoot = detailedInformationPanel != null
+            ? detailedInformationPanel
+            : gameObject;
+
+        if (detailRoot == null || !detailRoot.activeInHierarchy)
+        {
+            return false;
+        }
+
+        RectTransform rectTransform = detailRoot.transform as RectTransform;
+        if (rectTransform != null &&
+            (Mathf.Approximately(rectTransform.localScale.x, 0f) ||
+             Mathf.Approximately(rectTransform.localScale.y, 0f)))
+        {
+            return false;
+        }
+
+        CanvasGroup canvasGroup = detailRoot.GetComponent<CanvasGroup>();
+        if (canvasGroup == null)
+        {
+            return true;
+        }
+
+        return canvasGroup.alpha > 0.01f && canvasGroup.blocksRaycasts;
+    }
+
     private void PrepareDetailPanelForDisplay()
     {
         ResolveRuntimeReferences();
@@ -234,10 +262,16 @@ public class DetailedInformationUI : MonoBehaviour
         Transform current = detailRoot.transform.parent;
         while (current != null)
         {
-            if (current.name == IllustratedHandbookTabsController.RootObjectName ||
-                current.name == IllustratedHandbookTabsController.IllustratedHandbookCanvasName)
+            if (current.name == IllustratedHandbookTabsController.IllustratedHandbookCanvasName)
             {
                 illustratedHandbookPanel = current.gameObject;
+                return;
+            }
+
+            if (current.name == IllustratedHandbookTabsController.RootObjectName)
+            {
+                Transform handbookPage = current.Find(IllustratedHandbookTabsController.IllustratedHandbookCanvasName);
+                illustratedHandbookPanel = handbookPage != null ? handbookPage.gameObject : current.gameObject;
                 return;
             }
 

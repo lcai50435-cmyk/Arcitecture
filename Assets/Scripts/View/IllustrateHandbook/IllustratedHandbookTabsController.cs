@@ -3220,11 +3220,11 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         }
 
         Button authoredCloseButton = FindSceneAuthoredBookmarkButton(closeVisualRoot);
+        bool isDetailCloseButton = IsSceneAuthoredDetailCanvas(pageRoot);
         if (authoredCloseButton != null)
         {
             ConfigureSceneBookmarkButton(authoredCloseButton);
-            authoredCloseButton.onClick.RemoveListener(HandleCloseRequested);
-            authoredCloseButton.onClick.AddListener(HandleCloseRequested);
+            BindSceneCloseAction(authoredCloseButton, isDetailCloseButton);
         }
 
         Button sceneCloseButton = GetOrCreateBookmarkHitAreaButton(closeVisualRoot);
@@ -3235,11 +3235,22 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         }
 
         ConfigureSceneBookmarkHitArea(sceneCloseButton, closeVisualRoot as RectTransform);
-        sceneCloseButton.onClick.RemoveListener(HandleCloseRequested);
         EnsureButtonRaycastTarget(sceneCloseButton);
-        sceneCloseButton.onClick.AddListener(HandleCloseRequested);
+        BindSceneCloseAction(sceneCloseButton, isDetailCloseButton);
         closeVisualRoot.SetAsLastSibling();
         return sceneCloseButton;
+    }
+
+    private void BindSceneCloseAction(Button button, bool isDetailCloseButton)
+    {
+        if (button == null)
+        {
+            return;
+        }
+
+        button.onClick.RemoveListener(HandleCloseRequested);
+        button.onClick.RemoveListener(HandleDetailCloseRequested);
+        button.onClick.AddListener(isDetailCloseButton ? HandleDetailCloseRequested : HandleCloseRequested);
     }
 
     private void RegisterScenePageButtons(GameObject pageRoot)
@@ -3703,6 +3714,37 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
         }
 
         gameObject.SetActive(false);
+    }
+
+    private void HandleDetailCloseRequested()
+    {
+        DetailedInformationUI visibleDetailUi = ResolveVisibleDetailUi();
+        if (visibleDetailUi != null)
+        {
+            visibleDetailUi.CloseDetailOnlyReturnHandbook();
+            return;
+        }
+
+        HandleCloseRequested();
+    }
+
+    private DetailedInformationUI ResolveVisibleDetailUi()
+    {
+        DetailedInformationUI detailUi = GetComponent<DetailedInformationUI>();
+        if (detailUi != null)
+        {
+            return detailUi;
+        }
+
+        return GetComponentInChildren<DetailedInformationUI>(true);
+    }
+
+    private static bool IsSceneAuthoredDetailCanvas(GameObject pageRoot)
+    {
+        return pageRoot != null &&
+               (string.Equals(pageRoot.name, SceneAuthoredFujianDetailCanvasName, StringComparison.Ordinal) ||
+                string.Equals(pageRoot.name, SceneAuthoredShuiXiangDetailCanvasName, StringComparison.Ordinal) ||
+                pageRoot.GetComponent<DetailedInformationUI>() != null);
     }
 
     private void ActivateChromeRoot()
