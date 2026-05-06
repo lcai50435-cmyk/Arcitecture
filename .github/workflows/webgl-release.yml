@@ -164,7 +164,7 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       RELEASE_TAG: ${{ github.ref_name }}
       VERSION: ${{ needs.build.outputs.version }}
-      PAGE_URL: ${{ needs.deploy.outputs.page_url || env.FALLBACK_PAGE_URL }}
+      PAGE_URL: ${{ needs.deploy.outputs.page_url }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -177,10 +177,11 @@ jobs:
       - name: Write release notes
         shell: bash
         run: |
+          page_url="${PAGE_URL:-${FALLBACK_PAGE_URL}}"
           cat > release-notes.md <<EOF
           Arcitecture WebGL preview build.
 
-          Preview URL: ${PAGE_URL}
+          Preview URL: ${page_url}
           Version: ${VERSION}
           Commit: ${GITHUB_SHA}
           EOF
