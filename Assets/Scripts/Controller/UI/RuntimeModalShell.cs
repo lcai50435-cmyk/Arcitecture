@@ -97,6 +97,7 @@ public static class RuntimeModalStyle
             captureCamera.targetTexture = previousTarget;
             RenderTexture.active = previousActive;
             RenderTexture.ReleaseTemporary(captureTexture);
+            WebGLCanvasResizeBridge.RestoreCanvasViewportNow();
         }
     }
 
@@ -138,6 +139,7 @@ public static class RuntimeModalStyle
         RenderTexture.ReleaseTemporary(halfTexture);
         RenderTexture.ReleaseTemporary(quarterTexture);
         RenderTexture.ReleaseTemporary(tempTexture);
+        WebGLCanvasResizeBridge.RestoreCanvasViewportNow();
         return blurredBackdropTexture;
     }
 
@@ -182,6 +184,7 @@ public static class RuntimeModalStyle
             RenderTexture.ReleaseTemporary(halfTexture);
             RenderTexture.ReleaseTemporary(quarterTexture);
             RenderTexture.ReleaseTemporary(tempTexture);
+            WebGLCanvasResizeBridge.RestoreCanvasViewportNow();
         }
     }
 
@@ -291,6 +294,7 @@ public static class RuntimeModalStyle
 
         RenderTexture rebuiltTexture = BuildBlurBackdrop(screenshot);
         UnityEngine.Object.Destroy(screenshot);
+        WebGLCanvasResizeBridge.RestoreCanvasViewportNow();
         if (rebuiltTexture == null)
         {
             return blurredBackdropTexture;
@@ -351,7 +355,6 @@ public sealed class RuntimeModalShell : MonoBehaviour
     {
         EnsureUi();
         SetTarget(targetCanvasGroup);
-        WebGLCanvasResizeBridge.RequestCanvasSync();
         ApplyState(0f);
 
         canvas.gameObject.SetActive(true);
@@ -411,7 +414,6 @@ public sealed class RuntimeModalShell : MonoBehaviour
     {
         yield return new WaitForEndOfFrame();
 
-        WebGLCanvasResizeBridge.SyncCanvasSizeNow();
         RefreshRealtimeBackdrop();
 
         float elapsed = 0f;
@@ -489,7 +491,6 @@ public sealed class RuntimeModalShell : MonoBehaviour
         while (IsVisible)
         {
             yield return new WaitForEndOfFrame();
-            WebGLCanvasResizeBridge.SyncCanvasSizeNow();
             RefreshRealtimeBackdrop();
         }
 
@@ -503,7 +504,6 @@ public sealed class RuntimeModalShell : MonoBehaviour
             return;
         }
 
-        WebGLCanvasResizeBridge.SyncCanvasSizeNow();
         blurredBackdropTexture = RuntimeModalStyle.RefreshRealtimeBlurBackdrop(blurredBackdropTexture);
         if (blurBackdropImage.texture != blurredBackdropTexture)
         {

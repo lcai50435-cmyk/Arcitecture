@@ -276,6 +276,22 @@ mergeInto(LibraryManager.library, {
       return changed ? 1 : 0;
     };
 
+    state.restoreCanvasViewport = function () {
+      var canvas = state.resolveCanvas();
+      if (!canvas || typeof GLctx === "undefined" || !GLctx) {
+        return 0;
+      }
+
+      var width = canvas.width || 0;
+      var height = canvas.height || 0;
+      if (width <= 0 || height <= 0) {
+        return 0;
+      }
+
+      GLctx.viewport(0, 0, width, height);
+      return 1;
+    };
+
     state.scheduleRefresh = function () {
       var delays = [0, 16, 50, 100, 250, 500, 1000];
       for (var i = 0; i < state.pendingTimers.length; i++) {
@@ -327,5 +343,20 @@ mergeInto(LibraryManager.library, {
     }
 
     return state.syncCanvasSize();
+  },
+
+  ArcitectureRestoreCanvasViewport: function () {
+    var state = Module.arcitectureCanvasResizeState;
+    if (state && state.restoreCanvasViewport) {
+      return state.restoreCanvasViewport();
+    }
+
+    var canvas = Module.canvas || (typeof document !== "undefined" && document.querySelector("canvas"));
+    if (!canvas || typeof GLctx === "undefined" || !GLctx || !canvas.width || !canvas.height) {
+      return 0;
+    }
+
+    GLctx.viewport(0, 0, canvas.width, canvas.height);
+    return 1;
   }
 });

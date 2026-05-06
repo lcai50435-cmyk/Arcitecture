@@ -36,6 +36,13 @@ public sealed class WebGLCanvasResizeBridge : MonoBehaviour
 #endif
     }
 
+    public static void RestoreCanvasViewportNow()
+    {
+#if UNITY_WEBGL && !UNITY_EDITOR
+        EnsureInstance().RestoreNativeCanvasViewport();
+#endif
+    }
+
     private static WebGLCanvasResizeBridge EnsureInstance()
     {
         if (instance != null)
@@ -144,11 +151,22 @@ public sealed class WebGLCanvasResizeBridge : MonoBehaviour
 #endif
     }
 
+    private void RestoreNativeCanvasViewport()
+    {
+#if UNITY_WEBGL && !UNITY_EDITOR
+        InstallNativeBridge();
+        ArcitectureRestoreCanvasViewport();
+#endif
+    }
+
 #if UNITY_WEBGL && !UNITY_EDITOR
     [DllImport("__Internal")]
     private static extern void ArcitectureInstallCanvasResizeBridge(string gameObjectName);
 
     [DllImport("__Internal")]
     private static extern int ArcitectureSyncCanvasSize();
+
+    [DllImport("__Internal")]
+    private static extern int ArcitectureRestoreCanvasViewport();
 #endif
 }

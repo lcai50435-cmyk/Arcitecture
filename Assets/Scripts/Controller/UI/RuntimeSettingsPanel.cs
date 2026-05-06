@@ -1903,7 +1903,6 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
     private IEnumerator ShowSequenceRoutine()
     {
         yield return new WaitForEndOfFrame();
-        WebGLCanvasResizeBridge.RequestCanvasSync();
         CaptureBlurBackdrop();
         ApplyAnimationState(0f);
         PlayShowAnimation();
@@ -1912,12 +1911,9 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
 
     private IEnumerator RefreshBackdropRoutine()
     {
-        WebGLCanvasResizeBridge.RequestCanvasSync();
-
         for (int frame = 0; frame < DisplayRefreshFrameBudget; frame++)
         {
             yield return new WaitForEndOfFrame();
-            WebGLCanvasResizeBridge.SyncCanvasSizeNow();
             ScreenAdaptationManager.RefreshNow();
             RefreshDisplayPage();
 
@@ -1938,7 +1934,6 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
         while (IsPanelShown())
         {
             yield return new WaitForEndOfFrame();
-            WebGLCanvasResizeBridge.SyncCanvasSizeNow();
             CaptureBlurBackdrop();
         }
 
@@ -2055,7 +2050,6 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
             return;
         }
 
-        WebGLCanvasResizeBridge.SyncCanvasSizeNow();
         blurredBackdropTexture = RuntimeModalStyle.RefreshRealtimeBlurBackdrop(blurredBackdropTexture);
         if (blurBackdropImage.texture != blurredBackdropTexture)
         {
@@ -2097,6 +2091,7 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
             captureCamera.targetTexture = previousTarget;
             RenderTexture.active = previousActive;
             RenderTexture.ReleaseTemporary(captureTexture);
+            WebGLCanvasResizeBridge.RestoreCanvasViewportNow();
         }
     }
 
