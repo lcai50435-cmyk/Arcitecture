@@ -8,7 +8,7 @@ public static class ArcitectureWebGLBuildCommand
 {
     private const string VersionArgument = "-arcitectureVersion";
     private const string DefaultBuildPath = "Builds/WebGL";
-    private const string DefaultVersion = "0.1.0";
+    private const string DefaultVersion = "3.2.0";
 
     public static void Build()
     {

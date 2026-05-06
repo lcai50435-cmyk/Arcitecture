@@ -27,6 +27,7 @@ concurrency:
 env:
   # GameCI has the public 2022.3.62f1 image; the local project was last opened with 2022.3.62f3c1.
   UNITY_VERSION: 2022.3.62f1
+  DEFAULT_VERSION: 3.2.0
   BUILD_PATH: Builds
   BUILD_NAME: WebGL
   FALLBACK_PAGE_URL: https://lcai50435-cmyk.github.io/Arcitecture/
@@ -59,7 +60,7 @@ jobs:
             version="${REQUESTED_VERSION#v}"
             echo "is_release=false" >> "${GITHUB_OUTPUT}"
           else
-            version="0.0.${GITHUB_RUN_NUMBER}"
+            version="${DEFAULT_VERSION}"
             echo "is_release=false" >> "${GITHUB_OUTPUT}"
           fi
 
@@ -94,17 +95,29 @@ jobs:
             -arcitectureGitDescribe ${{ github.ref_name }}
 
       - name: Prepare Pages files
+        id: prepare_pages
         shell: bash
         run: |
           sudo chown -R "$(id -u):$(id -g)" "${BUILD_PATH}"
-          test -d "${BUILD_PATH}/${BUILD_NAME}"
-          touch "${BUILD_PATH}/${BUILD_NAME}/.nojekyll"
+          pages_path="${BUILD_PATH}/${BUILD_NAME}"
+          if [[ ! -f "${pages_path}/index.html" && -f "${pages_path}/${BUILD_NAME}/index.html" ]]; then
+            pages_path="${pages_path}/${BUILD_NAME}"
+          fi
+          if [[ ! -f "${pages_path}/index.html" ]]; then
+            echo "WebGL index.html not found under ${BUILD_PATH}/${BUILD_NAME}" >&2
+            find "${BUILD_PATH}" -maxdepth 3 -type f | sort >&2
+            exit 1
+          fi
+          touch "${pages_path}/.nojekyll"
+          echo "path=${pages_path}" >> "${GITHUB_OUTPUT}"
 
       - name: Package WebGL artifact
         shell: bash
+        env:
+          PAGES_PATH: ${{ steps.prepare_pages.outputs.path }}
         run: |
-          cd "${BUILD_PATH}"
-          zip -r "../arcitecture-webgl-${{ steps.version.outputs.version }}.zip" "${BUILD_NAME}"
+          cd "$(dirname "${PAGES_PATH}")"
+          zip -r "${GITHUB_WORKSPACE}/arcitecture-webgl-${{ steps.version.outputs.version }}.zip" "$(basename "${PAGES_PATH}")"
 
       - name: Upload downloadable artifact
         uses: actions/upload-artifact@v7
@@ -120,7 +133,7 @@ jobs:
       - name: Upload GitHub Pages artifact
         uses: actions/upload-pages-artifact@v5
         with:
-          path: ${{ env.BUILD_PATH }}/${{ env.BUILD_NAME }}
+          path: ${{ steps.prepare_pages.outputs.path }}
           include-hidden-files: true
 
   deploy:
