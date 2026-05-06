@@ -3,7 +3,7 @@ using System.Text;
 using UnityEngine;
 
 /// <summary>
-/// 建筑结构物品交互处理器
+/// Building structure item interaction handler
 /// </summary>
 public class CrystalInteractHandler : MonoBehaviour, IInteractable
 {

@@ -40,7 +40,7 @@ public sealed class IllustratedHandbookTabsController : MonoBehaviour
     private const string BookContentName = "Content";
     private const string BookPageContentPrefix = "PageContent_";
     private const string PageTagName = "PageTag";
-    // 场景资源中第四个书签沿用 Mission 命名但显示为“设置”，Setting 命名对应红色关闭按钮。
+    // The fourth bookmark in scene assets keeps the Mission name but displays as Settings; the Setting name maps to the red close button.
     private const string SceneAuthoredSettingTabName = "Mission";
     private const string SceneAuthoredCloseButtonName = "Setting";
     private const string SceneBookmarkHitAreaName = "SceneBookmarkHitArea";

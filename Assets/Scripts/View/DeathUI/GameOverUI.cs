@@ -4,7 +4,7 @@ using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 /// <summary>
-/// Game Over 界面按钮控制
+/// Game Over screen button controls
 /// </summary>
 public class GameOverUI : MonoBehaviour
 {

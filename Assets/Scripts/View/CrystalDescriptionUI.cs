@@ -2,7 +2,7 @@ using TMPro;
 using UnityEngine;
 
 /// <summary>
-/// 拾取普通结构后的轻量提示。
+/// Lightweight prompt after picking up a common structure.
 /// </summary>
 public class CrystalDescriptionUI : MonoBehaviour
 {
@@ -26,7 +26,7 @@ public class CrystalDescriptionUI : MonoBehaviour
     }
 
     /// <summary>
-    /// 展示拾取反馈
+    /// Show pickup feedback
     /// </summary>
     private void ShowDescription(ArchitecturalCrystal crystal)
     {

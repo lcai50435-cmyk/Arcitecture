@@ -6,19 +6,19 @@ public class FireMonAttack : EnemyAttack
     private Animator animator;
 
     [Header("火球攻击设置")]
-    public GameObject fireballPrefab; // 火球预制体
-    public Transform firePoint;       // 火球发射点
+    public GameObject fireballPrefab; // Fireball prefab
+    public Transform firePoint;       // Fireball spawn point
 
     protected override void Awake()
     {
-        // 初始化自身依赖的组件
+        // Initialize this component's dependencies
         directionTracker = GetComponent<DirectionTracker>();
         animator = GetComponent<Animator>();
 
-        // 执行父类的 Awake 逻辑
+        // Run the base class Awake logic
         base.Awake();
 
-        // 防止没挂 DirectionTracker，自动添加
+        // Add DirectionTracker automatically if it is missing
         if (directionTracker == null)
         {
             directionTracker = gameObject.AddComponent<DirectionTracker>();
@@ -26,24 +26,24 @@ public class FireMonAttack : EnemyAttack
         }
     }
 
-    // 重写 EnemyAttack 的 TryAttack 方法
+    // Override EnemyAttack.TryAttack
     protected override void TryAttack()
     {
-        // 攻击时间冷却
+        // Attack cooldown
         if (attackInterval > 0f && Time.time - lastAttackTime < attackInterval)
         {
-            return; // 冷却没好
+            return; // Cooldown is not ready
         }
 
-        // 先执行父类的攻击冷却检测
+        // Run the base class attack cooldown check first
         base.TryAttack();
 
-        // 执行火球攻击逻辑
+        // Run the fireball attack logic
         TriggerFireballAttack();
     }
 
     /// <summary>
-    /// 触发火球攻击（封装攻击逻辑）
+    /// Trigger the fireball attack (encapsulated attack logic)
     /// </summary>
     private void TriggerFireballAttack()
     {
@@ -53,7 +53,7 @@ public class FireMonAttack : EnemyAttack
             return;
         }
 
-        // 触发 CharacterAttack 的核心攻击逻辑（停止移动、播放动画等）
+        // Trigger CharacterAttack core attack logic, such as stopping movement and playing animation
         base.TriggerAttack();
         MusicManager.PlaySfx(SfxCueId.FireMonsterCast);
 
@@ -63,16 +63,16 @@ public class FireMonAttack : EnemyAttack
             return;
         }
 
-        // 计算怪物（发射点）到玩家的向量
+        // Calculate the vector from the monster (spawn point) to the player
         Vector2 fireToPlayerDir = player.position - firePoint.position;
         fireToPlayerDir = fireToPlayerDir.normalized;
 
-        //// 获取敌人面朝方向（DirectionTracker 记录的方向）
+        //// Get the enemy facing direction recorded by DirectionTracker
         //Vector2 faceDir = directionTracker.LastDirection;
 
-        // 生成火球并设置朝向
+        // Spawn the fireball and set its facing direction
         GameObject fireball = Instantiate(fireballPrefab, firePoint.position, Quaternion.identity);
-        fireball.transform.right = fireToPlayerDir; // 火球朝向 = 敌人面朝方向
+        fireball.transform.right = fireToPlayerDir; // Fireball facing = enemy facing direction
 
       
 

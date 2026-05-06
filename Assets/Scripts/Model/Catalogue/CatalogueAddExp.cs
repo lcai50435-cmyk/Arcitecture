@@ -3,25 +3,25 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// 建筑图录进度数据
-/// 负责累计不同建筑类型的构建度，并提供总进度给UI读取
+/// Building catalogue progress data
+/// Accumulates build progress by building type and exposes total progress for UI reads
 /// </summary>
 public class CatalogueAddExp : MonoBehaviour
 {
     [Header("总进度上限")]
     public int totalMaxProgress = 100;
 
-    // 每个建筑结构物品的构建度
+    // Build progress for each building structure item
     private Dictionary<ArchitecturalType, int> expDict = new Dictionary<ArchitecturalType, int>();
 
     /// <summary>
-    /// 当进度变化时，通知UI刷新
+    /// Notifies UI refresh when progress changes
     /// </summary>
     public event Action OnProgressChanged;
 
     private void Start()
     {
-        // 初始化所有类型的经验为0
+        // Initialize every type's experience to 0
         foreach (ArchitecturalType type in Enum.GetValues(typeof(ArchitecturalType)))
         {
             expDict[type] = 0;
@@ -46,7 +46,7 @@ public class CatalogueAddExp : MonoBehaviour
     }
 
     /// <summary>
-    /// 对应建筑结构增加构建度
+    /// Adds build progress for the matching building structure
     /// </summary>
     private void HandleExperienceChange(ArchitecturalType type, int newExperience)
     {
@@ -59,12 +59,12 @@ public class CatalogueAddExp : MonoBehaviour
 
         Debug.Log($"基地收到：{type} +{newExperience}，当前总量：{expDict[type]}");
 
-        // 通知UI刷新
+        // Notify UI to refresh
         OnProgressChanged?.Invoke();
     }
 
     /// <summary>
-    /// 获取某个类型当前的构建度
+    /// Gets the current build progress for a type
     /// </summary>
     public int GetProgress(ArchitecturalType type)
     {
@@ -77,7 +77,7 @@ public class CatalogueAddExp : MonoBehaviour
     }
 
     /// <summary>
-    /// 获取总构建度（Gold + Green + White）
+    /// Gets total build progress (Gold + Green + White)
     /// </summary>
     public int GetTotalProgress()
     {
@@ -92,7 +92,7 @@ public class CatalogueAddExp : MonoBehaviour
     }
 
     /// <summary>
-    /// 获取限制在总上限内的总进度
+    /// Gets total progress clamped to the maximum cap
     /// </summary>
     public int GetClampedTotalProgress()
     {

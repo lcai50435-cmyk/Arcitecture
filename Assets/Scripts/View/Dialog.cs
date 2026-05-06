@@ -1060,7 +1060,7 @@ public class Dialog : MonoBehaviour
         return $"{visibleContent}{WrapHiddenText(hiddenContent)}";
     }
 
-    // 用透明富文本保留完整排版，避免 reveal 过程中出现换行抖动。
+    // Use transparent rich text to preserve full layout and avoid line-wrap jitter during reveal.
     private string WrapHiddenText(string hiddenContent)
     {
         if (string.IsNullOrEmpty(hiddenContent))

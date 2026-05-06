@@ -50,7 +50,7 @@ public class DetailedInformationUI : MonoBehaviour
     }
 
     /// <summary>
-    /// 显示建筑详细信息
+    /// Show building details
     /// </summary>
     public void ShowDetail(BuildingDetailData data)
     {
@@ -91,7 +91,7 @@ public class DetailedInformationUI : MonoBehaviour
     }
 
     /// <summary>
-    /// 显示第一页
+    /// Show the first page
     /// </summary>
     public void ShowPage1()
     {
@@ -106,7 +106,7 @@ public class DetailedInformationUI : MonoBehaviour
     }
 
     /// <summary>
-    /// 显示第二页
+    /// Show the second page
     /// </summary>
     public void ShowPage2()
     {
@@ -125,7 +125,7 @@ public class DetailedInformationUI : MonoBehaviour
     }
 
     /// <summary>
-    /// 只显示第一页（本地页面状态）
+    /// Show only the first page (local page state)
     /// </summary>
     private void ShowPage1Only()
     {
@@ -137,7 +137,7 @@ public class DetailedInformationUI : MonoBehaviour
     }
 
     /// <summary>
-    /// 关闭整个图鉴系统
+    /// Close the entire catalogue system
     /// </summary>
     public void CloseAllUI()
     {
@@ -146,7 +146,7 @@ public class DetailedInformationUI : MonoBehaviour
     }
 
     /// <summary>
-    /// 从详情页回到图鉴主页
+    /// Return from the detail page to the catalogue home page
     /// </summary>
     public void CloseDetailOnlyReturnHandbook()
     {

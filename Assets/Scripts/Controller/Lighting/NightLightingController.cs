@@ -77,6 +77,7 @@ public sealed class NightLightingController : MonoBehaviour
     internal const int LocalLightSortingOrder = OverlaySortingOrder + 200;
     private const int InitialSceneBindingPassCount = 3;
     private const float InitialSceneBindingInterval = 0.25f;
+    private const float OverlayViewportPaddingMultiplier = 1.08f;
     private const string ProfileResourcePath = "Lighting/NightLightingProfiles";
 
     private static readonly Color GameplayLightColor = new Color(0.96f, 0.86f, 0.62f, 1f);
@@ -257,6 +258,17 @@ public sealed class NightLightingController : MonoBehaviour
         EnsureOverlayRenderer();
     }
 
+    private void OnEnable()
+    {
+        Camera.onPreCull -= HandleCameraPreCull;
+        Camera.onPreCull += HandleCameraPreCull;
+    }
+
+    private void OnDisable()
+    {
+        Camera.onPreCull -= HandleCameraPreCull;
+    }
+
     private void Start()
     {
         if (string.IsNullOrWhiteSpace(currentSceneName))
@@ -309,6 +321,25 @@ public sealed class NightLightingController : MonoBehaviour
         }
 
         UnbindCountdownManager();
+    }
+
+    private void HandleCameraPreCull(Camera renderingCamera)
+    {
+        if (renderingCamera == null || currentProfile == null)
+        {
+            return;
+        }
+
+        ResolveCameraIfNeeded();
+        if (currentCamera == null || renderingCamera != currentCamera)
+        {
+            return;
+        }
+
+        EnsureCameraIncludesEffectLayer(currentCamera);
+        CaptureBaseCameraBackgroundIfNeeded();
+        UpdateOverlayVisual();
+        UpdateViewportLights();
     }
 
     public void ApplySceneProfile(string sceneName)
@@ -650,8 +681,8 @@ public sealed class NightLightingController : MonoBehaviour
             currentCamera.transform.position.y,
             0f);
         overlayRenderer.transform.localScale = new Vector3(
-            GetCameraWorldWidth(currentCamera),
-            GetCameraWorldHeight(currentCamera),
+            GetCameraWorldWidth(currentCamera) * OverlayViewportPaddingMultiplier,
+            GetCameraWorldHeight(currentCamera) * OverlayViewportPaddingMultiplier,
             1f);
 
         Color overlayColor = currentProfile.overlayTint;

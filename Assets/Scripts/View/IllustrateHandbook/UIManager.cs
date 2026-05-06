@@ -1,7 +1,7 @@
 using UnityEngine;
 
 /// <summary>
-/// UI 管理器，负责图鉴开关、其他 UI 显隐与玩家移动锁定。
+/// UI manager for catalogue toggling, other UI visibility, and player movement locking.
 /// </summary>
 public class UIManager : MonoBehaviour
 {

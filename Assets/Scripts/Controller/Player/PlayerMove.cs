@@ -5,7 +5,7 @@ using UnityEngine.SceneManagement;
 using UnityEngine.Tilemaps;
 
 /// <summary>
-/// 人物移动
+/// Character movement
 /// </summary>
 public class PlayerMove : MonoBehaviour
 {
@@ -22,17 +22,17 @@ public class PlayerMove : MonoBehaviour
     
     protected CharacterCore core;
 
-    // 记住最后一次的方向
+    // Remember the last direction
     private float lastInputX;
     private float lastInputY;
     private Vector2 pendingMoveInput;
 
-    private float moveSpeed; // 速度
+    private float moveSpeed; // Speed
     private float externalMoveSpeedMultiplier = 1f;
 
     [HideInInspector] public bool canMove = true;
 
-    // 挂载朝向跟踪组件
+    // Attach the facing direction tracker component
     private DirectionTracker directionTracker;
     private SpriteRenderer playerRenderer;
     private Collider2D bodyCollider;
@@ -52,7 +52,7 @@ public class PlayerMove : MonoBehaviour
             rb.collisionDetectionMode = CollisionDetectionMode2D.Continuous;
         }
 
-        // 获取朝向跟踪组件
+        // Get the facing direction tracker component
         directionTracker = GetComponent<DirectionTracker>();
         playerRenderer = GetComponent<SpriteRenderer>();
         bodyCollider = ResolveBodyCollider();
@@ -99,18 +99,18 @@ public class PlayerMove : MonoBehaviour
         float inputX = Input.GetAxisRaw("Horizontal"); 
         float inputY = Input.GetAxisRaw("Vertical");
 
-        // 人物强制四方向行走
+        // Force four-direction character movement
         if (Mathf.Abs(inputX) > 0.1f && Mathf.Abs(inputY) > 0.1f)
         {
-            // 同时按了两个键 则 清空一个轴，强制四方向
+            // If two keys are pressed at the same time, clear one axis to force four-direction movement
             inputX = 0;
         }
 
         Vector2 currentMoveDir = new Vector2(inputX, inputY);
-        // 判断是否移动
+        // Check whether the character is moving
         bool isMoving = Mathf.Abs(inputX) > 0.1f || Mathf.Abs(inputY) > 0.1f;
 
-        // 关键：更新朝向到工具类
+        // Important: update facing direction in the helper
         if (isMoving)
         {
             directionTracker?.UpdateMoveDirection(currentMoveDir);
@@ -120,7 +120,7 @@ public class PlayerMove : MonoBehaviour
             }
         }
 
-        // 从工具类获取最后朝向，更新动画
+        // Get the last facing direction from the helper and update animation
         Vector2 lastDir = directionTracker != null ? directionTracker.LastDirection : Vector2.down;
         if (AnimatorParameterUtility.CanDrive(animator))
         {
@@ -129,7 +129,7 @@ public class PlayerMove : MonoBehaviour
             AnimatorParameterUtility.SetBoolIfPresent(animator, "IsMoving", isMoving);
         }
 
-        // 移动
+        // Move
         pendingMoveInput = new Vector2(inputX, inputY);
     }
 

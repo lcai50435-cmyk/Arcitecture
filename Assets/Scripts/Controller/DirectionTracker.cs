@@ -1,45 +1,45 @@
 using UnityEngine;
 
 /// <summary>
-/// 通用朝向跟踪工具类
-/// 记录角色（玩家/敌人）的最后移动朝向，支持获取攻击/待机朝向
+/// General-purpose facing direction tracker
+/// Records the last movement direction for characters (player/enemy) and exposes attack/idle facing
 /// </summary>
 public class DirectionTracker : MonoBehaviour
 {
-    // 最后一次有效移动的朝向（X/Y轴）
+    // Last valid movement direction (X/Y axes)
     private Vector2 lastDirection;
-    // 默认朝向（比如角色初始朝右）
+    // Default facing direction (for example, the character initially faces right)
     [Header("默认朝向")]
     public Vector2 defaultDirection = Vector2.up;
 
     /// <summary>
-    /// 获取最后面朝方向（对外只读）
+    /// Gets the last facing direction (read-only externally)
     /// </summary>
     public Vector2 LastDirection
     {
         get
         {
-            // 如果从未移动过，返回默认朝向
+            // If the character has never moved, return the default facing direction
             return lastDirection.magnitude < 0.1f ? defaultDirection : lastDirection;
         }
     }
 
     /// <summary>
-    /// 更新移动朝向（角色移动时调用）
+    /// Updates the movement direction (called when the character moves)
     /// </summary>
-    /// <param name="currentMoveDir">当前移动方向</param>
+    /// <param name="currentMoveDir">Current movement direction</param>
     public void UpdateMoveDirection(Vector2 currentMoveDir)
     {
-        // 过滤无效输入（避免微小数值干扰）
+        // Filter invalid input to avoid tiny value jitter
         if (currentMoveDir.magnitude > 0.1f)
         {
-            // 归一化，保证方向向量长度为1
+            // Normalize to keep the direction vector length at 1
             lastDirection = currentMoveDir.normalized;
         }
     }
 
     /// <summary>
-    /// 重置朝向（可选，比如角色重生时）
+    /// Resets facing direction (optional, for example when the character respawns)
     /// </summary>
     public void ResetDirection()
     {

@@ -1,7 +1,7 @@
 using UnityEngine;
 
 /// <summary>
-/// 地震怪死亡相关逻辑
+/// Stone monster death logic
 /// </summary>
 public class StoneMonsterDeath : CharacterDeathBase
 {
@@ -12,7 +12,7 @@ public class StoneMonsterDeath : CharacterDeathBase
 
     protected override void OnCharacterDie()
     {
-        // 触发动画机的死亡Trigger
+        // Trigger the Animator death trigger
         anim.SetTrigger("IsDeath");
     }
 

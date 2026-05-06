@@ -2,8 +2,8 @@ using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
-/// 图鉴总进度 UI。
-/// 三个进度条按顺序增长：先满第一条，再加第二条，再加第三条。
+/// Overall catalogue progress UI.
+/// The three progress bars fill in order: first the first bar, then the second, then the third.
 /// </summary>
 public class UniversalCollectionProgress : MonoBehaviour
 {

@@ -4,7 +4,7 @@ using UnityEngine;
 
 public class FollowPlayer : MonoBehaviour
 {
-    public Transform player; // 拖入你的 Player
+    public Transform player; // Assign your Player here
 
     private void OnEnable()
     {

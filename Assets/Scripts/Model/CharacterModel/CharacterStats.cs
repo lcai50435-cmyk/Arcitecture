@@ -2,7 +2,7 @@ using System;
 using UnityEngine;
 
 /// <summary>
-/// 管理角色相关变量。
+/// Manages character-related variables.
 /// </summary>
 [Serializable]
 public class CharacterStats

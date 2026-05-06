@@ -2,8 +2,8 @@ using System;
 using UnityEngine;
 
 /// <summary>
-/// 角色管理脚本。
-/// 负责维护角色基础属性、当前属性与血量。
+/// Character management script.
+/// Maintains base stats, current stats, and health.
 /// </summary>
 public class CharacterCore : MonoBehaviour
 {

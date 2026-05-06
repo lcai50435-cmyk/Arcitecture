@@ -4,7 +4,7 @@ using UnityEngine;
 
 public class CatagloueAreaTrigger2D : MonoBehaviour
 {
-    // 只识别玩家
+    // Only detect the player
     private void OnTriggerEnter2D(Collider2D other)
     {
         if (other.CompareTag("Player"))

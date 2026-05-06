@@ -2,7 +2,7 @@ using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
-/// 玩家濒死时的整屏红色危险反馈。
+/// Full-screen red danger feedback when the player is near death.
 /// </summary>
 public class PlayerCriticalStateFeedback : MonoBehaviour
 {

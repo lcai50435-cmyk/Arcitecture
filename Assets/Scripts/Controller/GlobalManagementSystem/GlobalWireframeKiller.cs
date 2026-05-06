@@ -15,7 +15,7 @@ public class GlobalWireframeKiller : MonoBehaviour
 
     void HideAllCanvasWireframe()
     {
-        // 只在游戏运行时执行
+        // Only run while the game is playing
         if (!Application.isPlaying) return;
 
         Canvas[] allCanvas = Resources.FindObjectsOfTypeAll<Canvas>();
@@ -24,7 +24,7 @@ public class GlobalWireframeKiller : MonoBehaviour
         {
             try
             {
-                // 只处理动态创建、带Overlay的UI（就是你那些白线框物体）
+                // Only process dynamically created Overlay UI objects that show the white wireframe.
                 if (canvas.renderMode == RenderMode.ScreenSpaceOverlay)
                 {
                     canvas.gameObject.hideFlags = HideFlags.HideInHierarchy | HideFlags.NotEditable;

@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// 经验管理
+/// Experience management
 /// </summary>
 public class ExperienceManager : MonoBehaviour
 {
@@ -12,7 +12,7 @@ public class ExperienceManager : MonoBehaviour
     public delegate void ExperienceChangeHandler(ArchitecturalType type, int value);
     public event ExperienceChangeHandler OnExperienceChange;
 
-    // 单例模式
+    // Singleton pattern
     private void Awake()
     {      
         if (Instance == null)
@@ -28,7 +28,7 @@ public class ExperienceManager : MonoBehaviour
 
     public void AddExperience(ArchitecturalType type, int value)
     {
-        // 防止经验值为0
+        // Prevent experience from being 0
         if (value < 0)
         {
             Debug.LogError("经验值不能为负");

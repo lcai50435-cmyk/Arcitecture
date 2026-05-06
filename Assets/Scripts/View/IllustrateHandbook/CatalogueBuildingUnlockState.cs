@@ -2,11 +2,11 @@ using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
-/// 单个建筑图鉴条目的完成状态判断
-/// 条件：
-/// 1. 通用材料最多推进到 70% 解锁度
-/// 2. 3 个专用槽位点亮后补足剩余 30%
-/// 3. 点击未解锁图标确认完成
+/// Completion state check for a single building catalogue entry
+/// Conditions:
+/// 1. Common materials can advance unlock progress up to 70%
+/// 2. Lighting all 3 dedicated slots completes the remaining 30%
+/// 3. Click the locked icon to confirm completion
 /// </summary>
 public class CatalogueBuildingUnlockState : MonoBehaviour
 {

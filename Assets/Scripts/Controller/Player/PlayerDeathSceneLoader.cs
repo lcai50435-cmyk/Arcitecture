@@ -2,7 +2,7 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 
 /// <summary>
-/// 玩家死亡后切换到 GameOver 场景
+/// Switch to the GameOver scene after the player dies
 /// </summary>
 public class PlayerDeathSceneLoader : MonoBehaviour
 {

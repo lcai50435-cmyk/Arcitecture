@@ -1,7 +1,7 @@
 using UnityEngine;
 
 /// <summary>
-/// 火灾怪死亡相关逻辑
+/// Fire monster death logic
 /// </summary>
 public class FireMonsterDeath : CharacterDeathBase
 {
@@ -12,13 +12,13 @@ public class FireMonsterDeath : CharacterDeathBase
 
     protected override void OnCharacterDie()
     {
-        // 触发动画机的死亡Trigger
+        // Trigger the Animator death trigger
         anim.SetTrigger("IsDeath");
     }
 
     protected override void DisablePhysicsComponents()
     {
-        // 关闭碰撞
+        // Disable collision
         if (characterCollider != null)
             characterCollider.enabled = false;
 

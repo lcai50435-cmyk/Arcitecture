@@ -55,17 +55,17 @@ public class PropPrefabSetup : MonoBehaviour
     {
         string prefabName = prefab.name;
         
-        // 移除旧的交互组件
+        // Remove old interaction components
         CrystalInteractHandler existingHandler = prefab.GetComponent<CrystalInteractHandler>();
         if (existingHandler != null)
         {
             Component.DestroyImmediate(existingHandler, true);
         }
 
-        // 添加CrystalInteractHandler组件
+        // Add the CrystalInteractHandler component
         CrystalInteractHandler handler = prefab.AddComponent<CrystalInteractHandler>();
 
-        // 设置类型
+        // Set type
         if (nameToTypeMap.TryGetValue(prefabName, out ArchitecturalType type))
         {
             handler.type = type;
@@ -76,13 +76,13 @@ public class PropPrefabSetup : MonoBehaviour
             handler.type = ArchitecturalType.MortiseAndTenonJoint;
         }
 
-        // 设置文本描述
+        // Set text description
         if (typeDescriptions.TryGetValue(prefabName, out string description))
         {
             handler.textDescription = description;
         }
 
-        // 设置默认属性
+        // Set default attributes
         handler.resourceCategory = ArchitecturalResourceCategory.CommonStructure;
         handler.isUnlockMaterial = false;
         handler.buildProgressPercent = 0;
@@ -90,19 +90,19 @@ public class PropPrefabSetup : MonoBehaviour
         handler.persistCollectedAcrossSceneLoads = false;
         handler.startClosedAsLootBag = false;
 
-        // 移除旧的碰撞器
+        // Remove old colliders
         CircleCollider2D existingCollider = prefab.GetComponent<CircleCollider2D>();
         if (existingCollider != null)
         {
             Component.DestroyImmediate(existingCollider, true);
         }
 
-        // 添加圆形碰撞器
+        // Add a circle collider
         CircleCollider2D collider = prefab.AddComponent<CircleCollider2D>();
         collider.isTrigger = true;
         collider.radius = 0.2f;
 
-        // 设置SpriteRenderer的sortingOrder
+        // Set the SpriteRenderer sortingOrder
         SpriteRenderer renderer = prefab.GetComponent<SpriteRenderer>();
         if (renderer != null)
         {

@@ -37,7 +37,7 @@ public class PropInteractiveSetup : MonoBehaviour
         {
             string objName = obj.name;
             
-            // 移除后缀 (Clone)
+            // Remove the (Clone) suffix
             if (objName.EndsWith("(Clone)"))
             {
                 objName = objName.Substring(0, objName.Length - 7);
@@ -54,22 +54,22 @@ public class PropInteractiveSetup : MonoBehaviour
 
     private void SetupPropObject(GameObject obj, string propName)
     {
-        // 检查是否已经有CrystalInteractHandler
+        // Check whether CrystalInteractHandler already exists
         CrystalInteractHandler existingHandler = obj.GetComponent<CrystalInteractHandler>();
         if (existingHandler != null)
         {
-            // 如果已经有组件，更新配置
+            // If the component already exists, update its config
             UpdateHandlerConfig(existingHandler, propName);
             return;
         }
 
-        // 添加CrystalInteractHandler组件
+        // Add the CrystalInteractHandler component
         CrystalInteractHandler handler = obj.AddComponent<CrystalInteractHandler>();
         
-        // 设置配置
+        // Set config
         UpdateHandlerConfig(handler, propName);
 
-        // 添加圆形碰撞器
+        // Add a circle collider
         CircleCollider2D collider = obj.GetComponent<CircleCollider2D>();
         if (collider == null)
         {
@@ -78,7 +78,7 @@ public class PropInteractiveSetup : MonoBehaviour
         collider.isTrigger = true;
         collider.radius = 0.2f;
 
-        // 设置SpriteRenderer的sortingOrder
+        // Set the SpriteRenderer sortingOrder
         SpriteRenderer renderer = obj.GetComponent<SpriteRenderer>();
         if (renderer != null)
         {
@@ -90,19 +90,19 @@ public class PropInteractiveSetup : MonoBehaviour
 
     private void UpdateHandlerConfig(CrystalInteractHandler handler, string propName)
     {
-        // 设置类型
+        // Set type
         if (nameToTypeMap.TryGetValue(propName, out ArchitecturalType type))
         {
             handler.type = type;
         }
 
-        // 设置文本描述
+        // Set text description
         if (typeDescriptions.TryGetValue(propName, out string description))
         {
             handler.textDescription = description;
         }
 
-        // 设置默认属性
+        // Set default attributes
         handler.resourceCategory = ArchitecturalResourceCategory.CommonStructure;
         handler.isUnlockMaterial = false;
         handler.buildProgressPercent = 0;

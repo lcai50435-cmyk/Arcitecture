@@ -231,7 +231,7 @@ public class CatalogueUnlockSlotButton : MonoBehaviour, IDropHandler
             }
         }
 
-        // 运行时优先信任父建筑配置里的槽位顺序，兼容 prefab 里仍保留旧 slotId 的情况。
+        // At runtime, prefer the slot order from the parent building config while supporting prefabs that still keep old slotIds.
         if (IsResolvedSlotIndexValid(buildingId, resolvedSlotIndex))
         {
             return true;

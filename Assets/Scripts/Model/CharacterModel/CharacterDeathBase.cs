@@ -48,7 +48,7 @@ public class CharacterDeathBase : MonoBehaviour
 
     protected virtual void DisablePhysicsComponents()
     {
-        // 关闭碰撞
+        // Disable collision
         if (characterCollider != null)
             characterCollider.enabled = false;
 
@@ -90,7 +90,7 @@ public class CharacterDeathBase : MonoBehaviour
 
     protected virtual void OnCharacterDie()
     {
-        // 交由子类播放死亡表现
+        // Let subclasses play the death presentation
     }
 
     protected virtual float GetDeathFallbackDelay()

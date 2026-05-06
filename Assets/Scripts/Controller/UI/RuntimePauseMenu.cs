@@ -20,7 +20,7 @@ public sealed class RuntimePauseMenu : MonoBehaviour
     }
 
     private const string CanvasName = "RuntimePauseMenuCanvas";
-    // 暂停面板必须高于所有运行时弹窗，避免旧 UI 遮罩吞掉 Esc 打开的面板点击。
+    // The pause panel must be above all runtime popups so old UI masks do not consume clicks on the panel opened by Esc.
     private const int SortingOrder = Dialog.TopmostRuntimeDialogSortingOrder + 50;
     private const string PauseReason = "RuntimePauseMenu";
     private const float PanelWidth = 1120f;
@@ -103,7 +103,7 @@ public sealed class RuntimePauseMenu : MonoBehaviour
 
     public static void ConsumeOpenHotkey()
     {
-        // 保留给旧调用方；Esc 现在始终优先打开暂停页。
+        // Kept for old callers; Esc now always opens the pause page first.
     }
 
     public static void CloseForSceneTransition()

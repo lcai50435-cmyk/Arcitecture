@@ -1,8 +1,8 @@
 using UnityEngine;
 
 /// <summary>
-/// 玩家播放受击动画
-/// 禁用/启用移动
+/// Player hit reaction animation
+/// Disable/enable movement
 /// </summary>
 public class PlayerTakeDamage : MonoBehaviour
 {
@@ -10,7 +10,7 @@ public class PlayerTakeDamage : MonoBehaviour
 
     [Header("组件引用")]
     public Animator playerAnim;
-    public PlayerMove playerMovement; // 拖拽赋值移动脚本
+    public PlayerMove playerMovement; // Assign the movement script by dragging it here
     [Header("受击动画参数")]
     public string hurtAnimParam = "IsHurt";
     [Header("血条脚本")]
@@ -31,7 +31,7 @@ public class PlayerTakeDamage : MonoBehaviour
             characterCore.OnTakeDamage += PlayHurtAnimation;
         }
 
-        // 安全校验：确保移动脚本引用不为空
+        // Safety check: ensure the movement script reference is not null
         if (playerMovement == null)
         {
             playerMovement = GetComponent<PlayerMove>();
@@ -52,7 +52,7 @@ public class PlayerTakeDamage : MonoBehaviour
     }
 
     /// <summary>
-    /// 播放受击动画并禁用移动
+    /// Play the hit reaction animation and disable movement
     /// </summary>
     private void PlayHurtAnimation()
     {
@@ -63,24 +63,24 @@ public class PlayerTakeDamage : MonoBehaviour
             if (playerMovement != null)
             {
                 bool shouldRestoreMovement = movementLockedByHurt || playerMovement.canMove;
-                // 受击时禁止移动
+                // Disable movement while taking damage
                 playerMovement.canMove = false;
                 movementLockedByHurt = shouldRestoreMovement;
                 hurtRecoveryTimer = shouldRestoreMovement ? HurtMoveLockDuration : 0f;
-                // 清空刚体速度，立即停止位移
+                // Clear rigidbody velocity to stop movement immediately
                 if (playerMovement.rb != null)
                 {
                     playerMovement.rb.velocity = Vector2.zero;
                 }
             }
 
-            // 触发受击动画
+            // Trigger the hit reaction animation
             playerAnim.SetTrigger(hurtAnimParam);
         }
     }
 
     /// <summary>
-    /// 动画事件回调：受击动画播放完成后启用移动
+    /// Animation event callback: re-enable movement after the hit reaction animation finishes
     /// </summary>
     public void OnHurtAnimationEnd()
     {
@@ -112,7 +112,7 @@ public class PlayerTakeDamage : MonoBehaviour
         movementLockedByHurt = false;
         if (playerMovement != null)
         {
-            playerMovement.canMove = true; // 只恢复受击锁定
+            playerMovement.canMove = true; // Only clear the hit reaction lock
         }
     }
 

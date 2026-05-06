@@ -2,7 +2,7 @@ using UnityEngine;
 
 public class CrackDamage : MonoBehaviour
 {
-    private float damage = 20f; // 攻击伤害
+    private float damage = 20f; // Attack damage
 
     private EnemyStatsManager sourceStatsManager;
 
@@ -11,7 +11,7 @@ public class CrackDamage : MonoBehaviour
         sourceStatsManager = statsManager;
     }
 
-    // 因为碰撞矩阵已经过滤，这里进来的一定是玩家
+    // The collision matrix already filters this, so anything entering here must be the player
     private void OnTriggerEnter2D(Collider2D other)
     {
         TryApplyDamage(other);

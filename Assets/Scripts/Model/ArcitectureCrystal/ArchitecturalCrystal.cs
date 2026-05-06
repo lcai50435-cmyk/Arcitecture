@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-// 建筑结构物品类型
+// Building structure item type
 public enum ArchitecturalType
 {
     MortiseAndTenonJoint,
@@ -37,12 +37,12 @@ public enum AttributeBonusType
 }
 
 /// <summary>
-/// 建筑结构物品数据信息。
+/// Building structure item data.
 /// </summary>
 public struct ArchitecturalCrystal
 {
     public ArchitecturalType type;
-    // 兼容旧场景与 prefab 序列化，普通结构的构建度已改由 buildProgressPercent 驱动。
+    // Keep compatibility with old scene and prefab serialization; normal structure build progress is now driven by buildProgressPercent.
     public int expValue;
     public int buildProgressPercent;
     public Sprite icon;

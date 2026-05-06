@@ -1877,7 +1877,7 @@ public class BackpackUI : MonoBehaviour
 
         if (UseFollowTogglePromptStyle())
         {
-            // gameplay 场景里统一改成贴玩家侧边的小提示，底部热区仅保留点击能力。
+            // In gameplay scenes, use a compact prompt attached to the player side; the bottom hot zone only keeps click handling.
             toggleHotspotRect.localScale = Vector3.one;
             Color hiddenColor = toggleHotspotImage.color;
             hiddenColor.a = 0f;
@@ -1939,7 +1939,7 @@ public class BackpackUI : MonoBehaviour
 
     private bool ShouldShowFollowTogglePrompt()
     {
-        // 背包不再提供手动折叠/展开入口，跟随提示保持关闭。
+        // Backpack no longer exposes manual collapse/expand controls, so keep the follow prompt closed.
         return false;
     }
 

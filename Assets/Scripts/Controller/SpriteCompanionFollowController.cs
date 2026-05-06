@@ -326,7 +326,7 @@ public sealed class SpriteCompanionFollowController : MonoBehaviour
         avoidObstacle?.ResetAvoidance();
         move?.StopMovement();
 
-        // 只初始化目标槽位，不直接改 transform.position，避免精灵运行时瞬移。
+        // Only initialize the target slot; do not change transform.position directly to avoid runtime sprite snapping.
         Vector2 faceDirection = ResolveFourWayDirection((Vector2)(playerPosition - targetPosition));
         if (faceDirection != Vector2.zero && companionCore != null)
         {

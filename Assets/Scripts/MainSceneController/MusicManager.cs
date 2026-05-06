@@ -79,10 +79,10 @@ public class MusicManager : MonoBehaviour
         Instance = this;
         DontDestroyOnLoad(gameObject);
 
-        // 防止图标渲染
+        // Prevent icon rendering
         gameObject.hideFlags = HideFlags.HideInHierarchy | HideFlags.HideInInspector;
         //gameObject.layer = 31;
-        //transform.hideFlags = HideFlags.HideInHierarchy | HideFlags.HideInInspector; // 连Transform一起隐藏
+        //transform.hideFlags = HideFlags.HideInHierarchy | HideFlags.HideInInspector; // Hide the Transform too
 
         LoadAudioCatalog();
         EnsureAudioSources();
@@ -526,7 +526,7 @@ public class MusicManager : MonoBehaviour
 
         AudioSource childSource = childObject.GetComponent<AudioSource>();
 
-        // 隐藏渲染辅助线
+        // Hide rendering guide lines
         childObject.hideFlags = HideFlags.HideInHierarchy | HideFlags.HideInInspector;
         if (childSource == null)
         {

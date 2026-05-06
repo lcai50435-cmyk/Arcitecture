@@ -27,7 +27,7 @@ public sealed class RuntimeSettingsPanel : MonoBehaviour
     }
 
     private const string CanvasName = "RuntimeSettingsPanelCanvas";
-    // 设置页与暂停页保持同一交互层级，避免透明切场遮罩吞掉点击。
+    // Keep the settings page and pause page on the same interaction layer so the transparent scene-transition mask does not consume clicks.
     private const int SortingOrder = 10050;
     private const float PanelWidth = 1440f;
     private const float PanelHeight = 840f;

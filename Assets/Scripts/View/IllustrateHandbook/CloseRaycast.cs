@@ -6,7 +6,7 @@ public class CloseRaycast : MonoBehaviour
 {
     void Awake()
     {
-        // 直接把Raycast Target关掉
+        // Disable Raycast Target directly
         var subMesh = GetComponent<TMP_SubMeshUI>();
         if (subMesh != null)
         {

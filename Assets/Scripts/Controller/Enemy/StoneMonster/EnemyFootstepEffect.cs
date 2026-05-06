@@ -17,10 +17,10 @@ public class EnemyFootstepEffect : MonoBehaviour
     public EnemyStatsManager statsManager;
 
     [Header("裂纹生成间隔（秒）")]
-    public float spawnInterval = 2f; // 每2秒生成一次
+    public float spawnInterval = 2f; // Spawn once every 2 seconds
 
-    // 冷却时间记录
-    private float lastSpawnTime = -2f; // 一开始就能生成
+    // Cooldown time record
+    private float lastSpawnTime = -2f; // Can spawn immediately at the start
 
     private void Reset()
     {
@@ -38,24 +38,24 @@ public class EnemyFootstepEffect : MonoBehaviour
     }
 
     /// <summary>
-    /// 裂纹生成脚本
+    /// Crack spawning script
     /// </summary>
     public void SpawnFootstepCrack()
     {
         if (!CanSpawnFootstepCrack())
             return;
 
-        // 距离上次生成不足2秒，直接跳过，不生成
+        // Skip spawning if less than 2 seconds have passed since the last spawn
         if (Time.time < lastSpawnTime + spawnInterval)
             return;
 
         if (crackEffectPrefab == null || enemyTransform == null)
             return;
 
-        // 更新最后生成时间
+        // Update the last spawn time
         lastSpawnTime = Time.time;
 
-        // 生成裂纹
+        // Spawn crack
         GameObject crack = Instantiate(
             crackEffectPrefab,
             enemyTransform.position,
@@ -74,7 +74,7 @@ public class EnemyFootstepEffect : MonoBehaviour
             crackDamage.BindSource(statsManager);
         }
 
-        // 自动销毁
+        // Auto-destroy
         Destroy(crack, effectDuration);
     }
 

@@ -2,7 +2,7 @@ using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
-/// 建筑图片解锁后可点击，点击跳转到详细信息界面
+/// Building image becomes clickable after unlock and opens the detail screen when clicked
 /// </summary>
 [RequireComponent(typeof(Button))]
 public class UnlockedBuildingImageButton : MonoBehaviour

@@ -1,9 +1,9 @@
-﻿using UnityEngine;
+using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
-/// 控制建筑大图颜色：
-/// 初始为较深灰色，随着 Slider 和小图标点亮逐渐变亮，最终恢复正常显示
+/// Controls the large building image color:
+/// Starts as dark gray, brightens as the Slider and small icons light up, and finally restores normal display
 /// </summary>
 public class ImageColorController : MonoBehaviour
 {
@@ -40,7 +40,7 @@ public class ImageColorController : MonoBehaviour
             return;
         }
 
-        // 1. Slider 进度，0~1
+        // 1. Slider progress, 0 to 1
         float sliderProgress = 0f;
         if (buildingSlider.maxValue > 0f)
         {
@@ -48,7 +48,7 @@ public class ImageColorController : MonoBehaviour
         }
         sliderProgress = Mathf.Clamp01(sliderProgress);
 
-        // 2. 小图标点亮进度，0~1
+        // 2. Small icon lit progress, 0 to 1
         float slotProgress = 0f;
         if (slotButtons != null && slotButtons.Length > 0)
         {
@@ -65,11 +65,11 @@ public class ImageColorController : MonoBehaviour
             slotProgress = (float)unlockedCount / slotButtons.Length;
         }
 
-        // 3. 组合进度
+        // 3. Combined progress
         float combinedProgress = sliderProgress * sliderWeight + slotProgress * slotWeight;
         combinedProgress = Mathf.Clamp01(combinedProgress);
 
-        // 4. 从 baseGray 渐变到 1（白色）
+        // 4. Lerp from baseGray to 1 (white)
         float brightness = Mathf.Lerp(baseGray, 1f, combinedProgress);
 
         targetImage.color = new Color(brightness, brightness, brightness, 1f);

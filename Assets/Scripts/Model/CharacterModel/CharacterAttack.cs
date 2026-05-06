@@ -5,27 +5,27 @@ using UnityEngine;
 using UnityEngine.SocialPlatforms.Impl;
 
 /// <summary>
-/// 封装角色攻击的通用逻辑
-/// 攻击期间不得再次攻击
-/// 攻击期间不得移动
+/// Encapsulates common character attack logic
+/// Cannot attack again while attacking
+/// Cannot move while attacking
 /// </summary>
 public abstract class CharacterAttack : MonoBehaviour
 {
     [Header("攻击基础配置 [动画/移动脚本]")]
     public Animator anim;
-    public MonoBehaviour moveScript; // 挂载角色移动的脚本
+    public MonoBehaviour moveScript; // Character movement script attached here
 
-    // 攻击状态判断
+    // Attack state check
     protected bool isAttacking = false;
     protected CharacterCore core;
     private Vector3 initialLocalScale;
 
-    // 攻击扩展事件（可挂载攻击特效/音效等逻辑）
+    // Attack extension events for effects, audio, and related logic
     public event Action OnAttackStarted;
     public event Action OnAttackFinished;
 
     public delegate void AttackHitEvent(GameObject attacker, GameObject target, float damage);
-    public static event AttackHitEvent OnAttackHit; // 攻击命中时触发
+    public static event AttackHitEvent OnAttackHit; // Triggered when an attack hits
 
     protected PlayerMove playerMove;
 
@@ -60,36 +60,36 @@ public abstract class CharacterAttack : MonoBehaviour
     #region 角色攻击（复用核心逻辑：面朝方向 + 移动禁用 + 动画触发）
     public virtual void TriggerAttack()
     {
-        if (isAttacking || core == null || core.IsDead) return; // 攻击中或者已死亡则拦截
+        if (isAttacking || core == null || core.IsDead) return; // Block if already attacking or dead
 
-        // 根据最后面朝方向更新攻击朝向
+        // Update attack facing from the last facing direction
         UpdateAttackFacingDirection();  
 
-        // 通用攻击状态切换
+        // Common attack state transition
         isAttacking = true;
-        AnimatorParameterUtility.SetBoolIfPresent(anim, "IsMoving", false); // 停止移动动画
+        AnimatorParameterUtility.SetBoolIfPresent(anim, "IsMoving", false); // Stop movement animation
         if (playerMove != null)
         {   
-            // 禁用移动
+            // Disable movement
             playerMove.canMove = false;
-            // 速度清零
+            // Clear velocity
             if (playerMove.rb != null)
             {
                 playerMove.rb.velocity = Vector2.zero;
             }
         }     
-        AnimatorParameterUtility.SetBoolIfPresent(anim, "IsAttacking", true); // 触发攻击动画
+        AnimatorParameterUtility.SetBoolIfPresent(anim, "IsAttacking", true); // Trigger attack animation
 
-        // 触发攻击开始事件
+        // Trigger attack start event
         OnAttackStarted?.Invoke();
     }
 
     /// <summary>
-    /// 更新攻击的面朝方向（玩家/敌人通用）
+    /// Updates attack facing direction (shared by player/enemy)
     /// </summary>
     private void UpdateAttackFacingDirection()
     {
-        // 获取CharacterCore中维护的「最后面朝方向」
+        // Get the last facing direction maintained by CharacterCore
         Vector2 lastFacingDir = core.lastFacingDirection;
         if (lastFacingDir.sqrMagnitude > 0.0001f)
         {
@@ -98,8 +98,8 @@ public abstract class CharacterAttack : MonoBehaviour
             AnimatorParameterUtility.SetFloatIfPresent(anim, "InputY", normalizedFacingDir.y);
         }
 
-        // 更新角色Transform朝向
-        if (ShouldMirrorRootForAttack && lastFacingDir.x != 0) // 左右朝向
+        // Update the character Transform facing
+        if (ShouldMirrorRootForAttack && lastFacingDir.x != 0) // Horizontal facing
         {
             float scaleX = Mathf.Abs(initialLocalScale.x);
             if (scaleX <= Mathf.Epsilon)
@@ -113,14 +113,14 @@ public abstract class CharacterAttack : MonoBehaviour
                 transform.localScale.z
             );
         }
-        // 若有上下攻击需求，可扩展：
+        // Extend here if vertical attacks are needed:
         // else if (lastFacingDir.y != 0) 
         // {
-        //     // 上下朝向逻辑（如旋转/动画参数）
+        //     // Vertical facing logic (for example, rotation/animation parameters)
         //     anim?.SetFloat("AttackUpDown", lastFacingDir.y);
         // }
 
-        // 可选：给动画层传递朝向参数（便于动画适配不同方向攻击）
+        // Optional: pass facing parameters to the animation layer so animations can adapt to different attack directions
         // if (anim != null)
         // {
         //     anim.SetFloat("FacingX", lastFacingDir.x);
@@ -129,7 +129,7 @@ public abstract class CharacterAttack : MonoBehaviour
     }
 
     /// <summary>
-    /// 攻击结束统一逻辑（动画帧事件调用）
+    /// Unified attack end logic (called by an animation frame event)
     /// </summary>
     public virtual void OnAttackEnd()
     {
@@ -141,16 +141,16 @@ public abstract class CharacterAttack : MonoBehaviour
             return;
         }
 
-        // 恢复移动能力
+        // Restore movement ability
         if (playerMove != null) playerMove.canMove = true;
         AnimatorParameterUtility.SetBoolIfPresent(anim, "IsAttacking", false);
 
-        // 触发攻击结束事件（扩展逻辑：如攻击后摇、重置朝向）
+        // Trigger attack end event for extensions such as recovery frames or facing reset
         OnAttackFinished?.Invoke();
     }
     #endregion
 
-    // 防止事件内存泄漏
+    // Prevent event memory leaks
     protected virtual void OnDisable()
     {
         if (core != null)
@@ -180,9 +180,9 @@ public abstract class CharacterAttack : MonoBehaviour
     }
 
     /// <summary>
-    /// 攻击命中扣血
+    /// Apply damage on attack hit
     /// </summary>
-    /// <param name="target">被命中的目标</param>
+    /// <param name="target">Hit target</param>
     public void HitTarget(GameObject target)
     {
         if (core == null) return;

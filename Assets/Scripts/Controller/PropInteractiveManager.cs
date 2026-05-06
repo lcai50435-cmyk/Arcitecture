@@ -94,7 +94,7 @@ public class PropInteractiveManager : MonoBehaviour
             }
             else
             {
-                // 如果Instance不存在，直接设置
+                // If Instance does not exist, assign it directly
                 SetupPropObjectDirect(obj, objName);
             }
         }

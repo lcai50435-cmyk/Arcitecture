@@ -1,8 +1,8 @@
 using UnityEngine;
 
 /// <summary>
-/// 图鉴解锁选择管理器
-/// 负责兼容旧图鉴解锁入口，专用结构以背包格为准。
+/// Catalogue unlock selection manager
+/// Keeps compatibility with the old catalogue unlock entry; dedicated structures are driven by backpack slots.
 /// </summary>
 public class CatalogueUnlockSelectionManager : MonoBehaviour
 {

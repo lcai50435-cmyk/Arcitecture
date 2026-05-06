@@ -6,8 +6,8 @@ public class FireBall : MonoBehaviour
 {
     [Header("基础设置")]
     public float speed = 6f;
-    public float autoDestroyTime = 10f; // 未命中10秒自动销毁
-    public float hitDestroyDelay = 3f;  // 命中后兜底销毁延迟
+    public float autoDestroyTime = 10f; // Auto-destroy after 10 seconds if no hit occurs
+    public float hitDestroyDelay = 3f;  // Fallback destroy delay after a hit
 
     private float damage = 10;
     private Animator anim;
@@ -19,7 +19,7 @@ public class FireBall : MonoBehaviour
         anim = GetComponent<Animator>();
         rb = GetComponent<Rigidbody2D>();
 
-        // 判空校验，避免空引用
+        // Null check to avoid null references
         if (anim == null) Debug.LogError($"[{gameObject.name}] 缺少Animator组件！");
         if (rb == null) Debug.LogError($"[{gameObject.name}] 缺少Rigidbody2D组件！");
     }
@@ -32,7 +32,7 @@ public class FireBall : MonoBehaviour
             0.12f,
             NightLightingController.GetGameplayFireballLightColor());
 
-        // 未命中10秒自动销毁
+        // Auto-destroy after 10 seconds if no hit occurs
         Destroy(gameObject, autoDestroyTime);
     }
 
@@ -49,34 +49,34 @@ public class FireBall : MonoBehaviour
 
         isHit = true;
 
-        // 停止移动
+        // Stop movement
         rb.velocity = Vector2.zero;
 
-        // 获得玩家脚本CharacterCore
+        // Get the player CharacterCore script
         CharacterCore playerCore = other.GetComponent<CharacterCore>();
         if (playerCore != null)
         {
-            // 对玩家造成伤害
+            // Damage the player
             playerCore.TakeDamage(damage);
         }
 
-        // 播放命中动画（判空保护）
+        // Play hit animation with null protection
         if (anim != null)
             anim.SetTrigger("IsHit");
 
-        // 关闭碰撞器，避免重复触发
+        // Disable the collider to avoid repeated triggers
         Collider2D col = GetComponent<Collider2D>();
         if (col != null)
             col.enabled = false;
 
-        // 取消原本的10秒自动销毁，避免和动画事件冲突
+        // Cancel the original 10-second auto-destroy to avoid conflicts with animation events
         CancelInvoke(nameof(Destroy));
 
-        // 避免卡死
+        // Avoid getting stuck
         Destroy(gameObject, hitDestroyDelay);
     }
 
-    // 命中动画播完后销毁
+    // Destroy after the hit animation finishes
     public void DestroyAfterHit()
     {
         Destroy(gameObject);

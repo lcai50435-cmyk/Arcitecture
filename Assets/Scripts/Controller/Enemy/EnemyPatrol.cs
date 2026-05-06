@@ -126,11 +126,11 @@ public class EnemyPatrol : MonoBehaviour
 
     private void PickNextTarget(Vector2 currentPosition)
     {
-        // 更改的代码
+        // Changed code
         Vector2 currentAlignedPos = GetAlignedPosition(currentPosition);
 
         float minimumDistance = Mathf.Max(patrolPointSnap * 0.5f, minPatrolPointDistance);
-        Vector2 bestCandidate = currentAlignedPos; // 原来是这个currentPosition
+        Vector2 bestCandidate = currentAlignedPos; // Previously this used currentPosition
         float bestDistance = 0f;
         bool hasFallbackCandidate = false;
 
@@ -141,7 +141,7 @@ public class EnemyPatrol : MonoBehaviour
                 Random.Range(-patrolRange.y, patrolRange.y));
 
             Vector2 candidate = GetReachableAlignedPosition(
-                SnapPatrolPoint(currentAlignedPos + randomOffset), currentAlignedPos); // 原来是这个spawnPoint
+                SnapPatrolPoint(currentAlignedPos + randomOffset), currentAlignedPos); // Previously this used spawnPoint
 
             if (avoidObstacle != null && avoidObstacle.IsPointBlocked(candidate))
             {
@@ -256,7 +256,7 @@ public class EnemyPatrol : MonoBehaviour
             return spawnPoint;
         }
 
-        return GetAlignedPosition(transform.position); // 原来是这个transform.position
+        return GetAlignedPosition(transform.position); // Previously this used transform.position
     }
 
     private void OnDrawGizmos()

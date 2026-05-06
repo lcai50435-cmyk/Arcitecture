@@ -188,7 +188,7 @@ public class SceneLoader : MonoBehaviour
         GameObject canvasObject = existingCanvas != null ? existingCanvas.gameObject : new GameObject("FadeOverlayCanvas");
         canvasObject.transform.SetParent(transform, false);
 
-        // 隐藏白色线框
+        // Hide the white outline
         canvasObject.hideFlags = HideFlags.HideInHierarchy | HideFlags.NotEditable;
         overlayCanvas = canvasObject.GetComponent<Canvas>();
         if (overlayCanvas == null)

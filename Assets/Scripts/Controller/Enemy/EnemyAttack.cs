@@ -1,7 +1,7 @@
-﻿using UnityEngine;
+using UnityEngine;
 
 /// <summary>
-/// 敌人相关攻击逻辑
+/// Enemy attack logic
 /// </summary>
 [DisallowMultipleComponent]
 [RequireComponent(typeof(EnemyStatsManager))]
@@ -10,19 +10,19 @@ public class EnemyAttack : CharacterAttack
     [Header("初始化")]
     public EnemyStatsManager statsManager;
     public Transform player;
-    // 攻击范围触发器
+    // Attack range trigger
     [SerializeField] private EnemyAttackRangeTrigger2D attackRangeTrigger;
 
     [Header("攻击设置")]
-    [Min(0f)] public float attackInterval = 2f; // 攻击间隔
+    [Min(0f)] public float attackInterval = 2f; // Attack interval
 
-    protected float lastAttackTime;  // 上次攻击时间
-    private bool isPlayerInRange;  // 标记玩家是否在攻击范围内
+    protected float lastAttackTime;  // Last attack time
+    private bool isPlayerInRange;  // Tracks whether the player is in attack range
 
     private void Reset()
     {
         statsManager = GetComponent<EnemyStatsManager>();
-        // 自动查找子物体AttackRange上的触发器
+        // Automatically find the trigger on the AttackRange child object
         FindAttackRangeTrigger();
     }
 
@@ -40,7 +40,7 @@ public class EnemyAttack : CharacterAttack
             FindAttackRangeTrigger();
         }
 
-        // 注册触发器事件
+        // Register trigger events
         if (attackRangeTrigger != null)
         {
             attackRangeTrigger.OnPlayerEnterRange += OnPlayerEnterAttackRange;
@@ -50,7 +50,7 @@ public class EnemyAttack : CharacterAttack
 
     private void OnDestroy()
     {
-        // 解注册事件，防止内存泄漏
+        // Unregister events to prevent memory leaks
         if (attackRangeTrigger != null)
         {
             attackRangeTrigger.OnPlayerEnterRange -= OnPlayerEnterAttackRange;
@@ -61,7 +61,7 @@ public class EnemyAttack : CharacterAttack
     private void OnValidate()
     {
         if (attackInterval < 0f) attackInterval = 0f;
-        // 自动查找触发器
+        // Automatically find the trigger
         if (attackRangeTrigger == null)
         {
             FindAttackRangeTrigger();
@@ -77,13 +77,13 @@ public class EnemyAttack : CharacterAttack
 
         if (statsManager == null || player == null)
         {
-            // 自动获取玩家目标
+            // Automatically get the player target
             statsManager?.ResolvePlayerTargetIfMissing();
             player = statsManager?.PlayerTarget;
             return;
         }
 
-        // 根据玩家是否在范围切换状态
+        // Switch state based on whether the player is in range
         if (statsManager.CurrentState == EnemyState.Chase)
         {
             if (isPlayerInRange)
@@ -104,12 +104,12 @@ public class EnemyAttack : CharacterAttack
             return;
         }
 
-        // 玩家在攻击范围内且处于攻击状态，尝试攻击
+        // Try attacking when the player is in range and the enemy is in attack state
         TryAttack();
     }
 
     /// <summary>
-    /// 自动查找AttackRange子物体上的触发器组件
+    /// Automatically finds the trigger component on the AttackRange child object
     /// </summary>
     private void FindAttackRangeTrigger()
     {
@@ -117,7 +117,7 @@ public class EnemyAttack : CharacterAttack
         if (attackRangeTrans != null)
         {
             attackRangeTrigger = attackRangeTrans.GetComponent<EnemyAttackRangeTrigger2D>();
-            // 如果没有则自动添加
+            // Add one automatically if missing
             if (attackRangeTrigger == null)
             {
                 attackRangeTrigger = attackRangeTrans.gameObject.AddComponent<EnemyAttackRangeTrigger2D>();
@@ -126,7 +126,7 @@ public class EnemyAttack : CharacterAttack
     }
 
     /// <summary>
-    /// 玩家进入攻击范围回调
+    /// Callback when the player enters attack range
     /// </summary>
     private void OnPlayerEnterAttackRange()
     {
@@ -134,7 +134,7 @@ public class EnemyAttack : CharacterAttack
     }
 
     /// <summary>
-    /// 玩家离开攻击范围回调
+    /// Callback when the player exits attack range
     /// </summary>
     private void OnPlayerExitAttackRange()
     {
@@ -148,7 +148,7 @@ public class EnemyAttack : CharacterAttack
             return;
         }
 
-        // 攻击时间冷却
+        // Attack cooldown
         if (attackInterval > 0f && Time.time - lastAttackTime < attackInterval)
         {
             return;
@@ -159,8 +159,8 @@ public class EnemyAttack : CharacterAttack
     }
 
 //#if UNITY_EDITOR
-//    // 移除原有攻击范围Gizmos（因为改用触发器可视化）
-//    // 如果需要保留Gizmos，可改为绘制AttackRange子物体的范围
+//    // Remove the old attack range Gizmos because trigger visualization is now used
+//    // If Gizmos are needed, draw the AttackRange child object bounds instead
 //    private void OnDrawGizmosSelected()
 //    {
 //        if (attackRangeTrigger != null)
@@ -177,7 +177,7 @@ public class EnemyAttack : CharacterAttack
 //                UnityEditor.Handles.DrawWireCube(attackRangeTrigger.transform.position + (Vector3)boxCol.offset,
 //                    boxCol.size);
 //            }
-//            // 3D触发器同理扩展
+//            // Extend similarly for 3D triggers
 //        }
 //    }
 //#endif
