@@ -2,37 +2,60 @@ using UnityEngine;
 
 public class EnemyFootstepEffect : MonoBehaviour
 {
-    [Header("²ÈµØÁÑÎÆÔ¤Éè")]
+    private const int RuntimeCrackSortingOrder = 3;
+
+    [Header("è¸©åœ°è£‚çº¹é¢„è®¾")]
     public GameObject crackEffectPrefab;
 
-    [Header("ÁÑÎÆÏÔÊ¾Ê±³¤£¨Ãë£©")]
+    [Header("è£‚çº¹æ˜¾ç¤ºæ—¶é•¿ï¼ˆç§’ï¼‰")]
     public float effectDuration = 0.5f;
 
-    [Header("µĞÈËÎ»ÖÃ")]
+    [Header("æ•Œäººä½ç½®")]
     public Transform enemyTransform;
 
-    [Header("ÁÑÎÆÉú³É¼ä¸ô£¨Ãë£©")]
-    public float spawnInterval = 2f; // Ã¿2ÃëÉú³ÉÒ»´Î
+    [Header("æ•ŒäººçŠ¶æ€")]
+    public EnemyStatsManager statsManager;
 
-    // ÀäÈ´Ê±¼ä¼ÇÂ¼
-    private float lastSpawnTime = -2f; // Ò»¿ªÊ¼¾ÍÄÜÉú³É
+    [Header("è£‚çº¹ç”Ÿæˆé—´éš”ï¼ˆç§’ï¼‰")]
+    public float spawnInterval = 2f; // Spawn once every 2 seconds
+
+    // Cooldown time record
+    private float lastSpawnTime = -2f; // Can spawn immediately at the start
+
+    private void Reset()
+    {
+        ResolveDependencies();
+    }
+
+    private void Awake()
+    {
+        ResolveDependencies();
+    }
+
+    private void OnValidate()
+    {
+        ResolveDependencies();
+    }
 
     /// <summary>
-    /// ÁÑÎÆÉú³É½Å±¾
+    /// Crack spawning script
     /// </summary>
     public void SpawnFootstepCrack()
     {
-        // ¾àÀëÉÏ´ÎÉú³É²»×ã2Ãë£¬Ö±½ÓÌø¹ı£¬²»Éú³É
+        if (!CanSpawnFootstepCrack())
+            return;
+
+        // Skip spawning if less than 2 seconds have passed since the last spawn
         if (Time.time < lastSpawnTime + spawnInterval)
             return;
 
         if (crackEffectPrefab == null || enemyTransform == null)
             return;
 
-        // ¸üĞÂ×îºóÉú³ÉÊ±¼ä
+        // Update the last spawn time
         lastSpawnTime = Time.time;
 
-        // Éú³ÉÁÑÎÆ
+        // Spawn crack
         GameObject crack = Instantiate(
             crackEffectPrefab,
             enemyTransform.position,
@@ -42,10 +65,41 @@ public class EnemyFootstepEffect : MonoBehaviour
         SpriteRenderer crackRenderer = crack.GetComponent<SpriteRenderer>();
         if (crackRenderer != null)
         {
-            crackRenderer.sortingOrder = 0;
+            crackRenderer.sortingOrder = RuntimeCrackSortingOrder;
         }
 
-        // ×Ô¶¯Ïú»Ù
+        CrackDamage crackDamage = crack.GetComponent<CrackDamage>();
+        if (crackDamage != null)
+        {
+            crackDamage.BindSource(statsManager);
+        }
+
+        // Auto-destroy
         Destroy(crack, effectDuration);
+    }
+
+    private bool CanSpawnFootstepCrack()
+    {
+        ResolveDependencies();
+        if (statsManager == null || !statsManager.HasPlayerInRange || statsManager.PlayerTarget == null)
+        {
+            return false;
+        }
+
+        return statsManager.CurrentState == EnemyState.Chase ||
+               statsManager.CurrentState == EnemyState.Attack;
+    }
+
+    private void ResolveDependencies()
+    {
+        if (enemyTransform == null)
+        {
+            enemyTransform = transform;
+        }
+
+        if (statsManager == null)
+        {
+            statsManager = GetComponent<EnemyStatsManager>();
+        }
     }
 }

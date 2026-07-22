@@ -2,21 +2,27 @@ using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
-/// ½¨ÖşÍ¼Æ¬½âËøºó¿Éµã»÷£¬µã»÷Ìø×ªµ½ÏêÏ¸ĞÅÏ¢½çÃæ
+/// Building image becomes clickable after unlock and opens the detail screen when clicked
 /// </summary>
 [RequireComponent(typeof(Button))]
 public class UnlockedBuildingImageButton : MonoBehaviour
 {
-    [Header("µ±Ç°½¨Öş×´Ì¬½Å±¾")]
+    [Header("å½“å‰å»ºç­‘çŠ¶æ€è„šæœ¬")]
     public CatalogueBuildingUnlockState buildingUnlockState;
 
-    [Header("Í¼¼øÖ÷½çÃæ")]
+    [Header("å›¾é‰´ä¸»ç•Œé¢")]
     public GameObject illustratedHandbookPanel;
 
-    [Header("ÏêÏ¸ĞÅÏ¢½çÃæ")]
+    [Header("è¯¦ç»†ä¿¡æ¯ç•Œé¢")]
     public GameObject detailedInformationPanel;
 
-    [Header("ÊÇ·ñ½âËøºó²ÅÔÊĞíµã»÷")]
+    [Header("è¯¦ç»†ä¿¡æ¯æ§åˆ¶å™¨")]
+    public DetailedInformationUI detailedInformationUI;
+
+    [Header("å»ºç­‘è¯¦æƒ…æ•°æ®")]
+    public BuildingDetailData buildingDetailData;
+
+    [Header("æ˜¯å¦è§£é”åæ‰å…è®¸ç‚¹å‡»")]
     public bool onlyClickableWhenUnlocked = true;
 
     private Button button;
@@ -51,6 +57,7 @@ public class UnlockedBuildingImageButton : MonoBehaviour
 
     private void RefreshClickableState()
     {
+        ResolveReferences();
         if (button == null)
         {
             return;
@@ -68,29 +75,64 @@ public class UnlockedBuildingImageButton : MonoBehaviour
             return;
         }
 
-        button.interactable = buildingUnlockState.isBuildingUnlocked;
+        button.interactable = IsBuildingUnlocked();
     }
 
     private void OnClickImage()
     {
+        ResolveReferences();
         if (onlyClickableWhenUnlocked)
         {
-            if (buildingUnlockState == null || !buildingUnlockState.isBuildingUnlocked)
+            if (buildingUnlockState == null || !IsBuildingUnlocked())
             {
                 return;
             }
         }
 
-        Debug.Log("µã»÷ÒÑ½âËø½¨ÖşÍ¼Æ¬£¬Ìø×ªµ½ÏêÏ¸ĞÅÏ¢½çÃæ");
+        Debug.Log("ç‚¹å‡»å·²è§£é”å»ºç­‘å›¾ç‰‡ï¼Œè·³è½¬åˆ°è¯¦ç»†ä¿¡æ¯ç•Œé¢");
 
         if (illustratedHandbookPanel != null)
         {
             illustratedHandbookPanel.SetActive(false);
         }
 
+        if (detailedInformationUI != null && buildingDetailData != null)
+        {
+            BuildingDetailRuntimeResolver.HideOtherSceneAuthoredDetailCanvases(buildingUnlockState);
+            detailedInformationUI.ShowDetail(buildingDetailData);
+            return;
+        }
+
         if (detailedInformationPanel != null)
         {
             detailedInformationPanel.SetActive(true);
         }
+    }
+
+    private void ResolveReferences()
+    {
+        buildingUnlockState = BuildingDetailRuntimeResolver.ResolveUnlockState(this, buildingUnlockState);
+        buildingDetailData = BuildingDetailRuntimeResolver.ResolveDetailData(this, buildingUnlockState, buildingDetailData);
+        detailedInformationUI = BuildingDetailRuntimeResolver.ResolveDetailUi(
+            this,
+            buildingUnlockState,
+            detailedInformationUI,
+            detailedInformationPanel);
+        detailedInformationPanel = BuildingDetailRuntimeResolver.ResolveDetailPanel(
+            detailedInformationUI,
+            detailedInformationPanel);
+    }
+
+    private bool IsBuildingUnlocked()
+    {
+        if (buildingUnlockState == null)
+        {
+            return false;
+        }
+
+        RuntimeProgressState runtimeState = RuntimeProgressState.Instance;
+        return runtimeState != null
+            ? runtimeState.IsBuildingUnlocked(buildingUnlockState.BuildingId)
+            : buildingUnlockState.isBuildingUnlocked;
     }
 }

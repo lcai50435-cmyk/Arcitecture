@@ -6,10 +6,15 @@ public class CatagloueInteractHandler : MonoBehaviour, IInteractable
 {
     public void OnInteract()
     {
-        // Ìá½»¾­Ñé
-        var player = FindObjectOfType<PlayerGetArchitectural>();
+        PlayerGetArchitectural player = FindObjectOfType<PlayerGetArchitectural>();
+        if (player == null)
+        {
+            Debug.LogWarning("æœªæ‰¾åˆ° PlayerGetArchitecturalï¼Œæ— æ³•æäº¤å›¾é‰´");
+            return;
+        }
+
         player.SubmitAllCachedExp();
     }
 
-    public string InteractionTip => "´ò¿ªÍ¼¼ø";
+    public string InteractionTip => "æäº¤å›¾é‰´";
 }

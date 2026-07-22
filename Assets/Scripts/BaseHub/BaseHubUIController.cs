@@ -1,0 +1,447 @@
+using System;
+using UnityEngine;
+using UnityEngine.EventSystems;
+using UnityEngine.SceneManagement;
+
+public class BaseHubUIController : MonoBehaviour
+{
+    private const KeyCode PlayerPanelHotkey = KeyCode.I;
+
+    [SerializeField] private GameObject illustratedHandbookPanel;
+    [SerializeField] private SpiritPanelUI spiritPanel;
+    [SerializeField] private StageSelectionPanelUI stageSelectionPanel;
+    [SerializeField] private BaseHubAlbumPanel albumPanel;
+    [SerializeField] private GameObject interactTipUI;
+    [SerializeField] private GameObject player;
+
+    private PlayerMove playerMove;
+    private Rigidbody2D playerBody;
+    private PlayerInteraction playerInteraction;
+    private BaseHubInkAttack playerInkAttack;
+    private Transform handbookFocusTarget;
+    private Transform spiritFocusTarget;
+    private Transform stageFocusTarget;
+    private Transform albumFocusTarget;
+    private bool isClosingModal;
+    private bool hasSavedPlayerState;
+    private bool wasMoveEnabled;
+    private bool wasCanMove;
+    private bool wasBodySimulated = true;
+    private bool wasInkAttackEnabled;
+    private RuntimeSettingsPanel settingsPanel;
+
+    private void Awake()
+    {
+        EnsureRuntimeBindings();
+    }
+
+    public void Configure(
+        GameObject playerObject,
+        GameObject handbookPanel,
+        SpiritPanelUI spirit,
+        StageSelectionPanelUI stagePanel,
+        BaseHubAlbumPanel photoAlbumPanel,
+        GameObject interactTip)
+    {
+        player = playerObject;
+        illustratedHandbookPanel = handbookPanel;
+        spiritPanel = spirit;
+        stageSelectionPanel = stagePanel;
+        albumPanel = photoAlbumPanel;
+        interactTipUI = interactTip;
+
+        EnsureRuntimeBindings();
+        isClosingModal = false;
+        ClosePanelsOnly();
+        EnsureSettingsPanel();
+    }
+
+    private void Update()
+    {
+        HandleSettingsHotkey();
+        HandlePlayerPanelHotkey();
+    }
+
+    private void OnDestroy()
+    {
+        if (settingsPanel != null)
+        {
+            settingsPanel.ContinueRequested -= HandleSettingsPanelClosed;
+        }
+    }
+
+    private void HandlePlayerPanelHotkey()
+    {
+        if (!Input.GetKeyDown(PlayerPanelHotkey) || spiritPanel == null || isClosingModal)
+        {
+            return;
+        }
+
+        if (settingsPanel != null && settingsPanel.IsShown)
+        {
+            return;
+        }
+
+        if (UIRootManager.Instance != null && UIRootManager.Instance.IsModalFlowOpen)
+        {
+            if (UIRootManager.Instance.ActiveModalType == RuntimeModalType.Spirit)
+            {
+                CloseAll();
+            }
+
+            return;
+        }
+
+        OpenSpiritPanel();
+    }
+
+    private void HandleSettingsHotkey()
+    {
+        KeyCode pauseKey = GameSettingsStore.GetKeyBinding(GameInputAction.Pause);
+        if (pauseKey == KeyCode.None || !Input.GetKeyDown(pauseKey))
+        {
+            return;
+        }
+
+        if (RuntimeMiniMapHud.Instance != null && RuntimeMiniMapHud.Instance.IsExpandedViewVisible)
+        {
+            return;
+        }
+
+        EnsureSettingsPanel();
+        if (settingsPanel == null)
+        {
+            return;
+        }
+
+        if (settingsPanel.IsShown)
+        {
+            if (!settingsPanel.IsCapturingBinding)
+            {
+                settingsPanel.RequestContinueGame();
+            }
+
+            return;
+        }
+
+        if (UIRootManager.Instance != null && UIRootManager.Instance.IsModalFlowOpen)
+        {
+            return;
+        }
+
+        if (UIRootManager.Instance != null && UIRootManager.Instance.IsAnyGameplayBlockingUIOpen())
+        {
+            return;
+        }
+
+        if (RuntimePauseMenu.TryOpenFromExternal())
+        {
+            return;
+        }
+
+        OpenSettingsPanel();
+    }
+
+    public void OpenIllustratedHandbook(RuntimeModalOpenSource source = RuntimeModalOpenSource.None)
+    {
+        OpenHandbookPage(IllustratedHandbookPage.IllustratedHandbook, RuntimeModalType.Handbook, source);
+    }
+
+    public void OpenSpiritPanel(RuntimeModalOpenSource source = RuntimeModalOpenSource.None)
+    {
+        OpenHandbookPage(IllustratedHandbookPage.PersonalInformation, RuntimeModalType.Spirit, source);
+    }
+
+    public void OpenStageSelectionPanel(RuntimeModalOpenSource source = RuntimeModalOpenSource.None)
+    {
+        EnsureRuntimeBindings();
+        ApplyCameraFocus(RuntimeModalType.Stage, source);
+        OpenModal(stageSelectionPanel != null ? stageSelectionPanel.gameObject : null, RuntimeModalType.Stage, source);
+        stageSelectionPanel?.Open();
+    }
+
+    public void OpenAlbumPanel(RuntimeModalOpenSource source = RuntimeModalOpenSource.None)
+    {
+#if UNITY_WEBGL && !UNITY_EDITOR
+        OpenIllustratedHandbook(source);
+#else
+        OpenHandbookPage(IllustratedHandbookPage.PhotoAlbum, RuntimeModalType.Album, source);
+#endif
+    }
+
+    public void CloseAll()
+    {
+        if (isClosingModal)
+        {
+            return;
+        }
+
+        if (UIRootManager.Instance != null && UIRootManager.Instance.IsModalFlowOpen)
+        {
+            isClosingModal = true;
+            UIRootManager.Instance.CloseModalFlow(CompleteCloseAll);
+            return;
+        }
+
+        CompleteCloseAll();
+    }
+
+    public void OpenSettingsPanel()
+    {
+        OpenHandbookPage(IllustratedHandbookPage.Setting, RuntimeModalType.Handbook, RuntimeModalOpenSource.None);
+    }
+
+    private void OpenModal(GameObject panel, RuntimeModalType modalType, RuntimeModalOpenSource source)
+    {
+        if (panel == null) return;
+
+        EnsureRuntimeBindings();
+        ClosePanelsOnly();
+        LockPlayer();
+        SetInteractTipVisible(false);
+        panel.SetActive(true);
+        isClosingModal = false;
+
+        if (UIRootManager.Instance != null)
+        {
+            UIRootManager.Instance.OpenModal(modalType, source);
+        }
+    }
+
+    private void OpenHandbookPage(
+        IllustratedHandbookPage page,
+        RuntimeModalType focusType,
+        RuntimeModalOpenSource source)
+    {
+        ApplyCameraFocus(focusType, source);
+        GameObject[] hideTargets = interactTipUI != null
+            ? new[] { interactTipUI }
+            : Array.Empty<GameObject>();
+
+        if (IllustratedUISceneLoader.Open(source, page, hideTargets, interactTipUI, player))
+        {
+            return;
+        }
+
+        if (UIManager.Instance != null)
+        {
+            UIManager.Instance.OpenIllustratedHandbook(source, page);
+            return;
+        }
+
+        IllustratedHandbookTabsController tabsController = illustratedHandbookPanel != null
+            ? illustratedHandbookPanel.GetComponent<IllustratedHandbookTabsController>()
+            : null;
+        tabsController?.OpenPage(page);
+        OpenModal(illustratedHandbookPanel, RuntimeModalType.Handbook, source);
+    }
+
+    private void ClosePanelsOnly()
+    {
+        HidePanel(illustratedHandbookPanel);
+
+        if (spiritPanel != null)
+            HidePanel(spiritPanel.gameObject);
+
+        if (stageSelectionPanel != null)
+            HidePanel(stageSelectionPanel.gameObject);
+
+        if (albumPanel != null)
+            HidePanel(albumPanel.gameObject);
+    }
+
+    private static void HidePanel(GameObject panel)
+    {
+        if (panel == null)
+        {
+            return;
+        }
+
+        CanvasGroup[] canvasGroups = panel.GetComponentsInChildren<CanvasGroup>(true);
+        for (int i = 0; i < canvasGroups.Length; i++)
+        {
+            CanvasGroup canvasGroup = canvasGroups[i];
+            if (canvasGroup == null)
+            {
+                continue;
+            }
+
+            canvasGroup.alpha = 0f;
+            canvasGroup.interactable = false;
+            canvasGroup.blocksRaycasts = false;
+        }
+
+        if (panel.activeSelf)
+        {
+            panel.SetActive(false);
+        }
+    }
+
+    private void LockPlayer()
+    {
+        if (!hasSavedPlayerState)
+        {
+            wasMoveEnabled = playerMove == null || playerMove.enabled;
+            wasCanMove = playerMove == null || playerMove.canMove;
+            wasBodySimulated = playerBody == null || playerBody.simulated;
+            wasInkAttackEnabled = playerInkAttack == null || playerInkAttack.enabled;
+            hasSavedPlayerState = true;
+        }
+
+        if (playerInteraction != null)
+            playerInteraction.ClearCurrentInteractable();
+
+        if (playerMove != null)
+        {
+            playerMove.canMove = false;
+            playerMove.enabled = false;
+        }
+
+        if (playerInkAttack != null)
+            playerInkAttack.enabled = false;
+
+        if (playerBody != null)
+        {
+            playerBody.velocity = Vector2.zero;
+            playerBody.simulated = false;
+        }
+    }
+
+    private void UnlockPlayer()
+    {
+        if (!hasSavedPlayerState) return;
+
+        if (playerBody != null)
+            playerBody.simulated = wasBodySimulated;
+
+        if (playerMove != null)
+        {
+            playerMove.enabled = wasMoveEnabled;
+            playerMove.canMove = wasCanMove;
+        }
+
+        if (playerInkAttack != null)
+            playerInkAttack.enabled = wasInkAttackEnabled;
+
+        hasSavedPlayerState = false;
+    }
+
+    private void SetInteractTipVisible(bool visible)
+    {
+        if (interactTipUI != null)
+            interactTipUI.SetActive(visible);
+    }
+
+    private void EnsureSettingsPanel()
+    {
+        RuntimeSettingsPanel panel = RuntimeSettingsPanel.EnsureInstance();
+        if (settingsPanel == panel)
+        {
+            return;
+        }
+
+        if (settingsPanel != null)
+        {
+            settingsPanel.ContinueRequested -= HandleSettingsPanelClosed;
+        }
+
+        settingsPanel = panel;
+        settingsPanel.ContinueRequested -= HandleSettingsPanelClosed;
+        settingsPanel.ContinueRequested += HandleSettingsPanelClosed;
+    }
+
+    private void HandleSettingsPanelClosed()
+    {
+        if (!string.Equals(SceneManager.GetActiveScene().name, "NewBase", System.StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        UIRootManager.Instance?.ShowBackpack();
+        SetInteractTipVisible(false);
+        UnlockPlayer();
+        RuntimeCameraController.EnsureInstance().ClearHubFocus();
+    }
+
+    private void CompleteCloseAll()
+    {
+        UIRootManager.Instance?.CloseModalFlowImmediate();
+        ClosePanelsOnly();
+        RuntimeUiRaycastCleanup.CleanupAfterBaseModalClosed();
+        SetInteractTipVisible(false);
+        UnlockPlayer();
+        RuntimeCameraController.EnsureInstance().ClearHubFocus();
+        isClosingModal = false;
+    }
+
+    private void ApplyCameraFocus(RuntimeModalType modalType, RuntimeModalOpenSource source)
+    {
+        RuntimeCameraController controller = RuntimeCameraController.EnsureInstance();
+        if (source != RuntimeModalOpenSource.Interact)
+        {
+            controller.ClearHubFocus();
+            return;
+        }
+
+        Transform focusTarget = ResolveFocusTarget(modalType);
+        if (focusTarget != null)
+        {
+            controller.SetHubFocusTarget(focusTarget);
+        }
+        else
+        {
+            controller.ClearHubFocus();
+        }
+    }
+
+    private Transform ResolveFocusTarget(RuntimeModalType modalType)
+    {
+        switch (modalType)
+        {
+            case RuntimeModalType.Handbook:
+                handbookFocusTarget = ResolveCachedFocusTarget(handbookFocusTarget, () => FindObjectOfType<BaseHubBookInteract>(true));
+                return handbookFocusTarget;
+            case RuntimeModalType.Spirit:
+                spiritFocusTarget = ResolveCachedFocusTarget(spiritFocusTarget, () => FindObjectOfType<SpiritInteract>(true));
+                return spiritFocusTarget;
+            case RuntimeModalType.Stage:
+                stageFocusTarget = ResolveCachedFocusTarget(stageFocusTarget, () => FindObjectOfType<BaseHubGameSceneInteract>(true));
+                return stageFocusTarget;
+            case RuntimeModalType.Album:
+                albumFocusTarget = ResolveCachedFocusTarget(albumFocusTarget, () => FindObjectOfType<BaseHubAlbumInteract>(true));
+                return albumFocusTarget;
+            default:
+                return null;
+        }
+    }
+
+    private static Transform ResolveCachedFocusTarget<T>(Transform cachedTarget, System.Func<T> resolver)
+        where T : Component
+    {
+        if (cachedTarget != null)
+        {
+            return cachedTarget;
+        }
+
+        T component = resolver != null ? resolver() : null;
+        return component != null ? component.transform : null;
+    }
+
+    private void EnsureRuntimeBindings()
+    {
+        if (player == null)
+        {
+            player = GameObject.FindGameObjectWithTag("Player");
+        }
+
+        playerMove = player != null ? player.GetComponent<PlayerMove>() : null;
+        playerBody = player != null ? player.GetComponent<Rigidbody2D>() : null;
+        playerInteraction = player != null ? player.GetComponent<PlayerInteraction>() : null;
+        playerInkAttack = player != null ? player.GetComponent<BaseHubInkAttack>() : null;
+
+        if (stageSelectionPanel != null)
+        {
+            stageSelectionPanel.BindController(this);
+        }
+    }
+}

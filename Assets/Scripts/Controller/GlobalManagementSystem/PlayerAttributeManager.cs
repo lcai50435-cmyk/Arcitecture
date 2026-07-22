@@ -1,129 +1,336 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 public class PlayerAttributeManager : MonoBehaviour
 {
     public static PlayerAttributeManager Instance;
 
-    // 角色属性
     public CharacterCore characterCore;
     public PlayerAttack playerAttack;
     public PlayerTakeDamage playerTakeDamage;
+    public PlayerProfileData profileData;
 
-    // 主属性
-    private float bonusCurrentHp = 0f;
-    private float bonusMoveSpeed = 0f;
-    private float bonusAttackDamage = 0f;
-    private float bonusDefense = 0f;
-    private float bonusDurability = 0f;
+    private readonly Dictionary<AttributeBonusType, float> temporaryBonuses =
+        new Dictionary<AttributeBonusType, float>();
 
-    // 副属性
-    private float subBonusCurrentHp = 0f;
-    private float subBonusMoveSpeed = 0f;
-    private float subBonusAttackDamage = 0f;
-    private float subBonusDefense = 0f;
-    private float subBonusDurability = 0f;
+    private readonly Dictionary<AttributeBonusType, float> backpackBonuses =
+        new Dictionary<AttributeBonusType, float>();
+
+    private readonly Dictionary<AttributeBonusType, float> permanentBonuses =
+        new Dictionary<AttributeBonusType, float>();
 
     private void Awake()
     {
-        if (Instance == null) Instance = this;
-        else Destroy(gameObject);
+        if (Instance == null)
+        {
+            Instance = this;
+        }
+        else
+        {
+            Destroy(gameObject);
+            return;
+        }
+
+        ResolveReferences();
+        EnsureDesignBaseline();
+        RebuildPermanentBonuses();
+        ApplyAllBonus();
     }
 
-    // 捡起道具则加总加成
+    private void OnEnable()
+    {
+        ResolveReferences();
+        RuntimeProgressState.EnsureInstance().OnStateChanged += HandleRuntimeStateChanged;
+        RebuildPermanentBonuses();
+        ApplyAllBonus();
+    }
+
+    private void OnDisable()
+    {
+        if (RuntimeProgressState.Instance != null)
+        {
+            RuntimeProgressState.Instance.OnStateChanged -= HandleRuntimeStateChanged;
+        }
+    }
+
+    public void AddBonus(AttributeBonusType type, float value)
+    {
+        AddToBonusMap(temporaryBonuses, type, value);
+        ApplyAllBonus();
+    }
+
     public void AddBonus(AttributeBonusType type, float value, AttributeBonusType subType, float subValue)
     {
-        // 主属性加成
-        switch (type)
-        {
-            case AttributeBonusType.CurrentHealth: bonusCurrentHp += value; break;
-            case AttributeBonusType.MoveSpeed: bonusMoveSpeed += value; break;
-            case AttributeBonusType.AttackPower: bonusAttackDamage += value; break;
-            case AttributeBonusType.Defense: bonusDefense += value; break;
-            case AttributeBonusType.Durability: bonusDurability += value; break;
-        }
-        // 副属性加成
-        switch (subType)
-        {
-            case AttributeBonusType.CurrentHealth: subBonusCurrentHp += subValue; break;
-            case AttributeBonusType.MoveSpeed: subBonusMoveSpeed += subValue; break;
-            case AttributeBonusType.AttackPower: subBonusAttackDamage += subValue; break;
-            case AttributeBonusType.Defense: subBonusDefense += subValue; break;
-            case AttributeBonusType.Durability: subBonusDurability += subValue; break;
-        }
-
-        ApplyAllBonus(); // 把总加成应用到角色
+        AddToBonusMap(temporaryBonuses, type, value);
+        AddToBonusMap(temporaryBonuses, subType, subValue);
+        ApplyAllBonus();
     }
 
-    // 丢弃或者上交则减总加成
+    public void RemoveBonus(AttributeBonusType type, float value)
+    {
+        AddToBonusMap(temporaryBonuses, type, -value);
+        ApplyAllBonus();
+    }
+
     public void RemoveBonus(AttributeBonusType type, float value, AttributeBonusType subType, float subValue)
     {
-        // 主属性扣除
-        switch (type)
-        {
-            case AttributeBonusType.CurrentHealth: bonusCurrentHp -= value; break;
-            case AttributeBonusType.MoveSpeed: bonusMoveSpeed -= value; break;
-            case AttributeBonusType.AttackPower: bonusAttackDamage -= value; break;
-            case AttributeBonusType.Defense: bonusDefense -= value; break;
-            case AttributeBonusType.Durability: bonusDurability -= value; break;
-        }
-        // 副属性扣除
-        switch (subType)
-        {
-            case AttributeBonusType.CurrentHealth: subBonusCurrentHp -= subValue; break;
-            case AttributeBonusType.MoveSpeed: subBonusMoveSpeed -= subValue; break;
-            case AttributeBonusType.AttackPower: subBonusAttackDamage -= subValue; break;
-            case AttributeBonusType.Defense: subBonusDefense -= subValue; break;
-            case AttributeBonusType.Durability: subBonusDurability -= subValue; break;
-        }
-
-        ApplyAllBonus(); // 把总加成应用到角色
+        AddToBonusMap(temporaryBonuses, type, -value);
+        AddToBonusMap(temporaryBonuses, subType, -subValue);
+        ApplyAllBonus();
     }
 
-    // 一次性应用总加成到角色
     public void ApplyAllBonus()
     {
-        // 血量：0 ≤ currentHp ≤ 100
-        float newHp = characterCore.currentHp + bonusCurrentHp + subBonusCurrentHp;
-        characterCore.currentHp = Mathf.Clamp(newHp, 0f, 100f);
-        // 刷新UI
-        playerTakeDamage.healthTrans.SetValue(characterCore.currentHp);
+        ResolveReferences();
+        PlayerLoadoutRuntime.EnsureCurrentWeaponUnlocked();
+        EnsureDesignBaseline();
+        RebuildBackpackBonuses();
+        WeaponType effectiveWeaponType = RuntimeWeaponTypeResolver.ResolveEffectiveWeaponType(BackpackMananger.Instance);
 
-        // 移动速度：≥1
-        float newMoveSpeed = characterCore.stats.moveSpeed + bonusMoveSpeed + subBonusMoveSpeed;
-        characterCore.stats.moveSpeed = Mathf.Max(newMoveSpeed, 1f);
+        if (characterCore == null || characterCore.baseStats == null)
+        {
+            return;
+        }
 
-        // 攻击力：≥1
-        float newAttack = characterCore.stats.attackDamage + bonusAttackDamage + subBonusAttackDamage;
-        characterCore.stats.attackDamage = Mathf.Max(newAttack, 1f);
+        float currentMaxHp = characterCore.stats != null ? Mathf.Max(1f, characterCore.stats.maxHp) : 1f;
+        float healthRatio = currentMaxHp > 0f ? Mathf.Clamp01(characterCore.currentHp / currentMaxHp) : 1f;
 
-        // 防御力：≥0
-        float newDefense = characterCore.stats.defense + bonusDefense + subBonusDefense;
-        characterCore.stats.defense = Mathf.Max(newDefense, 0f);
+        CharacterStats recalculated = characterCore.baseStats.Clone();
+        recalculated.maxHp = Mathf.Max(1f, recalculated.maxHp + GetTotalBonus(AttributeBonusType.MaxHealth));
+        recalculated.attackDamage = Mathf.Max(
+            Mathf.Max(recalculated.attackDamage, InkTypeCatalog.Get(effectiveWeaponType).baseDamage) +
+            GetTotalBonus(AttributeBonusType.AttackPower),
+            0f);
+        recalculated.moveSpeed = Mathf.Max(0f, recalculated.moveSpeed + GetTotalBonus(AttributeBonusType.MoveSpeed));
+        recalculated.defense = Mathf.Max(0f, recalculated.defense + GetTotalBonus(AttributeBonusType.Defense));
 
-        // 耐久度（ink）：≥0
-        float newDurability = playerAttack.ink + bonusDurability + subBonusDurability;
-        playerAttack.ink = Mathf.Max(newDurability, 0f);
-        // 刷新UI
-        playerAttack.weaponTrans.SetValue(playerAttack.ink);
+        characterCore.stats = recalculated;
 
-        ClearAllBonus();
+        float currentHpBonus = GetTotalBonus(AttributeBonusType.CurrentHealth);
+        float expectedCurrentHp = recalculated.maxHp * healthRatio + currentHpBonus;
+        characterCore.currentHp = Mathf.Clamp(expectedCurrentHp, 0f, recalculated.maxHp);
+
+        RefreshAttackDurability();
+        RefreshHealthUi();
+        SyncProfileData(effectiveWeaponType);
     }
 
-    // 清空总加成 // 下一次从零开始
     public void ClearAllBonus()
     {
-        // 主属性清0
-        bonusCurrentHp = 0;
-        bonusMoveSpeed = 0;
-        bonusAttackDamage = 0;
-        bonusDefense = 0;
-        bonusDurability = 0;
+        temporaryBonuses.Clear();
+        ApplyAllBonus();
+    }
 
-        // 副属性清0
-        subBonusCurrentHp = 0;
-        subBonusMoveSpeed = 0;
-        subBonusAttackDamage = 0;
-        subBonusDefense = 0;
-        subBonusDurability = 0;
+    private void HandleRuntimeStateChanged()
+    {
+        RebuildPermanentBonuses();
+        ApplyAllBonus();
+    }
+
+    private void RebuildPermanentBonuses()
+    {
+        permanentBonuses.Clear();
+
+        RuntimeProgressState runtimeState = RuntimeProgressState.EnsureInstance();
+        foreach (BuildingRewardDefinition reward in runtimeState.GetGrantedRewards())
+        {
+            if (reward == null)
+            {
+                continue;
+            }
+
+            AddToBonusMap(permanentBonuses, reward.bonusType, reward.bonusValue);
+            AddToBonusMap(permanentBonuses, reward.subBonusType, reward.subBonusValue);
+        }
+    }
+
+    private void RebuildBackpackBonuses()
+    {
+        backpackBonuses.Clear();
+
+        BackpackMananger backpack = BackpackMananger.Instance;
+        if (backpack == null || backpack.backpackItems == null)
+        {
+            return;
+        }
+
+        for (int i = 0; i < backpack.backpackItems.Count; i++)
+        {
+            ArchitecturalCrystal? nullableItem = backpack.backpackItems[i];
+            if (!nullableItem.HasValue)
+            {
+                continue;
+            }
+
+            ArchitecturalCrystal item = nullableItem.Value;
+            if (!item.IsCommonStructure)
+            {
+                continue;
+            }
+
+            AddToBonusMap(backpackBonuses, item.bonusType, item.bonusValue);
+            AddToBonusMap(backpackBonuses, item.subBonusType, item.subBonusValue);
+        }
+    }
+
+    private void RefreshAttackDurability()
+    {
+        float durabilityBonus = GetTotalBonus(AttributeBonusType.Durability);
+        float durabilityBase = 100f;
+
+        if (playerAttack != null)
+        {
+            playerAttack.baseMaxInk = Mathf.Max(playerAttack.baseMaxInk, 100f);
+            durabilityBase = playerAttack.baseMaxInk;
+            playerAttack.maxInk = Mathf.Max(1f, playerAttack.baseMaxInk + durabilityBonus);
+            playerAttack.ink = Mathf.Clamp(playerAttack.ink, 0f, playerAttack.maxInk);
+            playerAttack.RefreshInkUI();
+        }
+
+        if (profileData != null)
+        {
+            profileData.maxDurability = Mathf.Max(1f, durabilityBase + durabilityBonus);
+            profileData.currentDurability = Mathf.Clamp(profileData.currentDurability, 0f, profileData.maxDurability);
+        }
+    }
+
+    private void RefreshHealthUi()
+    {
+        if (playerTakeDamage != null && playerTakeDamage.healthTrans != null && characterCore != null)
+        {
+            playerTakeDamage.healthTrans.SetMaxValue(characterCore.stats.maxHp);
+            playerTakeDamage.healthTrans.SetValue(characterCore.currentHp);
+            GameplayStatusHudRuntime.RefreshHealthText(characterCore.currentHp, characterCore.stats.maxHp);
+        }
+    }
+
+    private void SyncProfileData(WeaponType effectiveWeaponType)
+    {
+        if (profileData == null)
+        {
+            profileData = FindObjectOfType<PlayerProfileData>();
+        }
+
+        if (profileData == null || characterCore == null)
+        {
+            return;
+        }
+
+        if (playerAttack != null)
+        {
+            profileData.maxDurability = playerAttack.maxInk;
+            profileData.currentDurability = playerAttack.ink;
+        }
+
+        profileData.SyncSelectedLoadoutFromRuntime();
+        profileData.SetEffectiveWeapon(effectiveWeaponType);
+    }
+
+    private void ResolveReferences()
+    {
+        if (characterCore == null)
+        {
+            characterCore = GetComponent<CharacterCore>();
+        }
+
+        if (playerAttack == null)
+        {
+            playerAttack = GetComponent<PlayerAttack>();
+        }
+
+        if (playerTakeDamage == null)
+        {
+            playerTakeDamage = GetComponent<PlayerTakeDamage>();
+        }
+
+        if (profileData == null)
+        {
+            profileData = GetComponent<PlayerProfileData>();
+        }
+    }
+
+    private void EnsureDesignBaseline()
+    {
+        if (characterCore == null)
+        {
+            return;
+        }
+
+        if (characterCore.baseStats == null)
+        {
+            characterCore.baseStats = characterCore.stats != null ? characterCore.stats.Clone() : new CharacterStats();
+        }
+
+        WeaponType effectiveWeaponType = RuntimeWeaponTypeResolver.ResolveEffectiveWeaponType(BackpackMananger.Instance);
+        InkTypeDefinition inkDefinition = InkTypeCatalog.Get(effectiveWeaponType);
+        if (characterCore.baseStats.attackDamage < inkDefinition.baseDamage)
+        {
+            characterCore.baseStats.attackDamage = inkDefinition.baseDamage;
+        }
+
+        if (playerAttack != null)
+        {
+            playerAttack.baseMaxInk = Mathf.Max(playerAttack.baseMaxInk, 100f);
+            if (playerAttack.maxInk <= 0f)
+            {
+                playerAttack.maxInk = playerAttack.baseMaxInk;
+            }
+
+            if (playerAttack.ink <= 0f)
+            {
+                playerAttack.ink = playerAttack.maxInk;
+            }
+        }
+    }
+
+    private float GetTotalBonus(AttributeBonusType type)
+    {
+        if (type == AttributeBonusType.None)
+        {
+            return 0f;
+        }
+
+        float total = 0f;
+        if (temporaryBonuses.TryGetValue(type, out float temporaryValue))
+        {
+            total += temporaryValue;
+        }
+
+        if (backpackBonuses.TryGetValue(type, out float backpackValue))
+        {
+            total += backpackValue;
+        }
+
+        if (permanentBonuses.TryGetValue(type, out float permanentValue))
+        {
+            total += permanentValue;
+        }
+
+        return total;
+    }
+
+    private static void AddToBonusMap(Dictionary<AttributeBonusType, float> target, AttributeBonusType type, float value)
+    {
+        if (target == null || type == AttributeBonusType.None || Mathf.Approximately(value, 0f))
+        {
+            return;
+        }
+
+        if (target.TryGetValue(type, out float currentValue))
+        {
+            float nextValue = currentValue + value;
+            if (Mathf.Approximately(nextValue, 0f))
+            {
+                target.Remove(type);
+            }
+            else
+            {
+                target[type] = nextValue;
+            }
+        }
+        else
+        {
+            target[type] = value;
+        }
     }
 }

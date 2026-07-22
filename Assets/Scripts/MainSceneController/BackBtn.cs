@@ -12,15 +12,15 @@ public class BackBtn : MonoBehaviour
 
     void OnClick()
     {
-        Debug.Log("·µ»Ø°´Å¥µã»÷³É¹¦£¡");
+        Debug.Log("è¿”å›æŒ‰é’®ç‚¹å‡»æˆåŠŸï¼");
 
-        if (SceneLoader.Instance == null)
+        SceneLoader loader = SceneLoader.EnsureInstance();
+        if (loader == null)
         {
-            Debug.LogError("SceneLoader µ¥Àı²»´æÔÚ£¡");
+            Debug.LogError("SceneLoader å•ä¾‹ä¸å­˜åœ¨ï¼");
             return;
         }
 
-        // µ÷ÓÃ·µ»Ø²Ëµ¥
-        SceneLoader.Instance.ToMenu();
+        loader.ToMenu();
     }
 }

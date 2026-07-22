@@ -1,10 +1,5 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 
-/// <summary>
-/// Íæ¼Ò¼ñ½¨Öş½á¹¹ÎïÆ·
-/// </summary>
 public class PlayerGetArchitectural : MonoBehaviour
 {
     private BackpackMananger backpack;
@@ -12,168 +7,147 @@ public class PlayerGetArchitectural : MonoBehaviour
 
     private void Start()
     {
-        if (BackpackMananger.Instance == null)
-        {
-            Debug.LogError("±³°ü¹ÜÀíÆ÷²»´æÔÚ£¡Çë·Åµ½³¡¾°Àï");
-            return;
-        }
-        backpack = BackpackMananger.Instance;
-        backpackUI = FindObjectOfType<BackpackUI>();
+        ResolveRuntimeDependencies();
     }
 
-    /// <summary>
-    /// Ìí¼ÓÎïÆ·µ½±³°ü
-    /// </summary>
-    /// <param name="crystal"></param>
     public bool PickCrystal(ArchitecturalCrystal crystal)
     {
-        // µ÷ÓÃ±³°üµÄÊ°È¡·½·¨£¬³É¹¦ÔòË¢ĞÂUI
-        if (backpack.PickItem(crystal))
+        if (!ResolveRuntimeDependencies() || backpack == null)
         {
-            backpackUI.RefreshUI();
-            return true;
+            return false;
         }
 
-        return false;
+        if (!backpack.PickItem(crystal))
+        {
+            return false;
+        }
+
+        if (backpackUI != null)
+        {
+            backpackUI.RefreshUI();
+        }
+
+        return true;
     }
 
-    /// <summary>
-    /// Ìá½»ËùÓĞ¹¹½¨¶È¸ø»ùµØ
-    /// </summary>
     public void SubmitAllCachedExp()
     {
-        if (backpack.GetOccupiedCount() == 0)
+        if (!ResolveRuntimeDependencies() || backpack == null)
         {
-            Debug.Log("±³°üÎª¿Õ£¬ÎŞĞèÉÏ½»£¡");
             return;
         }
 
-        foreach (var item in backpack.backpackItems)
+        if (backpack.GetOccupiedCount() == 0)
         {
-            if (item == null) continue;
-
-            if (item.isUnlockMaterial)
-            {
-                continue;
-            }
-
-            ExperienceManager.Instance.AddExperience(item.type, item.expValue);
+            Debug.Log("Backpack is empty");
+            return;
         }
 
-        backpack.ClearAllItems();
-        backpackUI.RefreshUI();
+        CatalogueAutoSubmitResult result = CatalogueSubmissionService.SubmitAllAuto(backpack);
+        if (backpackUI != null)
+        {
+            backpackUI.RefreshUI();
+        }
+
+        Debug.Log(
+            $"è‡ªåŠ¨æäº¤å®Œæˆï¼šä¿ç•™ä¸“ç”¨ç»“æ„ {result.remainingSpecialStructureCount}ï¼Œè¡¥ç»™ {result.inkSupplyCount}ï¼Œå‰©ä½™æ™®é€šç»“æ„ {result.remainingCommonStructureCount}");
     }
 
     public void SubmitSingleItem(int index)
     {
-        if (backpack == null) return;
-
-        ArchitecturalCrystal item = backpack.GetItem(index);
-        if (item == null)
-        {
-            Debug.Log("¸Ã¸ñ×ÓÃ»ÓĞÎïÆ·£¬ÎŞ·¨Ìá½»");
-            return;
-        }
-
-        // ×¨ÓÃµãÁÁµÀ¾ß£º½ûÖ¹Ìá½»
-        if (item.isUnlockMaterial)
-        {
-            Debug.Log("×¨ÓÃµãÁÁµÀ¾ß²»ÄÜÌá½»£¬Ö»ÄÜÓÃÓÚµãÁÁ");
-            return;
-        }
-
-        ExperienceManager.Instance.AddExperience(item.type, item.expValue);
-
-        backpack.RemoveItem(index);
-
-        if (backpackUI != null)
-        {
-            backpackUI.RefreshUI();
-        }
-
-        Debug.Log($"ÒÑÌá½»ÎïÆ·£º{item.type}");
+        Debug.LogWarning("æ™®é€šç»“æ„æäº¤éœ€è¦æŒ‡å®šç›®æ ‡å»ºç­‘ï¼Œè¯·ä½¿ç”¨ SubmitSingleItemToBuildingã€‚");
     }
-    /// <summary>
-    /// ÏûºÄÒ»¸ö×¨ÓÃµãÁÁµÀ¾ß
-    /// ³É¹¦·µ»Ø true£¬Ê§°Ü·µ»Ø false
-    /// </summary>
+
     public bool ConsumeOneUnlockMaterial()
     {
-        if (backpack == null) return false;
-
-        for (int i = 0; i < backpack.backpackItems.Count; i++)
+        if (!ResolveRuntimeDependencies() || backpack == null)
         {
-            ArchitecturalCrystal item = backpack.backpackItems[i];
-            if (item != null && item.isUnlockMaterial)
-            {
-                backpack.RemoveItem(i);
-
-                if (backpackUI != null)
-                {
-                    backpackUI.RefreshUI();
-                }
-
-                Debug.Log("³É¹¦ÏûºÄÒ»¸ö×¨ÓÃµãÁÁµÀ¾ß");
-                return true;
-            }
+            return false;
         }
 
-        Debug.Log("±³°üÖĞÃ»ÓĞ×¨ÓÃµãÁÁµÀ¾ß");
-        return false;
+        return backpack.TryConsumeFirstSpecialStructureMaterial(out _);
     }
+
     public void SubmitSingleItemToBuilding(int index, CatalogueBuildingId buildingId)
     {
-        if (backpack == null) return;
-
-        ArchitecturalCrystal item = backpack.GetItem(index);
-        if (item == null)
+        if (!ResolveRuntimeDependencies() || backpack == null)
         {
-            Debug.Log("¸Ã¸ñ×ÓÃ»ÓĞÎïÆ·£¬ÎŞ·¨Ìá½»");
             return;
         }
 
-        // ×¨ÓÃµãÁÁµÀ¾ß£º½ûÖ¹Ìá½»
-        if (item.isUnlockMaterial)
+        CatalogueSubmitCommonStructureResult submitResult = CatalogueSubmissionService.SubmitSingleCommonStructure(
+            backpack,
+            index,
+            buildingId);
+
+        if (!submitResult.success)
         {
-            Debug.Log("×¨ÓÃµãÁÁµÀ¾ß²»ÄÜÌá½»£¬Ö»ÄÜÓÃÓÚµãÁÁ");
             return;
         }
-
-        BuildingProgressController[] allControllers = FindObjectsOfType<BuildingProgressController>();
-        BuildingProgressController targetController = null;
-
-        for (int i = 0; i < allControllers.Length; i++)
-        {
-            if (allControllers[i].buildingId == buildingId)
-            {
-                targetController = allControllers[i];
-                break;
-            }
-        }
-
-        if (targetController == null)
-        {
-            Debug.LogError($"Ã»ÓĞÕÒµ½½¨Öş {buildingId} µÄ BuildingProgressController");
-            return;
-        }
-
-        // ¹Ø¼üĞŞ¸´£º½ø¶ÈÌõÂúÁË¾Í²»ÄÜÔÙÌá½»
-        if (targetController.IsFull())
-        {
-            Debug.Log($"½¨Öş {buildingId} µÄ½ø¶ÈÒÑÂú£¬²»ÄÜÔÙÌá½»ÎïÆ·");
-            return;
-        }
-
-        targetController.AddProgress(item.expValue);
-
-        backpack.RemoveItem(index);
 
         if (backpackUI != null)
         {
             backpackUI.RefreshUI();
         }
 
-        Debug.Log($"ÒÑÌá½»ÎïÆ·£º{item.type} -> Ä¿±ê½¨Öş£º{buildingId}");
+        RuntimeSubtitleFeedHud.PushMessage(BuildSubmitFeedbackMessage(submitResult));
+
+        if (submitResult.completionReward != null)
+        {
+            ShowRewardDialog(submitResult.completionReward);
+        }
+    }
+
+    private static string BuildSubmitFeedbackMessage(CatalogueSubmitCommonStructureResult submitResult)
+    {
+        BuildingDefinition definition = BuildingDefinitionLibrary.Get(submitResult.buildingId);
+        string progressLabel = submitResult.appliedProgress == submitResult.requestedProgress
+            ? "è¿›åº¦"
+            : "æœ‰æ•ˆè¿›åº¦";
+        return $"æäº¤æˆåŠŸï¼š{definition.displayName} æ„å»ºåº¦ {submitResult.rolledPercent}%ï¼Œ{progressLabel} +{submitResult.appliedProgress}";
+    }
+
+    private bool ResolveRuntimeDependencies()
+    {
+        if (backpack == null)
+        {
+            backpack = BackpackMananger.Instance;
+        }
+
+        if (backpack == null)
+        {
+            GameObject manager = new GameObject("RuntimeBackpackManager");
+            backpack = manager.AddComponent<BackpackMananger>();
+            Debug.Log("Created runtime BackpackMananger for PlayerGetArchitectural");
+        }
+
+        if (backpackUI == null)
+        {
+            backpackUI = BackpackUI.EnsureRuntimeInstance();
+        }
+
+        if (backpack == null)
+        {
+            Debug.LogError("PlayerGetArchitectural missing BackpackMananger");
+            return false;
+        }
+
+        return true;
+    }
+
+    private void ShowRewardDialog(BuildingRewardDefinition reward)
+    {
+        if (reward == null)
+        {
+            return;
+        }
+
+        Dialog dialog = Dialog.EnsureTopmostRuntimeInstance();
+        if (dialog == null)
+        {
+            return;
+        }
+
+        dialog.ShowClickCloseDialog($"{reward.title}\n{reward.description}");
     }
 }
-   

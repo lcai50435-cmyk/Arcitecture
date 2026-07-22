@@ -7,11 +7,32 @@ EditorBuildSettings:
   m_Scenes:
   - enabled: 1
     path: Assets/Scenes/MainScene.unity
-    guid: 1661ce5e08488e145bfec67bdc6a4c7a
+    guid: 09a9994671cec254c80bbaed8706c7a7
   - enabled: 1
+    path: Assets/Scenes/NewBase.unity
+    guid: ef362474438e8d94a91002f79c4d606f
+  - enabled: 1
+    path: Assets/Scenes/LevelSelection.unity
+    guid: f03395f8741516148a8afe80940cfafe
+  - enabled: 0
     path: Assets/Scenes/GameScene.unity
     guid: 2cda990e2423bbf4892e6590ba056729
   - enabled: 1
+    path: Assets/Scenes/FirstPass_1.unity
+    guid: 8c6430c665ee81d4f9a1a325a3da86bc
+  - enabled: 1
+    path: Assets/Scenes/SecondPassSence.unity
+    guid: 6cd18b09e03348d4187ff09abb70ecda
+  - enabled: 0
+    path: Assets/Scenes/GameScene_02.unity
+    guid: ac3b3fb1a4cd494697f5b10924013fcf
+  - enabled: 0
+    path: Assets/Scenes/GameScene_03.unity
+    guid: 271e426dc2134fc2b126848c79c4e459
+  - enabled: 1
     path: Assets/Scenes/DeadScene.unity
     guid: 5bd9a27e496bce8478b6b5a6332aabb7
+  - enabled: 1
+    path: Assets/Scenes/IllustratedUIScene.unity
+    guid: e60b91a3471d402db9e5803b278d86ea
   m_configObjects: {}

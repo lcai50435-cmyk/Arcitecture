@@ -1,67 +1,118 @@
 using UnityEngine;
 
 /// <summary>
-/// Íæ¼Ò²¥·ÅÊÜ»÷¶¯»­
-/// ½ûÓÃ/ÆôÓÃÒÆ¶¯
+/// Player hit reaction animation
+/// Disable/enable movement
 /// </summary>
 public class PlayerTakeDamage : MonoBehaviour
 {
-    [Header("×é¼şÒıÓÃ")]
+    private const float HurtMoveLockDuration = 0.12f;
+
+    [Header("ç»„ä»¶å¼•ç”¨")]
     public Animator playerAnim;
-    public PlayerMove playerMovement; // ÍÏ×§¸³ÖµÒÆ¶¯½Å±¾
-    [Header("ÊÜ»÷¶¯»­²ÎÊı")]
+    public PlayerMove playerMovement; // Assign the movement script by dragging it here
+    [Header("å—å‡»åŠ¨ç”»å‚æ•°")]
     public string hurtAnimParam = "IsHurt";
-    [Header("ÑªÌõ½Å±¾")]
+    [Header("è¡€æ¡è„šæœ¬")]
     public ValueTrans healthTrans; 
 
     private CharacterCore characterCore;
+    private float hurtRecoveryTimer;
+    private bool movementLockedByHurt;
 
     private void Awake()
     {
         characterCore = GetComponent<CharacterCore>();
-        // healthTrans = GetComponent<HealthTrans>();
+        healthTrans = GameplayStatusHudRuntime.EnsureHealthGauge(healthTrans);
+        PlayerCriticalStateFeedback.Ensure(gameObject);
 
-        characterCore.OnTakeDamage += PlayHurtAnimation;
+        if (characterCore != null)
+        {
+            characterCore.OnTakeDamage += PlayHurtAnimation;
+        }
 
-        // °²È«Ğ£Ñé£ºÈ·±£ÒÆ¶¯½Å±¾ÒıÓÃ²»Îª¿Õ
+        // Safety check: ensure the movement script reference is not null
         if (playerMovement == null)
         {
             playerMovement = GetComponent<PlayerMove>();
         }
 
-        healthTrans.SetMaxValue(characterCore.stats.maxHp);
+        RefreshHealthUi();
+    }
+
+    private void Start()
+    {
+        healthTrans = GameplayStatusHudRuntime.EnsureHealthGauge(healthTrans);
+        RefreshHealthUi();
+    }
+
+    private void Update()
+    {
+        TickHurtRecovery(Time.deltaTime);
     }
 
     /// <summary>
-    /// ²¥·ÅÊÜ»÷¶¯»­²¢½ûÓÃÒÆ¶¯
+    /// Play the hit reaction animation and disable movement
     /// </summary>
     private void PlayHurtAnimation()
     {
-        if (playerAnim == null || playerMovement == null) return;
+        RefreshHealthUi();
 
-        // ÊÜ»÷Ê±½ûÖ¹ÒÆ¶¯
-        playerMovement.canMove = false;
-        // Çå¿Õ¸ÕÌåËÙ¶È£¬Á¢¼´Í£Ö¹Î»ÒÆ
-        if (playerMovement.rb != null)
+        if (playerAnim != null)
         {
-            playerMovement.rb.velocity = Vector2.zero;
+            if (playerMovement != null)
+            {
+                bool shouldRestoreMovement = movementLockedByHurt || playerMovement.canMove;
+                // Disable movement while taking damage
+                playerMovement.canMove = false;
+                movementLockedByHurt = shouldRestoreMovement;
+                hurtRecoveryTimer = shouldRestoreMovement ? HurtMoveLockDuration : 0f;
+                // Clear rigidbody velocity to stop movement immediately
+                if (playerMovement.rb != null)
+                {
+                    playerMovement.rb.velocity = Vector2.zero;
+                }
+            }
+
+            // Trigger the hit reaction animation
+            playerAnim.SetTrigger(hurtAnimParam);
         }
-
-        // ´¥·¢ÊÜ»÷¶¯»­
-        playerAnim.SetTrigger(hurtAnimParam);
-
-        // ÑªÌõ¼õÉÙ
-        healthTrans.SetValue(characterCore.currentHp);
     }
 
     /// <summary>
-    /// ¶¯»­ÊÂ¼ş»Øµ÷£ºÊÜ»÷¶¯»­²¥·ÅÍê³ÉºóÆôÓÃÒÆ¶¯
+    /// Animation event callback: re-enable movement after the hit reaction animation finishes
     /// </summary>
     public void OnHurtAnimationEnd()
     {
+        ReleaseHurtMovementLock();
+    }
+
+    private void TickHurtRecovery(float deltaTime)
+    {
+        if (hurtRecoveryTimer <= 0f || playerMovement == null)
+        {
+            return;
+        }
+
+        hurtRecoveryTimer -= Mathf.Max(0f, deltaTime);
+        if (hurtRecoveryTimer <= 0f)
+        {
+            ReleaseHurtMovementLock();
+        }
+    }
+
+    private void ReleaseHurtMovementLock()
+    {
+        hurtRecoveryTimer = 0f;
+        if (!movementLockedByHurt)
+        {
+            return;
+        }
+
+        movementLockedByHurt = false;
         if (playerMovement != null)
         {
-            playerMovement.canMove = true; // Ö»¹ØÒÆ¶¯
+            playerMovement.canMove = true; // Only clear the hit reaction lock
         }
     }
 
@@ -71,5 +122,23 @@ public class PlayerTakeDamage : MonoBehaviour
         {
             characterCore.OnTakeDamage -= PlayHurtAnimation;
         }
+    }
+
+    private void RefreshHealthUi()
+    {
+        if (characterCore == null || characterCore.stats == null)
+        {
+            return;
+        }
+
+        healthTrans = GameplayStatusHudRuntime.EnsureHealthGauge(healthTrans);
+        if (healthTrans == null)
+        {
+            return;
+        }
+
+        healthTrans.SetMaxValue(characterCore.stats.maxHp);
+        healthTrans.SetValue(characterCore.currentHp);
+        GameplayStatusHudRuntime.RefreshHealthText(characterCore.currentHp, characterCore.stats.maxHp);
     }
 }

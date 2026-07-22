@@ -2,40 +2,94 @@ using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
-/// µ¥¸ö½¨ÖþÍ¼¼øÌõÄ¿µÄÍê³É×´Ì¬ÅÐ¶Ï
-/// Ìõ¼þ£º
-/// 1. ¸Ã½¨Öþ×Ô¼ºµÄSlider´ïµ½100
-/// 2. ¸Ã½¨ÖþÏÂ3¸ö²ÛÎ»È«²¿µãÁÁ
+/// Completion state check for a single building catalogue entry
+/// Conditions:
+/// 1. Common materials can advance unlock progress up to 70%
+/// 2. Lighting all 3 dedicated slots completes the remaining 30%
+/// 3. Click the locked icon to confirm completion
 /// </summary>
 public class CatalogueBuildingUnlockState : MonoBehaviour
 {
-    [Header("¸Ã½¨Öþ×Ô¼ºµÄ½ø¶ÈÌõ")]
+    [Header("å»ºç­‘ç¼–å·")]
+    public CatalogueBuildingId buildingId = CatalogueBuildingId.Building1;
+
+    [Header("è¯¥å»ºç­‘è‡ªå·±çš„è¿›åº¦æ¡")]
     public Slider buildingSlider;
 
-    [Header("¸Ã½¨ÖþÏÂµÄ3¸öµãÁÁ²ÛÎ»")]
+    [Header("è¯¥å»ºç­‘ä¸‹çš„3ä¸ªç‚¹äº®æ§½ä½")]
     public CatalogueUnlockSlotButton[] slotButtons;
 
-    [Header("Íê³É½âËøºóÏÔÊ¾µÄÎïÌå£¨¿ÉÑ¡£©")]
+    [Header("å®Œæˆè§£é”åŽæ˜¾ç¤ºçš„ç‰©ä½“ï¼ˆå¯é€‰ï¼‰")]
     public GameObject unlockedBuildingVisual;
 
-    [Header("Î´Íê³ÉÊ±ÏÔÊ¾µÄÎïÌå£¨¿ÉÑ¡£©")]
+    [Header("æœªå®Œæˆæ—¶æ˜¾ç¤ºçš„ç‰©ä½“ï¼ˆå¯é€‰ï¼‰")]
     public GameObject lockedBuildingVisual;
 
-    [Header("ÔËÐÐÊ±×´Ì¬¹Û²ì")]
+    [Header("ç‚¹å‡»æœªè§£é”å›¾æ ‡å®Œæˆå»ºç­‘ï¼ˆå¯é€‰ï¼‰")]
+    public Button lockedBuildingButton;
+
+    [Header("å»ºç­‘ä»‹ç»æ•°æ®ï¼ˆå¯é€‰ï¼‰")]
+    public BuildingDetailData buildingDetailData;
+
+    [Header("å¥–åŠ±å¼¹çª—ï¼ˆå¯é€‰ï¼‰")]
+    public Dialog dialogUI;
+
+    [Header("è¿è¡Œæ—¶çŠ¶æ€è§‚å¯Ÿ")]
     public bool isSliderComplete;
     public bool areAllSlotsUnlocked;
     public bool isBuildingUnlocked;
 
+    public CatalogueBuildingId BuildingId => buildingId;
+
+    private Button boundLockedButton;
+
     private void Start()
     {
+        BindBuildingButtons();
         RefreshState();
+    }
+
+    private void OnEnable()
+    {
+        RuntimeProgressState.EnsureInstance().OnStateChanged += RefreshState;
+        BindBuildingButtons();
+        RefreshState();
+    }
+
+    private void OnDisable()
+    {
+        if (RuntimeProgressState.Instance != null)
+        {
+            RuntimeProgressState.Instance.OnStateChanged -= RefreshState;
+        }
+    }
+
+    private void OnDestroy()
+    {
+        UnbindBuildingButtons();
     }
 
     public void RefreshState()
     {
-        isSliderComplete = CheckSliderComplete();
-        areAllSlotsUnlocked = CheckAllSlotsUnlocked();
-        isBuildingUnlocked = isSliderComplete && areAllSlotsUnlocked;
+        ResolveBuildingIdIfNeeded();
+        BindBuildingButtons();
+
+        RuntimeProgressState runtimeState = RuntimeProgressState.EnsureInstance();
+        BuildingDefinition definition = BuildingDefinitionLibrary.Get(buildingId);
+        BuildingRuntimeStateData state = runtimeState.GetBuildingState(buildingId);
+
+        if (buildingSlider != null)
+        {
+            buildingSlider.minValue = 0f;
+            buildingSlider.maxValue = definition.requiredProgress;
+            buildingSlider.value = state.progress;
+            SliderFillGeometryUtility.ApplyExactFill(buildingSlider, true);
+        }
+
+        isSliderComplete = state.progress >= definition.requiredProgress;
+        int slotCount = definition.slotDefinitions != null ? definition.slotDefinitions.Length : 0;
+        areAllSlotsUnlocked = runtimeState.GetUnlockedSlotCount(buildingId) >= slotCount;
+        isBuildingUnlocked = runtimeState.IsBuildingUnlocked(buildingId);
 
         if (unlockedBuildingVisual != null)
         {
@@ -47,34 +101,186 @@ public class CatalogueBuildingUnlockState : MonoBehaviour
             lockedBuildingVisual.SetActive(!isBuildingUnlocked);
         }
 
-        Debug.Log($"{gameObject.name} ½¨Öþ×´Ì¬£ºSliderÍê³É={isSliderComplete}£¬²ÛÎ»Íê³É={areAllSlotsUnlocked}£¬×îÖÕÍê³É={isBuildingUnlocked}");
-    }
-
-    private bool CheckSliderComplete()
-    {
-        if (buildingSlider == null)
+        if (boundLockedButton != null)
         {
-            return false;
+            boundLockedButton.interactable = runtimeState.CanUnlockBuilding(buildingId);
         }
 
-        return buildingSlider.value >= buildingSlider.maxValue;
-    }
-
-    private bool CheckAllSlotsUnlocked()
-    {
-        if (slotButtons == null || slotButtons.Length == 0)
+        if (slotButtons != null)
         {
-            return false;
-        }
-
-        for (int i = 0; i < slotButtons.Length; i++)
-        {
-            if (slotButtons[i] == null || !slotButtons[i].IsUnlocked)
+            for (int i = 0; i < slotButtons.Length; i++)
             {
-                return false;
+                if (slotButtons[i] != null)
+                {
+                    slotButtons[i].RefreshVisual();
+                }
             }
         }
 
-        return true;
+    }
+
+    private void HandleBuildingButtonClicked()
+    {
+        ResolveBuildingIdIfNeeded();
+
+        RuntimeProgressState runtimeState = RuntimeProgressState.EnsureInstance();
+        if (runtimeState.IsBuildingUnlocked(buildingId))
+        {
+            RefreshState();
+            return;
+        }
+
+        if (!runtimeState.TryUnlockBuilding(buildingId, out _))
+        {
+            RefreshState();
+            return;
+        }
+
+        RefreshState();
+        ShowBuildingIntroduction();
+    }
+
+    private void BindBuildingButtons()
+    {
+        BindLockedButton();
+    }
+
+    private void BindLockedButton()
+    {
+        Button nextButton = lockedBuildingButton;
+        if (nextButton == null && lockedBuildingVisual != null)
+        {
+            nextButton = EnsureButtonOnVisual(lockedBuildingVisual);
+        }
+
+        if (boundLockedButton == nextButton)
+        {
+            return;
+        }
+
+        UnbindLockedButton();
+        boundLockedButton = nextButton;
+        lockedBuildingButton = nextButton;
+
+        if (boundLockedButton != null)
+        {
+            boundLockedButton.onClick.AddListener(HandleBuildingButtonClicked);
+        }
+    }
+
+    private void UnbindBuildingButtons()
+    {
+        UnbindLockedButton();
+    }
+
+    private void UnbindLockedButton()
+    {
+        if (boundLockedButton != null)
+        {
+            boundLockedButton.onClick.RemoveListener(HandleBuildingButtonClicked);
+            boundLockedButton = null;
+        }
+    }
+
+    private static Button EnsureButtonOnVisual(GameObject visual)
+    {
+        if (visual == null)
+        {
+            return null;
+        }
+
+        Button button = visual.GetComponent<Button>();
+        if (button == null)
+        {
+            button = visual.AddComponent<Button>();
+        }
+
+        Image image = visual.GetComponent<Image>();
+        if (button.targetGraphic == null && image != null)
+        {
+            button.targetGraphic = image;
+        }
+
+        return button;
+    }
+
+    private void ShowBuildingIntroduction()
+    {
+        string content = BuildBuildingIntroductionContent();
+        dialogUI = Dialog.EnsureTopmostRuntimeInstance();
+        if (dialogUI == null)
+        {
+            Debug.Log(content);
+            return;
+        }
+
+        dialogUI.ShowClickCloseDialog(content);
+        dialogUI.EnsureTopmostRuntimePanelInputSurface();
+    }
+
+    private string BuildBuildingIntroductionContent()
+    {
+        BuildingDefinition definition = BuildingDefinitionLibrary.Get(buildingId);
+        BuildingDetailData detailData = ResolveBuildingDetailData();
+
+        string title = definition.displayName;
+        if (detailData != null && !string.IsNullOrWhiteSpace(detailData.buildingName))
+        {
+            title = detailData.buildingName;
+        }
+        else if (!string.IsNullOrWhiteSpace(definition.detailTitle))
+        {
+            title = definition.detailTitle;
+        }
+
+        string introduction = definition.detailDescription;
+        if (detailData != null && !string.IsNullOrWhiteSpace(detailData.introduction1))
+        {
+            introduction = detailData.introduction1;
+        }
+
+        string supplement = string.Empty;
+        if (detailData != null)
+        {
+            if (!string.IsNullOrWhiteSpace(detailData.finalIntroduction))
+            {
+                supplement = detailData.finalIntroduction;
+            }
+            else if (!string.IsNullOrWhiteSpace(detailData.introduction2))
+            {
+                supplement = detailData.introduction2;
+            }
+        }
+
+        return string.IsNullOrWhiteSpace(supplement)
+            ? $"{title}\n{introduction}"
+            : $"{title}\n{introduction}\n\n{supplement}";
+    }
+
+    private BuildingDetailData ResolveBuildingDetailData()
+    {
+        if (buildingDetailData != null)
+        {
+            return buildingDetailData;
+        }
+
+        BuildingDetailOpenButton detailOpenButton = GetComponentInChildren<BuildingDetailOpenButton>(true);
+        if (detailOpenButton != null && detailOpenButton.buildingDetailData != null)
+        {
+            buildingDetailData = detailOpenButton.buildingDetailData;
+            return buildingDetailData;
+        }
+
+        buildingDetailData = GetComponentInChildren<BuildingDetailData>(true);
+        return buildingDetailData;
+    }
+
+    private void ResolveBuildingIdIfNeeded()
+    {
+        BuildingProgressController controller = GetComponent<BuildingProgressController>();
+        if (controller != null)
+        {
+            buildingId = controller.buildingId;
+        }
     }
 }

@@ -2,22 +2,22 @@ using UnityEngine;
 using System;
 
 /// <summary>
-/// 敌人攻击范围触发器
+/// Enemy attack range trigger
 /// </summary>
 [RequireComponent(typeof(Collider2D))] 
 public class EnemyAttackRangeTrigger2D : MonoBehaviour
 {
-    // 玩家进入攻击范围事件
+    // Player entered attack range event
     public event Action OnPlayerEnterRange;
-    // 玩家离开攻击范围事件
+    // Player exited attack range event
     public event Action OnPlayerExitRange;
 
-    // 标签检测
+    // Tag check
     [SerializeField] private string playerTag = "Player";
 
     private void Awake()
     {
-        // 确保触发器是开启状态且非碰撞体
+        // Ensure the trigger is enabled and non-solid
         Collider2D col = GetComponent<Collider2D>();
         if (col != null)
         {
@@ -29,7 +29,7 @@ public class EnemyAttackRangeTrigger2D : MonoBehaviour
     {
         if (other.CompareTag(playerTag))
         {
-            Debug.Log("玩家进入攻击范围");
+            Debug.Log("鐜╁杩涘叆鏀诲嚮鑼冨洿");
             OnPlayerEnterRange?.Invoke();
         }
     }

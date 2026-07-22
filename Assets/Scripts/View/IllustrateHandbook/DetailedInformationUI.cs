@@ -1,15 +1,16 @@
 using UnityEngine;
 using UnityEngine.UI;
+using TMPro;
 
 public class DetailedInformationUI : MonoBehaviour
 {
-    [Header("Õºº¯÷˜ΩÁ√Ê")]
+    [Header("ÂõæÈâ¥‰∏ªÁïåÈù¢")]
     public GameObject illustratedHandbookPanel;
 
-    [Header("œÍœ∏–≈œ¢◊‹ΩÁ√Ê")]
+    [Header("ËØ¶ÁªÜ‰ø°ÊÅØÊÄªÁïåÈù¢")]
     public GameObject detailedInformationPanel;
 
-    [Header("µ⁄“ª“≥")]
+    [Header("Á¨¨‰∏ÄÈ°µ")]
     public GameObject backGround1;
     public Image page1Image;
     public Text page1NameText;
@@ -17,7 +18,7 @@ public class DetailedInformationUI : MonoBehaviour
     public Button nextPageButton;
     public Button closeButton1;
 
-    [Header("µ⁄∂˛“≥")]
+    [Header("Á¨¨‰∫åÈ°µ")]
     public GameObject backGround2;
     public Image page2Image;
     public Text page2IntroductionText;
@@ -27,17 +28,8 @@ public class DetailedInformationUI : MonoBehaviour
 
     private void Start()
     {
-        if (nextPageButton != null)
-            nextPageButton.onClick.AddListener(ShowPage2);
-
-        if (previousPageButton != null)
-            previousPageButton.onClick.AddListener(ShowPage1);
-
-        if (closeButton1 != null)
-            closeButton1.onClick.AddListener(CloseDetailOnlyReturnHandbook);
-
-        if (closeButton2 != null)
-            closeButton2.onClick.AddListener(CloseDetailOnlyReturnHandbook);
+        ApplyRuntimeFonts();
+        BindButtons();
 
         ShowPage1Only();
     }
@@ -58,7 +50,7 @@ public class DetailedInformationUI : MonoBehaviour
     }
 
     /// <summary>
-    /// œ‘ æΩ®÷˛œÍœ∏–≈œ¢
+    /// Show building details
     /// </summary>
     public void ShowDetail(BuildingDetailData data)
     {
@@ -88,36 +80,41 @@ public class DetailedInformationUI : MonoBehaviour
         if (page2FinallyIntroductionText != null)
             page2FinallyIntroductionText.text = data.finalIntroduction;
 
-        // ¥Úø™œÍœ∏“≥µ⁄“ª“≥
+        PrepareDetailPanelForDisplay();
+
         if (UIRootManager.Instance != null)
         {
-            UIRootManager.Instance.OpenDetailViewPage1();
+            UIRootManager.Instance.OpenModal(RuntimeModalType.DetailPage1, RuntimeModalOpenSource.None, true);
         }
 
         ShowPage1Only();
     }
 
     /// <summary>
-    /// œ‘ æµ⁄“ª“≥
+    /// Show the first page
     /// </summary>
     public void ShowPage1()
     {
+        PrepareDetailPanelForDisplay();
+
         if (UIRootManager.Instance != null)
         {
-            UIRootManager.Instance.OpenDetailViewPage1();
+            UIRootManager.Instance.OpenModal(RuntimeModalType.DetailPage1, RuntimeModalOpenSource.None, true);
         }
 
         ShowPage1Only();
     }
 
     /// <summary>
-    /// œ‘ æµ⁄∂˛“≥
+    /// Show the second page
     /// </summary>
     public void ShowPage2()
     {
+        PrepareDetailPanelForDisplay();
+
         if (UIRootManager.Instance != null)
         {
-            UIRootManager.Instance.OpenDetailViewPage2();
+            UIRootManager.Instance.OpenModal(RuntimeModalType.DetailPage2, RuntimeModalOpenSource.None, true);
         }
 
         if (backGround1 != null)
@@ -128,7 +125,7 @@ public class DetailedInformationUI : MonoBehaviour
     }
 
     /// <summary>
-    /// ÷ªœ‘ æµ⁄“ª“≥£®±æµÿ“≥√Ê◊¥Ã¨£©
+    /// Show only the first page (local page state)
     /// </summary>
     private void ShowPage1Only()
     {
@@ -140,30 +137,290 @@ public class DetailedInformationUI : MonoBehaviour
     }
 
     /// <summary>
-    /// πÿ±’’˚∏ˆÕºº¯œµÕ≥
+    /// Close the entire catalogue system
     /// </summary>
     public void CloseAllUI()
     {
-        if (UIRootManager.Instance != null)
-        {
-            UIRootManager.Instance.CloseAllBookUI();
-        }
-
         ShowPage1Only();
-        UIManager.Instance?.RestoreUI();
+        UIManager.Instance?.CloseIllustratedHandbook();
     }
 
     /// <summary>
-    /// ¥”œÍœ∏“≥ªÿµΩÕºº¯÷˜“≥
+    /// Return from the detail page to the catalogue home page
     /// </summary>
     public void CloseDetailOnlyReturnHandbook()
     {
+        if (detailedInformationPanel != null)
+            detailedInformationPanel.SetActive(false);
+
+        if (illustratedHandbookPanel != null)
+            illustratedHandbookPanel.SetActive(true);
+
         if (UIRootManager.Instance != null)
         {
-            UIRootManager.Instance.HideAllDetail();
-            UIRootManager.Instance.ShowHandbook();
+            UIRootManager.Instance.OpenModal(RuntimeModalType.Handbook, RuntimeModalOpenSource.None, true);
         }
 
         ShowPage1Only();
+    }
+
+    public bool IsDetailVisible()
+    {
+        GameObject detailRoot = detailedInformationPanel != null
+            ? detailedInformationPanel
+            : gameObject;
+
+        if (detailRoot == null || !detailRoot.activeInHierarchy)
+        {
+            return false;
+        }
+
+        RectTransform rectTransform = detailRoot.transform as RectTransform;
+        if (rectTransform != null &&
+            (Mathf.Approximately(rectTransform.localScale.x, 0f) ||
+             Mathf.Approximately(rectTransform.localScale.y, 0f)))
+        {
+            return false;
+        }
+
+        CanvasGroup canvasGroup = detailRoot.GetComponent<CanvasGroup>();
+        if (canvasGroup == null)
+        {
+            return true;
+        }
+
+        return canvasGroup.alpha > 0.01f && canvasGroup.blocksRaycasts;
+    }
+
+    private void PrepareDetailPanelForDisplay()
+    {
+        ResolveRuntimeReferences();
+
+        GameObject detailRoot = detailedInformationPanel != null
+            ? detailedInformationPanel
+            : gameObject;
+        EnsureAncestorsVisible(detailRoot.transform);
+        detailRoot.SetActive(true);
+        detailRoot.transform.SetAsLastSibling();
+
+        RectTransform detailRect = detailRoot.transform as RectTransform;
+        if (detailRect != null &&
+            Mathf.Approximately(detailRect.localScale.x, 0f) &&
+            Mathf.Approximately(detailRect.localScale.y, 0f))
+        {
+            detailRect.localScale = Vector3.one;
+        }
+
+        CanvasGroup canvasGroup = detailRoot.GetComponent<CanvasGroup>();
+        if (canvasGroup == null)
+        {
+            canvasGroup = detailRoot.AddComponent<CanvasGroup>();
+        }
+
+        canvasGroup.alpha = 1f;
+        canvasGroup.interactable = true;
+        canvasGroup.blocksRaycasts = true;
+
+        Canvas canvas = detailRoot.GetComponent<Canvas>();
+        if (canvas == null)
+        {
+            canvas = detailRoot.AddComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        }
+
+        canvas.overrideSorting = true;
+        canvas.sortingOrder = RuntimeModalStyle.ModalSortingOrder + 2;
+
+        if (detailRoot.GetComponent<GraphicRaycaster>() == null)
+        {
+            detailRoot.AddComponent<GraphicRaycaster>();
+        }
+
+        BindButtons();
+
+        if (UIManager.Instance != null)
+        {
+            UIManager.Instance.detailedInformation = detailRoot;
+        }
+    }
+
+    private void ResolveRuntimeReferences()
+    {
+        GameObject detailRoot = detailedInformationPanel != null
+            ? detailedInformationPanel
+            : gameObject;
+        if (detailedInformationPanel == null)
+        {
+            detailedInformationPanel = detailRoot;
+        }
+
+        if (illustratedHandbookPanel != null)
+        {
+            return;
+        }
+
+        Transform current = detailRoot.transform.parent;
+        while (current != null)
+        {
+            if (current.name == IllustratedHandbookTabsController.IllustratedHandbookCanvasName)
+            {
+                illustratedHandbookPanel = current.gameObject;
+                return;
+            }
+
+            if (current.name == IllustratedHandbookTabsController.RootObjectName)
+            {
+                Transform handbookPage = current.Find(IllustratedHandbookTabsController.IllustratedHandbookCanvasName);
+                illustratedHandbookPanel = handbookPage != null ? handbookPage.gameObject : current.gameObject;
+                return;
+            }
+
+            current = current.parent;
+        }
+    }
+
+    private void EnsureAncestorsVisible(Transform detailRoot)
+    {
+        Transform current = detailRoot != null ? detailRoot.parent : null;
+        while (current != null)
+        {
+            if (!current.gameObject.activeSelf)
+            {
+                current.gameObject.SetActive(true);
+            }
+
+            RectTransform rectTransform = current as RectTransform;
+            if (rectTransform != null &&
+                Mathf.Approximately(rectTransform.localScale.x, 0f) &&
+                Mathf.Approximately(rectTransform.localScale.y, 0f))
+            {
+                rectTransform.localScale = Vector3.one;
+            }
+
+            CanvasGroup canvasGroup = current.GetComponent<CanvasGroup>();
+            if (canvasGroup != null)
+            {
+                canvasGroup.alpha = 1f;
+                canvasGroup.interactable = true;
+                canvasGroup.blocksRaycasts = true;
+            }
+
+            current = current.parent;
+        }
+    }
+
+    private void BindButtons()
+    {
+        if (nextPageButton != null)
+        {
+            nextPageButton.onClick.RemoveListener(ShowPage2);
+            nextPageButton.onClick.AddListener(ShowPage2);
+        }
+
+        if (previousPageButton != null)
+        {
+            previousPageButton.onClick.RemoveListener(ShowPage1);
+            previousPageButton.onClick.AddListener(ShowPage1);
+        }
+
+        ResolveCloseButtons();
+        BindCloseButton(closeButton1);
+        BindCloseButton(closeButton2);
+    }
+
+    private void ResolveCloseButtons()
+    {
+        Transform searchRoot = detailedInformationPanel != null
+            ? detailedInformationPanel.transform
+            : transform;
+
+        if (closeButton1 == null)
+        {
+            closeButton1 = FindButton(searchRoot, "Close", "Setting", "ÂÖ≥Èó≠");
+        }
+
+        if (closeButton2 == null)
+        {
+            closeButton2 = FindButton(searchRoot, "Previous", "Back", "ËøîÂõû");
+            if (closeButton2 == closeButton1)
+            {
+                closeButton2 = null;
+            }
+        }
+    }
+
+    private void BindCloseButton(Button button)
+    {
+        if (button == null)
+        {
+            return;
+        }
+
+        button.onClick.RemoveListener(CloseDetailOnlyReturnHandbook);
+        button.onClick.AddListener(CloseDetailOnlyReturnHandbook);
+        button.interactable = true;
+
+        Graphic targetGraphic = button.targetGraphic;
+        if (targetGraphic == null)
+        {
+            targetGraphic = button.GetComponent<Graphic>();
+            button.targetGraphic = targetGraphic;
+        }
+
+        if (targetGraphic != null)
+        {
+            targetGraphic.raycastTarget = true;
+        }
+    }
+
+    private static Button FindButton(Transform root, params string[] nameFragments)
+    {
+        if (root == null)
+        {
+            return null;
+        }
+
+        Button[] buttons = root.GetComponentsInChildren<Button>(true);
+        for (int fragmentIndex = 0; fragmentIndex < nameFragments.Length; fragmentIndex++)
+        {
+            string fragment = nameFragments[fragmentIndex];
+            if (string.IsNullOrEmpty(fragment))
+            {
+                continue;
+            }
+
+            for (int i = 0; i < buttons.Length; i++)
+            {
+                Button button = buttons[i];
+                if (button == null)
+                {
+                    continue;
+                }
+
+                Text label = button.GetComponentInChildren<Text>(true);
+                TMP_Text tmpLabel = button.GetComponentInChildren<TMP_Text>(true);
+                bool matchesName = button.name.IndexOf(fragment, System.StringComparison.OrdinalIgnoreCase) >= 0;
+                bool matchesLabel = label != null &&
+                                    label.text != null &&
+                                    label.text.IndexOf(fragment, System.StringComparison.OrdinalIgnoreCase) >= 0;
+                bool matchesTmpLabel = tmpLabel != null &&
+                                       tmpLabel.text != null &&
+                                       tmpLabel.text.IndexOf(fragment, System.StringComparison.OrdinalIgnoreCase) >= 0;
+                if (matchesName || matchesLabel || matchesTmpLabel)
+                {
+                    return button;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private void ApplyRuntimeFonts()
+    {
+        RuntimeTextFontRepair.RepairLegacyText(page1NameText);
+        RuntimeTextFontRepair.RepairLegacyText(page1IntroductionText);
+        RuntimeTextFontRepair.RepairLegacyText(page2IntroductionText);
+        RuntimeTextFontRepair.RepairLegacyText(page2FinallyIntroductionText);
     }
 }

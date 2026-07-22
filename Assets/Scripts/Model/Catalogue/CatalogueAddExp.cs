@@ -3,25 +3,25 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// ½¨ÖşÍ¼Â¼½ø¶ÈÊı¾İ
-/// ¸ºÔğÀÛ¼Æ²»Í¬½¨ÖşÀàĞÍµÄ¹¹½¨¶È£¬²¢Ìá¹©×Ü½ø¶È¸øUI¶ÁÈ¡
+/// Building catalogue progress data
+/// Accumulates build progress by building type and exposes total progress for UI reads
 /// </summary>
 public class CatalogueAddExp : MonoBehaviour
 {
-    [Header("×Ü½ø¶ÈÉÏÏŞ")]
+    [Header("æ€»è¿›åº¦ä¸Šé™")]
     public int totalMaxProgress = 100;
 
-    // Ã¿¸ö½¨Öş½á¹¹ÎïÆ·µÄ¹¹½¨¶È
+    // Build progress for each building structure item
     private Dictionary<ArchitecturalType, int> expDict = new Dictionary<ArchitecturalType, int>();
 
     /// <summary>
-    /// µ±½ø¶È±ä»¯Ê±£¬Í¨ÖªUIË¢ĞÂ
+    /// Notifies UI refresh when progress changes
     /// </summary>
     public event Action OnProgressChanged;
 
     private void Start()
     {
-        // ³õÊ¼»¯ËùÓĞÀàĞÍµÄ¾­ÑéÎª0
+        // Initialize every type's experience to 0
         foreach (ArchitecturalType type in Enum.GetValues(typeof(ArchitecturalType)))
         {
             expDict[type] = 0;
@@ -33,7 +33,7 @@ public class CatalogueAddExp : MonoBehaviour
         }
         else
         {
-            Debug.LogError("ExperienceManager.Instance ²»´æÔÚ£¬ÎŞ·¨¼àÌı¾­Ñé±ä»¯£¡");
+            Debug.LogError("ExperienceManager.Instance ä¸å­˜åœ¨ï¼Œæ— æ³•ç›‘å¬ç»éªŒå˜åŒ–ï¼");
         }
     }
 
@@ -46,7 +46,7 @@ public class CatalogueAddExp : MonoBehaviour
     }
 
     /// <summary>
-    /// ¶ÔÓ¦½¨Öş½á¹¹Ôö¼Ó¹¹½¨¶È
+    /// Adds build progress for the matching building structure
     /// </summary>
     private void HandleExperienceChange(ArchitecturalType type, int newExperience)
     {
@@ -57,14 +57,14 @@ public class CatalogueAddExp : MonoBehaviour
 
         expDict[type] += newExperience;
 
-        Debug.Log($"»ùµØÊÕµ½£º{type} +{newExperience}£¬µ±Ç°×ÜÁ¿£º{expDict[type]}");
+        Debug.Log($"åŸºåœ°æ”¶åˆ°ï¼š{type} +{newExperience}ï¼Œå½“å‰æ€»é‡ï¼š{expDict[type]}");
 
-        // Í¨ÖªUIË¢ĞÂ
+        // Notify UI to refresh
         OnProgressChanged?.Invoke();
     }
 
     /// <summary>
-    /// »ñÈ¡Ä³¸öÀàĞÍµ±Ç°µÄ¹¹½¨¶È
+    /// Gets the current build progress for a type
     /// </summary>
     public int GetProgress(ArchitecturalType type)
     {
@@ -77,7 +77,7 @@ public class CatalogueAddExp : MonoBehaviour
     }
 
     /// <summary>
-    /// »ñÈ¡×Ü¹¹½¨¶È£¨Gold + Green + White£©
+    /// Gets total build progress (Gold + Green + White)
     /// </summary>
     public int GetTotalProgress()
     {
@@ -92,7 +92,7 @@ public class CatalogueAddExp : MonoBehaviour
     }
 
     /// <summary>
-    /// »ñÈ¡ÏŞÖÆÔÚ×ÜÉÏÏŞÄÚµÄ×Ü½ø¶È
+    /// Gets total progress clamped to the maximum cap
     /// </summary>
     public int GetClampedTotalProgress()
     {

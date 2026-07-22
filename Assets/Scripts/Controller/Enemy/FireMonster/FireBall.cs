@@ -4,10 +4,10 @@ using UnityEngine;
 
 public class FireBall : MonoBehaviour
 {
-    [Header("»ù´¡ÉèÖÃ")]
+    [Header("åŸºç¡€è®¾ç½®")]
     public float speed = 6f;
-    public float autoDestroyTime = 10f; // Î´ÃüÖĞ10Ãë×Ô¶¯Ïú»Ù
-    public float hitDestroyDelay = 3f;  // ÃüÖĞºó¶µµ×Ïú»ÙÑÓ³Ù
+    public float autoDestroyTime = 10f; // Auto-destroy after 10 seconds if no hit occurs
+    public float hitDestroyDelay = 3f;  // Fallback destroy delay after a hit
 
     private float damage = 10;
     private Animator anim;
@@ -19,14 +19,20 @@ public class FireBall : MonoBehaviour
         anim = GetComponent<Animator>();
         rb = GetComponent<Rigidbody2D>();
 
-        // ÅĞ¿ÕĞ£Ñé£¬±ÜÃâ¿ÕÒıÓÃ
-        if (anim == null) Debug.LogError($"[{gameObject.name}] È±ÉÙAnimator×é¼ş£¡");
-        if (rb == null) Debug.LogError($"[{gameObject.name}] È±ÉÙRigidbody2D×é¼ş£¡");
+        // Null check to avoid null references
+        if (anim == null) Debug.LogError($"[{gameObject.name}] ç¼ºå°‘Animatorç»„ä»¶ï¼");
+        if (rb == null) Debug.LogError($"[{gameObject.name}] ç¼ºå°‘Rigidbody2Dç»„ä»¶ï¼");
     }
 
     private void Start()
     {
-        // Î´ÃüÖĞ10Ãë×Ô¶¯Ïú»Ù
+        NightLightingController.EnsureTransientFxLight(
+            gameObject,
+            0.95f,
+            0.12f,
+            NightLightingController.GetGameplayFireballLightColor());
+
+        // Auto-destroy after 10 seconds if no hit occurs
         Destroy(gameObject, autoDestroyTime);
     }
 
@@ -43,34 +49,34 @@ public class FireBall : MonoBehaviour
 
         isHit = true;
 
-        // Í£Ö¹ÒÆ¶¯
+        // Stop movement
         rb.velocity = Vector2.zero;
 
-        // »ñµÃÍæ¼Ò½Å±¾CharacterCore
+        // Get the player CharacterCore script
         CharacterCore playerCore = other.GetComponent<CharacterCore>();
         if (playerCore != null)
         {
-            // ¶ÔÍæ¼ÒÔì³ÉÉËº¦
+            // Damage the player
             playerCore.TakeDamage(damage);
         }
 
-        // ²¥·ÅÃüÖĞ¶¯»­£¨ÅĞ¿Õ±£»¤£©
+        // Play hit animation with null protection
         if (anim != null)
             anim.SetTrigger("IsHit");
 
-        // ¹Ø±ÕÅö×²Æ÷£¬±ÜÃâÖØ¸´´¥·¢
+        // Disable the collider to avoid repeated triggers
         Collider2D col = GetComponent<Collider2D>();
         if (col != null)
             col.enabled = false;
 
-        // È¡ÏûÔ­±¾µÄ10Ãë×Ô¶¯Ïú»Ù£¬±ÜÃâºÍ¶¯»­ÊÂ¼ş³åÍ»
+        // Cancel the original 10-second auto-destroy to avoid conflicts with animation events
         CancelInvoke(nameof(Destroy));
 
-        // ±ÜÃâ¿¨ËÀ
+        // Avoid getting stuck
         Destroy(gameObject, hitDestroyDelay);
     }
 
-    // ÃüÖĞ¶¯»­²¥ÍêºóÏú»Ù
+    // Destroy after the hit animation finishes
     public void DestroyAfterHit()
     {
         Destroy(gameObject);

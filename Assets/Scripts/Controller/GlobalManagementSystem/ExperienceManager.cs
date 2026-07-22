@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// ¾­Ñé¹ÜÀí
+/// Experience management
 /// </summary>
 public class ExperienceManager : MonoBehaviour
 {
@@ -12,7 +12,7 @@ public class ExperienceManager : MonoBehaviour
     public delegate void ExperienceChangeHandler(ArchitecturalType type, int value);
     public event ExperienceChangeHandler OnExperienceChange;
 
-    // µ¥ÀýÄ£Ê½
+    // Singleton pattern
     private void Awake()
     {      
         if (Instance == null)
@@ -28,10 +28,10 @@ public class ExperienceManager : MonoBehaviour
 
     public void AddExperience(ArchitecturalType type, int value)
     {
-        // ·ÀÖ¹¾­ÑéÖµÎª0
+        // Prevent experience from being 0
         if (value < 0)
         {
-            Debug.LogError("¾­ÑéÖµ²»ÄÜÎª¸º");
+            Debug.LogError("ç»éªŒå€¼ä¸èƒ½ä¸ºè´Ÿ");
             return;
         }
         OnExperienceChange?.Invoke(type, value);

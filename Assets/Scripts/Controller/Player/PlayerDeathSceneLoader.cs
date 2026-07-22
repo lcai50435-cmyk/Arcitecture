@@ -2,14 +2,14 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 
 /// <summary>
-/// Íæ¼ÒËÀÍöºóÇĞ»»µ½ GameOver ³¡¾°
+/// Switch to the GameOver scene after the player dies
 /// </summary>
 public class PlayerDeathSceneLoader : MonoBehaviour
 {
-    [Header("Íæ¼ÒÉúÃüºËĞÄ")]
+    [Header("ç©å®¶ç”Ÿå‘½æ ¸å¿ƒ")]
     public CharacterCore characterCore;
 
-    [Header("ËÀÍöºóÌø×ªµÄ³¡¾°Ãû")]
+    [Header("æ­»äº¡åè·³è½¬çš„åœºæ™¯å")]
     public string gameOverSceneName = "GameOverScene";
 
     private void Awake()
@@ -38,9 +38,24 @@ public class PlayerDeathSceneLoader : MonoBehaviour
 
     private void HandlePlayerDeath()
     {
-        Debug.Log("Íæ¼ÒËÀÍö£¬½øÈë GameOver ³¡¾°");
+        Debug.Log("ç©å®¶æ­»äº¡ï¼Œè¿›å…¥å¤±è´¥ç»“ç®—");
 
-        Time.timeScale = 1f; // ·ÀÖ¹ÄãÖ®Ç°ÔİÍ£¹ıÊ±¼ä£¬µ¼ÖÂĞÂ³¡¾°°´Å¥²»ÄÜµã
+        if (GameplayFailureController.TryTriggerFailure(
+            GameplayFailureReason.PlayerDeath,
+            gameOverSceneName))
+        {
+            return;
+        }
+
+        Time.timeScale = 1f;
+
+        SceneLoader loader = SceneLoader.EnsureInstance();
+        if (loader != null)
+        {
+            loader.ToScene(gameOverSceneName);
+            return;
+        }
+
         SceneManager.LoadScene(gameOverSceneName);
     }
 }

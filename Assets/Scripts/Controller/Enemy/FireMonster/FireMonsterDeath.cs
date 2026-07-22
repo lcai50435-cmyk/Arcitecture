@@ -1,9 +1,7 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// 火灾怪死亡相关逻辑
+/// Fire monster death logic
 /// </summary>
 public class FireMonsterDeath : CharacterDeathBase
 {
@@ -14,26 +12,26 @@ public class FireMonsterDeath : CharacterDeathBase
 
     protected override void OnCharacterDie()
     {
-        // 触发动画机的死亡Trigger
+        // Trigger the Animator death trigger
         anim.SetTrigger("IsDeath");
     }
 
     protected override void DisablePhysicsComponents()
     {
-        // 关闭碰撞
+        // Disable collision
         if (characterCollider != null)
             characterCollider.enabled = false;
 
         if (characterRigidbody != null)
         {
-            characterRigidbody.velocity = Vector2.zero;      // 清空速度
-            characterRigidbody.angularVelocity = 0f;         // 清空旋转速度
-            characterRigidbody.bodyType = RigidbodyType2D.Static; // 完全静止
+            characterRigidbody.velocity = Vector2.zero;
+            characterRigidbody.angularVelocity = 0f;
+            characterRigidbody.bodyType = RigidbodyType2D.Static;
         }
     }
 
-    public void OnDestroy()
+    public void DestroyAfterDeathAnimation()
     {
-        Destroy(gameObject);
+        CompleteDeathDestroy();
     }
 }

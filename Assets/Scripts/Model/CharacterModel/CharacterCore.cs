@@ -2,48 +2,88 @@ using System;
 using UnityEngine;
 
 /// <summary>
-/// ½ÇÉ«¹ÜÀí½Å±¾
-/// ¸ºÔğµ÷Õû½ÇÉ«ÑªÁ¿
-/// Ã¿¸ö½ÇÉ«¶¼Òª¹ÒÔØ
+/// Character management script.
+/// Maintains base stats, current stats, and health.
 /// </summary>
 public class CharacterCore : MonoBehaviour
 {
-    public CharacterStats stats; // ½ÇÉ«Ïà¹Ø±äÁ¿
+    public CharacterStats stats;
+    public CharacterStats baseStats;
 
-    [Header("½ÇÉ«Ä¿Ç°ÑªÁ¿")]
-    public float currentHp; // ½ÇÉ«Ä¿Ç°ÑªÁ¿
+    [Header("è§’è‰²ç›®å‰è¡€é‡")]
+    public float currentHp;
 
-    public event Action OnTakeDamage; // ÊÜ»÷ÊÂ¼ş
-    public event Action OnDeath;  // ËÀÍöÊÂ¼ş
+    public event Action OnTakeDamage;
+    public event Action<float> OnTakeDamageWithValue;
+    public event Action OnDeath;
 
-    [Header("³¯ÏòÅäÖÃ")]
-    public Vector2 lastFacingDirection = Vector2.down; // Ä¬ÈÏ³¯ÏÂ
+    [Header("æœå‘é…ç½®")]
+    public Vector2 lastFacingDirection = Vector2.down;
+
+    public float LastDamageTaken { get; private set; }
+    public bool IsDead { get; private set; }
 
     private void Awake()
     {
-        currentHp = stats.maxHp; // ÂúÑª×´Ì¬
+        if (stats == null)
+        {
+            stats = new CharacterStats();
+        }
+
+        if (baseStats == null || IsZeroStats(baseStats))
+        {
+            baseStats = stats.Clone();
+        }
+        else
+        {
+            baseStats = baseStats.Clone();
+        }
+
+        stats = baseStats.Clone();
+        currentHp = stats.maxHp;
     }
 
-    /// <summary>
-    /// ÉËº¦¿ÛÑª
-    /// </summary>
-    /// <param name="damage">ÉËº¦</param>
     public void TakeDamage(float damage)
     {
-        float realDmg = Mathf.Max(0, damage); // ·ÀÖ¹ÑªÁ¿Î´¸ºÊı
-        currentHp -= Mathf.Max(0, realDmg - stats.defense); // ÊÜµ½ÉËº¦
+        if (IsDead)
+        {
+            return;
+        }
 
-        OnTakeDamage?.Invoke(); // ²¥·ÅÏà¹Ø±»¹¥»÷Âß¼­
+        float realDamage = Mathf.Max(0f, damage - Mathf.Max(0f, stats.defense));
+        LastDamageTaken = realDamage;
+        currentHp -= realDamage;
 
-        if (currentHp <= 0)
+        OnTakeDamage?.Invoke();
+        OnTakeDamageWithValue?.Invoke(realDamage);
+
+        if (currentHp <= 0f)
         {
             Die();
         }
     }
 
-    void Die()
+    private void Die()
     {
-        // ´¥·¢Ïà¹ØËÀÍöÂß¼­
+        if (IsDead)
+        {
+            return;
+        }
+
+        IsDead = true;
         OnDeath?.Invoke();
+    }
+
+    private static bool IsZeroStats(CharacterStats candidate)
+    {
+        if (candidate == null)
+        {
+            return true;
+        }
+
+        return candidate.maxHp <= 0f &&
+               candidate.attackDamage <= 0f &&
+               candidate.moveSpeed <= 0f &&
+               candidate.defense <= 0f;
     }
 }

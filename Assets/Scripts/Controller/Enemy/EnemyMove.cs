@@ -30,7 +30,7 @@ public class EnemyMove : MonoBehaviour
     private float lastInputY = -1f;
     private float lastDirectionChangeTime = float.NegativeInfinity;
     private CharacterCore character;
-    private float moveSpeed;
+    private float externalSpeedMultiplier = 1f;
 
     public Vector2 Position => rb != null ? rb.position : (Vector2)transform.position;
 
@@ -44,8 +44,6 @@ public class EnemyMove : MonoBehaviour
     private void Start()
     {
         character = GetComponent<CharacterCore>();
-        // 初始化怪物速度
-        moveSpeed = character.stats.moveSpeed;
     }
 
     private void Awake()
@@ -61,7 +59,6 @@ public class EnemyMove : MonoBehaviour
 
     private void OnValidate()
     {
-        if (moveSpeed < 0f) moveSpeed = 0f;
         if (axisSwitchThreshold < 0f) axisSwitchThreshold = 0f;
         if (reverseDirectionLockTime < 0f) reverseDirectionLockTime = 0f;
         if (turnLockTime < 0f) turnLockTime = 0f;
@@ -74,6 +71,11 @@ public class EnemyMove : MonoBehaviour
     public void StopMovement()
     {
         ApplyDirection(Vector2.zero);
+    }
+
+    public void SetExternalSpeedMultiplier(float multiplier)
+    {
+        externalSpeedMultiplier = Mathf.Clamp(multiplier, 0.05f, 1f);
     }
 
     public void SetMoveDirection(Vector2 rawDirection)
@@ -220,11 +222,11 @@ public class EnemyMove : MonoBehaviour
             lastInputY = direction.y;
         }
 
-        if (animator != null)
+        if (AnimatorParameterUtility.CanDrive(animator))
         {
-            animator.SetFloat("InputX", lastInputX);
-            animator.SetFloat("InputY", lastInputY);
-            animator.SetBool("IsMoving", isMoving);
+            AnimatorParameterUtility.SetFloatIfPresent(animator, "InputX", lastInputX);
+            AnimatorParameterUtility.SetFloatIfPresent(animator, "InputY", lastInputY);
+            AnimatorParameterUtility.SetBoolIfPresent(animator, "IsMoving", isMoving);
         }
 
         if (rb == null)
@@ -239,7 +241,11 @@ public class EnemyMove : MonoBehaviour
             return;
         }
 
-        rb.MovePosition(rb.position + direction * moveSpeed * Time.fixedDeltaTime);
+        float moveSpeed = character != null && character.stats != null
+            ? Mathf.Max(0f, character.stats.moveSpeed)
+            : 0f;
+
+        rb.MovePosition(rb.position + direction * moveSpeed * externalSpeedMultiplier * Time.fixedDeltaTime);
     }
 
     private Vector2 FilterToFourWay(Vector2 rawDirection)

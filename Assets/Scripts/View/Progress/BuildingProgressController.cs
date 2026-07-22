@@ -3,16 +3,16 @@ using UnityEngine.UI;
 
 public class BuildingProgressController : MonoBehaviour
 {
-    [Header("½¨Öş±àºÅ")]
+    [Header("å»ºç­‘ç¼–å·")]
     public CatalogueBuildingId buildingId;
 
-    [Header("¶ÔÓ¦½ø¶ÈÌõ")]
+    [Header("å¯¹åº”è¿›åº¦æ¡")]
     public Slider progressSlider;
 
-    [Header("×î´ó½ø¶È")]
+    [Header("æœ€å¤§è¿›åº¦")]
     public float maxProgress = 100f;
 
-    [Header("¶ÔÓ¦½¨Öş½âËø×´Ì¬")]
+    [Header("å¯¹åº”å»ºç­‘è§£é”çŠ¶æ€")]
     public CatalogueBuildingUnlockState buildingUnlockState;
 
     private void Awake()
@@ -21,33 +21,62 @@ public class BuildingProgressController : MonoBehaviour
         {
             buildingUnlockState = GetComponent<CatalogueBuildingUnlockState>();
         }
+
+        RefreshFromRuntimeState();
+    }
+
+    private void OnEnable()
+    {
+        RuntimeProgressState.EnsureInstance().OnStateChanged += RefreshFromRuntimeState;
+        RefreshFromRuntimeState();
+    }
+
+    private void OnDisable()
+    {
+        if (RuntimeProgressState.Instance != null)
+        {
+            RuntimeProgressState.Instance.OnStateChanged -= RefreshFromRuntimeState;
+        }
     }
 
     public void AddProgress(float value)
     {
-        if (progressSlider == null) return;
         if (value <= 0f) return;
 
-        progressSlider.value = Mathf.Clamp(progressSlider.value + value, 0f, maxProgress);
-
-        Debug.Log($"{buildingId} Ôö¼Ó½ø¶È {value}£¬µ±Ç°£º{progressSlider.value}/{maxProgress}");
-
-        // ¹Ø¼ü£º½ø¶ÈÌõ±ä»¯ºó£¬Á¢¿ÌË¢ĞÂ½¨Öş½âËø×´Ì¬
-        if (buildingUnlockState != null)
+        if (RuntimeProgressState.EnsureInstance().AddBuildingProgress(buildingId, Mathf.RoundToInt(value), out _))
         {
-            buildingUnlockState.RefreshState();
+            RefreshFromRuntimeState();
         }
     }
 
     public float GetCurrentProgress()
     {
-        if (progressSlider == null) return 0f;
-        return progressSlider.value;
+        return progressSlider == null ? 0f : progressSlider.value;
     }
 
     public bool IsFull()
     {
         if (progressSlider == null) return false;
         return progressSlider.value >= maxProgress;
+    }
+
+    public void RefreshFromRuntimeState()
+    {
+        if (progressSlider == null)
+        {
+            return;
+        }
+
+        BuildingDefinition definition = BuildingDefinitionLibrary.Get(buildingId);
+        maxProgress = definition.requiredProgress;
+        progressSlider.minValue = 0f;
+        progressSlider.maxValue = maxProgress;
+        progressSlider.value = RuntimeProgressState.EnsureInstance().GetBuildingProgress(buildingId);
+        SliderFillGeometryUtility.ApplyExactFill(progressSlider, true);
+
+        if (buildingUnlockState != null)
+        {
+            buildingUnlockState.RefreshState();
+        }
     }
 }

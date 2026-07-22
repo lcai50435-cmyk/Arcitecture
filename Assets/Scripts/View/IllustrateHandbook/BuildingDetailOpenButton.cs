@@ -4,29 +4,31 @@ using UnityEngine.UI;
 [RequireComponent(typeof(Button))]
 public class BuildingDetailOpenButton : MonoBehaviour
 {
-    [Header("µ±Ç°½¨ÖşÊÇ·ñ½âËø")]
+    [Header("å½“å‰å»ºç­‘æ˜¯å¦è§£é”")]
     public CatalogueBuildingUnlockState buildingUnlockState;
 
-    [Header("µ±Ç°½¨ÖşµÄÊı¾İ")]
+    [Header("å½“å‰å»ºç­‘çš„æ•°æ®")]
     public BuildingDetailData buildingDetailData;
 
-    [Header("ÏêÏ¸ĞÅÏ¢½çÃæ¿ØÖÆÆ÷")]
+    [Header("è¯¦ç»†ä¿¡æ¯ç•Œé¢æ§åˆ¶å™¨")]
     public DetailedInformationUI detailedInformationUI;
 
     private Button button;
 
     private void Awake()
     {
-        button = GetComponent<Button>();
+        ResolveButton();
     }
 
     private void Start()
     {
-        if (button != null)
-        {
-            button.onClick.AddListener(OpenDetail);
-        }
+        BindClickHandler();
+        RefreshClickable();
+    }
 
+    private void OnEnable()
+    {
+        BindClickHandler();
         RefreshClickable();
     }
 
@@ -45,24 +47,81 @@ public class BuildingDetailOpenButton : MonoBehaviour
 
     private void RefreshClickable()
     {
+        ResolveButton();
+        ResolveReferences();
         if (button == null) return;
 
-        button.interactable = buildingUnlockState != null && buildingUnlockState.isBuildingUnlocked;
+        button.interactable = IsBuildingUnlocked() && buildingDetailData != null && detailedInformationUI != null;
     }
 
     private void OpenDetail()
     {
-        if (buildingUnlockState == null || !buildingUnlockState.isBuildingUnlocked)
+        ResolveReferences();
+
+        if (!IsBuildingUnlocked())
         {
             return;
         }
 
         if (detailedInformationUI == null)
         {
-            Debug.LogError("DetailedInformationUI Î´°ó¶¨");
+            Debug.LogError("DetailedInformationUI æœªç»‘å®š");
             return;
         }
 
+        BuildingDetailRuntimeResolver.HideOtherSceneAuthoredDetailCanvases(buildingUnlockState);
         detailedInformationUI.ShowDetail(buildingDetailData);
+    }
+
+    private void ResolveButton()
+    {
+        if (button != null)
+        {
+            return;
+        }
+
+        button = GetComponent<Button>();
+        Image image = GetComponent<Image>();
+        if (button != null && image != null)
+        {
+            button.targetGraphic = button.targetGraphic != null ? button.targetGraphic : image;
+            image.raycastTarget = true;
+        }
+    }
+
+    private void BindClickHandler()
+    {
+        ResolveButton();
+        if (button == null)
+        {
+            return;
+        }
+
+        button.onClick.RemoveListener(OpenDetail);
+        button.onClick.AddListener(OpenDetail);
+    }
+
+    private void ResolveReferences()
+    {
+        buildingUnlockState = BuildingDetailRuntimeResolver.ResolveUnlockState(this, buildingUnlockState);
+        buildingDetailData = BuildingDetailRuntimeResolver.ResolveDetailData(this, buildingUnlockState, buildingDetailData);
+        detailedInformationUI = BuildingDetailRuntimeResolver.ResolveDetailUi(
+            this,
+            buildingUnlockState,
+            detailedInformationUI,
+            null);
+    }
+
+    private bool IsBuildingUnlocked()
+    {
+        if (buildingUnlockState == null)
+        {
+            return false;
+        }
+
+        RuntimeProgressState runtimeState = RuntimeProgressState.Instance;
+        return runtimeState != null
+            ? runtimeState.IsBuildingUnlocked(buildingUnlockState.BuildingId)
+            : buildingUnlockState.isBuildingUnlocked;
     }
 }

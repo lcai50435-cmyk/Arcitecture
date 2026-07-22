@@ -1,39 +1,90 @@
-using System.Collections;
-using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 
 /// <summary>
-/// µÚÒ»´Î¼ñÆðÎïÆ·½éÉÜ3UI´¥·¢
+/// Lightweight prompt after picking up a common structure.
 /// </summary>
 public class CrystalDescriptionUI : MonoBehaviour
 {
     public TextMeshProUGUI descriptionText;
 
+    private BackpackMananger backpack;
+    private bool subscribed;
+
     private void Start()
     {
-        // ¼àÌýµÚÒ»´ÎÊ°È¡ÊÂ¼þ
-        BackpackMananger.Instance.OnFirstTimePickItemType += ShowDescription;
         gameObject.SetActive(false);
+        TrySubscribe();
+    }
+
+    private void Update()
+    {
+        if (!subscribed)
+        {
+            TrySubscribe();
+        }
     }
 
     /// <summary>
-    /// Õ¹Ê¾UIÎÄ±¾
+    /// Show pickup feedback
     /// </summary>
-    /// <param name="desc">½éÉÜÎÄ±¾</param>
-    void ShowDescription(ArchitecturalCrystal crystal)
+    private void ShowDescription(ArchitecturalCrystal crystal)
     {
-        string desc = string.IsNullOrEmpty(crystal.textDescription)
-            ? $"»ñµÃ {crystal.type}£¡\n¹¹½¨¶È +{crystal.expValue}"
-            : crystal.textDescription;
+        if (!crystal.IsCommonStructure)
+        {
+            return;
+        }
+
+        if (UIRootManager.Instance != null && UIRootManager.Instance.IsAnyGameplayBlockingUIOpen())
+        {
+            return;
+        }
+
+        string desc = InkModifierRuntimeConfig.BuildCrystalActivationText(
+            crystal,
+            BackpackMananger.Instance,
+            RuntimeWeaponTypeResolver.ResolveEffectiveWeaponType(BackpackMananger.Instance));
+
+        if (string.IsNullOrEmpty(desc))
+        {
+            desc = string.IsNullOrEmpty(crystal.textDescription)
+                ? $"{crystal.DisplayName} å·²ç”Ÿæ•ˆ"
+                : crystal.textDescription;
+        }
 
         descriptionText.text = desc;
         gameObject.SetActive(true);
+        CancelInvoke(nameof(Hide));
         Invoke(nameof(Hide), 4f);
     }
 
-    void Hide()
+    private void Hide()
     {
         gameObject.SetActive(false);
+    }
+
+    private void OnDestroy()
+    {
+        if (backpack != null)
+        {
+            backpack.OnItemPicked -= ShowDescription;
+        }
+    }
+
+    private void TrySubscribe()
+    {
+        if (subscribed)
+        {
+            return;
+        }
+
+        backpack = BackpackMananger.Instance;
+        if (backpack == null)
+        {
+            return;
+        }
+
+        backpack.OnItemPicked += ShowDescription;
+        subscribed = true;
     }
 }

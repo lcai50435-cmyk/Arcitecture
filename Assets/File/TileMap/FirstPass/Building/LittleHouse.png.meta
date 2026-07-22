@@ -1,0 +1,320 @@
+fileFormatVersion: 2
+guid: d36d7c6a08e51fb4dbad3bd854c675e5
+TextureImporter:
+  internalIDToNameTable: []
+  externalObjects: {}
+  serializedVersion: 13
+  mipmaps:
+    mipMapMode: 0
+    enableMipMap: 0
+    sRGBTexture: 1
+    linearTexture: 0
+    fadeOut: 0
+    borderMipMap: 0
+    mipMapsPreserveCoverage: 0
+    alphaTestReferenceValue: 0.5
+    mipMapFadeDistanceStart: 1
+    mipMapFadeDistanceEnd: 3
+  bumpmap:
+    convertToNormalMap: 0
+    externalNormalMap: 0
+    heightScale: 0.25
+    normalMapFilter: 0
+    flipGreenChannel: 0
+  isReadable: 0
+  streamingMipmaps: 0
+  streamingMipmapsPriority: 0
+  vTOnly: 0
+  ignoreMipmapLimit: 0
+  grayScaleToAlpha: 0
+  generateCubemap: 6
+  cubemapConvolution: 0
+  seamlessCubemap: 0
+  textureFormat: 1
+  maxTextureSize: 2048
+  textureSettings:
+    serializedVersion: 2
+    filterMode: 0
+    aniso: 1
+    mipBias: 0
+    wrapU: 1
+    wrapV: 1
+    wrapW: 1
+  nPOTScale: 0
+  lightmap: 0
+  compressionQuality: 50
+  spriteMode: 2
+  spriteExtrude: 1
+  spriteMeshType: 1
+  alignment: 0
+  spritePivot: {x: 0.5, y: 0.5}
+  spritePixelsToUnits: 100
+  spriteBorder: {x: 0, y: 0, z: 0, w: 0}
+  spriteGenerateFallbackPhysicsShape: 1
+  alphaUsage: 1
+  alphaIsTransparency: 1
+  spriteTessellationDetail: -1
+  textureType: 8
+  textureShape: 1
+  singleChannelComponent: 0
+  flipbookRows: 1
+  flipbookColumns: 1
+  maxTextureSizeSet: 0
+  compressionQualitySet: 0
+  textureFormatSet: 0
+  ignorePngGamma: 0
+  applyGammaDecoding: 0
+  swizzle: 50462976
+  cookieLightType: 0
+  platformSettings:
+  - serializedVersion: 3
+    buildTarget: DefaultTexturePlatform
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: 4
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 3
+    buildTarget: Standalone
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 3
+    buildTarget: WebGL
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  spriteSheet:
+    serializedVersion: 2
+    sprites:
+    - serializedVersion: 2
+      name: LittleHouse_0
+      rect:
+        serializedVersion: 2
+        x: 40
+        y: 957
+        width: 96
+        height: 32
+      alignment: 9
+      pivot: {x: 0.5, y: 0.875}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape:
+      - - {x: -42, y: -13}
+        - {x: -41, y: 16}
+        - {x: 40, y: 15}
+        - {x: 40, y: -13}
+      tessellationDetail: 0
+      bones: []
+      spriteID: b0a6177fbf0d21b449565861b71b6729
+      internalID: -1908410037
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: LittleHouse_1
+      rect:
+        serializedVersion: 2
+        x: 40
+        y: 989
+        width: 96
+        height: 96
+      alignment: 9
+      pivot: {x: 0.49791667, y: 0.010416667}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 18cf8f5418625634fa9a68ba30fdde3e
+      internalID: -1730279276
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: LittleHouse_2
+      rect:
+        serializedVersion: 2
+        x: 194
+        y: 962
+        width: 96
+        height: 32
+      alignment: 9
+      pivot: {x: 0.5, y: 0.9375}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape:
+      - - {x: -42, y: -14}
+        - {x: -42, y: 15}
+        - {x: 9, y: 15}
+        - {x: 41, y: 16}
+        - {x: 41, y: -14}
+      tessellationDetail: 0
+      bones: []
+      spriteID: 3b182113c31e53445b65c21e2f8ea214
+      internalID: 1299330080
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: LittleHouse_3
+      rect:
+        serializedVersion: 2
+        x: 194
+        y: 994
+        width: 96
+        height: 64
+      alignment: 9
+      pivot: {x: 0.49791667, y: 0.015625}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 8550d08e950842842bea7e1fe0267194
+      internalID: -1001920867
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: LittleHouse_4
+      rect:
+        serializedVersion: 2
+        x: 248
+        y: 795
+        width: 128
+        height: 32
+      alignment: 9
+      pivot: {x: 0.5, y: 0.90625}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape:
+      - - {x: -55, y: -13}
+        - {x: -55, y: 15}
+        - {x: 55, y: 15}
+        - {x: 55, y: -13}
+      tessellationDetail: 0
+      bones: []
+      spriteID: adc309e0e92a7a74e83c58b899e471a1
+      internalID: 382951155
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: LittleHouse_5
+      rect:
+        serializedVersion: 2
+        x: 248
+        y: 827
+        width: 128
+        height: 96
+      alignment: 9
+      pivot: {x: 0.4984375, y: 0.041666668}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 133881e478e4a2b45aa6f6f6118809e8
+      internalID: 2078685498
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: LittleHouse_6
+      rect:
+        serializedVersion: 2
+        x: 77
+        y: 783
+        width: 160
+        height: 32
+      alignment: 9
+      pivot: {x: 0.5, y: 0.875}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape:
+      - - {x: -72, y: -13}
+        - {x: -72, y: 15}
+        - {x: 73, y: 15}
+        - {x: 73, y: -13}
+      tessellationDetail: 0
+      bones: []
+      spriteID: 5c43f1f5e6546ea4685f701d5656bfdc
+      internalID: 1440080132
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: LittleHouse_7
+      rect:
+        serializedVersion: 2
+        x: 77
+        y: 815
+        width: 160
+        height: 64
+      alignment: 9
+      pivot: {x: 0.50124997, y: 0.015625}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 42b618577c84b5c44b6c50f899744afe
+      internalID: -119154434
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    outline: []
+    physicsShape: []
+    bones: []
+    spriteID: 5e97eb03825dee720800000000000000
+    internalID: 0
+    vertices: []
+    indices: 
+    edges: []
+    weights: []
+    secondaryTextures: []
+    nameFileIdTable:
+      LittleHouse_0: -1908410037
+      LittleHouse_1: -1730279276
+      LittleHouse_2: 1299330080
+      LittleHouse_3: -1001920867
+      LittleHouse_4: 382951155
+      LittleHouse_5: 2078685498
+      LittleHouse_6: 1440080132
+      LittleHouse_7: -119154434
+  mipmapLimitGroupName: 
+  pSDRemoveMatte: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 

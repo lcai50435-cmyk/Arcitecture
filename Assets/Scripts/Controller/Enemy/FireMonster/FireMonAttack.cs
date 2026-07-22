@@ -5,76 +5,77 @@ public class FireMonAttack : EnemyAttack
     private DirectionTracker directionTracker;
     private Animator animator;
 
-    [Header("»ğÇò¹¥»÷ÉèÖÃ")]
-    public GameObject fireballPrefab; // »ğÇòÔ¤ÖÆÌå
-    public Transform firePoint;       // »ğÇò·¢Éäµã
+    [Header("ç«çƒæ”»å‡»è®¾ç½®")]
+    public GameObject fireballPrefab; // Fireball prefab
+    public Transform firePoint;       // Fireball spawn point
 
     protected override void Awake()
     {
-        // ³õÊ¼»¯×ÔÉíÒÀÀµµÄ×é¼ş
+        // Initialize this component's dependencies
         directionTracker = GetComponent<DirectionTracker>();
         animator = GetComponent<Animator>();
 
-        // Ö´ĞĞ¸¸ÀàµÄ Awake Âß¼­
+        // Run the base class Awake logic
         base.Awake();
 
-        // ·ÀÖ¹Ã»¹Ò DirectionTracker£¬×Ô¶¯Ìí¼Ó
+        // Add DirectionTracker automatically if it is missing
         if (directionTracker == null)
         {
             directionTracker = gameObject.AddComponent<DirectionTracker>();
-            Debug.LogWarning("×Ô¶¯Îª FireMon Ìí¼ÓÁË DirectionTracker ×é¼ş", this);
+            Debug.LogWarning("è‡ªåŠ¨ä¸º FireMon æ·»åŠ äº† DirectionTracker ç»„ä»¶", this);
         }
     }
 
-    // ÖØĞ´ EnemyAttack µÄ TryAttack ·½·¨
+    // Override EnemyAttack.TryAttack
     protected override void TryAttack()
     {
-        // ¹¥»÷Ê±¼äÀäÈ´
+        // Attack cooldown
         if (attackInterval > 0f && Time.time - lastAttackTime < attackInterval)
         {
-            return; // ÀäÈ´Ã»ºÃ
+            return; // Cooldown is not ready
         }
 
-        // ÏÈÖ´ĞĞ¸¸ÀàµÄ¹¥»÷ÀäÈ´¼ì²â
+        // Run the base class attack cooldown check first
         base.TryAttack();
 
-        // Ö´ĞĞ»ğÇò¹¥»÷Âß¼­
+        // Run the fireball attack logic
         TriggerFireballAttack();
     }
 
     /// <summary>
-    /// ´¥·¢»ğÇò¹¥»÷£¨·â×°¹¥»÷Âß¼­£©
+    /// Trigger the fireball attack (encapsulated attack logic)
     /// </summary>
     private void TriggerFireballAttack()
     {
         if (fireballPrefab == null || firePoint == null)
         {
-            Debug.LogError("»ğÇòÔ¤ÖÆÌå»ò·¢ÉäµãÎ´ÅäÖÃ", this);
+            Debug.LogError("ç«çƒé¢„åˆ¶ä½“æˆ–å‘å°„ç‚¹æœªé…ç½®", this);
             return;
         }
 
-        // ´¥·¢ CharacterAttack µÄºËĞÄ¹¥»÷Âß¼­£¨Í£Ö¹ÒÆ¶¯¡¢²¥·Å¶¯»­µÈ£©
+        // Trigger CharacterAttack core attack logic, such as stopping movement and playing animation
         base.TriggerAttack();
+        MusicManager.PlaySfx(SfxCueId.FireMonsterCast);
 
         if (player == null)
         {
-            Debug.LogError("Íæ¼Ò¶ÔÏóÎª¿Õ£¬ÎŞ·¨¼ÆËã»ğÇò·½Ïò", this);
+            Debug.LogError("ç©å®¶å¯¹è±¡ä¸ºç©ºï¼Œæ— æ³•è®¡ç®—ç«çƒæ–¹å‘", this);
             return;
         }
 
-        // ¼ÆËã¹ÖÎï£¨·¢Éäµã£©µ½Íæ¼ÒµÄÏòÁ¿
+        // Calculate the vector from the monster (spawn point) to the player
         Vector2 fireToPlayerDir = player.position - firePoint.position;
         fireToPlayerDir = fireToPlayerDir.normalized;
 
-        //// »ñÈ¡µĞÈËÃæ³¯·½Ïò£¨DirectionTracker ¼ÇÂ¼µÄ·½Ïò£©
+        //// Get the enemy facing direction recorded by DirectionTracker
         //Vector2 faceDir = directionTracker.LastDirection;
 
-        // Éú³É»ğÇò²¢ÉèÖÃ³¯Ïò
+        // Spawn the fireball and set its facing direction
         GameObject fireball = Instantiate(fireballPrefab, firePoint.position, Quaternion.identity);
-        fireball.transform.right = fireToPlayerDir; // »ğÇò³¯Ïò = µĞÈËÃæ³¯·½Ïò
+        fireball.transform.right = fireToPlayerDir; // Fireball facing = enemy facing direction
 
       
 
-        Debug.Log("»ğÑæ¹Ö·¢Éä»ğÇò£¬³¯Ïò£º" + fireToPlayerDir);
+        Debug.Log("ç«ç„°æ€ªå‘å°„ç«çƒï¼Œæœå‘ï¼š" + fireToPlayerDir);
     }
 }

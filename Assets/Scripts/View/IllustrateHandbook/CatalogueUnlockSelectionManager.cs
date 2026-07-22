@@ -1,24 +1,40 @@
-using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// Í¼¼ø½âËøÑ¡Ôñ¹ÜÀíÆ÷
-/// ¸ºÔğ¼ÇÂ¼Íæ¼Òµ±Ç°»¹¿ÉÒÔµãÁÁ¼¸´Î
+/// Catalogue unlock selection manager
+/// Keeps compatibility with the old catalogue unlock entry; dedicated structures are driven by backpack slots.
 /// </summary>
 public class CatalogueUnlockSelectionManager : MonoBehaviour
 {
     public static CatalogueUnlockSelectionManager Instance;
 
-    [Header("µ±Ç°¿ÉÓÃµãÁÁ´ÎÊı£¨ÔËĞĞÊ±¹Û²ì£©")]
+    [Header("å½“å‰å¯ç”¨ä¸“ç”¨ç»“æ„ï¼ˆè¿è¡Œæ—¶è§‚å¯Ÿï¼‰")]
     public int availableUnlockCount = 0;
 
-    private readonly HashSet<string> unlockedSlotIds = new HashSet<string>();
+    public static CatalogueUnlockSelectionManager EnsureInstance()
+    {
+        if (Instance != null)
+        {
+            return Instance;
+        }
+
+        CatalogueUnlockSelectionManager existing = FindObjectOfType<CatalogueUnlockSelectionManager>();
+        if (existing != null)
+        {
+            Instance = existing;
+            return existing;
+        }
+
+        GameObject runtimeObject = new GameObject("CatalogueUnlockSelectionManager");
+        return runtimeObject.AddComponent<CatalogueUnlockSelectionManager>();
+    }
 
     private void Awake()
     {
         if (Instance == null)
         {
             Instance = this;
+            DontDestroyOnLoad(gameObject);
         }
         else
         {
@@ -26,52 +42,127 @@ public class CatalogueUnlockSelectionManager : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Ôö¼Ó¿ÉµãÁÁ´ÎÊı
-    /// </summary>
+    private void OnEnable()
+    {
+        RuntimeProgressState.EnsureInstance().OnStateChanged += RefreshInventoryValue;
+        RefreshInventoryValue();
+    }
+
+    private void OnDisable()
+    {
+        if (RuntimeProgressState.Instance != null)
+        {
+            RuntimeProgressState.Instance.OnStateChanged -= RefreshInventoryValue;
+        }
+    }
+
     public void AddUnlockCount(int count)
     {
-        if (count <= 0) return;
+        BackpackMananger backpack = ResolveRuntimeBackpackManager();
+        for (int i = 0; i < count && backpack != null; i++)
+        {
+            backpack.PickItem(ArchitecturalCrystalFactory.CreateSpecialStructureMaterial());
+        }
 
-        availableUnlockCount += count;
-        Debug.Log($"Ôö¼Ó¿ÉµãÁÁ´ÎÊı£º+{count}£¬µ±Ç°Ê£Óà£º{availableUnlockCount}");
+        RefreshInventoryValue();
     }
 
-    /// <summary>
-    /// ³¢ÊÔÏûºÄÒ»´ÎµãÁÁ´ÎÊı²¢½âËøÄ³¸ö²ÛÎ»
-    /// </summary>
     public bool TryUnlockSlot(string slotId)
     {
-        if (string.IsNullOrEmpty(slotId))
+        if (!TryResolveSlotContext(slotId, out CatalogueBuildingId buildingId, out int slotIndex))
         {
-            Debug.LogWarning("slotId Îª¿Õ£¬ÎŞ·¨½âËø");
             return false;
         }
 
-        if (unlockedSlotIds.Contains(slotId))
+        RuntimeProgressState runtimeState = RuntimeProgressState.EnsureInstance();
+        if (runtimeState.IsSlotUnlocked(buildingId, slotIndex))
         {
-            Debug.Log($"²ÛÎ» {slotId} ÒÑ¾­µãÁÁ¹ıÁË");
+            RefreshInventoryValue();
             return false;
         }
 
-        if (availableUnlockCount <= 0)
+        BackpackMananger backpack = ResolveRuntimeBackpackManager();
+        if (backpack == null || !backpack.TryConsumeFirstSpecialStructureMaterial(out _))
         {
-            Debug.Log("µ±Ç°Ã»ÓĞ¿ÉÓÃµãÁÁ´ÎÊı");
+            RefreshInventoryValue();
             return false;
         }
 
-        availableUnlockCount--;
-        unlockedSlotIds.Add(slotId);
-
-        Debug.Log($"³É¹¦µãÁÁ²ÛÎ»£º{slotId}£¬Ê£Óà¿ÉµãÁÁ´ÎÊı£º{availableUnlockCount}");
-        return true;
+        bool success = runtimeState.TryUnlockSlot(buildingId, slotIndex, out _, out _);
+        RefreshInventoryValue();
+        return success;
     }
 
-    /// <summary>
-    /// Ä³¸ö²ÛÎ»ÊÇ·ñÒÑ¾­µãÁÁ
-    /// </summary>
     public bool IsSlotUnlocked(string slotId)
     {
-        return !string.IsNullOrEmpty(slotId) && unlockedSlotIds.Contains(slotId);
+        if (!TryResolveSlotContext(slotId, out CatalogueBuildingId buildingId, out int slotIndex))
+        {
+            return false;
+        }
+
+        return RuntimeProgressState.EnsureInstance().IsSlotUnlocked(buildingId, slotIndex);
+    }
+
+    public bool TryConsumeUnlockCount()
+    {
+        BackpackMananger backpack = ResolveRuntimeBackpackManager();
+        bool success = backpack != null && backpack.TryConsumeFirstSpecialStructureMaterial(out _);
+        RefreshInventoryValue();
+        return success;
+    }
+
+    private void RefreshInventoryValue()
+    {
+        BackpackMananger backpack = ResolveRuntimeBackpackManager();
+        availableUnlockCount = backpack != null ? backpack.GetSpecialStructureMaterialCount() : 0;
+    }
+
+    private static BackpackMananger ResolveRuntimeBackpackManager()
+    {
+        BackpackMananger backpack = BackpackMananger.Instance;
+        if (backpack != null)
+        {
+            return backpack;
+        }
+
+        GameObject manager = new GameObject("RuntimeBackpackManager");
+        return manager.AddComponent<BackpackMananger>();
+    }
+
+    private static bool TryResolveSlotContext(
+        string slotId,
+        out CatalogueBuildingId buildingId,
+        out int slotIndex)
+    {
+        buildingId = CatalogueBuildingId.Building1;
+        slotIndex = -1;
+
+        if (string.IsNullOrEmpty(slotId))
+        {
+            return false;
+        }
+
+        foreach (BuildingDefinition definition in BuildingDefinitionLibrary.GetAll())
+        {
+            if (definition.slotDefinitions == null)
+            {
+                continue;
+            }
+
+            for (int i = 0; i < definition.slotDefinitions.Length; i++)
+            {
+                BuildingSlotDefinition slotDefinition = definition.slotDefinitions[i];
+                if (slotDefinition == null || slotDefinition.slotId != slotId)
+                {
+                    continue;
+                }
+
+                buildingId = definition.buildingId;
+                slotIndex = i;
+                return true;
+            }
+        }
+
+        return false;
     }
 }
