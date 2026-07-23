@@ -1,0 +1,29 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!221 &22100000
+AnimatorOverrideController:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: StoneMonsterMove_8496955d
+  m_Controller: {fileID: 9100000, guid: 8496955d1869d504dba06b60dc63db77, type: 2}
+  m_Clips:
+  - m_OriginalClip: {fileID: 7400000, guid: 1897dd514d5550e44b8c325fe9e27801, type: 2}
+    m_OverrideClip: {fileID: 7400000, guid: 3d2c458426531a24db8574d7f906a92d, type: 2}
+  - m_OriginalClip: {fileID: 7400000, guid: 1033ee092d392824793ada412d5f7e3a, type: 2}
+    m_OverrideClip: {fileID: 7400000, guid: 9b585fbcc25b31847baf6ce74786f343, type: 2}
+  - m_OriginalClip: {fileID: 7400000, guid: 71942075cb08f10419132d66d75d9816, type: 2}
+    m_OverrideClip: {fileID: 7400000, guid: b523fd17c44aa6742855b1039bdf92c7, type: 2}
+  - m_OriginalClip: {fileID: 7400000, guid: 339a83874245e1741a55afd0f697bfa6, type: 2}
+    m_OverrideClip: {fileID: 7400000, guid: 0fce8cae155a98c40bd5deccd3e80c52, type: 2}
+  - m_OriginalClip: {fileID: 7400000, guid: 89ae618e1d7a8074dafb748f0f645f7c, type: 2}
+    m_OverrideClip: {fileID: 7400000, guid: 5df42be3cace93548b6cd03c0b427968, type: 2}
+  - m_OriginalClip: {fileID: 7400000, guid: 1cd3ec1145b73804782d76d6e9f932f8, type: 2}
+    m_OverrideClip: {fileID: 7400000, guid: 59b7d6defa3f80d4fb7f84f53d2ab3a9, type: 2}
+  - m_OriginalClip: {fileID: 7400000, guid: 6859c952393672642ac9ed0ef1849c53, type: 2}
+    m_OverrideClip: {fileID: 7400000, guid: 39197644f6e3dda4b908d112722648a3, type: 2}
+  - m_OriginalClip: {fileID: 7400000, guid: 3fe925ea7323d1d42ab594acecde7b9e, type: 2}
+    m_OverrideClip: {fileID: 7400000, guid: 3f2e8fb035487134b9f88aecd4bf891c, type: 2}
+  - m_OriginalClip: {fileID: 7400000, guid: 31160b361c45d794d89ab53152d43b68, type: 2}
+    m_OverrideClip: {fileID: 7400000, guid: fa3759d4420510b43a0f33d4c25c2a87, type: 2}

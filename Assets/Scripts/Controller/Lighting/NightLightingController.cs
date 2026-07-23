@@ -109,6 +109,10 @@ public sealed class NightLightingController : MonoBehaviour
             CreateReadableSceneProfile(FirstPassSceneName, true, 0f, 0.16f, 0.58f, 0.82f, 1.02f)
         },
         {
+            "FirstPass_V2",
+            CreateReadableSceneProfile("FirstPass_V2", true, 0f, 0.16f, 0.58f, 0.82f, 1.02f)
+        },
+        {
             "GameScene",
             CreateReadableSceneProfile("GameScene", true, 0f, 0.16f, 0.58f, 0.82f, 1.02f)
         },
@@ -544,7 +548,7 @@ public sealed class NightLightingController : MonoBehaviour
             return null;
         }
 
-        return EnsureLocalLight(
+        NightLocalLightSource lightSource = EnsureLocalLight(
             target,
             radius,
             baseIntensity,
@@ -552,6 +556,8 @@ public sealed class NightLightingController : MonoBehaviour
             localOffset ?? Vector3.zero,
             lightColor,
             false);
+        lightSource?.SetTransientBudgeted(true);
+        return lightSource;
     }
 
     public static void RemoveLocalLight(GameObject target)

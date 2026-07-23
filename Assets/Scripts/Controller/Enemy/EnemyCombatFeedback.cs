@@ -1,4 +1,5 @@
 using UnityEngine;
+using TMPro;
 
 [DisallowMultipleComponent]
 public class EnemyCombatFeedback : MonoBehaviour
@@ -14,6 +15,7 @@ public class EnemyCombatFeedback : MonoBehaviour
     private bool keepHealthBarVisibleWhileAlive;
     private int feedbackSortingLayerId;
     private int feedbackBaseSortingOrder = 30;
+    private float nextHealthBarPositionRefreshTime;
 
     private void Awake()
     {
@@ -52,7 +54,11 @@ public class EnemyCombatFeedback : MonoBehaviour
 
     private void Update()
     {
-        UpdateHealthBarPosition();
+        if (Time.unscaledTime >= nextHealthBarPositionRefreshTime)
+        {
+            nextHealthBarPositionRefreshTime = Time.unscaledTime + 0.1f;
+            UpdateHealthBarPosition();
+        }
 
         if (keepHealthBarVisibleWhileAlive && IsAlive())
         {
@@ -159,16 +165,46 @@ public class EnemyCombatFeedback : MonoBehaviour
         SetHealthBarVisible(visible && IsAlive());
     }
 
+    public void ResetForReuse()
+    {
+        barVisibleTimer = 0f;
+        RefreshHealthBar();
+        SetHealthBarVisible(keepHealthBarVisibleWhileAlive && IsAlive());
+    }
+
     private void SpawnDamageNumber(float damage)
     {
-        GameObject numberObject = new GameObject("DamageNumber");
-        numberObject.transform.position = GetDamageNumberSpawnPosition();
+        GameObject numberObject = CombatObjectPool.RentRuntime(
+            "Enemy.DamageNumber",
+            CreateDamageNumberObject,
+            GetDamageNumberSpawnPosition(),
+            Quaternion.identity);
+        if (numberObject == null)
+        {
+            return;
+        }
 
         string damageText = Mathf.Max(0f, damage).ToString("0");
-        CreateDamageNumberSprites(numberObject.transform, damageText);
+        TextMeshPro text = numberObject.GetComponent<TextMeshPro>();
+        text.text = damageText;
+        text.color = new Color(1f, 0.92f, 0.18f, 1f);
+        text.fontSize = 3.2f;
+        text.alignment = TextAlignmentOptions.Center;
+        text.sortingLayerID = feedbackSortingLayerId;
+        text.sortingOrder = feedbackBaseSortingOrder + 22;
 
-        EnemyDamageNumberMotion motion = numberObject.AddComponent<EnemyDamageNumberMotion>();
-        motion.Initialize();
+        EnemyDamageNumberMotion motion = numberObject.GetComponent<EnemyDamageNumberMotion>();
+        motion.Initialize(text);
+    }
+
+    private static GameObject CreateDamageNumberObject()
+    {
+        GameObject numberObject = new GameObject("DamageNumber");
+        TextMeshPro text = numberObject.AddComponent<TextMeshPro>();
+        text.enableWordWrapping = false;
+        text.raycastTarget = false;
+        numberObject.AddComponent<EnemyDamageNumberMotion>();
+        return numberObject;
     }
 
     private void CreateDamageNumberSprites(Transform parent, string value)
@@ -352,13 +388,15 @@ public class EnemyDamageNumberMotion : MonoBehaviour
 {
     private Vector3 velocity;
     private float lifetime;
-    private SpriteRenderer[] spriteRenderers;
+    private TextMeshPro text;
+    private Color initialColor;
 
-    public void Initialize()
+    public void Initialize(TextMeshPro damageText)
     {
         velocity = new Vector3(Random.Range(-0.08f, 0.08f), 0.34f, 0f);
         lifetime = 0.9f;
-        spriteRenderers = GetComponentsInChildren<SpriteRenderer>(true);
+        text = damageText;
+        initialColor = text != null ? text.color : Color.white;
     }
 
     private void Update()
@@ -366,25 +404,17 @@ public class EnemyDamageNumberMotion : MonoBehaviour
         transform.position += velocity * Time.deltaTime;
         lifetime -= Time.deltaTime;
 
-        if (spriteRenderers != null)
+        if (text != null)
         {
             float alphaMultiplier = Mathf.Clamp01(lifetime / 0.9f);
-            for (int i = 0; i < spriteRenderers.Length; i++)
-            {
-                if (spriteRenderers[i] == null)
-                {
-                    continue;
-                }
-
-                Color color = spriteRenderers[i].color;
-                color.a = Mathf.Min(color.a, alphaMultiplier);
-                spriteRenderers[i].color = color;
-            }
+            Color color = initialColor;
+            color.a *= alphaMultiplier;
+            text.color = color;
         }
 
         if (lifetime <= 0f)
         {
-            Destroy(gameObject);
+            CombatObjectPool.ReleaseOrDestroy(gameObject);
         }
     }
 }

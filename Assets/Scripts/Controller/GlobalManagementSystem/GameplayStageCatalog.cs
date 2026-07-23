@@ -27,7 +27,7 @@ public static class GameplayStageCatalog
             mapTitle = "福建土楼",
             displayName = "第一关 · 福建土楼",
             sceneName = "FirstPass_1",
-            sceneAliases = new[] { "GameScene" },
+            sceneAliases = new[] { "GameScene", "FirstPass_V2" },
             stageBuildingId = CatalogueBuildingId.Building1,
             gatingBuildingId = CatalogueBuildingId.Building1,
             lockedHint = "默认开放"

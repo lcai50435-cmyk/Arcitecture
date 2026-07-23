@@ -145,14 +145,23 @@ public class PlayerAttack : CharacterAttack
             }
 
             GameObject inkball = inkballPrefab != null
-                ? Instantiate(inkballPrefab, spawnPosition, Quaternion.identity)
-                : CreateRuntimeInkBall(spawnPosition);
+                ? CombatObjectPool.RentPrefab(inkballPrefab, spawnPosition, Quaternion.identity)
+                : CombatObjectPool.RentRuntime(
+                    "Player.RuntimeInkBall",
+                    CreateRuntimeInkBall,
+                    spawnPosition,
+                    Quaternion.identity);
+            if (inkball == null)
+            {
+                continue;
+            }
+
             inkball.transform.right = shotDirection;
 
-            InkBall inkBallComponent = inkball.GetComponent<InkBall>();
-            if (inkBallComponent != null)
+            InkBall inkBallComponent;
+            if (inkball.TryGetComponent(out inkBallComponent))
             {
-                inkBallComponent.character = GetComponent<CharacterCore>();
+                inkBallComponent.character = core;
                 inkBallComponent.Init(inkConfig);
             }
         }
@@ -201,10 +210,9 @@ public class PlayerAttack : CharacterAttack
         return ownerCollider != null && ownerCollider.bounds.Contains(spawnPosition);
     }
 
-    private GameObject CreateRuntimeInkBall(Vector3 spawnPosition)
+    private GameObject CreateRuntimeInkBall()
     {
         GameObject inkball = new GameObject("RuntimeInkBall");
-        inkball.transform.position = spawnPosition;
 
         SpriteRenderer renderer = inkball.AddComponent<SpriteRenderer>();
         renderer.sortingOrder = 8;

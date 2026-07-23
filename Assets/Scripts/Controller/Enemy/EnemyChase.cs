@@ -31,6 +31,9 @@ public class EnemyChase : MonoBehaviour
 
     [HideInInspector] public Vector2 targetPos;
 
+    private float mNextStateDecisionTime;
+    private float mNextMovementDecisionTime;
+
     private void Awake()
     {
         if (move == null)
@@ -74,6 +77,11 @@ public class EnemyChase : MonoBehaviour
         {
             statsManager.OnStateChanged += HandleStateChanged;
         }
+
+        float interval = GameplayPerformanceSettings.Profile.EnemyDecisionInterval;
+        float stagger = Mathf.Abs(GetInstanceID() % 10) * interval * 0.1f;
+        mNextStateDecisionTime = Time.time + stagger;
+        mNextMovementDecisionTime = Time.time + stagger;
     }
 
     private void Start()
@@ -84,11 +92,23 @@ public class EnemyChase : MonoBehaviour
 
     private void Update()
     {
+        if (Time.time < mNextStateDecisionTime)
+        {
+            return;
+        }
+
+        mNextStateDecisionTime = Time.time + GameplayPerformanceSettings.Profile.EnemyDecisionInterval;
         UpdateStateMachine();
     }
 
     private void FixedUpdate()
     {
+        if (Time.time < mNextMovementDecisionTime)
+        {
+            return;
+        }
+
+        mNextMovementDecisionTime = Time.time + GameplayPerformanceSettings.Profile.EnemyDecisionInterval;
         UpdateMovement();
     }
 

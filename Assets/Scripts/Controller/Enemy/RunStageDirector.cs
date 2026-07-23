@@ -47,6 +47,7 @@ public class RunStageDirector : MonoBehaviour
     private const float SpawnProbeRadius = 3.5f;
     private const int SpawnProbeAttempts = 16;
     private static readonly Vector2 SpawnProbeSize = new Vector2(0.55f, 0.55f);
+    private static readonly Collider2D[] SpawnOverlapResults = new Collider2D[32];
     private static readonly string[] FallbackBlockedKeywords = { "Water", "Obstacle", "Building" };
 
     private static readonly ArchitecturalType[] CommonStructureTypes =
@@ -458,6 +459,12 @@ public class RunStageDirector : MonoBehaviour
             return;
         }
 
+        CharacterCore characterCore = enemyObject.GetComponent<CharacterCore>();
+        characterCore?.ResetForReuse();
+
+        CharacterDeathBase deathBehaviour = enemyObject.GetComponent<CharacterDeathBase>();
+        deathBehaviour?.ResetForReuse();
+
         ResolvedStageState stageState = currentStageState ?? ResolveStageState(GetElapsedTime());
         ApplyStageToEnemy(enemyObject, stageState);
 
@@ -469,10 +476,13 @@ public class RunStageDirector : MonoBehaviour
 
         binding.Configure(this);
 
-        if (enemyObject.GetComponent<EnemyCombatFeedback>() == null)
+        EnemyCombatFeedback feedback = enemyObject.GetComponent<EnemyCombatFeedback>();
+        if (feedback == null)
         {
-            enemyObject.AddComponent<EnemyCombatFeedback>();
+            feedback = enemyObject.AddComponent<EnemyCombatFeedback>();
         }
+
+        feedback.ResetForReuse();
 
         NightLightingController.EnsureProjectedShadow(enemyObject);
         NightLightingController.EnsureGameplayEnemyLight(enemyObject);
@@ -766,9 +776,13 @@ public class RunStageDirector : MonoBehaviour
 
     private void SpawnEnemyFromTemplate(EnemySpawnTemplate template, Vector3 spawnPosition)
     {
-        GameObject enemyObject = Instantiate(template.template, spawnPosition, template.rotation);
+        GameObject enemyObject = CombatObjectPool.RentPrefab(template.template, spawnPosition, template.rotation);
+        if (enemyObject == null)
+        {
+            return;
+        }
+
         enemyObject.name = template.template.name.Replace("_Template", string.Empty);
-        enemyObject.SetActive(true);
         PrepareEnemyInstance(enemyObject);
     }
 
@@ -824,10 +838,10 @@ public class RunStageDirector : MonoBehaviour
             return avoidObstacle.IsPointBlocked(point);
         }
 
-        Collider2D[] overlaps = Physics2D.OverlapBoxAll(point, SpawnProbeSize, 0f);
-        for (int i = 0; i < overlaps.Length; i++)
+        int overlapCount = Physics2D.OverlapBoxNonAlloc(point, SpawnProbeSize, 0f, SpawnOverlapResults);
+        for (int i = 0; i < overlapCount; i++)
         {
-            Collider2D collider = overlaps[i];
+            Collider2D collider = SpawnOverlapResults[i];
             if (collider == null)
             {
                 continue;
@@ -1004,8 +1018,7 @@ public class RunStageDirector : MonoBehaviour
         }
 #endif
 
-        enemyObject.SetActive(false);
-        Destroy(enemyObject);
+        CombatObjectPool.ReleaseOrDestroy(enemyObject);
     }
 
     private void HandleCountdownFinished()
@@ -1113,7 +1126,7 @@ public class RunStageEnemyBinding : MonoBehaviour
         HandleDeathSequenceCompleted();
         if (deathBehaviour == null)
         {
-            Destroy(gameObject, FallbackDestroyDelay);
+            CombatObjectPool.ReleaseOrDestroy(gameObject, FallbackDestroyDelay);
         }
     }
 }

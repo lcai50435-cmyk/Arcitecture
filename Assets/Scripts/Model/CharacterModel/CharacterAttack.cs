@@ -1,8 +1,6 @@
 using System;
 using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.SocialPlatforms.Impl;
 
 /// <summary>
 /// Encapsulates common character attack logic
@@ -15,10 +13,16 @@ public abstract class CharacterAttack : MonoBehaviour
     public Animator anim;
     public MonoBehaviour moveScript; // Character movement script attached here
 
+    [Header("攻击恢复")]
+    [SerializeField, Min(0f)] private float mMovementRecoveryDelay = 0.2f;
+    [SerializeField, Min(0.05f)] private float mAttackStateDuration = 0.4f;
+
     // Attack state check
     protected bool isAttacking = false;
     protected CharacterCore core;
     private Vector3 initialLocalScale;
+    private Coroutine mAttackRecoveryCoroutine;
+    private bool mbMovementRecovered;
 
     // Attack extension events for effects, audio, and related logic
     public event Action OnAttackStarted;
@@ -28,6 +32,10 @@ public abstract class CharacterAttack : MonoBehaviour
     public static event AttackHitEvent OnAttackHit; // Triggered when an attack hits
 
     protected PlayerMove playerMove;
+
+    public bool IsAttacking => isAttacking;
+    public float MovementRecoveryDelay => Mathf.Max(0f, mMovementRecoveryDelay);
+    public float AttackStateDuration => Mathf.Max(MovementRecoveryDelay, mAttackStateDuration);
 
     protected virtual bool ShouldMirrorRootForAttack => true;
 
@@ -67,6 +75,7 @@ public abstract class CharacterAttack : MonoBehaviour
 
         // Common attack state transition
         isAttacking = true;
+        mbMovementRecovered = false;
         AnimatorParameterUtility.SetBoolIfPresent(anim, "IsMoving", false); // Stop movement animation
         if (playerMove != null)
         {   
@@ -79,6 +88,8 @@ public abstract class CharacterAttack : MonoBehaviour
             }
         }     
         AnimatorParameterUtility.SetBoolIfPresent(anim, "IsAttacking", true); // Trigger attack animation
+
+        restartAttackRecoveryFallback();
 
         // Trigger attack start event
         OnAttackStarted?.Invoke();
@@ -129,20 +140,39 @@ public abstract class CharacterAttack : MonoBehaviour
     }
 
     /// <summary>
+    /// Restores player movement while keeping the attack state and cooldown independent.
+    /// Called by an animation event, with a timer fallback when the event is absent.
+    /// </summary>
+    public virtual void OnAttackRecovery()
+    {
+        if (!isAttacking || mbMovementRecovered)
+        {
+            return;
+        }
+
+        mbMovementRecovered = true;
+        if (playerMove != null && (core == null || !core.IsDead))
+        {
+            playerMove.canMove = true;
+        }
+    }
+
+    /// <summary>
     /// Unified attack end logic (called by an animation frame event)
     /// </summary>
     public virtual void OnAttackEnd()
     {
-        isAttacking = false;
+        cancelAttackRecoveryFallback();
 
         if (core != null && core.IsDead)
         {
+            isAttacking = false;
             AnimatorParameterUtility.SetBoolIfPresent(anim, "IsAttacking", false);
             return;
         }
 
-        // Restore movement ability
-        if (playerMove != null) playerMove.canMove = true;
+        OnAttackRecovery();
+        isAttacking = false;
         AnimatorParameterUtility.SetBoolIfPresent(anim, "IsAttacking", false);
 
         // Trigger attack end event for extensions such as recovery frames or facing reset
@@ -153,6 +183,8 @@ public abstract class CharacterAttack : MonoBehaviour
     // Prevent event memory leaks
     protected virtual void OnDisable()
     {
+        cancelAttackRecoveryFallback();
+
         if (core != null)
         {
             core.OnDeath -= HandleOwnerDeath;
@@ -164,7 +196,9 @@ public abstract class CharacterAttack : MonoBehaviour
 
     public void HandleOwnerDeathImmediate()
     {
+        cancelAttackRecoveryFallback();
         isAttacking = false;
+        mbMovementRecovered = false;
 
         if (playerMove != null)
         {
@@ -193,5 +227,42 @@ public abstract class CharacterAttack : MonoBehaviour
     private void HandleOwnerDeath()
     {
         HandleOwnerDeathImmediate();
+    }
+
+    private void restartAttackRecoveryFallback()
+    {
+        cancelAttackRecoveryFallback();
+        mAttackRecoveryCoroutine = StartCoroutine(attackRecoveryFallbackRoutine());
+    }
+
+    private IEnumerator attackRecoveryFallbackRoutine()
+    {
+        float recoveryDelay = MovementRecoveryDelay;
+        if (recoveryDelay > 0f)
+        {
+            yield return new WaitForSeconds(recoveryDelay);
+        }
+
+        OnAttackRecovery();
+
+        float remainingAttackTime = AttackStateDuration - recoveryDelay;
+        if (remainingAttackTime > 0f)
+        {
+            yield return new WaitForSeconds(remainingAttackTime);
+        }
+
+        mAttackRecoveryCoroutine = null;
+        OnAttackEnd();
+    }
+
+    private void cancelAttackRecoveryFallback()
+    {
+        if (mAttackRecoveryCoroutine == null)
+        {
+            return;
+        }
+
+        StopCoroutine(mAttackRecoveryCoroutine);
+        mAttackRecoveryCoroutine = null;
     }
 }

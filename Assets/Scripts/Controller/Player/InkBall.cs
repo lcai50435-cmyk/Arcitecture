@@ -4,6 +4,7 @@ using UnityEngine;
 public class InkBall : MonoBehaviour
 {
     private static Sprite runtimeSprite;
+    private static readonly Collider2D[] EXPLOSION_HITS = new Collider2D[64];
 
     [Header("基础设置")]
     public float speed = 6f;
@@ -16,6 +17,8 @@ public class InkBall : MonoBehaviour
     private Animator anim;
     private Rigidbody2D rb;
     private SpriteRenderer spriteRenderer;
+    private Collider2D projectileCollider;
+    private Vector3 initialScale;
     private bool isHit;
     private int maxHitCount = 1;
     private bool explodeOnHit;
@@ -45,6 +48,8 @@ public class InkBall : MonoBehaviour
         anim = GetComponent<Animator>();
         rb = GetComponent<Rigidbody2D>();
         spriteRenderer = GetComponent<SpriteRenderer>();
+        projectileCollider = GetComponent<Collider2D>();
+        initialScale = transform.localScale;
         GameObject player = GameObject.FindGameObjectWithTag("Player");
         if (player != null)
         {
@@ -54,13 +59,27 @@ public class InkBall : MonoBehaviour
         EnsureSpriteRenderer();
     }
 
-    private void Start()
-    {
-        ScheduleDestroyTimer();
-    }
-
     public void Init(InkAttackRuntimeConfig config)
     {
+        isHit = false;
+        hitTargets.Clear();
+        transform.localScale = initialScale;
+        if (projectileCollider != null)
+        {
+            projectileCollider.enabled = true;
+        }
+
+        if (rb != null)
+        {
+            rb.velocity = Vector2.zero;
+            rb.angularVelocity = 0f;
+        }
+
+        if (anim != null)
+        {
+            anim.ResetTrigger("IsHit");
+        }
+
         inkType = config.inkType;
         displayColor = config.displayColor;
         damageMultiplier = Mathf.Max(0.01f, config.damageMultiplier);
@@ -85,26 +104,19 @@ public class InkBall : MonoBehaviour
         nextTrailSpawnTime = Time.time;
         speed = Mathf.Max(0.01f, config.baseProjectileSpeed * config.speedMultiplier);
         autoDestroyTime = Mathf.Max(0.05f, config.baseProjectileLifetime * config.lifetimeMultiplier);
-        Vector3 nextScale = transform.localScale;
+        Vector3 nextScale = initialScale;
         nextScale.x *= Mathf.Max(0.01f, config.projectileScale * config.projectileStretch.x);
         nextScale.y *= Mathf.Max(0.01f, config.projectileScale * config.projectileStretch.y);
         transform.localScale = nextScale;
+        damage = character != null && character.stats != null
+            ? character.stats.attackDamage * damageMultiplier
+            : 0f;
         ApplyVisualStyle();
-        NightLightingController.EnsureTransientFxLight(
-            gameObject,
-            0.90f,
-            0.10f,
-            displayColor);
         ScheduleDestroyTimer();
     }
 
     private void FixedUpdate()
     {
-        if (character != null)
-        {
-            damage = character.stats.attackDamage * damageMultiplier;
-        }
-
         if (isHit || rb == null)
         {
             return;
@@ -170,10 +182,11 @@ public class InkBall : MonoBehaviour
     private void ApplyExplosion()
     {
         SpawnImpactPulse(transform.position, impactPulseScale);
-        Collider2D[] hits = Physics2D.OverlapCircleAll(transform.position, explosionRadius);
-        for (int i = 0; i < hits.Length; i++)
+        int hitCount = Physics2D.OverlapCircleNonAlloc(transform.position, explosionRadius, EXPLOSION_HITS);
+        for (int i = 0; i < hitCount; i++)
         {
-            CharacterCore enemyCore = hits[i].GetComponent<CharacterCore>();
+            Collider2D hit = EXPLOSION_HITS[i];
+            CharacterCore enemyCore = hit != null ? hit.GetComponentInParent<CharacterCore>() : null;
             if (enemyCore == null || enemyCore == character || hitTargets.Contains(enemyCore))
             {
                 continue;
@@ -239,29 +252,27 @@ public class InkBall : MonoBehaviour
             anim.SetTrigger("IsHit");
         }
 
-        Collider2D col = GetComponent<Collider2D>();
-        if (col != null)
+        if (projectileCollider != null)
         {
-            col.enabled = false;
+            projectileCollider.enabled = false;
         }
 
-        Destroy(gameObject, hitDestroyDelay);
+        CombatObjectPool.ReleaseOrDestroy(gameObject, hitDestroyDelay);
     }
 
     public void DestroyAfterHit()
     {
-        Destroy(gameObject);
+        CombatObjectPool.ReleaseOrDestroy(gameObject);
     }
 
     private void ScheduleDestroyTimer()
     {
-        CancelInvoke(nameof(DestroyAfterTime));
-        Invoke(nameof(DestroyAfterTime), autoDestroyTime);
+        CombatObjectPool.ReleaseOrDestroy(gameObject, autoDestroyTime);
     }
 
     private void DestroyAfterTime()
     {
-        Destroy(gameObject);
+        CombatObjectPool.ReleaseOrDestroy(gameObject);
     }
 
     private void EnsureSpriteRenderer()
@@ -301,22 +312,24 @@ public class InkBall : MonoBehaviour
 
     private void SpawnImpactPulse(Vector3 position, float pulseScale, Color pulseColor, float pulseDuration, float expansionMultiplier)
     {
-        GameObject pulseObject = new GameObject("InkImpactPulse");
-        pulseObject.transform.position = position;
+        GameObject pulseObject = CombatObjectPool.RentRuntime(
+            "Ink.ImpactPulse",
+            CreateImpactPulseObject,
+            position,
+            Quaternion.identity);
+        if (pulseObject == null)
+        {
+            return;
+        }
+
         pulseObject.transform.localScale = Vector3.one * Mathf.Max(0.2f, pulseScale);
 
-        SpriteRenderer renderer = pulseObject.AddComponent<SpriteRenderer>();
+        SpriteRenderer renderer = pulseObject.GetComponent<SpriteRenderer>();
         renderer.sprite = GetRuntimeSprite();
         renderer.color = pulseColor;
         renderer.sortingOrder = 12;
 
-        NightLightingController.EnsureTransientFxLight(
-            pulseObject,
-            Mathf.Max(0.2f, pulseScale) * 1.8f,
-            0.14f,
-            pulseColor);
-
-        InkImpactPulse pulse = pulseObject.AddComponent<InkImpactPulse>();
+        InkImpactPulse pulse = pulseObject.GetComponent<InkImpactPulse>();
         pulse.Initialize(pulseColor, pulseDuration, expansionMultiplier);
     }
 
@@ -348,37 +361,68 @@ public class InkBall : MonoBehaviour
 
         nextTrailSpawnTime = Time.time + trailSpawnInterval;
 
-        GameObject trailObject = new GameObject("InkTrailAfterImage");
-        trailObject.transform.position = transform.position - transform.right * 0.08f;
-        trailObject.transform.rotation = transform.rotation;
+        GameObject trailObject = CombatObjectPool.RentRuntime(
+            "Ink.TrailAfterImage",
+            CreateTransientSpriteObject,
+            transform.position - transform.right * 0.08f,
+            transform.rotation);
+        if (trailObject == null)
+        {
+            return;
+        }
+
         trailObject.transform.localScale = transform.localScale * trailScaleMultiplier;
 
-        SpriteRenderer renderer = trailObject.AddComponent<SpriteRenderer>();
+        SpriteRenderer renderer = trailObject.GetComponent<SpriteRenderer>();
         renderer.sprite = spriteRenderer.sprite != null ? spriteRenderer.sprite : GetRuntimeSprite();
         Color trailColor = Color.Lerp(displayColor, Color.white, 0.12f);
         trailColor.a = trailAlpha;
         renderer.color = trailColor;
         renderer.sortingOrder = Mathf.Max(1, spriteRenderer.sortingOrder - 1);
 
-        InkTransientSprite transientSprite = trailObject.AddComponent<InkTransientSprite>();
+        InkTransientSprite transientSprite = trailObject.GetComponent<InkTransientSprite>();
         transientSprite.Initialize(trailColor, trailLifetime, 1.03f, 0.75f);
     }
 
     private void SpawnSlowResidue(Vector3 position)
     {
-        GameObject residueObject = new GameObject("InkSlowResidue");
-        residueObject.transform.position = position;
+        GameObject residueObject = CombatObjectPool.RentRuntime(
+            "Ink.SlowResidue",
+            CreateTransientSpriteObject,
+            position,
+            Quaternion.identity);
+        if (residueObject == null)
+        {
+            return;
+        }
+
         residueObject.transform.localScale = new Vector3(slowResidueScale, slowResidueScale * 0.62f, 1f);
 
-        SpriteRenderer renderer = residueObject.AddComponent<SpriteRenderer>();
+        SpriteRenderer renderer = residueObject.GetComponent<SpriteRenderer>();
         renderer.sprite = GetRuntimeSprite();
         Color residueColor = Color.Lerp(displayColor, new Color(0.56f, 0.74f, 0.42f, 1f), 0.45f);
         residueColor.a = 0.26f;
         renderer.color = residueColor;
         renderer.sortingOrder = 6;
 
-        InkTransientSprite transientSprite = residueObject.AddComponent<InkTransientSprite>();
+        InkTransientSprite transientSprite = residueObject.GetComponent<InkTransientSprite>();
         transientSprite.Initialize(residueColor, slowResidueDuration, 1.08f, 0.88f);
+    }
+
+    private static GameObject CreateImpactPulseObject()
+    {
+        GameObject pulseObject = new GameObject("InkImpactPulse");
+        pulseObject.AddComponent<SpriteRenderer>();
+        pulseObject.AddComponent<InkImpactPulse>();
+        return pulseObject;
+    }
+
+    private static GameObject CreateTransientSpriteObject()
+    {
+        GameObject transientObject = new GameObject("InkTransientSprite");
+        transientObject.AddComponent<SpriteRenderer>();
+        transientObject.AddComponent<InkTransientSprite>();
+        return transientObject;
     }
 
     private static Sprite GetRuntimeSprite()
@@ -430,7 +474,7 @@ public class InkImpactPulse : MonoBehaviour
     {
         if (spriteRenderer == null)
         {
-            Destroy(gameObject);
+            CombatObjectPool.ReleaseOrDestroy(gameObject);
             return;
         }
 
@@ -444,7 +488,7 @@ public class InkImpactPulse : MonoBehaviour
 
         if (remaining <= 0f)
         {
-            Destroy(gameObject);
+            CombatObjectPool.ReleaseOrDestroy(gameObject);
         }
     }
 }
@@ -474,7 +518,7 @@ public class InkTransientSprite : MonoBehaviour
     {
         if (spriteRenderer == null)
         {
-            Destroy(gameObject);
+            CombatObjectPool.ReleaseOrDestroy(gameObject);
             return;
         }
 
@@ -489,7 +533,7 @@ public class InkTransientSprite : MonoBehaviour
 
         if (remaining <= 0f)
         {
-            Destroy(gameObject);
+            CombatObjectPool.ReleaseOrDestroy(gameObject);
         }
     }
 }

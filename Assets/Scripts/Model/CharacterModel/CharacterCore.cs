@@ -74,6 +74,18 @@ public class CharacterCore : MonoBehaviour
         OnDeath?.Invoke();
     }
 
+    public void ResetForReuse()
+    {
+        if (stats == null)
+        {
+            stats = baseStats != null ? baseStats.Clone() : new CharacterStats();
+        }
+
+        IsDead = false;
+        LastDamageTaken = 0f;
+        currentHp = Mathf.Max(0f, stats.maxHp);
+    }
+
     private static bool IsZeroStats(CharacterStats candidate)
     {
         if (candidate == null)

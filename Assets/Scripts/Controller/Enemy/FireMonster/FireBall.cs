@@ -1,5 +1,3 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 
 public class FireBall : MonoBehaviour
@@ -12,28 +10,51 @@ public class FireBall : MonoBehaviour
     private float damage = 10;
     private Animator anim;
     private Rigidbody2D rb;
+    private Collider2D hitCollider;
     private bool isHit = false;
 
     private void Awake()
     {
         anim = GetComponent<Animator>();
         rb = GetComponent<Rigidbody2D>();
+        hitCollider = GetComponent<Collider2D>();
 
         // Null check to avoid null references
         if (anim == null) Debug.LogError($"[{gameObject.name}] 缺少Animator组件！");
         if (rb == null) Debug.LogError($"[{gameObject.name}] 缺少Rigidbody2D组件！");
     }
 
-    private void Start()
+    private void OnEnable()
     {
+        Initialize();
+    }
+
+    public void Initialize()
+    {
+        isHit = false;
+        if (rb != null)
+        {
+            rb.velocity = Vector2.zero;
+            rb.angularVelocity = 0f;
+        }
+
+        if (hitCollider != null)
+        {
+            hitCollider.enabled = true;
+        }
+
+        if (anim != null)
+        {
+            anim.ResetTrigger("IsHit");
+        }
+
         NightLightingController.EnsureTransientFxLight(
             gameObject,
             0.95f,
             0.12f,
             NightLightingController.GetGameplayFireballLightColor());
 
-        // Auto-destroy after 10 seconds if no hit occurs
-        Destroy(gameObject, autoDestroyTime);
+        CombatObjectPool.ReleaseOrDestroy(gameObject, autoDestroyTime);
     }
 
     private void FixedUpdate()
@@ -65,20 +86,16 @@ public class FireBall : MonoBehaviour
             anim.SetTrigger("IsHit");
 
         // Disable the collider to avoid repeated triggers
-        Collider2D col = GetComponent<Collider2D>();
-        if (col != null)
-            col.enabled = false;
-
-        // Cancel the original 10-second auto-destroy to avoid conflicts with animation events
-        CancelInvoke(nameof(Destroy));
+        if (hitCollider != null)
+            hitCollider.enabled = false;
 
         // Avoid getting stuck
-        Destroy(gameObject, hitDestroyDelay);
+        CombatObjectPool.ReleaseOrDestroy(gameObject, hitDestroyDelay);
     }
 
     // Destroy after the hit animation finishes
     public void DestroyAfterHit()
     {
-        Destroy(gameObject);
+        CombatObjectPool.ReleaseOrDestroy(gameObject);
     }
 }

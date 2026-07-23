@@ -153,7 +153,9 @@ public class PlayerMove : MonoBehaviour
     private static void ConfigureMovementDamping(Rigidbody2D rigidbody)
     {
         string sceneName = SceneManager.GetActiveScene().name;
-        bool disableMovementDamping = sceneName == "FirstPass_1" || sceneName == "SecondPassSence";
+        bool disableMovementDamping = sceneName == "FirstPass_1" ||
+                                      sceneName == "FirstPass_V2" ||
+                                      sceneName == "SecondPassSence";
 
         rigidbody.interpolation = RigidbodyInterpolation2D.Interpolate;
 

@@ -71,8 +71,19 @@ public class FireMonAttack : EnemyAttack
         //Vector2 faceDir = directionTracker.LastDirection;
 
         // Spawn the fireball and set its facing direction
-        GameObject fireball = Instantiate(fireballPrefab, firePoint.position, Quaternion.identity);
+        GameObject fireball = CombatObjectPool.RentPrefab(fireballPrefab, firePoint.position, Quaternion.identity);
+        if (fireball == null)
+        {
+            return;
+        }
+
         fireball.transform.right = fireToPlayerDir; // Fireball facing = enemy facing direction
+
+        FireBall fireBallComponent;
+        if (fireball.TryGetComponent(out fireBallComponent))
+        {
+            fireBallComponent.Initialize();
+        }
 
       
 

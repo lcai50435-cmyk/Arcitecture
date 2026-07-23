@@ -9,6 +9,7 @@ public class CharacterDeathBase : MonoBehaviour
     protected CharacterCore core;
     private bool deathTriggered;
     private bool deathCompleted;
+    private RigidbodyType2D initialBodyType;
 
     public event Action OnDeathSequenceCompleted;
 
@@ -18,6 +19,10 @@ public class CharacterDeathBase : MonoBehaviour
         characterRigidbody = GetComponent<Rigidbody2D>();
         anim = GetComponent<Animator>();
         core = GetComponent<CharacterCore>();
+        if (characterRigidbody != null)
+        {
+            initialBodyType = characterRigidbody.bodyType;
+        }
     }
 
     public void TriggerCharacterDie()
@@ -107,7 +112,58 @@ public class CharacterDeathBase : MonoBehaviour
 
         deathCompleted = true;
         OnDeathSequenceCompleted?.Invoke();
-        Destroy(gameObject);
+        CombatObjectPool.ReleaseOrDestroy(gameObject);
+    }
+
+    public void ResetForReuse()
+    {
+        StopAllCoroutines();
+        deathTriggered = false;
+        deathCompleted = false;
+
+        if (characterCollider != null)
+        {
+            characterCollider.enabled = true;
+        }
+
+        if (characterRigidbody != null)
+        {
+            characterRigidbody.velocity = Vector2.zero;
+            characterRigidbody.angularVelocity = 0f;
+            characterRigidbody.bodyType = initialBodyType;
+        }
+
+        CharacterAttack attackBehaviour = GetComponent<CharacterAttack>();
+        if (attackBehaviour != null)
+        {
+            attackBehaviour.enabled = true;
+        }
+
+        EnemyMove enemyMove = GetComponent<EnemyMove>();
+        if (enemyMove != null)
+        {
+            enemyMove.enabled = true;
+            enemyMove.StopMovement();
+        }
+
+        EnemyStatsManager enemyStats = GetComponent<EnemyStatsManager>();
+        if (enemyStats != null)
+        {
+            enemyStats.enabled = true;
+            enemyStats.ResetState();
+        }
+
+        EnemyChase enemyChase = GetComponent<EnemyChase>();
+        if (enemyChase != null)
+        {
+            enemyChase.enabled = true;
+        }
+
+        if (anim != null)
+        {
+            anim.Rebind();
+            anim.Update(0f);
+        }
     }
 
     private System.Collections.IEnumerator DestroyAfterDelayRoutine()

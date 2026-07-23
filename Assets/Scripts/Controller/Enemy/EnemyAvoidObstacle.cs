@@ -47,6 +47,9 @@ public class EnemyAvoidObstacle : MonoBehaviour
     private readonly Dictionary<Vector2Int, Vector2Int> cameFrom = new Dictionary<Vector2Int, Vector2Int>();
     private readonly Dictionary<Vector2Int, int> gScore = new Dictionary<Vector2Int, int>();
     private readonly List<Vector2Int> openSet = new List<Vector2Int>();
+    private readonly List<Vector2Int> orderedNeighbors = new List<Vector2Int>(4);
+    private readonly List<Vector2Int> pathScratch = new List<Vector2Int>();
+    private readonly Collider2D[] overlapResults = new Collider2D[32];
 
     private Vector2Int cachedGoalCell;
     private Vector2 cachedDestination;
@@ -56,6 +59,7 @@ public class EnemyAvoidObstacle : MonoBehaviour
     private Vector2Int pathStartCell;
     private Vector2 lastResolvedDirection;
     private float lastResolvedDirectionTime;
+    private bool navigationReferencesResolved;
 
     private static readonly Vector2[] WorldDirections =
     {
@@ -146,10 +150,15 @@ public class EnemyAvoidObstacle : MonoBehaviour
 
         if (needRepath)
         {
-            BuildPath(startCell, goalCell, preferredDirection);
-            cachedGoalCell = goalCell;
-            cachedDestination = destination;
-            nextRepathTime = Time.time + repathInterval;
+            if (EnemyNavigationBudget.TryConsumePathRequest())
+            {
+                BuildPath(startCell, goalCell, preferredDirection);
+                cachedGoalCell = goalCell;
+                cachedDestination = destination;
+                nextRepathTime = Time.time + Mathf.Max(
+                    repathInterval,
+                    GameplayPerformanceSettings.Profile.MinimumRepathInterval);
+            }
         }
 
         AdvancePathIndex(currentPos);
@@ -211,6 +220,11 @@ public class EnemyAvoidObstacle : MonoBehaviour
 
     private void ResolveNavigationReferences()
     {
+        if (navigationReferencesResolved)
+        {
+            return;
+        }
+
         if (autoFindObstacleTilemaps)
         {
             AutoFindObstacleTilemaps();
@@ -225,6 +239,8 @@ public class EnemyAvoidObstacle : MonoBehaviour
         {
             AutoFindNavigationGrid();
         }
+
+        navigationReferencesResolved = true;
     }
 
     private void AutoFindObstacleTilemaps()
@@ -235,7 +251,7 @@ public class EnemyAvoidObstacle : MonoBehaviour
             return;
         }
 
-        Tilemap[] tilemaps = FindObjectsOfType<Tilemap>(true);
+        Tilemap[] tilemaps = EnemyNavigationSceneContext.Tilemaps;
         for (int i = 0; i < tilemaps.Length; i++)
         {
             Tilemap tilemap = tilemaps[i];
@@ -272,7 +288,7 @@ public class EnemyAvoidObstacle : MonoBehaviour
             }
         }
 
-        GridLayout[] grids = FindObjectsOfType<GridLayout>(true);
+        GridLayout[] grids = EnemyNavigationSceneContext.Grids;
         if (grids.Length > 0)
         {
             navigationGrid = grids[0];
@@ -287,10 +303,10 @@ public class EnemyAvoidObstacle : MonoBehaviour
             return;
         }
 
-        TilemapCollider2D[] tilemapColliders = FindObjectsOfType<TilemapCollider2D>(true);
-        for (int i = 0; i < tilemapColliders.Length; i++)
+        Collider2D[] sceneColliders = EnemyNavigationSceneContext.Colliders;
+        for (int i = 0; i < sceneColliders.Length; i++)
         {
-            TilemapCollider2D tilemapCollider = tilemapColliders[i];
+            TilemapCollider2D tilemapCollider = sceneColliders[i] as TilemapCollider2D;
             if (tilemapCollider == null || tilemapCollider.isTrigger)
             {
                 continue;
@@ -311,10 +327,9 @@ public class EnemyAvoidObstacle : MonoBehaviour
             }
         }
 
-        Collider2D[] colliders = FindObjectsOfType<Collider2D>(true);
-        for (int i = 0; i < colliders.Length; i++)
+        for (int i = 0; i < sceneColliders.Length; i++)
         {
-            Collider2D collider = colliders[i];
+            Collider2D collider = sceneColliders[i];
             if (collider == null || collider.isTrigger || collider.transform.IsChildOf(transform))
             {
                 continue;
@@ -450,7 +465,7 @@ public class EnemyAvoidObstacle : MonoBehaviour
                 return;
             }
 
-            List<Vector2Int> orderedNeighbors = GetOrderedNeighbors(current, goalCell, preferredDirection);
+            GetOrderedNeighbors(current, goalCell, preferredDirection);
             for (int i = 0; i < orderedNeighbors.Count; i++)
             {
                 Vector2Int neighbor = orderedNeighbors[i];
@@ -494,21 +509,21 @@ public class EnemyAvoidObstacle : MonoBehaviour
     {
         currentPath.Clear();
 
-        List<Vector2Int> cellPath = new List<Vector2Int>();
+        pathScratch.Clear();
         Vector2Int current = endCell;
-        cellPath.Add(current);
+        pathScratch.Add(current);
 
         while (current != startCell && cameFrom.TryGetValue(current, out Vector2Int parent))
         {
             current = parent;
-            cellPath.Add(current);
+            pathScratch.Add(current);
         }
 
-        cellPath.Reverse();
+        pathScratch.Reverse();
 
-        for (int i = 1; i < cellPath.Count; i++)
+        for (int i = 1; i < pathScratch.Count; i++)
         {
-            currentPath.Add(cellPath[i]);
+            currentPath.Add(pathScratch[i]);
         }
     }
 
@@ -595,9 +610,9 @@ public class EnemyAvoidObstacle : MonoBehaviour
         return bestIndex;
     }
 
-    private List<Vector2Int> GetOrderedNeighbors(Vector2Int current, Vector2Int goal, Vector2 preferredDirection)
+    private void GetOrderedNeighbors(Vector2Int current, Vector2Int goal, Vector2 preferredDirection)
     {
-        List<Vector2Int> neighbors = new List<Vector2Int>(4);
+        orderedNeighbors.Clear();
         Vector2 goalWorldDelta = GetCellCenterWorld(goal) - GetCellCenterWorld(current);
 
         Vector2 primaryDirection = preferredDirection != Vector2.zero
@@ -609,7 +624,7 @@ public class EnemyAvoidObstacle : MonoBehaviour
             primaryDirection = Vector2.right;
         }
 
-        AddNeighborIfMissing(neighbors, current + WorldDirectionToCellDelta(primaryDirection));
+        AddNeighborIfMissing(orderedNeighbors, current + WorldDirectionToCellDelta(primaryDirection));
 
         Vector2 secondaryDirection;
         if (Mathf.Abs(primaryDirection.x) > 0.1f)
@@ -621,14 +636,12 @@ public class EnemyAvoidObstacle : MonoBehaviour
             secondaryDirection = goalWorldDelta.x >= 0f ? Vector2.right : Vector2.left;
         }
 
-        AddNeighborIfMissing(neighbors, current + WorldDirectionToCellDelta(secondaryDirection));
+        AddNeighborIfMissing(orderedNeighbors, current + WorldDirectionToCellDelta(secondaryDirection));
 
         for (int i = 0; i < WorldDirections.Length; i++)
         {
-            AddNeighborIfMissing(neighbors, current + WorldDirectionToCellDelta(WorldDirections[i]));
+            AddNeighborIfMissing(orderedNeighbors, current + WorldDirectionToCellDelta(WorldDirections[i]));
         }
-
-        return neighbors;
     }
 
     private void AddNeighborIfMissing(List<Vector2Int> neighbors, Vector2Int candidate)
@@ -741,10 +754,10 @@ public class EnemyAvoidObstacle : MonoBehaviour
 
     private bool IsBlockedByObstacleColliders(Vector2 point)
     {
-        Collider2D[] overlaps = Physics2D.OverlapBoxAll(point, GetEffectiveProbeSize(), 0f);
-        for (int i = 0; i < overlaps.Length; i++)
+        int overlapCount = Physics2D.OverlapBoxNonAlloc(point, GetEffectiveProbeSize(), 0f, overlapResults);
+        for (int i = 0; i < overlapCount; i++)
         {
-            if (IsKnownObstacleCollider(overlaps[i]))
+            if (IsKnownObstacleCollider(overlapResults[i]))
             {
                 return true;
             }

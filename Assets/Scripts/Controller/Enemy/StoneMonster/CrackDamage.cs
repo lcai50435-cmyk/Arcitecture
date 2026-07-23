@@ -11,6 +11,11 @@ public class CrackDamage : MonoBehaviour
         sourceStatsManager = statsManager;
     }
 
+    private void OnDisable()
+    {
+        sourceStatsManager = null;
+    }
+
     // The collision matrix already filters this, so anything entering here must be the player
     private void OnTriggerEnter2D(Collider2D other)
     {

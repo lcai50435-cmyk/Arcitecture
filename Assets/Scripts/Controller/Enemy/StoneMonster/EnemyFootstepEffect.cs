@@ -56,11 +56,15 @@ public class EnemyFootstepEffect : MonoBehaviour
         lastSpawnTime = Time.time;
 
         // Spawn crack
-        GameObject crack = Instantiate(
+        GameObject crack = CombatObjectPool.RentPrefab(
             crackEffectPrefab,
             enemyTransform.position,
             Quaternion.identity
         );
+        if (crack == null)
+        {
+            return;
+        }
 
         SpriteRenderer crackRenderer = crack.GetComponent<SpriteRenderer>();
         if (crackRenderer != null)
@@ -74,8 +78,7 @@ public class EnemyFootstepEffect : MonoBehaviour
             crackDamage.BindSource(statsManager);
         }
 
-        // Auto-destroy
-        Destroy(crack, effectDuration);
+        CombatObjectPool.ReleaseOrDestroy(crack, effectDuration);
     }
 
     private bool CanSpawnFootstepCrack()

@@ -14,6 +14,7 @@ public sealed class ProjectedShadowFollower : MonoBehaviour
     private const float EllipseHeightFactor = 0.68f;
     private const float MinimumShadowWidth = 0.20f;
     private const float MinimumShadowHeight = 0.08f;
+    private const float ShadowRefreshInterval = 0.1f;
 
     [SerializeField] private Vector3 localOffset = new Vector3(0.18f, -0.28f, 0f);
     [SerializeField] private Vector3 scaleMultiplier = new Vector3(1.1f, 0.42f, 1f);
@@ -24,6 +25,7 @@ public sealed class ProjectedShadowFollower : MonoBehaviour
 
     private SpriteRenderer sourceRenderer;
     private SpriteRenderer shadowRenderer;
+    private float nextShadowRefreshTime;
 
     public void Configure(
         SpriteRenderer sourceRenderer,
@@ -55,6 +57,12 @@ public sealed class ProjectedShadowFollower : MonoBehaviour
 
     private void LateUpdate()
     {
+        if (Time.unscaledTime < nextShadowRefreshTime)
+        {
+            return;
+        }
+
+        nextShadowRefreshTime = Time.unscaledTime + ShadowRefreshInterval;
         if (sourceRenderer == null)
         {
             sourceRenderer = ResolveSourceRenderer();

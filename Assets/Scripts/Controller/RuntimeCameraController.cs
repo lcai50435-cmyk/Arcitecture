@@ -765,6 +765,7 @@ public sealed class RuntimeCameraController : MonoBehaviour
     private bool ShouldDisableCameraDamping()
     {
         return string.Equals(activeSceneName, "FirstPass_1", System.StringComparison.Ordinal) ||
+               string.Equals(activeSceneName, "FirstPass_V2", System.StringComparison.Ordinal) ||
                string.Equals(activeSceneName, "SecondPassSence", System.StringComparison.Ordinal);
     }
 

@@ -22,13 +22,13 @@ AnimationClip:
     curve:
     - time: 0
       value: {fileID: -1470064625, guid: 6d74f90239b70124abfe82b7d2183595, type: 3}
-    - time: 0.16666667
+    - time: 0.09756097
       value: {fileID: 1878419242, guid: 4be71c3ce40c27b4cb37f1c32c7b419b, type: 3}
-    - time: 0.33333334
+    - time: 0.19512194
       value: {fileID: 1878419242, guid: 4be71c3ce40c27b4cb37f1c32c7b419b, type: 3}
-    - time: 0.5
+    - time: 0.29268292
       value: {fileID: 1761361625, guid: 6d74f90239b70124abfe82b7d2183595, type: 3}
-    - time: 0.6666667
+    - time: 0.3902439
       value: {fileID: 1761361625, guid: 6d74f90239b70124abfe82b7d2183595, type: 3}
     attribute: m_Sprite
     path: 
@@ -62,7 +62,7 @@ AnimationClip:
     m_AdditiveReferencePoseClip: {fileID: 0}
     m_AdditiveReferencePoseTime: 0
     m_StartTime: 0
-    m_StopTime: 0.68333334
+    m_StopTime: 0.40691057
     m_OrientationOffsetY: 0
     m_Level: 0
     m_CycleOffset: 0
@@ -82,7 +82,14 @@ AnimationClip:
   m_HasGenericRootTransform: 0
   m_HasMotionFloatCurves: 0
   m_Events:
-  - time: 0.6666667
+  - time: 0.2
+    functionName: OnAttackRecovery
+    data: 
+    objectReferenceParameter: {fileID: 0}
+    floatParameter: 0
+    intParameter: 0
+    messageOptions: 0
+  - time: 0.4
     functionName: OnAttackEnd
     data: 
     objectReferenceParameter: {fileID: 0}
